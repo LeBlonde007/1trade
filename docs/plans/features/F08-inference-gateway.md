@@ -4,7 +4,9 @@
 
 ## Spec
 
-OpenAI-compatible Go gateway. One base URL, drop-in replacement for `openai.OpenAI(base_url=...)`.
+**Exascale's own inference API** (Go gateway) for text, code, speech, image, and video. It is
+wire-compatible with the OpenAI request/response format, so a customer migrates by changing a single
+base URL — a migration convenience, not a dependency. Lead with "the Exascale API."
 
 Endpoints:
 

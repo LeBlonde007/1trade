@@ -1,13 +1,18 @@
 # Agent plan — `inference-ml`
 
 > **Critical-path under the GTM pivot.** Fastest revenue path: AI startups pay-per-use against
-> the OpenAI-compatible API.
+> **Exascale's own platform API** (text, code, speech, image, video).
+
+> **Framing (positioning):** this is *our* platform and *our* API. We keep it **wire-compatible
+> with the OpenAI request/response format** purely as a drop-in-migration convenience (a customer
+> switches by changing one base URL) — that's a feature, not our identity. Lead with "the Exascale
+> API"; treat OpenAI-wire-compatibility as a migration detail, never as what we are.
 
 ## 1. Scope under the GTM pivot
 
 The inference layer goes from "important" to "the headline product for Phase 1." Everything in
 the original agent definition stays; the emphasis shifts to **DX for AI-startup builders**:
-OpenAI compatibility must be flawless, latency must be competitive, the catalog must be current.
+the API must be flawless, drop-in migration must be frictionless, latency competitive, catalog current.
 
 ## 2. Features owned
 

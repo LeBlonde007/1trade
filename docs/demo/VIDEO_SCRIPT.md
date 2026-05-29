@@ -13,13 +13,14 @@
 
 **VO (0:00):** *"AI compute is the new oil — but it trades like real estate: no public price, no
 order book, no way to hedge. Every commodity that became liquid made a fortune for whoever built
-the venue. Compute is the last one without it."*
+the venue. Compute is the last one without it — and Exascale is the world's first exchange and
+platform for AI and GPU markets."*
 
 [Cut to `/inference` — pick a model, run a prompt, tokens stream, a credit debit ticks down.]
 
-**VO (0:12):** *"So we're building the venue — but we're earning revenue on the way there. Today,
-an AI startup points the OpenAI SDK at one base URL and runs inference on a curated catalog of
-state-of-the-art models. Pay per use."*
+**VO (0:12):** *"And we're already earning revenue. An AI startup connects to our platform — one
+API endpoint — and runs a curated catalog of state-of-the-art models across text, code, speech,
+image, and video. Pay per use."*
 
 [Cut to `/compute/new` → `/compute` list showing an H100 box spinning up.]
 
@@ -83,7 +84,7 @@ hash in the audit chain."*
 ### + The financial core is real (~30s) — the credibility beat
 [`/enterprise/audit`: click a row → cryptographic detail (block, prev-hash, this-hash, algorithm).]
 
-**VO:** *"Most companies at this stage have this on a slide. Ours is running. The credit ledger is
+**VO:** *"This is what others put on a roadmap — ours is already live. The credit ledger is
 append-only, hash-chained, exact fixed-point money math, atomic, idempotent, per-tenant isolated —
 deployed to a Kubernetes cluster and verified end-to-end. A purchase debits, the balance updates,
 the chain re-verifies. That's the part that has to be bulletproof before anyone touches real

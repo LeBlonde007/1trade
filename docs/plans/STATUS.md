@@ -47,7 +47,7 @@ Exascale
 │   ├── ⬜ F04 exascale CLI
 │   ├── ⬜ F06 billing          Stripe → ACH/wire → multi-currency
 │   ├── ⬜ F07 credit conversion (AI↔sub↔gpu, 1% spread — ADR-0002 provisional)
-│   ├── ⬜ F08 inference gateway (OpenAI-compatible, debit on usage)
+│   ├── ⬜ F08 inference gateway (our platform API: text/code/speech/image/video; OpenAI-wire-compatible for drop-in migration; debit on usage)
 │   ├── ⬜ F09 vLLM (first 3 models) · F10 catalog · F11 multi-model-per-GPU
 │   ├── ⬜ F12 compute control plane · F13 GPU lifecycle · F14 reserved · F15 clusters
 │   └── ⬜ F16 supply abstraction · F17 DC onboarding · F18 payouts · F19 GPU attestation

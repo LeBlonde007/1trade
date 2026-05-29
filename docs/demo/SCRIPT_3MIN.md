@@ -15,12 +15,14 @@
 AI compute is the most valuable commodity on earth — and the hardest to buy. There's no public
 price for an H100-hour, no order book, no way to hedge a budget. Every commodity that became liquid
 — oil, electricity, currencies — made a fortune for whoever built the marketplace. Compute is the
-last one without one. Exascale is building it — and we're already earning revenue on the way there.
+last one without one. Exascale is the world's first exchange and platform for AI and GPU compute —
+and it's already earning revenue.
 
 **(0:24 — Inference)**
-It starts with inference. An AI startup points the OpenAI SDK at a single URL and runs a curated
-catalog of state-of-the-art models — text, code, speech, image. Pay per use, metered to the token.
-One line of config, and they're live. It's the fastest path to the first dollar.
+It starts with inference. An AI startup connects to our platform — one API endpoint — and runs a
+curated catalog of state-of-the-art models across text, code, speech, image, and video. Pay per
+use, metered to the token. A single integration, and they're live. It's the fastest path to the
+first dollar.
 
 **(0:46 — Compute + credits)**
 The same account rents GPUs on demand — one command to a running H100, or reserved capacity at a
@@ -28,10 +30,10 @@ discount. Inference and compute both draw down from prepaid credits the customer
 Cash in before consumption — and a real-time balance they can actually trust.
 
 **(1:08 — The ledger: the credibility beat)**
-And here's what most companies at our stage only have on a slide. Every credit movement runs
-through a ledger that's append-only and cryptographically hash-chained — tamper-evident, exact to
-the micro-credit, fully audited. It's built, it's deployed, and it's verified. This is the
-compliance backbone a CFO will sign off on.
+And this is what others put on a roadmap — ours is already live. Every credit movement runs through
+a ledger that's append-only and cryptographically hash-chained — tamper-evident, exact to the
+micro-credit, fully audited. Built, deployed, and verified today. It's the compliance backbone a
+CFO signs off on.
 
 **(1:32 — Enterprise)**
 For enterprises, that becomes control: single sign-on, sub-accounts with per-team budgets, live
@@ -66,7 +68,7 @@ customers, and open the market. Exascale — the commodity market for AI compute
 | 0:00 | "AI compute is the most valuable…" | `/` landing — hold on headline + the live index ticker | Let the ticker tick; slow scroll |
 | 0:24 | "It starts with inference." | `/inference` — pick a model, type a prompt, tokens stream, credit balance ticks down | Show the live token + credit debit |
 | 0:46 | "The same account rents GPUs…" | `/compute/new` (type=H100, count) → `/compute` list (instance spinning up) → `/wallet` balances | Show "running" state + the credit balance |
-| 1:08 | "And here's what most companies…" | `/enterprise/audit` — click a row → cryptographic detail (block, prev-hash, this-hash) → hover the green chain-integrity badge | This is the hero shot — hold on the hash detail |
+| 1:08 | "And this is what others put on a roadmap…" | `/enterprise/audit` — click a row → cryptographic detail (block, prev-hash, this-hash) → hover the green chain-integrity badge | This is the hero shot — hold on the hash detail |
 | 1:32 | "For enterprises, that becomes control…" | `/enterprise/billing` (burn meter / MTD / projected) → `/enterprise/teams` (budgets) → `/enterprise/sso` | Let the burn meter animate |
 | 1:52 | "Supply comes from our own datacenter…" | `/datacenter` dashboard (capacity, fill rate, settlements) → `/datacenter/register` | KPI strip animating |
 | 2:12 | "Which is what powers the market." | `/trade` (candles tick, order book flickers, tape rolls) → `/markets` → `/portfolio` (P&L vs index) | The Bloomberg-density money shot; let data move |

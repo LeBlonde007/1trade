@@ -21,7 +21,7 @@
 
 | Route | What's on screen | Demo beat |
 |---|---|---|
-| `/inference` | Inference playground — pick a model, run a prompt, see tokens + live credit debit | "One base-URL change; pay per use" — the fastest revenue path |
+| `/inference` | Inference playground — pick a model, run a prompt, see tokens + live credit debit | Our platform API — text/code/speech/image/video, pay per use — the fastest revenue path |
 | `/compute` · `/compute/new` · `/compute/[id]` | GPU instances: list, create (type/count), instance detail | `exascale gpu create` → running box; on-demand + reserved |
 | `/wallet` · `/wallet/buy` | Credit balances per type, transactions, buy-credits flow | Prepaid credits; real-time balance — ties to the live ledger |
 | `/settings` | Account, API keys, security | DX + programmatic access |

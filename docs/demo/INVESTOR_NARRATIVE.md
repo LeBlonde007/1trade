@@ -9,8 +9,8 @@
 
 ## 1. One sentence
 
-**Exascale is building the commodity market for AI compute — and we're earning revenue on the way
-there by selling inference and GPU compute to AI startups today, paid for in prepaid credits.**
+**Exascale is the world's first exchange and platform for AI and GPU compute — already earning
+revenue by selling inference and GPU compute to AI startups, paid for in prepaid credits.**
 
 ## 2. The thesis (the big vision)
 
@@ -36,9 +36,9 @@ real activity.**
 
 ## 4. What we sell today (Phase 1 — the platform)
 
-- **Inference** — a curated catalog of state-of-the-art open models (text, code, speech, image,
-  embeddings) behind an **OpenAI-compatible API**. One base-URL change and an AI startup is live.
-  Pay-per-use. This is the fastest path to the first dollar.
+- **Inference** — our own platform API serving a curated catalog of state-of-the-art models across
+  **text, code, speech, image, and video**. A single integration and an AI startup is live;
+  pay-per-use, metered to the token. The fastest path to the first dollar.
 - **GPU compute** — on-demand H100/H200, reserved capacity (discounted, prepaid as GPU credits),
   CLI-first. From `exascale gpu create` to a running box in under 90 seconds (target).
 - **Prepaid credits** — buy in advance, redeem against inference or compute. Improves our cash flow
@@ -70,8 +70,8 @@ As of 2026-05, the platform is **real software, much of it running**:
   cryptographically **hash-chained** (every movement is `sha256(prev ‖ row)`, tamper-evident),
   exact **fixed-point** money math (no floating-point error), **atomic** balance updates,
   **idempotent** and **per-tenant-isolated** — is built, deployed to the cluster, and verified
-  end-to-end (a purchase debits, the balance updates, the audit chain verifies). This is the part
-  most pre-seed companies only have on a slide.
+  end-to-end (a purchase debits, the balance updates, the audit chain verifies). This is what other
+  platforms put on a roadmap; ours is already running.
 - **Engineering discipline that institutions require** — contract-first service architecture,
   a per-function documentation mandate, automated secrets scanning, security review gates on
   anything touching money, and an audit trail on every credit movement. The kind of foundation a
@@ -94,8 +94,8 @@ procurement are a warm pipeline, not the v1 wedge.
   overpay and under-optimize.
 - **Supply fragmentation** — hundreds of mid-tier datacenters now hold real GPU capacity with no
   route to AI buyers except a hyperscaler.
-- **The clearing stack is commodity software now** — Kubernetes, hash-chained audit, OpenAI-compat
-  APIs. What took an exchange a billion dollars to build, we run on rented servers.
+- **The clearing stack is commodity software now** — Kubernetes, hash-chained audit, standardized
+  model APIs. What took an exchange a billion dollars to build, we run on rented servers.
 - **A neutral venue is structurally un-buildable by the incumbents** — AWS/Azure/GCP won't invite
   their own customers to comparison-shop them; frontier labs want to *be* the buyer, not the venue.
 
