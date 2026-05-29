@@ -1,0 +1,92 @@
+# Exascale — golangci-lint config shared by every Go service + the CLI.
+# Enforces the non-negotiables in docs/plans/ENGINEERING_STANDARDS.md:
+#   - per-function doc comments (revive `exported` + godot)
+#   - error wrapping / no swallowed errors (errcheck, wrapcheck)
+#   - no float math sneaking into money paths (reviewed; flagged via forbidigo below)
+#   - security smells (gosec)
+# Run: golangci-lint run ./...
+# Owner: infra-sre (CI wiring) + tech-lead (rule changes).
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  # Start from a curated set rather than `enable-all` so the bar is intentional.
+  disable-all: true
+  enable:
+    - errcheck        # every returned error is handled
+    - govet           # suspicious constructs
+    - staticcheck     # the big correctness linter
+    - ineffassign     # ineffectual assignments
+    - unused          # dead code
+    - revive          # style + the exported-symbol doc-comment rule
+    - godot           # comments end in a period (doc-comment discipline)
+    - gosec           # security smells (G-series rules)
+    - bodyclose       # http response bodies closed
+    - sqlclosecheck   # sql rows/statements closed
+    - rowserrcheck    # sql rows.Err() checked
+    - contextcheck    # context propagated correctly
+    - errorlint       # errors.Is/As + %w wrapping
+    - wrapcheck       # external errors are wrapped with context
+    - noctx           # no http requests without context
+    - forbidigo       # ban specific patterns (see below)
+    - gocritic        # opinionated correctness/perf/style
+    - misspell        # typos in comments/strings
+    - nilerr          # don't return nil on a non-nil error
+    - prealloc        # preallocate slices where it matters
+
+linters-settings:
+  revive:
+    rules:
+      # Require doc comments on exported symbols (the comment mandate, machine-enforced).
+      - name: exported
+        severity: error
+        arguments:
+          - "checkPrivateReceivers"
+          - "sayRepetitiveInsteadOfStutters"
+      - name: package-comments
+      - name: error-strings
+      - name: error-return
+      - name: context-as-argument
+      - name: unhandled-error
+
+  godot:
+    scope: declarations
+    capital: false
+
+  forbidigo:
+    # Guardrails the standards call out. The money-path float ban is partly social
+    # (decimal lib is the rule) but we forbid the most common foot-guns outright.
+    forbid:
+      - p: '^fmt\.Print.*$'
+        msg: "use the structured logger, not fmt.Print*"
+      - p: '^panic\($'
+        msg: "no panic in request paths; return an error (init-only panics are OK — nolint with reason)"
+
+  gosec:
+    excludes:
+      - G104   # handled by errcheck/wrapcheck instead (avoid double-reporting)
+
+  wrapcheck:
+    ignoreSigs:
+      - .Errorf(
+      - errors.New(
+      - errors.Wrap(
+      - errors.Wrapf(
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  exclude-rules:
+    # Tests may use fmt and looser error handling for readability.
+    - path: _test\.go
+      linters:
+        - forbidigo
+        - wrapcheck
+        - gosec
+        - errcheck
+    # main.go is allowed to panic on unrecoverable startup failure.
+    - path: cmd/.*/main\.go
+      linters:
+        - forbidigo

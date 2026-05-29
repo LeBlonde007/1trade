@@ -1,0 +1,54 @@
+# Exascale — CODEOWNERS. The tracking layer: every path routes to its owning agent's human
+# reviewer, so nothing changes in someone's service without their review. Mirrors
+# docs/plans/REPO_LAYOUT.md §5 and the agent roster in docs/plans/README.md §3.
+#
+# Replace the @placeholders with the GitHub handle/team that owns each agent's domain.
+# A change touching a shared CONTRACT additionally requires @tech-lead (see the contracts block).
+
+# --- default: tech-lead sees everything not otherwise owned ---
+*                                   @tech-lead
+
+# --- shared contracts: tech-lead owns; security-compliance co-reviews money/auth surfaces ---
+/docs/contracts/                    @tech-lead @security-compliance
+/docs/contracts/credit-types.md     @tech-lead @credit-ledger @security-compliance
+/docs/plans/                        @tech-lead
+
+# --- platform / cross-cutting ---
+/services/platform-core/            @platform-core
+/apps/cli/                          @platform-core
+/deploy/                            @infra-sre
+/Makefile                           @infra-sre
+/.github/                           @infra-sre
+/.golangci.yml                      @infra-sre @tech-lead
+/.pre-commit-config.yaml            @infra-sre
+/.editorconfig                      @infra-sre
+
+# --- credit / financial core ---
+/services/credit-ledger/            @credit-ledger @security-compliance
+
+# --- inference ---
+/services/inference-gateway/        @inference-ml
+/services/inference-runtime/        @inference-ml
+
+# --- compute / supply ---
+/services/compute-control/          @compute-platform
+/deploy/k8s/compute/                @compute-platform
+/services/supply-service/           @settlement-trust
+/deploy/k8s/supply/                 @settlement-trust
+
+# --- index (keep-warm) ---
+/services/index-service/            @index-service
+
+# --- trading domain (paused / keep-warm) ---
+/services/matching-engine/          @matching-engine @security-compliance
+/services/market-maker/             @market-maker
+/services/surveillance/             @surveillance
+
+# --- frontend ---
+/apps/web/                          @trading-frontend
+/Exascale Frontend/                 @trading-frontend
+
+# --- security-sensitive surfaces: security-compliance co-reviews regardless of path owner ---
+# (GitHub applies the LAST matching rule, so keep these specific patterns below the dir rules.)
+/services/platform-core/internal/auth/      @platform-core @security-compliance
+/services/credit-ledger/migrations/         @credit-ledger @tech-lead @security-compliance

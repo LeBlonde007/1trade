@@ -1,0 +1,1636 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Exascale · EAI-IDX — AI Index</title>
+<meta name="viewport" content="width=1440, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+  :root {
+    --canvas:     #0A0B0E;
+    --elevated:   #14161B;
+    --overlay:    #1C1F26;
+    --hover:      #1F2229;
+    --text:       #E8E6E0;
+    --text-2:     #9A9A95;
+    --text-3:     #5F5F5C;
+    --border:     rgba(255,255,255,0.08);
+    --border-2:   rgba(255,255,255,0.14);
+    --brand:      #C8F25C;
+    --brand-hov:  #B8E548;
+    --accent:     #4A90E2;
+    --pos:        #19C37D;
+    --pos-sub:    rgba(25,195,125,0.12);
+    --pos-bar:    rgba(25,195,125,0.16);
+    --neg:        #EF4444;
+    --neg-sub:    rgba(239,68,68,0.12);
+    --neg-bar:    rgba(239,68,68,0.16);
+    --warn:       #F59E0B;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--canvas);
+    color: var(--text);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    line-height: 1.55;
+    font-feature-settings: 'tnum' on, 'ss01' on, 'cv11' on;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  .font-display { font-family: 'Inter Tight', 'Inter', sans-serif; }
+  .mono { font-family: 'JetBrains Mono', ui-monospace, SF Mono, Menlo, monospace; font-variant-numeric: tabular-nums; }
+  .num  { font-family: 'JetBrains Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  .pos { color: var(--pos); }
+  .neg { color: var(--neg); }
+  .muted { color: var(--text-2); }
+  .muted-2 { color: var(--text-3); }
+  .upper { text-transform: uppercase; letter-spacing: 0.18em; }
+
+  .lbl {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.20em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    font-weight: 500;
+  }
+
+  a { color: var(--text); text-decoration: none; }
+  a:hover { color: var(--brand); }
+
+  /* ============================================================
+     LAYOUT
+     ============================================================ */
+  .app {
+    display: grid;
+    grid-template-columns: 64px 1fr;
+    grid-template-rows: 56px 1fr;
+    grid-template-areas:
+      "topbar topbar"
+      "sidebar main";
+    width: 100vw;
+    min-height: 100vh;
+  }
+  .topbar { grid-area: topbar; }
+  .sidebar { grid-area: sidebar; height: calc(100vh - 56px); position: sticky; top: 56px; }
+  .main { grid-area: main; min-width: 0; }
+
+  /* ============================================================
+     TOP BAR (same chrome as trading dashboard)
+     ============================================================ */
+  .topbar {
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+    padding: 0 16px;
+    gap: 24px;
+    background: var(--canvas);
+    height: 56px;
+    position: sticky;
+    top: 0;
+    z-index: 30;
+  }
+  .topbar .brand {
+    font-family: 'Inter Tight';
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: -0.01em;
+    display: flex; align-items: center; gap: 8px;
+    padding-right: 16px;
+    border-right: 1px solid var(--border);
+    height: 36px;
+  }
+  .topbar .brand .mark {
+    width: 12px; height: 12px;
+    background: var(--brand);
+  }
+  .breadcrumbs {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--text-3);
+    letter-spacing: 0.02em;
+  }
+  .breadcrumbs a { color: var(--text-2); }
+  .breadcrumbs a:hover { color: var(--text); }
+  .breadcrumbs .sep { color: var(--text-3); opacity: 0.6; }
+  .breadcrumbs .cur { color: var(--text); }
+
+  .top-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .top-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--elevated);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    height: 32px;
+    padding: 0 10px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background 120ms;
+  }
+  .top-pill:hover { background: var(--hover); }
+  .icon-btn {
+    width: 32px; height: 32px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    color: var(--text-2);
+    cursor: pointer;
+    position: relative;
+    transition: background 120ms, color 120ms;
+  }
+  .icon-btn:hover { background: var(--hover); color: var(--text); }
+  .icon-btn .badge {
+    position: absolute;
+    top: -4px; right: -4px;
+    background: var(--brand);
+    color: var(--canvas);
+    font-size: 9px;
+    font-weight: 700;
+    min-width: 14px;
+    height: 14px;
+    border-radius: 999px;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0 4px;
+  }
+  .avatar {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: var(--brand);
+    color: var(--canvas);
+    font-weight: 700;
+    font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+
+  /* ============================================================
+     SIDEBAR
+     ============================================================ */
+  .sidebar {
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 8px 0;
+    background: var(--canvas);
+  }
+  .nav-item {
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-3);
+    cursor: pointer;
+    border-left: 3px solid transparent;
+    position: relative;
+    transition: color 120ms, background 120ms;
+  }
+  .nav-item:hover { color: var(--text); background: rgba(255,255,255,0.02); }
+  .nav-item.active {
+    color: var(--brand);
+    background: rgba(200,242,92,0.06);
+    border-left-color: var(--brand);
+  }
+  .nav-item .tooltip {
+    position: absolute;
+    left: 100%;
+    margin-left: 12px;
+    background: var(--overlay);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 2px;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateX(-4px);
+    transition: opacity 120ms, transform 120ms;
+    white-space: nowrap;
+    z-index: 10;
+  }
+  .nav-item:hover .tooltip { opacity: 1; transform: translateX(0); }
+  .nav-divider { height: 1px; background: var(--border); margin: 8px 12px; }
+  .sidebar .foot {
+    margin-top: auto;
+    padding: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--text-3);
+    letter-spacing: 0.08em;
+    text-align: center;
+    border-top: 1px solid var(--border);
+  }
+  .sidebar .foot .open-dot {
+    width: 6px; height: 6px;
+    background: var(--pos);
+    border-radius: 50%;
+    display: inline-block;
+    margin-bottom: 4px;
+  }
+
+  /* ============================================================
+     MAIN — page content
+     ============================================================ */
+  .main {
+    background: var(--canvas);
+    min-height: calc(100vh - 56px);
+  }
+  .page {
+    max-width: 1320px;
+    margin: 0 auto;
+    padding: 32px 40px 80px;
+  }
+
+  /* ============================================================
+     MARKET HEADER
+     ============================================================ */
+  .market-header {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 40px;
+    padding: 32px 0 48px;
+    border-bottom: 1px solid var(--border);
+  }
+  .mh-left { display: flex; flex-direction: column; gap: 8px; }
+  .mh-left .row1 {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 4px;
+  }
+  .mh-left .sym {
+    background: var(--elevated);
+    border: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 2px;
+    color: var(--text-2);
+    letter-spacing: 0.06em;
+  }
+  .mh-left .meta-pill {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .mh-left .meta-pill .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--pos);
+    position: relative;
+  }
+  .mh-left .meta-pill .dot::after {
+    content: '';
+    position: absolute; inset: -3px;
+    border-radius: 50%;
+    border: 1px solid var(--pos);
+    animation: ping 2.4s ease-out infinite;
+  }
+  @keyframes ping {
+    0%   { transform: scale(0.9); opacity: 0.6; }
+    100% { transform: scale(2);   opacity: 0; }
+  }
+  .mh-left h1 {
+    font-family: 'Inter Tight';
+    font-size: 44px;
+    font-weight: 600;
+    letter-spacing: -0.025em;
+    line-height: 1.05;
+    margin: 0;
+  }
+  .mh-price {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 88px;
+    font-weight: 600;
+    letter-spacing: -0.04em;
+    line-height: 1;
+    margin: 16px 0 12px;
+    transition: color 600ms;
+  }
+  .mh-price.flash-up   { color: var(--pos); }
+  .mh-price.flash-down { color: var(--neg); }
+  .mh-delta-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 8px;
+  }
+  .mh-delta {
+    background: var(--pos-sub);
+    color: var(--pos);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    padding: 5px 10px;
+    border-radius: 2px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+  }
+  .mh-delta.neg { background: var(--neg-sub); color: var(--neg); }
+  .mh-delta-abs {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
+    color: var(--text-2);
+  }
+  .mh-updated {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-3);
+    letter-spacing: 0.02em;
+    margin-top: auto;
+    padding-top: 12px;
+  }
+
+  .mh-right {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    align-items: flex-end;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    height: 52px;
+    padding: 0 28px;
+    font-family: 'Inter Tight';
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    border-radius: 2px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background 120ms, border-color 120ms, color 120ms, filter 120ms;
+    white-space: nowrap;
+  }
+  .btn-primary {
+    background: var(--brand);
+    color: var(--canvas);
+    width: 100%;
+  }
+  .btn-primary:hover { background: var(--brand-hov); }
+  .btn-ghost {
+    background: transparent;
+    color: var(--text-2);
+    height: auto;
+    padding: 0;
+    font-family: 'Inter';
+    font-size: 13px;
+    font-weight: 500;
+    border: none;
+    cursor: pointer;
+  }
+  .btn-ghost:hover { color: var(--text); }
+  .btn-ghost .ic { width: 14px; height: 14px; }
+
+  .mh-spark {
+    width: 100%;
+    height: 76px;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 8px 10px;
+    background: var(--canvas);
+  }
+  .mh-spark .label-row {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--text-3);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .mh-spark svg { width: 100%; height: calc(100% - 18px); display: block; overflow: visible; }
+  .mh-spark path.line {
+    fill: none;
+    stroke: var(--pos);
+    stroke-width: 1.4;
+    stroke-dasharray: 1500;
+    stroke-dashoffset: 1500;
+    animation: draw 1.4s cubic-bezier(0.2, 0, 0, 1) 0.2s forwards;
+  }
+  .mh-spark path.fill {
+    fill: var(--pos);
+    fill-opacity: 0;
+    animation: sparkFill 1.4s ease-out 0.6s forwards;
+  }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+  @keyframes sparkFill { to { fill-opacity: 0.12; } }
+
+  /* ============================================================
+     STATS GRID
+     ============================================================ */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0;
+    margin-top: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .stat {
+    padding: 24px 28px 24px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    border-right: 1px solid var(--border);
+    padding-left: 28px;
+  }
+  .stat:first-child { padding-left: 0; }
+  .stat:last-child { border-right: none; padding-right: 0; }
+  .stat .stat-lbl {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    font-weight: 500;
+  }
+  .stat .stat-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 24px;
+    font-weight: 500;
+    color: var(--text);
+    letter-spacing: -0.01em;
+  }
+  .stat .stat-sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-2);
+    letter-spacing: 0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat .stat-sub.pos { color: var(--pos); }
+  .stat .stat-sub.neg { color: var(--neg); }
+
+  /* Second row */
+  .stats-grid.row-2 { border-bottom: none; padding-bottom: 0; }
+
+  /* ============================================================
+     PRIMARY CHART
+     ============================================================ */
+  .chart-section { padding: 48px 0; }
+  .chart-section .chart-card {
+    background: var(--canvas);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .chart-section .chart-head {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .seg {
+    display: inline-flex;
+    background: var(--elevated);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .seg button {
+    background: transparent;
+    color: var(--text-2);
+    border: none;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    height: 28px;
+    padding: 0 12px;
+    cursor: pointer;
+    border-right: 1px solid var(--border);
+    transition: background 120ms, color 120ms;
+  }
+  .seg button:last-child { border-right: none; }
+  .seg button:hover { background: var(--hover); color: var(--text); }
+  .seg button.active {
+    background: rgba(200,242,92,0.10);
+    color: var(--brand);
+  }
+  .chart-head .right {
+    margin-left: auto;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .indicator-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--elevated);
+    border: 1px solid var(--border);
+    color: var(--text-2);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    padding: 0 10px;
+    height: 28px;
+    border-radius: 2px;
+    cursor: pointer;
+  }
+  .indicator-pill .x { color: var(--text-3); margin-left: 2px; }
+  .indicator-pill .x:hover { color: var(--neg); }
+  .indicator-pill:hover { background: var(--hover); color: var(--text); }
+  .add-indicator {
+    background: transparent;
+    border: 1px dashed var(--border-2);
+    color: var(--text-2);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    padding: 0 10px;
+    height: 28px;
+    border-radius: 2px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .add-indicator:hover { color: var(--text); border-color: var(--brand); }
+
+  #primaryChart { height: 520px; position: relative; }
+  #primaryChart > div { position: absolute; inset: 0; }
+
+  /* ============================================================
+     MARKET DETAILS — two columns
+     ============================================================ */
+  .details {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 56px;
+    padding: 16px 0 48px;
+    border-bottom: 1px solid var(--border);
+  }
+  .details h3 {
+    font-family: 'Inter Tight';
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    margin: 0 0 20px;
+  }
+  .details p {
+    color: var(--text-2);
+    font-size: 15px;
+    line-height: 1.65;
+    margin: 0 0 16px;
+    max-width: 60ch;
+  }
+  .details .methodology-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 12px;
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 500;
+    border-bottom: 1px solid var(--text);
+    padding-bottom: 1px;
+  }
+  .details .methodology-link:hover { color: var(--brand); border-bottom-color: var(--brand); }
+
+  .spec-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .spec-table th, .spec-table td {
+    text-align: left;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+    vertical-align: top;
+  }
+  .spec-table th {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    font-weight: 500;
+    width: 44%;
+  }
+  .spec-table td {
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .spec-table td a { color: var(--brand); border-bottom: 1px solid currentColor; padding-bottom: 1px; }
+
+  /* ============================================================
+     RELATED MARKETS
+     ============================================================ */
+  .related {
+    padding: 48px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .related h3 {
+    font-family: 'Inter Tight';
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    margin: 0 0 24px;
+  }
+  .related .grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+  .market-card {
+    background: var(--canvas);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 18px 20px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: background 120ms, border-color 120ms;
+  }
+  .market-card:hover { background: var(--elevated); border-color: var(--border-2); }
+  .market-card .sym {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-3);
+    letter-spacing: 0.06em;
+  }
+  .market-card .name {
+    font-family: 'Inter Tight';
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+  .market-card .pxrow {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .market-card .px {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text);
+    transition: color 600ms;
+  }
+  .market-card .px.flash-up { color: var(--pos); }
+  .market-card .px.flash-down { color: var(--neg); }
+  .market-card .delta {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .market-card .delta.pos { color: var(--pos); }
+  .market-card .delta.neg { color: var(--neg); }
+  .market-card svg {
+    width: 100%;
+    height: 36px;
+    display: block;
+    margin-top: 6px;
+  }
+  .market-card svg .line { fill: none; stroke-width: 1.2; }
+  .market-card svg .line.pos { stroke: var(--pos); }
+  .market-card svg .line.neg { stroke: var(--neg); }
+  .market-card svg .fill.pos { fill: var(--pos); fill-opacity: 0.08; }
+  .market-card svg .fill.neg { fill: var(--neg); fill-opacity: 0.08; }
+
+  /* ============================================================
+     OB + TAPE PREVIEW (collapsible)
+     ============================================================ */
+  .preview {
+    padding: 48px 0 64px;
+  }
+  .preview .head {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 20px;
+    cursor: pointer;
+  }
+  .preview .head h3 {
+    font-family: 'Inter Tight';
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    margin: 0;
+  }
+  .preview .head .caret {
+    color: var(--text-2);
+    transition: transform 200ms;
+  }
+  .preview.collapsed .head .caret { transform: rotate(-90deg); }
+  .preview .head .sub {
+    margin-left: auto;
+    color: var(--text-3);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+  }
+  .preview-body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    overflow: hidden;
+    transition: max-height 280ms ease-out, opacity 200ms;
+    max-height: 720px;
+  }
+  .preview.collapsed .preview-body {
+    max-height: 0;
+    opacity: 0;
+  }
+  .preview-card {
+    background: var(--canvas);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .preview-card .head-row {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .preview-card .head-row .lbl-badge {
+    background: var(--elevated);
+    color: var(--text-2);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 2px;
+    margin-left: auto;
+  }
+  .preview-cta-row {
+    display: flex;
+    justify-content: center;
+    padding-top: 24px;
+  }
+  .preview-cta-row a {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--brand);
+    font-family: 'Inter Tight';
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    padding: 12px 20px;
+    border: 1px solid var(--brand);
+    border-radius: 2px;
+    cursor: pointer;
+    transition: background 120ms;
+  }
+  .preview-cta-row a:hover { background: rgba(200,242,92,0.10); }
+
+  /* OB preview */
+  .ob-prev {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    padding: 10px 0;
+  }
+  .ob-cols {
+    display: grid;
+    grid-template-columns: 1.05fr 1fr 1fr;
+    padding: 6px 14px;
+    color: var(--text-3);
+    font-size: 9.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+  }
+  .ob-cols span { text-align: right; }
+  .ob-cols span:first-child { text-align: left; }
+  .ob-row {
+    display: grid;
+    grid-template-columns: 1.05fr 1fr 1fr;
+    padding: 0 14px;
+    height: 20px;
+    align-items: center;
+    position: relative;
+  }
+  .ob-row .bar {
+    position: absolute;
+    right: 0; top: 0; bottom: 0;
+  }
+  .ob-row.ask .bar { background: var(--neg-bar); }
+  .ob-row.bid .bar { background: var(--pos-bar); }
+  .ob-row > * { position: relative; text-align: right; }
+  .ob-row > .px { text-align: left; }
+  .ob-row.ask .px { color: var(--neg); }
+  .ob-row.bid .px { color: var(--pos); }
+  .ob-row .qty { color: var(--text); }
+  .ob-row .tot { color: var(--text-3); }
+  .ob-mid {
+    text-align: center;
+    padding: 6px 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    margin: 4px 0;
+    background: var(--elevated);
+  }
+  .ob-mid .spread {
+    color: var(--text-3);
+    font-size: 10px;
+    font-weight: 500;
+    margin-left: 8px;
+  }
+
+  /* Tape preview */
+  .tape-prev {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+  .tape-cols {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr 1fr 16px;
+    padding: 8px 14px;
+    color: var(--text-3);
+    font-size: 9.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+  }
+  .tape-cols span:nth-child(2),
+  .tape-cols span:nth-child(3) { text-align: right; }
+  .tape-row {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr 1fr 16px;
+    padding: 0 14px;
+    height: 20px;
+    align-items: center;
+    color: var(--text);
+  }
+  .tape-row.up .px { color: var(--pos); }
+  .tape-row.down .px { color: var(--neg); }
+  .tape-row .time { color: var(--text-3); }
+  .tape-row .qty  { text-align: right; }
+  .tape-row .px   { text-align: right; }
+  .tape-row .side { text-align: center; font-size: 10px; }
+  .tape-row.up .side   { color: var(--pos); }
+  .tape-row.down .side { color: var(--neg); }
+  .tape-row.large { background: rgba(255,255,255,0.025); }
+  .tape-row.enter {
+    animation: tapeIn 200ms ease-out;
+  }
+  @keyframes tapeIn {
+    from { transform: translateY(-6px); opacity: 0; }
+    to   { transform: translateY(0); opacity: 1; }
+  }
+
+  /* Lucide icon sizing */
+  [data-lucide] { width: 18px; height: 18px; stroke-width: 1.6; }
+  .nav-item [data-lucide] { width: 18px; height: 18px; }
+  .icon-btn [data-lucide] { width: 16px; height: 16px; }
+  .breadcrumbs [data-lucide] { width: 12px; height: 12px; opacity: 0.6; }
+  .btn-ghost [data-lucide] { width: 14px; height: 14px; }
+
+  /* Responsive (1024 breakpoint) */
+  @media (max-width: 1100px) {
+    .market-header { grid-template-columns: 1fr; }
+    .mh-right { align-items: stretch; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .stat { border-right: none; }
+    .related .grid { grid-template-columns: repeat(2, 1fr); }
+    .preview-body { grid-template-columns: 1fr; }
+    .details { grid-template-columns: 1fr; gap: 32px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ====================== TOP BAR ====================== -->
+  <header class="topbar">
+    <div class="brand"><span class="mark"></span>Exascale</div>
+
+    <nav class="breadcrumbs">
+      <a href="#">Markets</a>
+      <i data-lucide="chevron-right" class="sep"></i>
+      <span class="cur">EAI-IDX</span>
+    </nav>
+
+    <div class="top-right">
+      <div class="top-pill">
+        <i data-lucide="wallet" style="color: var(--brand); width: 14px; height: 14px;"></i>
+        <span class="num" style="font-size:13px; font-weight:500;">$10,247.83</span>
+      </div>
+      <button class="icon-btn" title="Search"><i data-lucide="search"></i></button>
+      <button class="icon-btn" title="Notifications">
+        <i data-lucide="bell"></i>
+        <span class="badge">2</span>
+      </button>
+      <div class="avatar">A</div>
+    </div>
+  </header>
+
+  <!-- ====================== SIDEBAR ====================== -->
+  <aside class="sidebar">
+    <div class="nav-item"><i data-lucide="candlestick-chart"></i><span class="tooltip">Trade</span></div>
+    <div class="nav-item active"><i data-lucide="list"></i><span class="tooltip">Markets</span></div>
+    <div class="nav-item"><i data-lucide="trending-up"></i><span class="tooltip">Index</span></div>
+    <div class="nav-item"><i data-lucide="briefcase"></i><span class="tooltip">Portfolio</span></div>
+    <div class="nav-item"><i data-lucide="clock"></i><span class="tooltip">History</span></div>
+    <div class="nav-item"><i data-lucide="wallet"></i><span class="tooltip">Wallet</span></div>
+    <div class="nav-divider"></div>
+    <div class="nav-item"><i data-lucide="server"></i><span class="tooltip">Compute</span></div>
+    <div class="nav-item"><i data-lucide="message-square"></i><span class="tooltip">Inference</span></div>
+    <div class="nav-item" style="margin-top: auto;"><i data-lucide="settings"></i><span class="tooltip">Settings</span></div>
+    <div class="foot">
+      <span class="open-dot"></span><br/>MKT OPEN
+    </div>
+  </aside>
+
+  <!-- ====================== MAIN PAGE ====================== -->
+  <main class="main">
+    <div class="page">
+
+      <!-- ====== MARKET HEADER ====== -->
+      <section class="market-header">
+        <div class="mh-left">
+          <div class="row1">
+            <span class="sym">EAI-IDX</span>
+            <span class="meta-pill"><span class="dot"></span>Open · 24/7</span>
+            <span class="meta-pill" style="color: var(--text-2);">Cash-settled · USD</span>
+          </div>
+          <h1>AI Index</h1>
+          <div class="mh-price" id="mhPrice">0.001005</div>
+          <div class="mh-delta-row">
+            <span class="mh-delta" id="mhDelta">▲ 0.18%</span>
+            <span class="mh-delta-abs" id="mhAbs">+$0.000002</span>
+          </div>
+          <div class="mh-updated">
+            Last updated <span id="mhUpdated">14:23:47.123 UTC</span> · Next index print <span style="color: var(--text-2);">16:00 UTC</span>
+          </div>
+        </div>
+
+        <div class="mh-right">
+          <a href="#" class="btn btn-primary">Trade this market <i data-lucide="arrow-right" style="width:16px;height:16px;"></i></a>
+          <button class="btn-ghost"><i data-lucide="star" class="ic"></i> Add to watchlist</button>
+          <div class="mh-spark">
+            <div class="label-row">
+              <span>— 24H</span>
+              <span class="pos">▲ 0.18%</span>
+            </div>
+            <svg id="hdrSpark" viewBox="0 0 320 60" preserveAspectRatio="none">
+              <path class="fill" id="hdrSparkFill"></path>
+              <path class="line" id="hdrSparkLine"></path>
+            </svg>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====== STATS GRID ROW 1 ====== -->
+      <section class="stats-grid">
+        <div class="stat">
+          <span class="stat-lbl">— 24h volume</span>
+          <span class="stat-val">$1.24M</span>
+          <span class="stat-sub pos">+12.3% vs avg</span>
+        </div>
+        <div class="stat">
+          <span class="stat-lbl">— 24h high</span>
+          <span class="stat-val">$0.001012</span>
+          <span class="stat-sub">@ 09:42 UTC</span>
+        </div>
+        <div class="stat">
+          <span class="stat-lbl">— 24h low</span>
+          <span class="stat-val">$0.000996</span>
+          <span class="stat-sub">@ 02:18 UTC</span>
+        </div>
+        <div class="stat">
+          <span class="stat-lbl">— All-time high</span>
+          <span class="stat-val">$0.001047</span>
+          <span class="stat-sub">12 Mar 2026</span>
+        </div>
+      </section>
+
+      <!-- ====== STATS GRID ROW 2 ====== -->
+      <section class="stats-grid row-2">
+        <div class="stat">
+          <span class="stat-lbl">— 7d change</span>
+          <span class="stat-val neg">−0.42%</span>
+          <span class="stat-sub">$0.000004</span>
+        </div>
+        <div class="stat">
+          <span class="stat-lbl">— 30d change</span>
+          <span class="stat-val pos">+2.31%</span>
+          <span class="stat-sub">$0.000023</span>
+        </div>
+        <div class="stat">
+          <span class="stat-lbl">— YTD change</span>
+          <span class="stat-val pos">+4.18%</span>
+          <span class="stat-sub">Since 01 Jan 2026</span>
+        </div>
+        <div class="stat">
+          <span class="stat-lbl">— Open interest</span>
+          <span class="stat-val" style="color: var(--text-3);">—</span>
+          <span class="stat-sub muted-2">Coming v1.5</span>
+        </div>
+      </section>
+
+      <!-- ====== PRIMARY CHART ====== -->
+      <section class="chart-section">
+        <div class="chart-card">
+          <div class="chart-head">
+            <div class="seg" id="tfSeg">
+              <button data-tf="1m">1m</button>
+              <button data-tf="5m">5m</button>
+              <button data-tf="15m">15m</button>
+              <button data-tf="1h">1h</button>
+              <button data-tf="4h">4h</button>
+              <button data-tf="1d" class="active">1d</button>
+              <button data-tf="1w">1w</button>
+              <button data-tf="1M">1M</button>
+              <button data-tf="1y">1y</button>
+              <button data-tf="all">All</button>
+            </div>
+            <div class="right">
+              <span class="indicator-pill">MA(20) <span class="x">×</span></span>
+              <span class="indicator-pill">RSI(14) <span class="x">×</span></span>
+              <span class="indicator-pill">BB(20,2) <span class="x">×</span></span>
+              <button class="add-indicator"><i data-lucide="plus" style="width:12px;height:12px;"></i> Indicators</button>
+            </div>
+          </div>
+          <div id="primaryChart"><div id="chartHost"></div></div>
+        </div>
+      </section>
+
+      <!-- ====== MARKET DETAILS ====== -->
+      <section class="details">
+        <div>
+          <h3>About this market</h3>
+          <p>
+            The Exascale AI Index (<span class="mono">EAI-IDX</span>) represents the unified price of AI inference, computed from observed market data and consumption metrics across the text, speech, image, video, and niche credit markets.
+          </p>
+          <p>
+            The index is published daily at 16:00 UTC by an independent administrator, methodology audited externally on a quarterly cadence. Intra-day prints shown here are real-time observations on the constituent venues, weighted by trailing-30-day volume and trimmed at the 5th and 95th percentiles to limit outlier influence.
+          </p>
+          <p>
+            <span class="mono">EAI-IDX</span> is cash-settled in USD. Counterparties may also redeem against any of the constituent sub-credit markets at the index's daily fixing rate, with no settlement fees on physical redemption above 100,000 credits.
+          </p>
+          <a href="#" class="methodology-link">View full methodology <i data-lucide="arrow-up-right" style="width:14px;height:14px;"></i></a>
+        </div>
+
+        <div>
+          <h3>Specifications</h3>
+          <table class="spec-table">
+            <tbody>
+              <tr><th>Settlement</th><td>Cash-settled in USD</td></tr>
+              <tr><th>Tick size</th><td>$0.000001</td></tr>
+              <tr><th>Minimum order</th><td>100 credits · $0.10</td></tr>
+              <tr><th>Trading hours</th><td>24 / 7 · 365</td></tr>
+              <tr><th>Currency</th><td>USD <span style="color: var(--text-3); font-weight: 400;">(JPY pricing available)</span></td></tr>
+              <tr><th>Fees · retail tier</th><td>0.50% maker / 1.00% taker <span style="color: var(--text-3); font-weight: 400;"><br/><a href="#">Fee schedule →</a></span></td></tr>
+              <tr><th>Constituents</th><td>TEXT · SPEECH · IMAGE · VIDEO · NICHE</td></tr>
+              <tr><th>Index administrator</th><td>Exascale Index Co.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ====== RELATED MARKETS ====== -->
+      <section class="related">
+        <h3>Related markets</h3>
+        <div class="grid" id="relatedGrid">
+          <!-- filled by JS -->
+        </div>
+      </section>
+
+      <!-- ====== OB + TAPE PREVIEW ====== -->
+      <section class="preview" id="previewSec">
+        <div class="head" id="previewToggle">
+          <i data-lucide="chevron-down" class="caret"></i>
+          <h3>Order book &amp; recent trades</h3>
+          <span class="sub">Live · 10 levels</span>
+        </div>
+        <div class="preview-body">
+          <div class="preview-card">
+            <div class="head-row">
+              <i data-lucide="layers" style="color: var(--text-2); width: 14px; height: 14px;"></i>
+              <span class="lbl">Order book</span>
+              <span class="lbl-badge">10 LVL</span>
+            </div>
+            <div class="ob-prev">
+              <div class="ob-cols">
+                <span>Price (USD)</span><span>Size</span><span>Total</span>
+              </div>
+              <div id="obAsks"></div>
+              <div class="ob-mid" id="obMid">0.001005 <span class="spread" id="obSpread">spread 0.000020 / 1.99%</span></div>
+              <div id="obBids"></div>
+            </div>
+          </div>
+          <div class="preview-card">
+            <div class="head-row">
+              <i data-lucide="activity" style="color: var(--text-2); width: 14px; height: 14px;"></i>
+              <span class="lbl">Recent trades</span>
+              <span class="lbl-badge">LIVE</span>
+            </div>
+            <div class="tape-prev">
+              <div class="tape-cols">
+                <span>Time</span><span>Price</span><span>Qty</span><span></span>
+              </div>
+              <div id="tapeList"></div>
+            </div>
+          </div>
+        </div>
+        <div class="preview-cta-row">
+          <a href="#">View full trading view <i data-lucide="arrow-right" style="width:14px;height:14px;"></i></a>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+</div>
+
+<script>
+/* ============================================================
+   STATE + helpers
+   ============================================================ */
+const STATE = {
+  midPrice: 0.001005,
+  open24h: 0.001003,
+  high24h: 0.001012,
+  low24h:  0.000996,
+};
+
+const fmtPx = (n, dp = 6) => Number(n).toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+const fmtUsd = (n, dp = 2) => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+const fmtInt = (n) => Number(n).toLocaleString('en-US');
+const arrow = (p) => (p >= 0 ? '▲' : '▼');
+
+function timestamp() {
+  const d = new Date();
+  return d.toLocaleTimeString('en-GB', { hour12: false, timeZone: 'UTC' }) + '.' + String(d.getMilliseconds()).padStart(3, '0') + ' UTC';
+}
+
+/* ============================================================
+   PRIMARY CHART — 1 year of daily candles + 1 day of 5-min
+   ============================================================ */
+let chart, candleSeries, volumeSeries;
+let dailySeries = [], dailyVol = [];
+let intradaySeries = [], intradayVol = [];
+let currentTf = '1d';
+
+function genDaily() {
+  // 365 daily candles, drift up with periodic drawdowns
+  const N = 365;
+  let p = 0.000970;
+  const endDay = new Date('2026-05-19');
+  endDay.setUTCHours(0, 0, 0, 0);
+  for (let i = 0; i < N; i++) {
+    const drift = 0.0000003;
+    const noise = (Math.random() - 0.48) * 0.0000080;
+    const dd = Math.random() < 0.016 ? -(0.000008 + Math.random() * 0.000018) : 0;
+    p = Math.max(0.000900, Math.min(0.001050, p + drift + noise + dd));
+    const open = p;
+    const close = Math.max(0.000900, Math.min(0.001050, p + (Math.random() - 0.48) * 0.000010));
+    const high = Math.max(open, close) + Math.random() * 0.000008;
+    const low  = Math.min(open, close) - Math.random() * 0.000008;
+    p = close;
+    const d = new Date(endDay);
+    d.setUTCDate(endDay.getUTCDate() - (N - 1 - i));
+    const time = d.toISOString().slice(0, 10);
+    dailySeries.push({ time, open, high, low, close });
+    const vol = Math.exp(Math.random() * 1.6 + 11);
+    dailyVol.push({ time, value: vol, color: close >= open ? 'rgba(25,195,125,0.30)' : 'rgba(239,68,68,0.30)' });
+  }
+  // Anchor today's close to STATE.midPrice
+  const last = dailySeries[dailySeries.length - 1];
+  last.close = STATE.midPrice;
+  last.high = Math.max(last.high, STATE.midPrice);
+  last.low  = Math.min(last.low,  STATE.midPrice);
+}
+
+function genIntraday() {
+  // ~ 24h of 5-min candles = 288 candles
+  const N = 288;
+  let p = 0.000999;
+  const startTime = Math.floor(Date.now() / 1000) - N * 300;
+  for (let i = 0; i < N; i++) {
+    const drift = (0.001005 - p) * 0.025;
+    const noise = (Math.random() - 0.5) * 0.0000035;
+    const open = p;
+    const close = Math.max(0.00094, Math.min(0.001065, p + drift + noise));
+    const swing = Math.random() * 0.0000025 + 0.0000005;
+    const high = Math.max(open, close) + swing;
+    const low  = Math.min(open, close) - swing;
+    const t = startTime + i * 300;
+    intradaySeries.push({ time: t, open, high, low, close });
+    const vol = Math.exp(Math.random() * 1.4 + 6);
+    intradayVol.push({ time: t, value: vol, color: close >= open ? 'rgba(25,195,125,0.30)' : 'rgba(239,68,68,0.30)' });
+    p = close;
+  }
+}
+
+function initChart() {
+  const host = document.getElementById('chartHost');
+  chart = LightweightCharts.createChart(host, {
+    layout: {
+      background: { color: '#0A0B0E' },
+      textColor: '#9A9A95',
+      fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+      fontSize: 10,
+    },
+    grid: {
+      vertLines: { color: 'rgba(255,255,255,0.03)' },
+      horzLines: { color: 'rgba(255,255,255,0.03)' },
+    },
+    rightPriceScale: {
+      borderColor: 'rgba(255,255,255,0.08)',
+      scaleMargins: { top: 0.08, bottom: 0.28 },
+    },
+    timeScale: {
+      borderColor: 'rgba(255,255,255,0.08)',
+      timeVisible: true,
+      secondsVisible: false,
+    },
+    crosshair: {
+      mode: LightweightCharts.CrosshairMode.Normal,
+      vertLine: { color: 'rgba(232,230,224,0.35)', width: 1, style: 0 },
+      horzLine: { color: 'rgba(232,230,224,0.35)', width: 1, style: 0 },
+    },
+  });
+
+  candleSeries = chart.addCandlestickSeries({
+    upColor: '#19C37D',
+    downColor: '#EF4444',
+    borderUpColor: '#19C37D',
+    borderDownColor: '#EF4444',
+    wickUpColor: '#19C37D',
+    wickDownColor: '#EF4444',
+    priceFormat: { type: 'price', precision: 6, minMove: 0.000001 },
+  });
+
+  volumeSeries = chart.addHistogramSeries({
+    priceFormat: { type: 'volume' },
+    priceScaleId: '',
+    color: 'rgba(232,230,224,0.18)',
+  });
+  volumeSeries.priceScale().applyOptions({
+    scaleMargins: { top: 0.80, bottom: 0 },
+  });
+
+  setTimeframe('1d');
+
+  const ro = new ResizeObserver(() => {
+    chart.applyOptions({ width: host.clientWidth, height: host.clientHeight });
+  });
+  ro.observe(host);
+}
+
+function setTimeframe(tf) {
+  currentTf = tf;
+  // Daily-or-coarser timeframes use the daily series; intra-day use the 5-min series
+  const useDaily = ['1d', '1w', '1M', '1y', 'all'].includes(tf);
+  if (useDaily) {
+    let data = dailySeries.slice();
+    let vol  = dailyVol.slice();
+    if (tf === '1w' || tf === '1M' || tf === '1y' || tf === 'all') {
+      // For now show entire daily series; in a real app would aggregate
+      // Show last 90 for 1w default zoom, 180 for 1M, 365 for 1y/all
+      const sliceN = tf === '1w' ? 90 : (tf === '1M' ? 180 : 365);
+      data = dailySeries.slice(-sliceN);
+      vol  = dailyVol.slice(-sliceN);
+    }
+    candleSeries.setData(data);
+    volumeSeries.setData(vol);
+  } else {
+    // Intra-day
+    let data = intradaySeries.slice();
+    let vol  = intradayVol.slice();
+    if (tf === '1m') { data = data.slice(-180); vol = vol.slice(-180); }
+    if (tf === '5m') { data = data.slice(-200); vol = vol.slice(-200); }
+    if (tf === '15m'){ data = data.slice(-160); vol = vol.slice(-160); }
+    if (tf === '1h') { data = data.slice(-120); vol = vol.slice(-120); }
+    if (tf === '4h') { data = data.slice(-60);  vol = vol.slice(-60); }
+    candleSeries.setData(data);
+    volumeSeries.setData(vol);
+  }
+  chart.timeScale().fitContent();
+}
+
+// Live tick: drift midPrice and update intraday last bar
+function chartTick() {
+  const drift = (0.001005 - STATE.midPrice) * 0.04;
+  const noise = (Math.random() - 0.5) * 0.0000028;
+  STATE.midPrice = Math.max(0.00094, Math.min(0.001065, STATE.midPrice + drift + noise));
+
+  // Update intraday last candle
+  if (intradaySeries.length) {
+    const last = intradaySeries[intradaySeries.length - 1];
+    last.close = STATE.midPrice;
+    last.high = Math.max(last.high, STATE.midPrice);
+    last.low  = Math.min(last.low,  STATE.midPrice);
+    if (!['1d','1w','1M','1y','all'].includes(currentTf)) {
+      candleSeries.update(last);
+    }
+  }
+  // Update daily last candle
+  if (dailySeries.length) {
+    const last = dailySeries[dailySeries.length - 1];
+    last.close = STATE.midPrice;
+    last.high = Math.max(last.high, STATE.midPrice);
+    last.low  = Math.min(last.low,  STATE.midPrice);
+    if (['1d','1w','1M','1y','all'].includes(currentTf)) {
+      candleSeries.update(last);
+    }
+  }
+
+  STATE.high24h = Math.max(STATE.high24h, STATE.midPrice);
+  STATE.low24h  = Math.min(STATE.low24h,  STATE.midPrice);
+
+  syncHeader();
+  updateRelated();
+}
+
+function syncHeader() {
+  const px = STATE.midPrice;
+  const dpct = ((px - STATE.open24h) / STATE.open24h) * 100;
+  const dabs = px - STATE.open24h;
+  const el = document.getElementById('mhPrice');
+  el.textContent = fmtPx(px);
+  el.classList.remove('flash-up', 'flash-down');
+  void el.offsetWidth;
+  el.classList.add(dpct >= 0 ? 'flash-up' : 'flash-down');
+  setTimeout(() => el.classList.remove('flash-up','flash-down'), 700);
+
+  const dEl = document.getElementById('mhDelta');
+  dEl.textContent = arrow(dpct) + ' ' + Math.abs(dpct).toFixed(2) + '%';
+  dEl.classList.toggle('neg', dpct < 0);
+  const aEl = document.getElementById('mhAbs');
+  aEl.textContent = (dabs >= 0 ? '+' : '−') + '$' + Math.abs(dabs).toFixed(6);
+
+  document.getElementById('mhUpdated').textContent = timestamp();
+}
+
+/* ============================================================
+   HEADER SPARKLINE
+   ============================================================ */
+function buildHdrSpark() {
+  // 60 5-min points (last 5 hours of intraday)
+  const sub = intradaySeries.slice(-60).map(c => c.close);
+  if (!sub.length) return;
+  const W = 320, H = 60;
+  const min = Math.min(...sub), max = Math.max(...sub);
+  const range = max - min || 1;
+  const stepX = W / (sub.length - 1);
+  const pad = 6;
+  const usableH = H - pad * 2;
+  const path = sub.map((v, i) => {
+    const x = i * stepX;
+    const y = pad + usableH - ((v - min) / range) * usableH;
+    return (i === 0 ? 'M' : 'L') + x.toFixed(1) + ' ' + y.toFixed(1);
+  }).join(' ');
+  document.getElementById('hdrSparkLine').setAttribute('d', path);
+  document.getElementById('hdrSparkFill').setAttribute('d', path + ' L ' + W + ' ' + H + ' L 0 ' + H + ' Z');
+}
+
+/* ============================================================
+   ORDER BOOK preview (simpler, no live updates beyond mid)
+   ============================================================ */
+function generateBook() {
+  const mid = STATE.midPrice;
+  const half = mid * 0.0005;
+  const asks = [];
+  const bids = [];
+  for (let i = 0; i < 8; i++) {
+    const baseQty = 5000 + Math.pow(i, 1.6) * 4500;
+    asks.push({ price: mid + half + i * mid * 0.0008, qty: Math.round(baseQty + (Math.random() - 0.5) * 800) });
+    bids.push({ price: mid - half - i * mid * 0.0008, qty: Math.round(baseQty + (Math.random() - 0.5) * 800) });
+  }
+  return { asks, bids };
+}
+function renderBook() {
+  const { asks, bids } = generateBook();
+  const maxQty = Math.max(...asks.map(a => a.qty), ...bids.map(b => b.qty));
+
+  let askRun = 0;
+  const askCum = asks.map(a => (askRun += a.qty, askRun));
+  let asksHtml = '';
+  for (let i = asks.length - 1; i >= 0; i--) {
+    const l = asks[i];
+    const w = (l.qty / maxQty) * 100;
+    asksHtml += `<div class="ob-row ask"><div class="bar" style="width:${w}%"></div><span class="px">${fmtPx(l.price)}</span><span class="qty">${fmtInt(l.qty)}</span><span class="tot">${fmtInt(askCum[i])}</span></div>`;
+  }
+  document.getElementById('obAsks').innerHTML = asksHtml;
+
+  let bidRun = 0;
+  let bidsHtml = '';
+  for (let i = 0; i < bids.length; i++) {
+    const l = bids[i];
+    bidRun += l.qty;
+    const w = (l.qty / maxQty) * 100;
+    bidsHtml += `<div class="ob-row bid"><div class="bar" style="width:${w}%"></div><span class="px">${fmtPx(l.price)}</span><span class="qty">${fmtInt(l.qty)}</span><span class="tot">${fmtInt(bidRun)}</span></div>`;
+  }
+  document.getElementById('obBids').innerHTML = bidsHtml;
+
+  const spread = asks[0].price - bids[0].price;
+  const spreadPct = (spread / STATE.midPrice) * 100;
+  const midEl = document.getElementById('obMid');
+  midEl.firstChild.nodeValue = fmtPx(STATE.midPrice) + ' ';
+  document.getElementById('obSpread').textContent = `spread ${fmtPx(spread)} / ${spreadPct.toFixed(2)}%`;
+}
+
+/* ============================================================
+   TRADE TAPE preview
+   ============================================================ */
+const MAX_TAPE = 18;
+const tape = [];
+
+function addTrade() {
+  const burst = 1 + Math.floor(Math.random() * 2);
+  for (let i = 0; i < burst; i++) {
+    const side = Math.random() < 0.5 ? 'up' : 'down';
+    const px = side === 'up'
+      ? STATE.midPrice + Math.random() * 0.0000015
+      : STATE.midPrice - Math.random() * 0.0000015;
+    const lnSize = Math.exp(Math.random() * 2.6 + 4.4);
+    const isLarge = Math.random() < 0.05;
+    const qty = Math.round(isLarge ? lnSize * 60 : lnSize);
+    const now = new Date();
+    const time = now.toLocaleTimeString('en-GB', { hour12: false }) + '.' + String(now.getMilliseconds()).padStart(3, '0');
+    tape.unshift({ side, px, qty, time, large: isLarge });
+    if (tape.length > MAX_TAPE) tape.pop();
+  }
+  renderTape();
+}
+
+function renderTape() {
+  const html = tape.map((t, idx) => {
+    const arr = t.side === 'up' ? '▲' : '▼';
+    return `<div class="tape-row ${t.side}${idx === 0 ? ' enter' : ''}${t.large ? ' large' : ''}">
+      <span class="time">${t.time}</span>
+      <span class="px">${fmtPx(t.px)}</span>
+      <span class="qty">${fmtInt(t.qty)}</span>
+      <span class="side">${arr}</span>
+    </div>`;
+  }).join('');
+  document.getElementById('tapeList').innerHTML = html;
+}
+
+/* ============================================================
+   RELATED MARKETS
+   ============================================================ */
+const RELATED = [
+  { sym: 'TEXT-SPOT',  name: 'Text credits',    px: 0.001210, dpct: +0.42, color: 'pos' },
+  { sym: 'SPEECH-SPOT',name: 'Speech credits',  px: 0.001200, dpct: -0.18, color: 'neg' },
+  { sym: 'IMAGE-SPOT', name: 'Image credits',   px: 0.008000, dpct: +1.24, color: 'pos' },
+  { sym: 'VIDEO-SPOT', name: 'Video credits',   px: 0.250000, dpct: -0.65, color: 'neg' },
+];
+
+function genRelatedSpark(seed, trend) {
+  // 30 points
+  let v = 1.0;
+  const pts = [];
+  for (let i = 0; i < 30; i++) {
+    v += (Math.random() - (trend < 0 ? 0.55 : 0.45)) * 0.012;
+    pts.push(v);
+  }
+  return pts;
+}
+
+function buildRelated() {
+  const grid = document.getElementById('relatedGrid');
+  grid.innerHTML = RELATED.map(m => {
+    const pts = genRelatedSpark(m.sym, m.dpct);
+    const W = 200, H = 36;
+    const min = Math.min(...pts), max = Math.max(...pts);
+    const range = max - min || 1;
+    const stepX = W / (pts.length - 1);
+    const pad = 4;
+    const usableH = H - pad * 2;
+    const path = pts.map((p, i) => {
+      const x = i * stepX;
+      const y = pad + usableH - ((p - min) / range) * usableH;
+      return (i === 0 ? 'M' : 'L') + x.toFixed(1) + ' ' + y.toFixed(1);
+    }).join(' ');
+    const fill = path + ` L ${W} ${H} L 0 ${H} Z`;
+    const dp = m.px >= 0.01 ? 6 : 6;
+    const dpDisp = m.px >= 0.1 ? 4 : 6;
+    const arr = m.dpct >= 0 ? '▲' : '▼';
+    return `<div class="market-card" data-sym="${m.sym}">
+      <span class="sym">${m.sym}</span>
+      <span class="name">${m.name}</span>
+      <div class="pxrow">
+        <span class="px">${fmtPx(m.px, dpDisp)}</span>
+        <span class="delta ${m.color}">${arr} ${Math.abs(m.dpct).toFixed(2)}%</span>
+      </div>
+      <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+        <path class="fill ${m.color}" d="${fill}"/>
+        <path class="line ${m.color}" d="${path}"/>
+      </svg>
+    </div>`;
+  }).join('');
+}
+
+function updateRelated() {
+  document.querySelectorAll('.market-card').forEach((card, idx) => {
+    const m = RELATED[idx];
+    if (!m) return;
+    // small drift
+    const noise = (Math.random() - 0.5) * 0.0008;
+    m.dpct += noise;
+    const drift = Math.random() * (m.px < 0.01 ? 0.000003 : (m.px < 0.1 ? 0.00002 : 0.0008));
+    const sign = Math.random() < 0.5 ? -1 : 1;
+    m.px = Math.max(m.px * 0.985, m.px + drift * sign);
+
+    const pxEl = card.querySelector('.px');
+    const prevTxt = pxEl.textContent;
+    const dpDisp = m.px >= 0.1 ? 4 : 6;
+    pxEl.textContent = fmtPx(m.px, dpDisp);
+    const up = parseFloat(pxEl.textContent.replace(',','')) >= parseFloat(prevTxt.replace(',',''));
+    pxEl.classList.remove('flash-up','flash-down');
+    void pxEl.offsetWidth;
+    pxEl.classList.add(up ? 'flash-up' : 'flash-down');
+    setTimeout(() => pxEl.classList.remove('flash-up','flash-down'), 700);
+
+    const dEl = card.querySelector('.delta');
+    dEl.textContent = (m.dpct >= 0 ? '▲ ' : '▼ ') + Math.abs(m.dpct).toFixed(2) + '%';
+    dEl.classList.toggle('pos', m.dpct >= 0);
+    dEl.classList.toggle('neg', m.dpct < 0);
+  });
+}
+
+/* ============================================================
+   PREVIEW COLLAPSE
+   ============================================================ */
+document.getElementById('previewToggle').addEventListener('click', () => {
+  document.getElementById('previewSec').classList.toggle('collapsed');
+});
+
+/* ============================================================
+   TIMEFRAME SEG
+   ============================================================ */
+document.querySelectorAll('#tfSeg button').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('#tfSeg button').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    setTimeframe(b.dataset.tf);
+  });
+});
+
+/* ============================================================
+   BOOT
+   ============================================================ */
+document.addEventListener('DOMContentLoaded', () => {
+  if (window.lucide) lucide.createIcons();
+
+  genDaily();
+  genIntraday();
+  // align state midPrice to last intraday close
+  STATE.midPrice = intradaySeries[intradaySeries.length - 1].close;
+
+  initChart();
+  buildHdrSpark();
+  renderBook();
+  // seed tape
+  for (let i = 0; i < MAX_TAPE; i++) addTrade();
+  tape.forEach(t => t.justAdded = false);
+  buildRelated();
+  syncHeader();
+
+  // Live update loops
+  setInterval(chartTick, 3000);
+  setInterval(renderBook, 4000);
+  setInterval(addTrade, 5000);
+});
+</script>
+
+</body>
+</html>

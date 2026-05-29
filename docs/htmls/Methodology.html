@@ -1,0 +1,1792 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Exascale — AI Index Methodology · v1.2</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="Methodology document for the Exascale AI Index — the daily reference price for AI compute." />
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&display=swap" rel="stylesheet">
+
+<!-- KaTeX -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous"></script>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<style>
+/* ============================================================
+   EXASCALE — AI Index Methodology  ·  Light mode
+   ============================================================ */
+:root {
+  --canvas:    #F8F7F4;
+  --paper:     #FFFFFF;
+  --sunken:    #F2EEE3;
+  --inverse:   #0E0E0E;
+
+  --t-1: #0A0B0E;
+  --t-2: #4A4A45;
+  --t-3: #8A8A82;
+  --t-4: #B8B8B0;
+
+  --bd:        rgba(14,14,14,0.10);
+  --bd-strong: rgba(14,14,14,0.20);
+  --bd-soft:   rgba(14,14,14,0.06);
+
+  --brand: #C8F25C;
+  --info:  #4A90E2;
+  --pos:   #16A34A;
+  --neg:   #DC2626;
+  --warn:  #D97706;
+
+  --font-display: 'Inter Tight', system-ui, sans-serif;
+  --font-sans:    'Inter', system-ui, sans-serif;
+  --font-serif:   'Source Serif 4', 'Charter', Georgia, serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, monospace;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--canvas);
+  color: var(--t-1);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "ss01";
+}
+
+/* ============================================================
+   TOP MARKETING NAV
+   ============================================================ */
+.site-nav {
+  height: 56px;
+  background: var(--paper);
+  border-bottom: 1px solid var(--bd);
+  display: flex;
+  align-items: center;
+  padding: 0 32px;
+  gap: 32px;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+.brand {
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: -0.005em;
+  color: var(--t-1);
+  text-decoration: none;
+}
+.brand .mark { width: 12px; height: 12px; background: var(--brand); display: inline-block; }
+.site-nav .links {
+  display: flex; gap: 26px;
+  font-size: 13.5px;
+  margin-left: 8px;
+}
+.site-nav .links a {
+  color: var(--t-2);
+  text-decoration: none;
+  font-weight: 500;
+}
+.site-nav .links a:hover { color: var(--t-1); }
+.site-nav .links a.active { color: var(--t-1); position: relative; }
+.site-nav .links a.active::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: -19px;
+  height: 2px; background: var(--t-1);
+}
+.site-nav .right {
+  margin-left: auto;
+  display: flex; align-items: center; gap: 16px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--t-3);
+  letter-spacing: 0.06em;
+}
+.site-nav .right .live {
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.site-nav .right .live .pulse {
+  width: 6px; height: 6px; background: var(--pos); border-radius: 50%;
+  box-shadow: 0 0 0 0 rgba(22,163,74,0.6);
+  animation: pulse 2.4s infinite;
+}
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(22,163,74,0.6); }
+  70% { box-shadow: 0 0 0 6px rgba(22,163,74,0); }
+  100% { box-shadow: 0 0 0 0 rgba(22,163,74,0); }
+}
+.site-nav .cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--t-1);
+  color: var(--paper);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  border-radius: 2px;
+  text-decoration: none;
+}
+.site-nav .cta:hover { background: #222; }
+.site-nav .signin {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--t-2);
+  text-decoration: none;
+  letter-spacing: 0;
+}
+.site-nav .signin:hover { color: var(--t-1); }
+
+/* ============================================================
+   PAGE GRID — three pane
+   ============================================================ */
+.shell {
+  max-width: 1280px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr) 220px;
+  gap: 48px;
+  padding: 48px 32px 96px;
+  align-items: start;
+}
+
+/* ============================================================
+   LEFT NAV — section list
+   ============================================================ */
+.lnav {
+  position: sticky;
+  top: 80px;
+  max-height: calc(100vh - 96px);
+  overflow-y: auto;
+  padding-right: 8px;
+  font-size: 13px;
+}
+.lnav::-webkit-scrollbar { width: 6px; }
+.lnav::-webkit-scrollbar-track { background: transparent; }
+.lnav::-webkit-scrollbar-thumb { background: var(--bd); border-radius: 2px; }
+
+.lnav-group { margin-bottom: 18px; }
+.lnav-group-head {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--t-3);
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--bd-soft);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.lnav-group-head .num {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--t-4);
+  letter-spacing: 0.04em;
+}
+.lnav ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 1px; }
+.lnav li a {
+  display: block;
+  color: var(--t-2);
+  text-decoration: none;
+  padding: 5px 10px 5px 14px;
+  font-size: 13px;
+  line-height: 1.35;
+  border-left: 2px solid transparent;
+  transition: color 120ms, border-color 120ms, background 120ms;
+}
+.lnav li a:hover { color: var(--t-1); }
+.lnav li a.active {
+  color: var(--t-1);
+  border-left-color: var(--t-1);
+  background: var(--sunken);
+  font-weight: 500;
+}
+.lnav li a .pre {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--t-3);
+  letter-spacing: 0.04em;
+  margin-right: 8px;
+}
+.lnav li a.active .pre { color: var(--t-1); }
+
+/* ============================================================
+   CONTENT — 720px reading column
+   ============================================================ */
+.content {
+  max-width: 720px;
+  width: 100%;
+  font-family: var(--font-sans);
+  color: var(--t-1);
+}
+
+/* Header */
+.doc-head {
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--bd);
+  margin-bottom: 32px;
+}
+.doc-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--t-3);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.doc-eyebrow::before {
+  content: ""; width: 5px; height: 5px; background: var(--brand); display: inline-block;
+}
+.doc-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 34px;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+  margin: 0 0 14px;
+  color: var(--t-1);
+}
+.doc-version {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--t-3);
+  letter-spacing: 0.04em;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+.doc-version span strong { color: var(--t-1); font-weight: 500; }
+.doc-version .pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 2px 8px; border: 1px solid var(--bd); background: var(--paper);
+  border-radius: 2px;
+  font-size: 11px;
+}
+.doc-version .pill .dot { width: 5px; height: 5px; background: var(--pos); border-radius: 50%; }
+
+.downloads {
+  display: flex; gap: 8px;
+  margin-top: 4px;
+}
+.dl-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--bd-strong);
+  border-radius: 2px;
+  background: var(--paper);
+  color: var(--t-1);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  transition: background 120ms, border-color 120ms;
+}
+.dl-link:hover { background: var(--canvas); border-color: rgba(14,14,14,0.32); }
+.dl-link svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 1.6; }
+.dl-link .meta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--t-3);
+  letter-spacing: 0.04em;
+}
+
+/* Live index box */
+.live-box {
+  border: 1px solid var(--bd-strong);
+  background: var(--paper);
+  border-radius: 2px;
+  margin-bottom: 40px;
+  position: relative;
+  overflow: hidden;
+}
+.live-box::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--brand);
+}
+.live-box-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--bd-soft);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--t-3);
+  font-weight: 600;
+}
+.live-box-head .live {
+  color: var(--t-2);
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.live-box-head .live .pulse {
+  width: 6px; height: 6px; background: var(--pos); border-radius: 50%;
+  animation: pulse 2.4s infinite;
+}
+.live-box-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1fr;
+  gap: 0;
+}
+.live-box-cell {
+  padding: 18px 22px;
+  border-right: 1px solid var(--bd-soft);
+}
+.live-box-cell:last-child { border-right: 0; }
+.live-box .lbl {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--t-3);
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.live-box .val {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 24px;
+  font-weight: 500;
+  color: var(--t-1);
+  letter-spacing: -0.01em;
+}
+.live-box .val .unit {
+  font-size: 12px;
+  color: var(--t-3);
+  font-weight: 400;
+  margin-left: 4px;
+  letter-spacing: 0.04em;
+}
+.live-box .sub {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--t-2);
+  margin-top: 4px;
+  letter-spacing: 0.04em;
+}
+
+/* Section ============================================== */
+section.sec { margin-bottom: 56px; scroll-margin-top: 80px; }
+section.sec .sec-head {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+section.sec .sec-num {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--t-3);
+  letter-spacing: 0.08em;
+  font-variant-numeric: tabular-nums;
+  padding-top: 6px;
+  flex-shrink: 0;
+  width: 38px;
+}
+section.sec h2 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 24px;
+  letter-spacing: -0.018em;
+  line-height: 1.2;
+  margin: 0;
+  color: var(--t-1);
+}
+.sec-body {
+  padding-left: 52px;
+}
+.sec-body p,
+.sec-body ul,
+.sec-body ol {
+  font-family: var(--font-serif);
+  font-size: 16px;
+  line-height: 1.62;
+  color: var(--t-1);
+  margin: 0 0 16px;
+}
+.sec-body .lede {
+  font-size: 17px;
+  line-height: 1.6;
+}
+.sec-body strong { font-weight: 600; }
+.sec-body em { font-style: italic; color: var(--t-2); }
+.sec-body a {
+  color: var(--t-1);
+  text-decoration: underline;
+  text-decoration-color: var(--t-3);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+.sec-body a:hover { text-decoration-color: var(--t-1); }
+.sec-body code {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  background: var(--sunken);
+  padding: 1px 5px;
+  border-radius: 2px;
+  color: var(--t-1);
+}
+.sec-body ul, .sec-body ol {
+  padding-left: 24px;
+}
+.sec-body ul li, .sec-body ol li {
+  margin-bottom: 8px;
+  padding-left: 4px;
+}
+.sec-body ul li::marker { color: var(--t-3); }
+.sec-body ol li::marker { color: var(--t-3); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* Subheading inside a section */
+h3.sub {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 17px;
+  letter-spacing: -0.005em;
+  color: var(--t-1);
+  margin: 32px 0 12px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+h3.sub .ix {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--t-3);
+  letter-spacing: 0.04em;
+}
+
+/* ============================================================
+   TABLES
+   ============================================================ */
+.tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  margin: 16px 0 8px;
+  border-top: 1px solid var(--bd);
+  border-bottom: 2px solid var(--t-1);
+}
+.tbl thead th {
+  text-align: left;
+  padding: 8px 10px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--t-2);
+  border-bottom: 1px solid var(--t-1);
+  background: transparent;
+  white-space: nowrap;
+}
+.tbl thead th.num { text-align: right; }
+.tbl tbody td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--bd-soft);
+  color: var(--t-1);
+  vertical-align: top;
+  font-feature-settings: "ss01";
+}
+.tbl tbody tr:last-child td { border-bottom: 0; }
+.tbl tbody td.num {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.tbl tbody td.mono {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--t-2);
+}
+.tbl tbody tr.total td {
+  border-top: 1px solid var(--t-1);
+  border-bottom: 0;
+  font-weight: 600;
+  padding-top: 12px;
+}
+.tbl tbody tr.total td.num { font-family: var(--font-mono); }
+.tbl-cap {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--t-3);
+  margin-top: 8px;
+}
+.tbl-cap strong { color: var(--t-2); font-weight: 500; }
+
+/* ============================================================
+   FORMULA
+   ============================================================ */
+.formula-box {
+  background: var(--paper);
+  border: 1px solid var(--bd);
+  border-radius: 2px;
+  padding: 28px 24px;
+  margin: 20px 0 16px;
+  text-align: center;
+  position: relative;
+}
+.formula-box::before {
+  content: "Equation 1";
+  position: absolute;
+  top: 8px; right: 12px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--t-4);
+}
+.formula-box .katex { font-size: 1.2em !important; }
+.formula-where {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--t-2);
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--bd);
+  letter-spacing: 0.02em;
+  text-align: left;
+}
+.formula-where dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 18px; }
+.formula-where dt {
+  font-family: var(--font-mono);
+  color: var(--t-1);
+  font-weight: 500;
+}
+.formula-where dd {
+  margin: 0;
+  color: var(--t-2);
+  font-family: var(--font-sans);
+  font-size: 13px;
+}
+
+/* ============================================================
+   FIGURES (histogram)
+   ============================================================ */
+.figure {
+  margin: 20px 0;
+  border: 1px solid var(--bd);
+  background: var(--paper);
+  border-radius: 2px;
+}
+.figure-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--bd-soft);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--t-3);
+  font-weight: 600;
+}
+.figure-head .legend {
+  display: inline-flex; gap: 14px;
+  text-transform: none;
+  letter-spacing: 0.04em;
+  font-size: 11px;
+}
+.figure-head .legend span {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: var(--t-2);
+}
+.figure-head .legend span .sw {
+  width: 9px; height: 9px; display: inline-block;
+}
+.figure-body {
+  padding: 16px 18px 14px;
+}
+.figure-cap {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--t-3);
+  letter-spacing: 0.04em;
+  padding: 0 16px 12px;
+}
+.figure-cap strong { color: var(--t-2); font-weight: 500; }
+
+.hist-svg { width: 100%; height: 200px; display: block; }
+
+/* ============================================================
+   CHART card (historical)
+   ============================================================ */
+.chart-card {
+  background: var(--paper);
+  border: 1px solid var(--bd);
+  border-radius: 2px;
+  margin: 16px 0;
+}
+.chart-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--bd-soft);
+}
+.chart-head .ttl {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: -0.005em;
+  margin: 0;
+  color: var(--t-1);
+}
+.chart-head .ttl .meta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--t-3);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  margin-left: 6px;
+}
+.chart-head .ranges {
+  display: inline-flex;
+  border: 1px solid var(--bd);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.chart-head .ranges .r {
+  background: transparent;
+  border: 0;
+  border-right: 1px solid var(--bd);
+  padding: 5px 10px;
+  color: var(--t-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+.chart-head .ranges .r:last-child { border-right: 0; }
+.chart-head .ranges .r.active { background: var(--sunken); color: var(--t-1); }
+.chart-head .ranges .r:hover { color: var(--t-1); }
+.chart-body { padding: 14px 18px 14px; }
+.chart-canvas-wrap { position: relative; height: 240px; width: 100%; }
+.chart-foot {
+  padding: 12px 18px;
+  border-top: 1px solid var(--bd-soft);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--t-3);
+  letter-spacing: 0.04em;
+}
+.chart-foot a { color: var(--t-1); text-decoration: none; font-weight: 500; }
+.chart-foot a:hover { text-decoration: underline; }
+
+/* ============================================================
+   CALLOUT (e.g. version note)
+   ============================================================ */
+.callout {
+  border-left: 3px solid var(--bd-strong);
+  background: var(--paper);
+  padding: 14px 18px;
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  color: var(--t-2);
+  line-height: 1.55;
+  margin: 18px 0 16px;
+  border-radius: 2px;
+}
+.callout strong { color: var(--t-1); font-weight: 500; }
+.callout .lbl {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--t-3);
+  margin-bottom: 6px;
+}
+.callout a { color: var(--t-1); text-decoration: underline; text-decoration-color: var(--t-3); }
+
+/* Committee table — names */
+.committee {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--bd);
+  border-radius: 2px;
+  background: var(--paper);
+  margin: 12px 0 16px;
+}
+.committee .member {
+  padding: 14px 18px;
+  border-right: 1px solid var(--bd-soft);
+  border-bottom: 1px solid var(--bd-soft);
+  font-family: var(--font-sans);
+}
+.committee .member:nth-child(2n) { border-right: 0; }
+.committee .member:nth-last-child(-n+2) { border-bottom: 0; }
+.committee .name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--t-1);
+  letter-spacing: -0.005em;
+}
+.committee .role {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--t-3);
+  letter-spacing: 0.04em;
+  margin-top: 2px;
+}
+.committee .bio {
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  color: var(--t-2);
+  margin-top: 8px;
+  line-height: 1.5;
+}
+
+/* Footnote */
+.footnote {
+  border-top: 1px solid var(--bd);
+  padding-top: 12px;
+  margin-top: 24px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--t-2);
+  line-height: 1.5;
+}
+.footnote sup {
+  font-family: var(--font-mono);
+  color: var(--t-1);
+  font-weight: 600;
+}
+
+/* Doc footer */
+.doc-foot {
+  margin-top: 64px;
+  padding-top: 24px;
+  border-top: 1px solid var(--bd);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--t-3);
+}
+.doc-foot .contacts {
+  display: flex; flex-direction: column; gap: 4px;
+  color: var(--t-2);
+}
+.doc-foot .contacts a { color: var(--t-1); text-decoration: none; }
+.doc-foot .contacts a:hover { text-decoration: underline; }
+.doc-foot .vers { text-align: right; }
+.doc-foot .vers .v { color: var(--t-1); font-weight: 500; }
+
+/* ============================================================
+   RIGHT TOC
+   ============================================================ */
+.rtoc {
+  position: sticky;
+  top: 80px;
+  max-height: calc(100vh - 96px);
+  font-size: 12.5px;
+  padding-left: 8px;
+  border-left: 1px solid var(--bd);
+}
+.rtoc-head {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--t-3);
+  margin: 0 0 12px 12px;
+}
+.rtoc ul { list-style: none; padding: 0; margin: 0; }
+.rtoc li a {
+  display: block;
+  color: var(--t-3);
+  text-decoration: none;
+  padding: 4px 12px;
+  line-height: 1.4;
+  border-left: 2px solid transparent;
+  margin-left: -1px;
+  font-size: 12.5px;
+  transition: color 120ms, border-color 120ms;
+}
+.rtoc li a:hover { color: var(--t-1); }
+.rtoc li a.active {
+  color: var(--t-1);
+  border-left-color: var(--t-1);
+  font-weight: 500;
+}
+.rtoc-meta {
+  margin-top: 18px;
+  padding: 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--t-3);
+  background: var(--sunken);
+  letter-spacing: 0.04em;
+  line-height: 1.55;
+  border-radius: 2px;
+}
+.rtoc-meta strong { color: var(--t-1); font-weight: 500; }
+
+/* Print styles */
+@media print {
+  .site-nav, .lnav, .rtoc { display: none !important; }
+  body { background: white; font-size: 12pt; }
+  .shell { grid-template-columns: 1fr; padding: 0; max-width: none; }
+  .content { max-width: none; }
+  section.sec { page-break-inside: avoid; }
+  a { color: var(--t-1); }
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .shell { grid-template-columns: 200px minmax(0, 1fr); }
+  .rtoc { display: none; }
+}
+</style>
+
+</head>
+<body data-screen-label="AI Index Methodology · v1.2">
+
+<!-- ==================== TOP NAV ==================== -->
+<nav class="site-nav" aria-label="Primary">
+  <a class="brand" href="#"><span class="mark"></span>EXASCALE</a>
+  <div class="links">
+    <a href="#">Markets</a>
+    <a href="#" class="active">Methodology</a>
+    <a href="#">Pricing</a>
+    <a href="#">Docs</a>
+    <a href="#">Research</a>
+  </div>
+  <div class="right">
+    <span class="live"><span class="pulse"></span>AI-INDEX 1.0024 ▲ 0.18%</span>
+    <a href="#" class="signin">Sign in</a>
+    <a href="#" class="cta">Open account →</a>
+  </div>
+</nav>
+
+<!-- ==================== PAGE ==================== -->
+<div class="shell">
+
+  <!-- ============ LEFT NAV ============ -->
+  <aside class="lnav" aria-label="Document sections">
+    <div class="lnav-group">
+      <div class="lnav-group-head"><span class="num">I</span>Overview</div>
+      <ul>
+        <li><a href="#sec-1"><span class="pre">§1</span>Executive summary</a></li>
+        <li><a href="#live-box"><span class="pre">··</span>Current index value</a></li>
+      </ul>
+    </div>
+    <div class="lnav-group">
+      <div class="lnav-group-head"><span class="num">II</span>Methodology</div>
+      <ul>
+        <li><a href="#sec-2"><span class="pre">§2</span>Constituent inputs</a></li>
+        <li><a href="#sec-3"><span class="pre">§3</span>Calculation formula</a></li>
+        <li><a href="#sec-4"><span class="pre">§4</span>Outlier filtering</a></li>
+        <li><a href="#sec-5"><span class="pre">§5</span>Volume floor</a></li>
+        <li><a href="#sec-6"><span class="pre">§6</span>Manipulation resistance</a></li>
+      </ul>
+    </div>
+    <div class="lnav-group">
+      <div class="lnav-group-head"><span class="num">III</span>Operations</div>
+      <ul>
+        <li><a href="#sec-7"><span class="pre">§7</span>Publication schedule</a></li>
+        <li><a href="#sec-8"><span class="pre">§8</span>Methodology versioning</a></li>
+        <li><a href="#sec-9"><span class="pre">§9</span>Audit &amp; oversight</a></li>
+      </ul>
+    </div>
+    <div class="lnav-group">
+      <div class="lnav-group-head"><span class="num">IV</span>Data</div>
+      <ul>
+        <li><a href="#sec-10"><span class="pre">§10</span>Historical prints</a></li>
+        <li><a href="#sec-11"><span class="pre">§11</span>Constituent transparency</a></li>
+      </ul>
+    </div>
+    <div class="lnav-group">
+      <div class="lnav-group-head"><span class="num">V</span>Governance</div>
+      <ul>
+        <li><a href="#sec-12"><span class="pre">§12</span>Methodology committee</a></li>
+        <li><a href="#sec-13"><span class="pre">§13</span>Complaint process</a></li>
+        <li><a href="#sec-14"><span class="pre">§14</span>Contact</a></li>
+      </ul>
+    </div>
+  </aside>
+
+  <!-- ============ CONTENT ============ -->
+  <main class="content" id="content">
+
+    <!-- HEADER -->
+    <header class="doc-head">
+      <div class="doc-eyebrow">Methodology · benchmark document</div>
+      <h1 class="doc-title">Exascale AI Index Methodology</h1>
+      <div class="doc-version">
+        <span>Version <strong>1.2</strong></span>
+        <span>Effective <strong>2026-04-01</strong></span>
+        <span>Next review <strong>2026-Q3</strong></span>
+        <span class="pill"><span class="dot"></span>IN EFFECT</span>
+      </div>
+      <div class="downloads">
+        <a class="dl-link" href="#" download>
+          <svg viewBox="0 0 16 16"><path d="M8 2v8M4 7l4 4 4-4M3 13h10"/></svg>
+          <span>PDF · full whitepaper</span>
+          <span class="meta">(486 KB)</span>
+        </a>
+        <a class="dl-link" href="#" download>
+          <svg viewBox="0 0 16 16"><path d="M8 2v8M4 7l4 4 4-4M3 13h10"/></svg>
+          <span>JSON · machine-readable</span>
+          <span class="meta">(12 KB)</span>
+        </a>
+        <a class="dl-link" href="#" download>
+          <svg viewBox="0 0 16 16"><path d="M8 2v8M4 7l4 4 4-4M3 13h10"/></svg>
+          <span>Schema · Avro</span>
+          <span class="meta">(4 KB)</span>
+        </a>
+      </div>
+    </header>
+
+    <!-- LIVE INDEX BOX -->
+    <div class="live-box" id="live-box">
+      <div class="live-box-head">
+        <span>— Current value · AI-INDEX</span>
+        <span class="live"><span class="pulse"></span>Live · refreshed each print</span>
+      </div>
+      <div class="live-box-grid">
+        <div class="live-box-cell">
+          <div class="lbl">Current value</div>
+          <div class="val"><span id="liveValue">$1 = 1,002.4</span><span class="unit">AI credits</span></div>
+          <div class="sub">24h Δ <span style="color: var(--pos);">▲ +0.18%</span> · 30d Δ <span style="color: var(--pos);">▲ +2.31%</span></div>
+        </div>
+        <div class="live-box-cell">
+          <div class="lbl">Last print</div>
+          <div class="val" style="font-size: 18px;">16:00 UTC</div>
+          <div class="sub">2026-05-19 · ref <span style="color: var(--t-1);">0x7a3c91…f042</span></div>
+        </div>
+        <div class="live-box-cell">
+          <div class="lbl">Next print in</div>
+          <div class="val" style="font-size: 22px;" id="countdown">03:24:18</div>
+          <div class="sub">17:00 UTC daily · ICE business days</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- §1 EXECUTIVE SUMMARY -->
+    <section class="sec" id="sec-1">
+      <div class="sec-head">
+        <span class="sec-num">§ 1</span>
+        <h2>Executive summary</h2>
+      </div>
+      <div class="sec-body">
+        <p class="lede">
+          The <strong>Exascale AI Index</strong> is a daily reference price for AI inference, expressed
+          as the number of <em>AI credits</em> redeemable per one United States dollar at print
+          time. The index is computed from observed transactions across the venue's constituent
+          sub-credit markets, weighted by inference category, with statistically robust filtering
+          for outliers and minimum-volume requirements.
+        </p>
+        <p>
+          The index is intended as the canonical reference for cash- or physically-settled
+          derivatives on AI compute, including the Exascale AI-INDEX spot and forward contracts.
+          Its design borrows from established commodity benchmarks (LBMA Gold Price, Brent Dated,
+          CME Henry Hub) and from equity-index methodology (S&amp;P, MSCI) where applicable to a
+          continuously-traded, multi-constituent underlying.
+        </p>
+        <p>
+          This document is normative. Any divergence between this document and an operational
+          implementation is to be treated as a defect in the implementation. The methodology
+          committee (§12) is the authority of last resort on interpretation.
+        </p>
+      </div>
+    </section>
+
+    <!-- §2 CONSTITUENT INPUTS -->
+    <section class="sec" id="sec-2">
+      <div class="sec-head">
+        <span class="sec-num">§ 2</span>
+        <h2>Constituent inputs</h2>
+      </div>
+      <div class="sec-body">
+        <p>
+          The index draws on six observable input streams, each capturing a distinct inference
+          category. Five are spot prices on Exascale sub-credit markets; the sixth is a derived
+          metric of weighted-average inference cost, computed from observed capacity utilisation
+          across the GPU-credit underlying.
+        </p>
+        <ul>
+          <li><strong>Text credit spot.</strong> Median execution price of TEXT-INDEX trades over the calculation window.</li>
+          <li><strong>Speech credit spot.</strong> Median execution price of SPEECH-INDEX trades over the calculation window.</li>
+          <li><strong>Image credit spot.</strong> Median execution price of IMAGE-INDEX trades over the calculation window.</li>
+          <li><strong>Video credit spot.</strong> Median execution price of VIDEO-INDEX trades; thinner book, see §5.</li>
+          <li><strong>Niche credit spot.</strong> Aggregate of long-tail inference categories (embedding, classification, fine-tune).</li>
+          <li><strong>Inference cost average.</strong> Capacity-weighted USD-per-token cost derived from H100 and H200 GPU-credit utilisation; see Appendix A of the full whitepaper.</li>
+        </ul>
+
+        <h3 class="sub">Constituent weights <span class="ix">— effective 2026-04-01</span></h3>
+        <p>
+          Weights are set by the methodology committee at each quarterly review (§8). Weights
+          reflect transaction-volume share over the preceding 90 calendar days, adjusted for
+          inference-category representativeness. The current schedule is reproduced below.
+        </p>
+
+        <table class="tbl" aria-label="Current constituent weights">
+          <thead>
+            <tr>
+              <th>Constituent</th>
+              <th class="num">Weight</th>
+              <th>Source</th>
+              <th class="num">Last update (UTC)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Text credit spot</td><td class="num">0.42</td><td class="mono">EX · TEXT-INDEX</td><td class="num">14:23:18</td></tr>
+            <tr><td>Speech credit spot</td><td class="num">0.08</td><td class="mono">EX · SPEECH-INDEX</td><td class="num">14:18:04</td></tr>
+            <tr><td>Image credit spot</td><td class="num">0.15</td><td class="mono">EX · IMAGE-INDEX</td><td class="num">14:21:51</td></tr>
+            <tr><td>Video credit spot</td><td class="num">0.05</td><td class="mono">EX · VIDEO-INDEX</td><td class="num">13:55:09</td></tr>
+            <tr><td>Niche credit spot</td><td class="num">0.10</td><td class="mono">EX · NICHE-INDEX</td><td class="num">14:10:32</td></tr>
+            <tr><td>Inference cost avg.</td><td class="num">0.20</td><td class="mono">Derived · capacity util.</td><td class="num">14:00:00</td></tr>
+            <tr class="total"><td>Total</td><td class="num">1.00</td><td colspan="2"></td></tr>
+          </tbody>
+        </table>
+        <div class="tbl-cap"><strong>Table 1.</strong> Constituent weights in effect at the time of publication. Subsequent quarterly revisions are linked from <a href="#sec-8">§8</a>.</div>
+      </div>
+    </section>
+
+    <!-- §3 CALCULATION FORMULA -->
+    <section class="sec" id="sec-3">
+      <div class="sec-head">
+        <span class="sec-num">§ 3</span>
+        <h2>Calculation formula</h2>
+      </div>
+      <div class="sec-body">
+        <p>
+          The index value <code>V(t)</code> at print time <code>t</code> is the trimmed,
+          volume-weighted sum of constituent observations across the calculation window
+          <code>[t − Δ, t]</code>:
+        </p>
+
+        <div class="formula-box" aria-label="Equation 1">
+          <div id="formula-1">
+            $$ V(t) \;=\; \mathrm{trimmedMean}_{0.025,\,0.975} \!\left( \sum_{i=1}^{N} P_i(t) \, w_i(t) \right) \times \kappa $$
+          </div>
+          <div class="formula-where">
+            <dl>
+              <dt>P<sub>i</sub>(t)</dt><dd>observed price of constituent <em>i</em> within the calculation window</dd>
+              <dt>w<sub>i</sub>(t)</dt><dd>active weight of constituent <em>i</em> at time <em>t</em>; <span style="font-family: var(--font-mono);">Σ w<sub>i</sub> = 1</span></dd>
+              <dt>N</dt><dd>number of constituents in effect; currently <strong>6</strong></dd>
+              <dt>Δ</dt><dd>calculation window; currently <strong>120 minutes</strong> rolling</dd>
+              <dt>κ</dt><dd>normalization scalar; <strong>1,000</strong> (so the index quotes near unity)</dd>
+            </dl>
+          </div>
+        </div>
+
+        <p>
+          The trimmed mean operator excludes the lowest 2.5% and highest 2.5% of observations
+          within the window before the volume-weighted sum is taken. The operator is applied
+          jointly across all constituents (rather than per-constituent) so that genuine
+          cross-asset moves are preserved while idiosyncratic spikes are suppressed.
+        </p>
+        <p>
+          A reference implementation in Python, with deterministic test vectors covering 18
+          published prints, is distributed with the JSON download above. The reference
+          implementation is the authority for any computational ambiguity in the prose.
+        </p>
+      </div>
+    </section>
+
+    <!-- §4 OUTLIER FILTERING -->
+    <section class="sec" id="sec-4">
+      <div class="sec-head">
+        <span class="sec-num">§ 4</span>
+        <h2>Outlier filtering</h2>
+      </div>
+      <div class="sec-body">
+        <p>
+          The 95% trimmed mean was selected after comparative back-testing against
+          Huber M-estimation, MAD-based winsorisation, and the unmodified arithmetic mean
+          across <em>2,194 simulated prints</em> drawn from observed sub-credit volatility. The
+          trimmed mean is the simplest estimator that meets two requirements:
+          <strong>(i)</strong> a published, auditable cut-off; and
+          <strong>(ii)</strong> bounded influence under a single-counterparty wash-trading attack
+          up to 2.4% of window volume.
+        </p>
+
+        <div class="figure" aria-label="Trimmed mean visualization">
+          <div class="figure-head">
+            <span>— Figure 1 · Trimmed-mean operator</span>
+            <span class="legend">
+              <span><span class="sw" style="background: var(--t-1);"></span>Retained · 95%</span>
+              <span><span class="sw" style="background: var(--sunken); border: 1px solid var(--bd-strong);"></span>Excluded tails · 2 × 2.5%</span>
+            </span>
+          </div>
+          <div class="figure-body">
+            <svg class="hist-svg" viewBox="0 0 720 200" preserveAspectRatio="none" aria-hidden="true">
+              <!-- baseline -->
+              <line x1="20" y1="180" x2="700" y2="180" stroke="rgba(14,14,14,0.20)" stroke-width="1"/>
+
+              <!-- excluded tails (filled) -->
+              <path d="M 20,180 L 20,165 L 40,155 L 60,148 L 80,140 L 80,180 Z" fill="#F2EEE3" stroke="#0E0E0E" stroke-width="1"/>
+              <path d="M 640,180 L 640,140 L 660,148 L 680,160 L 700,170 L 700,180 Z" fill="#F2EEE3" stroke="#0E0E0E" stroke-width="1"/>
+
+              <!-- retained main body -->
+              <path d="M 80,140 L 100,128 L 130,110 L 160,90 L 190,72 L 220,56 L 260,40 L 300,30 L 340,26 L 360,25 L 380,26 L 420,30 L 460,40 L 500,56 L 540,72 L 580,90 L 610,110 L 640,140 L 640,180 L 80,180 Z" fill="#0E0E0E" fill-opacity="0.86"/>
+
+              <!-- cut lines -->
+              <line x1="80" y1="20" x2="80" y2="180" stroke="#0E0E0E" stroke-width="1" stroke-dasharray="3 3"/>
+              <line x1="640" y1="20" x2="640" y2="180" stroke="#0E0E0E" stroke-width="1" stroke-dasharray="3 3"/>
+
+              <!-- center line / mean -->
+              <line x1="360" y1="20" x2="360" y2="180" stroke="#C8F25C" stroke-width="2"/>
+
+              <!-- annotations -->
+              <text x="80" y="14" text-anchor="middle" fill="#4A4A45" font-family="JetBrains Mono" font-size="10" font-weight="600" letter-spacing="0.06em">P₂.₅</text>
+              <text x="640" y="14" text-anchor="middle" fill="#4A4A45" font-family="JetBrains Mono" font-size="10" font-weight="600" letter-spacing="0.06em">P₉₇.₅</text>
+              <text x="360" y="14" text-anchor="middle" fill="#0E0E0E" font-family="JetBrains Mono" font-size="10" font-weight="600" letter-spacing="0.06em">x̄ = V(t)</text>
+
+              <!-- x-axis labels -->
+              <text x="50" y="196" text-anchor="middle" fill="#8A8A82" font-family="JetBrains Mono" font-size="9">2.5%</text>
+              <text x="360" y="196" text-anchor="middle" fill="#8A8A82" font-family="JetBrains Mono" font-size="9">Distribution of constituent-weighted observations · 120-min window</text>
+              <text x="670" y="196" text-anchor="middle" fill="#8A8A82" font-family="JetBrains Mono" font-size="9">2.5%</text>
+            </svg>
+          </div>
+          <div class="figure-cap"><strong>Figure 1.</strong> Stylised distribution of constituent-weighted observations across the calculation window. The two shaded tails (2.5% each) are excluded before the volume-weighted mean is taken.</div>
+        </div>
+
+        <p>
+          The 2.5% trimming threshold may be revised by the methodology committee with not less
+          than 30 calendar days' notice. Any revision triggers a new methodology version
+          (§8).
+        </p>
+      </div>
+    </section>
+
+    <!-- §5 VOLUME FLOOR -->
+    <section class="sec" id="sec-5">
+      <div class="sec-head">
+        <span class="sec-num">§ 5</span>
+        <h2>Volume floor</h2>
+      </div>
+      <div class="sec-body">
+        <p>
+          A valid print requires at least <strong>N = 240</strong> observations across the
+          calculation window, of which not fewer than <strong>20</strong> must originate from
+          each constituent except <em>video credit spot</em>, which has a lower floor of
+          <strong>8</strong> observations in recognition of its thinner book.
+        </p>
+        <p>
+          If the volume floor is not met at any constituent, the print is marked
+          <em>provisional</em> and republished with the next-day reconciliation. If the floor
+          is not met at the aggregate level, no print is issued; the previous print remains
+          the prevailing reference and the methodology committee convenes within four
+          business hours under standing protocol <code>VP-01</code>.
+        </p>
+        <p>
+          In the 18 months of pre-launch observation, the aggregate floor was met on
+          <strong>100.0%</strong> of business days; constituent floors were met on
+          <strong>99.6%</strong> of business days, with three provisional prints, each
+          reconciled within one publication cycle.
+        </p>
+      </div>
+    </section>
+
+    <!-- §6 MANIPULATION RESISTANCE -->
+    <section class="sec" id="sec-6">
+      <div class="sec-head">
+        <span class="sec-num">§ 6</span>
+        <h2>Manipulation resistance</h2>
+      </div>
+      <div class="sec-body">
+        <p>
+          The index incorporates the following defences against attempted manipulation. Each
+          is documented in greater detail in the corresponding annex of the full whitepaper.
+        </p>
+        <ol>
+          <li><strong>Cross-validation against multiple input sources.</strong> Each constituent's spot price is corroborated against the time-weighted mid-quote on the same market; large divergences trigger source isolation.</li>
+          <li><strong>Outlier exclusion via trimmed mean.</strong> See §4. Bounded influence of any single counterparty's window activity.</li>
+          <li><strong>Volume threshold for valid prints.</strong> See §5. A thin book defers to the prior print rather than admitting a thin observation.</li>
+          <li><strong>Surveillance for marking-the-close patterns.</strong> Pattern matching against last-minute order-book pressure, with manual review for matches above the surveillance threshold.</li>
+          <li><strong>Cryptographic audit chain on all prints.</strong> Each daily print is hashed and chained to the prior print; the chain root is published to a third-party transparency log within 60 seconds of issuance.</li>
+          <li><strong>Member-trading restrictions.</strong> Methodology committee members are subject to a 5-day cooling-off window around methodology revisions and may not hold proprietary positions in any constituent during their tenure.</li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- §7 PUBLICATION SCHEDULE -->
+    <section class="sec" id="sec-7">
+      <div class="sec-head">
+        <span class="sec-num">§ 7</span>
+        <h2>Publication schedule</h2>
+      </div>
+      <div class="sec-body">
+        <p>
+          The Exascale AI Index is published once per ICE business day at <strong>17:00 UTC</strong>.
+          Publication latency is targeted at &lt; 60 seconds from the close of the calculation
+          window; the observed median latency in 2026-Q1 was 14 seconds.
+        </p>
+        <p>
+          A continuous intraday <em>indicative</em> value is also computed at five-second intervals
+          and disseminated over the market data feed under the symbol <code>AI-INDEX.IV</code>.
+          The intraday indicative is for reference only and does not constitute a published print.
+        </p>
+        <p>
+          Holiday and exceptional-event handling follows the schedule maintained at
+          <a href="#">exascale.com/calendar</a>. No print is issued on days where the venue is closed.
+        </p>
+      </div>
+    </section>
+
+    <!-- §8 METHODOLOGY VERSIONING -->
+    <section class="sec" id="sec-8">
+      <div class="sec-head">
+        <span class="sec-num">§ 8</span>
+        <h2>Methodology versioning</h2>
+      </div>
+      <div class="sec-body">
+        <p>
+          Methodology revisions follow semantic versioning with the following correspondence:
+          <strong>major</strong> changes (formula structure, constituent set) carry a 90-day
+          consultation period; <strong>minor</strong> changes (weight schedule, trimming
+          threshold) carry a 30-day notification period; <strong>patch</strong> changes
+          (typographical, clarification of intent) take effect at publication and do not
+          re-rebase historical prints.
+        </p>
+
+        <table class="tbl" aria-label="Methodology version history">
+          <thead>
+            <tr>
+              <th>Version</th>
+              <th>Effective</th>
+              <th>Class</th>
+              <th>Summary</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td class="mono">1.2</td><td class="mono">2026-04-01</td><td>Minor</td><td>Weight schedule rebalanced; video credit weight lowered to 0.05 (from 0.07).</td></tr>
+            <tr><td class="mono">1.1</td><td class="mono">2026-01-08</td><td>Patch</td><td>Clarified provisional-print reconciliation under §5.</td></tr>
+            <tr><td class="mono">1.0</td><td class="mono">2025-10-15</td><td>Major</td><td>Initial release. Six constituents; 120-minute window; 95% trimming.</td></tr>
+            <tr><td class="mono">0.9</td><td class="mono">2025-07-01</td><td>Major</td><td>Pre-launch pilot (consultation draft, no live prints).</td></tr>
+          </tbody>
+        </table>
+        <div class="tbl-cap"><strong>Table 2.</strong> Methodology version history. Earlier consultation drafts available on request.</div>
+      </div>
+    </section>
+
+    <!-- §9 AUDIT & OVERSIGHT -->
+    <section class="sec" id="sec-9">
+      <div class="sec-head">
+        <span class="sec-num">§ 9</span>
+        <h2>Audit and oversight</h2>
+      </div>
+      <div class="sec-body">
+        <p>
+          The methodology is reviewed quarterly by the Exascale Methodology Committee (§12)
+          and audited annually by an independent third-party benchmark administrator. The
+          audit covers (a) conformity of the operational implementation to this document,
+          (b) integrity of the cryptographic audit chain, and (c) governance practices of the
+          methodology committee.
+        </p>
+        <div class="callout">
+          <span class="lbl">Independent auditor</span>
+          <p style="margin: 0;">
+            <em>[Auditor name to be confirmed — appointment under review by the Audit and
+            Oversight Committee. Expected attestation: ISAE 3000 (Revised), with scope per
+            IOSCO Principles for Financial Benchmarks.]</em>
+            <br/>
+            <a href="#" style="font-family: var(--font-sans); font-size: 13px;">Audit reports archive →</a>
+          </p>
+        </div>
+        <p>
+          The audit chain is rooted in a third-party transparency log operated by the
+          <em>Cloudflare Merkle Town</em> service (RFC 6962). Independent verifiers may
+          reconstruct the entire history of prints from the published audit roots and the
+          per-print JSON manifests distributed under
+          <a href="#">data.exascale.com/index/v1/</a>.
+        </p>
+      </div>
+    </section>
+
+    <!-- §10 HISTORICAL PRINTS -->
+    <section class="sec" id="sec-10">
+      <div class="sec-head">
+        <span class="sec-num">§ 10</span>
+        <h2>Historical prints</h2>
+      </div>
+      <div class="sec-body">
+        <p>
+          The chart below renders the full series of daily index prints from launch
+          (2025-10-15) to the most recent business day. The index was normalised to a value of
+          <strong>1.0000</strong> at launch; the most recent print is
+          <strong>1.0024</strong>, a year-to-date change of <strong>+4.18%</strong>.
+        </p>
+
+        <div class="chart-card">
+          <div class="chart-head">
+            <h3 class="ttl">AI-INDEX · daily prints<span class="meta">· since launch · 217 business days</span></h3>
+            <div class="ranges" id="histRanges">
+              <button class="r" data-r="90">90D</button>
+              <button class="r" data-r="180">180D</button>
+              <button class="r active" data-r="365">1Y</button>
+              <button class="r" data-r="all">ALL</button>
+            </div>
+          </div>
+          <div class="chart-body">
+            <div class="chart-canvas-wrap"><canvas id="histChart"></canvas></div>
+          </div>
+          <div class="chart-foot">
+            <span>Source · EX market data feed · published prints only · normalised to 1.0000 at launch</span>
+            <a href="#" download>Download full historical data (CSV) →</a>
+          </div>
+        </div>
+
+        <p>
+          Prints prior to launch are not included; the consultation-period pilot
+          (versions 0.9 — 0.9.4) was a paper exercise and did not include settlement.
+          Researchers requesting the pilot series should contact
+          <a href="/cdn-cgi/l/email-protection#f29f97869a9d969d9e9d958bb2978a938191939e97dc919d9f"><span class="__cf_email__" data-cfemail="a4c9c1d0cccbc0cbc8cbc3dde4c1dcc5d7c7c5c8c18ac7cbc9">[email&#160;protected]</span></a>.
+        </p>
+      </div>
+    </section>
+
+    <!-- §11 CONSTITUENT TRANSPARENCY -->
+    <section class="sec" id="sec-11">
+      <div class="sec-head">
+        <span class="sec-num">§ 11</span>
+        <h2>Constituent transparency</h2>
+      </div>
+      <div class="sec-body">
+        <p>
+          Per-constituent observed prices, window-volume figures, and exclusion counts are
+          published with each print under the JSON manifest. The manifest is fully signed and
+          chained to the audit log described in §9, and is downloadable on a five-second
+          delay over the public data API.
+        </p>
+        <p>
+          Subscribers to the institutional data feed receive the full per-fill detail in
+          real time, including taker / maker flags, counterparty bucket (member /
+          non-member), and the maker–taker contribution to each constituent's window-volume.
+        </p>
+      </div>
+    </section>
+
+    <!-- §12 METHODOLOGY COMMITTEE -->
+    <section class="sec" id="sec-12">
+      <div class="sec-head">
+        <span class="sec-num">§ 12</span>
+        <h2>Methodology committee</h2>
+      </div>
+      <div class="sec-body">
+        <p>
+          The methodology committee is responsible for (a) the quarterly review of constituent
+          weights, (b) extraordinary reviews triggered under the volume-floor protocol (§5),
+          and (c) approval of any methodology revision. Membership is mixed internal and
+          external; the external chair holds a casting vote.
+        </p>
+
+        <div class="committee">
+          <div class="member">
+            <div class="name">Dr. Rina Halpern</div>
+            <div class="role">Chair · External</div>
+            <div class="bio">Formerly Head of Index Research, FTSE Russell. Independent appointment, three-year term commencing 2025-09-01.</div>
+          </div>
+          <div class="member">
+            <div class="name">Marcus Kapoor</div>
+            <div class="role">Vice-chair · Internal</div>
+            <div class="bio">Chief Risk Officer, Exascale Markets. Non-voting on weight-schedule revisions per cooling-off rule.</div>
+          </div>
+          <div class="member">
+            <div class="name">Yui Tanaka</div>
+            <div class="role">Member · External</div>
+            <div class="bio">Director, Quantitative Research, Nomura Holdings. Two-year term.</div>
+          </div>
+          <div class="member">
+            <div class="name">Léon Beaumont</div>
+            <div class="role">Member · External</div>
+            <div class="bio">Adjunct Professor of Market Microstructure, INSEAD; formerly Deutsche Börse Index.</div>
+          </div>
+          <div class="member">
+            <div class="name">Priya Rao</div>
+            <div class="role">Member · Internal</div>
+            <div class="bio">Head of Market Data, Exascale Markets. Non-voting on revisions affecting data products.</div>
+          </div>
+          <div class="member">
+            <div class="name">Dr. Aiden O'Connell</div>
+            <div class="role">Observer · External</div>
+            <div class="bio">Representative of the audit firm; observer capacity, no vote.</div>
+          </div>
+        </div>
+
+        <p>
+          Committee minutes for non-confidential portions of each session are published at
+          <a href="#">exascale.com/methodology/committee/minutes</a> within ten business days
+          of the session.
+        </p>
+      </div>
+    </section>
+
+    <!-- §13 COMPLAINT PROCESS -->
+    <section class="sec" id="sec-13">
+      <div class="sec-head">
+        <span class="sec-num">§ 13</span>
+        <h2>Complaint process</h2>
+      </div>
+      <div class="sec-body">
+        <p>
+          Any market participant, vendor, or member of the public may submit a complaint
+          regarding the integrity of a print, the conduct of the methodology committee, or
+          the operation of the audit chain. Complaints are received at
+          <a href="/cdn-cgi/l/email-protection#82e1edeff2eee3ebecf6f1c2e7fae3f1e1e3eee7ace1edef"><span class="__cf_email__" data-cfemail="3e5d51534e525f57504a4d7e5b465f4d5d5f525b105d5153">[email&#160;protected]</span></a> and
+          acknowledged within two business days.
+        </p>
+        <p>
+          Substantive complaints are investigated within ten business days. Where the
+          investigation cannot be completed within the standard window, the complainant is
+          notified of an extended timetable. Resolution outcomes are published in
+          anonymised form at <a href="#">exascale.com/methodology/complaints</a>.
+        </p>
+      </div>
+    </section>
+
+    <!-- §14 CONTACT -->
+    <section class="sec" id="sec-14">
+      <div class="sec-head">
+        <span class="sec-num">§ 14</span>
+        <h2>Contact</h2>
+      </div>
+      <div class="sec-body">
+        <p>
+          General methodology enquiries:
+          <a href="/cdn-cgi/l/email-protection#d3beb6a7bbbcb7bcbfbcb4aa93b6abb2a0b0b2bfb6fdb0bcbe"><span class="__cf_email__" data-cfemail="a4c9c1d0cccbc0cbc8cbc3dde4c1dcc5d7c7c5c8c18ac7cbc9">[email&#160;protected]</span></a>.
+          Audit-chain and reconciliation enquiries:
+          <a href="/cdn-cgi/l/email-protection#68091d0c011c280d10091b0b09040d460b0705"><span class="__cf_email__" data-cfemail="660713020f1226031e071505070a034805090b">[email&#160;protected]</span></a>.
+          Media enquiries should be routed through
+          <a href="/cdn-cgi/l/email-protection#7d0d0f180e0e3d18051c0e1e1c1118531e1210"><span class="__cf_email__" data-cfemail="f28280978181b2978a938191939e97dc919d9f">[email&#160;protected]</span></a>.
+        </p>
+        <p>
+          Exascale Markets · 200 Pine Street · San Francisco, CA 94104 · United States.
+          For corporate registration and counterparty diligence, see
+          <a href="#">exascale.com/legal/entity</a>.
+        </p>
+      </div>
+    </section>
+
+    <!-- FOOTNOTES -->
+    <div class="footnote">
+      <p><sup>1</sup> The Exascale AI Index is a non-investible benchmark. Any reference to <em>"investing"</em> in the index refers to investment in derivatives whose settlement value is determined by reference to a print of the index.</p>
+      <p><sup>2</sup> The trimmed mean is the operator <em>x̄<sub>α,β</sub>(X) := mean({ x ∈ X : Q<sub>α</sub>(X) ≤ x ≤ Q<sub>β</sub>(X) })</em>, where Q is the empirical quantile function.</p>
+      <p><sup>3</sup> Cloudflare Merkle Town is referenced for illustrative purposes; the production audit log provider will be confirmed in the next minor revision.</p>
+    </div>
+
+    <!-- PAGE FOOTER -->
+    <div class="doc-foot">
+      <div class="contacts">
+        <span><a href="/cdn-cgi/l/email-protection#0e636b7a66616a61626169774e6b766f7d6d6f626b206d6163"><span class="__cf_email__" data-cfemail="59343c2d31363d3635363e20193c21382a3a38353c773a3634">[email&#160;protected]</span></a></span>
+        <span><a href="/cdn-cgi/l/email-protection#08697d6c617c486d70697b6b69646d266b6765"><span class="__cf_email__" data-cfemail="e58490818c91a5809d849686848980cb868a88">[email&#160;protected]</span></a></span>
+      </div>
+      <div class="vers">
+        <div class="v">Methodology v1.2</div>
+        <div>Last updated 2026-04-01</div>
+        <div>This document supersedes all prior methodology documents.</div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ============ RIGHT TOC ============ -->
+  <aside class="rtoc" aria-label="On this page">
+    <div class="rtoc-head">— On this page</div>
+    <ul id="rtocList">
+      <li><a href="#sec-1">Executive summary</a></li>
+      <li><a href="#sec-2">Constituent inputs</a></li>
+      <li><a href="#sec-3">Calculation formula</a></li>
+      <li><a href="#sec-4">Outlier filtering</a></li>
+      <li><a href="#sec-5">Volume floor</a></li>
+      <li><a href="#sec-6">Manipulation resistance</a></li>
+      <li><a href="#sec-7">Publication schedule</a></li>
+      <li><a href="#sec-8">Methodology versioning</a></li>
+      <li><a href="#sec-9">Audit &amp; oversight</a></li>
+      <li><a href="#sec-10">Historical prints</a></li>
+      <li><a href="#sec-11">Constituent transparency</a></li>
+      <li><a href="#sec-12">Methodology committee</a></li>
+      <li><a href="#sec-13">Complaint process</a></li>
+      <li><a href="#sec-14">Contact</a></li>
+    </ul>
+    <div class="rtoc-meta">
+      <strong>v1.2</strong> · Effective 2026-04-01<br/>
+      Next quarterly review: <strong>2026-Q3</strong>
+    </div>
+  </aside>
+
+</div>
+
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+// ============================================================
+// KaTeX render
+// ============================================================
+document.addEventListener("DOMContentLoaded", () => {
+  if (window.renderMathInElement) {
+    renderMathInElement(document.body, {
+      delimiters: [{ left: "$$", right: "$$", display: true }, { left: "\\(", right: "\\)", display: false }],
+      throwOnError: false,
+    });
+  } else {
+    // KaTeX loaded with defer — wait for it
+    setTimeout(() => {
+      if (window.renderMathInElement) {
+        renderMathInElement(document.body, {
+          delimiters: [{ left: "$$", right: "$$", display: true }],
+          throwOnError: false,
+        });
+      }
+    }, 200);
+  }
+});
+
+// ============================================================
+// Countdown — next print at 17:00 UTC
+// ============================================================
+(function countdown() {
+  const el = document.getElementById('countdown');
+  if (!el) return;
+  function tick() {
+    const now = new Date();
+    const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 17, 0, 0));
+    if (next <= now) next.setUTCDate(next.getUTCDate() + 1);
+    const diff = next - now;
+    const h = Math.floor(diff / 3.6e6);
+    const m = Math.floor((diff % 3.6e6) / 6e4);
+    const s = Math.floor((diff % 6e4) / 1e3);
+    el.textContent = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  }
+  tick();
+  setInterval(tick, 1000);
+})();
+
+// ============================================================
+// Scrollspy — left nav + right TOC
+// ============================================================
+(function scrollspy() {
+  const sections = [...document.querySelectorAll('section.sec')];
+  const leftLinks = new Map();
+  document.querySelectorAll('.lnav a[href^="#sec-"]').forEach(a => leftLinks.set(a.getAttribute('href').slice(1), a));
+  const rightLinks = new Map();
+  document.querySelectorAll('.rtoc a[href^="#sec-"]').forEach(a => rightLinks.set(a.getAttribute('href').slice(1), a));
+
+  function setActive(id) {
+    leftLinks.forEach((a, k) => a.classList.toggle('active', k === id));
+    rightLinks.forEach((a, k) => a.classList.toggle('active', k === id));
+  }
+
+  const io = new IntersectionObserver((entries) => {
+    let best = null;
+    for (const e of entries) {
+      if (e.isIntersecting && (!best || e.intersectionRatio > best.intersectionRatio)) best = e;
+    }
+    if (best) setActive(best.target.id);
+  }, { rootMargin: '-30% 0px -60% 0px', threshold: [0, 0.25, 0.5, 1] });
+
+  sections.forEach(s => io.observe(s));
+})();
+
+// ============================================================
+// Historical chart — Chart.js, with realistic mock series
+// ============================================================
+(function buildHistorical() {
+  const ctx = document.getElementById('histChart').getContext('2d');
+
+  // Generate 365 business-day series ending at 1.0024, normalised to 1.0000 at launch
+  // Drift up with occasional 5-10% drawdowns
+  function build(days) {
+    const N = days;
+    const out = [];
+    let val = 1.0000;
+    const startVal = 1.0000;
+    const endVal = 1.0024;
+    // build trend
+    for (let i = 0; i < N; i++) {
+      // small daily drift
+      const drift = (endVal - startVal) / N;
+      // noise: small + occasional drawdowns
+      const small = (Math.sin(i * 0.42) + Math.cos(i * 0.27)) * 0.0015;
+      const noise = (Math.random() - 0.5) * 0.0018;
+      // drawdown clusters
+      const ddPhase = Math.sin(i * 0.04) - 0.65;
+      const dd = ddPhase > 0 ? -ddPhase * 0.012 : 0;
+      val += drift + small + noise + dd;
+      out.push(val);
+    }
+    // pin endpoints
+    const last = out[out.length - 1];
+    const lift = endVal - last;
+    for (let i = 0; i < out.length; i++) out[i] += lift * (i / (out.length - 1));
+    out[0] = startVal;
+    out[out.length - 1] = endVal;
+    return out;
+  }
+
+  // Generate dates ending at 2026-05-19, weekdays only
+  function dates(days) {
+    const out = [];
+    const end = new Date('2026-05-19T17:00:00Z');
+    let d = new Date(end);
+    let count = 0;
+    while (count < days) {
+      const wd = d.getUTCDay();
+      if (wd !== 0 && wd !== 6) {
+        out.unshift(new Date(d));
+        count++;
+      }
+      d.setUTCDate(d.getUTCDate() - 1);
+    }
+    return out;
+  }
+
+  const allDays = 217; // since launch
+  const fullDates = dates(allDays);
+  const fullVals  = build(allDays);
+  const fullLabels = fullDates.map(d => d.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: '2-digit' }));
+  // mutable slice for ticks/tooltip
+  let currentDates = fullDates;
+
+  // gradient
+  const grad = ctx.createLinearGradient(0, 0, 0, 240);
+  grad.addColorStop(0, 'rgba(14,14,14,0.10)');
+  grad.addColorStop(1, 'rgba(14,14,14,0.00)');
+
+  const chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: fullLabels,
+      datasets: [{
+        label: 'AI-INDEX',
+        data: fullVals,
+        borderColor: '#0E0E0E',
+        borderWidth: 1.4,
+        backgroundColor: grad,
+        fill: true,
+        tension: 0.15,
+        pointRadius: 0,
+        pointHoverRadius: 3,
+        pointHoverBackgroundColor: '#fff',
+        pointHoverBorderColor: '#0E0E0E',
+        pointHoverBorderWidth: 1.5,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#FFFFFF',
+          borderColor: 'rgba(14,14,14,0.20)',
+          borderWidth: 1,
+          padding: 10,
+          cornerRadius: 2,
+          titleColor: '#4A4A45',
+          bodyColor: '#0E0E0E',
+          titleFont: { family: "'JetBrains Mono', monospace", size: 10, weight: '600' },
+          bodyFont:  { family: "'JetBrains Mono', monospace", size: 12 },
+          displayColors: false,
+          callbacks: {
+            title: (items) => {
+              const d = currentDates[items[0].dataIndex];
+              return d.toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+            },
+            label: (item) => 'AI-INDEX  ' + item.parsed.y.toFixed(4),
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: 'category',
+          grid: { display: false },
+          border: { color: 'rgba(14,14,14,0.20)' },
+          ticks: {
+            color: '#8A8A82',
+            font: { family: "'JetBrains Mono', monospace", size: 10 },
+            maxRotation: 0,
+            autoSkip: true,
+            maxTicksLimit: 8,
+            callback: function(value, idx) {
+              const d = currentDates[idx];
+              if (!d) return '';
+              return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+            }
+          }
+        },
+        y: {
+          position: 'right',
+          grid: { color: 'rgba(14,14,14,0.06)' },
+          border: { display: false },
+          ticks: {
+            color: '#8A8A82',
+            font: { family: "'JetBrains Mono', monospace", size: 10 },
+            callback: (v) => v.toFixed(4),
+            padding: 8,
+          }
+        }
+      }
+    }
+  });
+
+  // range tabs
+  document.getElementById('histRanges').addEventListener('click', (e) => {
+    const btn = e.target.closest('.r');
+    if (!btn) return;
+    document.querySelectorAll('#histRanges .r').forEach(r => r.classList.toggle('active', r === btn));
+    const r = btn.dataset.r;
+    let n = allDays;
+    if (r !== 'all') n = Math.min(parseInt(r, 10), allDays);
+    chart.data.labels = fullLabels.slice(-n);
+    chart.data.datasets[0].data = fullVals.slice(-n);
+    currentDates = fullDates.slice(-n);
+    chart.update();
+  });
+
+  // Ensure initial paint after layout settles (the canvas is far below the
+  // initial viewport so the first auto-draw can land before the wrapper has
+  // a measured height in some browsers).
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => chart.resize());
+  });
+  window.addEventListener('load', () => chart.resize());
+})();
+</script>
+
+</body>
+</html>

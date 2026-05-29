@@ -1,0 +1,50 @@
+# Exascale event contract — inference.usage.v1
+# One event per inference request, emitted by inference-gateway AFTER the response stream closes.
+# Consumed by credit-ledger (drives the sub-credit debit) and analytics. Owned by inference-ml.
+# The debit is idempotent on request_id. See docs/contracts/credit-types.md §2 for modality→credit.
+
+subject: inference.usage.v1
+transport: NATS JetStream
+version: 1.0.0
+description: Billable usage for one inference request. The ledger debits `credit_type` by `units`.
+
+payload_schema:
+  $schema: "https://json-schema.org/draft/2020-12/schema"
+  title: InferenceUsageV1
+  type: object
+  additionalProperties: false
+  required: [request_id, tenant_id, model, credit_type, units, is_paper, ts]
+  properties:
+    request_id:     { type: string, description: "unique per request; the ledger debit idempotency key" }
+    tenant_id:      { type: string, format: uuid }
+    sub_account_id: { type: [string, "null"], format: uuid }
+    model:          { type: string, description: "catalog model id, e.g. 'llama-3.1-70b'" }
+    modality:       { type: string, enum: [text, speech, image, video, embeddings] }
+    credit_type:
+      type: string
+      description: "the sub-credit to debit (mapped from modality per credit-types.md §2)"
+      enum: [text, speech, image, video, embeddings]
+    input_tokens:   { type: [integer, "null"], minimum: 0 }
+    output_tokens:  { type: [integer, "null"], minimum: 0 }
+    units:          { type: string, description: "billable amount to debit, fixed-point decimal string" }
+    latency_ms:     { type: [integer, "null"], minimum: 0 }
+    served_by_pod:  { type: [string, "null"], description: "inference-runtime pod that served it" }
+    supply_source_id: { type: [string, "null"], description: "owned DC or partner id that provided the GPU" }
+    is_paper:       { type: boolean }
+    ts:             { type: string, format: date-time }
+
+example:
+  request_id: "infreq_01Hf…"
+  tenant_id: "1f2e…"
+  sub_account_id: null
+  model: "llama-3.1-8b"
+  modality: text
+  credit_type: text
+  input_tokens: 312
+  output_tokens: 188
+  units: "12.500000"
+  latency_ms: 740
+  served_by_pod: "vllm-llama8b-7c9"
+  supply_source_id: "dc-owned-1"
+  is_paper: true
+  ts: "2026-06-01T12:00:00Z"

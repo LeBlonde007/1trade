@@ -1,0 +1,23 @@
+[build]
+  command = "npm run generate"
+  publish = "dist"
+
+# Single-Page App fallback — unmatched paths render via the Nuxt SPA shell.
+# Pre-rendered pages (e.g. /trade/index.html) are served first by Netlify,
+# so this only fires for true unknowns (handled by the [...slug].vue catch-all).
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Long-cache content-hashed Nuxt assets
+[[headers]]
+  for = "/_nuxt/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Short-cache HTML so updates propagate
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "public, max-age=3600, must-revalidate"

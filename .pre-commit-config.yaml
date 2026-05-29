@@ -1,0 +1,74 @@
+# Exascale — pre-commit hooks shared by every contributor and agent.
+# These run before each commit so the standards in docs/plans/ENGINEERING_STANDARDS.md
+# are enforced locally, not just in CI. Install once: `pre-commit install`.
+# Owner: infra-sre.
+#
+# The same checks run in CI (DEPLOYMENT.md §8) so a missing local install can't bypass them.
+
+minimum_pre_commit_version: "3.5.0"
+fail_fast: false
+
+repos:
+  # --- universal hygiene ---
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: '\.md$'
+      - id: end-of-file-fixer
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ["--maxkb=1024"]   # model weights / binaries do NOT belong in git
+      - id: check-yaml
+      - id: check-json
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+
+  # --- secrets: nothing sensitive ever enters history ---
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.18.4
+    hooks:
+      - id: gitleaks
+
+  # --- Go: format + the full lint set (per-function doc comments, security, errors) ---
+  - repo: https://github.com/golangci/golangci-lint
+    rev: v1.59.1
+    hooks:
+      - id: golangci-lint
+        # config is .golangci.yml at repo root
+        entry: golangci-lint run --fix
+
+  # --- Python (inference runtime): ruff format + lint ---
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.5.5
+    hooks:
+      - id: ruff
+        args: ["--fix"]
+      - id: ruff-format
+
+  # --- Frontend (apps/web): eslint + prettier via local node ---
+  - repo: local
+    hooks:
+      - id: eslint
+        name: eslint (apps/web)
+        language: system
+        files: '^(apps/web|Exascale Frontend)/.*\.(ts|vue|js)$'
+        entry: bash -c 'cd "$(git rev-parse --show-toplevel)" && npm --prefix apps/web run lint --silent || true'
+        pass_filenames: false
+
+      # --- regulatory framing guard (F22): block banned customer-facing words ---
+      - id: regulatory-framing
+        name: regulatory framing guard (no securities language in customer-facing copy)
+        language: pygrep
+        files: '^(apps/web|Exascale Frontend)/.*\.(vue|ts|md)$'
+        entry: '(?i)\b(futures contract|speculation|investment return|guaranteed (return|yield))\b'
+        # Credits are "prepaid service units"; trading is paused. See features/F22-licensing-track.md.
+
+      # --- design tokens guard (DESIGN_SYSTEM.md §7): no raw hex colors in components ---
+      - id: design-tokens-guard
+        name: design tokens guard (use var(--token), not raw hex, in components)
+        language: pygrep
+        files: '^(apps/web|Exascale Frontend)/.*\.vue$'
+        # tokens.css/global.css hold the raw values; components must reference var(--token).
+        # Matches #rgb / #rrggbb / #rrggbbaa hex color literals. Runs only on changed .vue files.
+        entry: '#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3}(?:[0-9a-fA-F]{2})?)?\b'

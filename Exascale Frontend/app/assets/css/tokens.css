@@ -1,0 +1,163 @@
+/* =====================================================
+   EXASCALE — Canonical Design Tokens
+   Single source of truth. Changing a value here propagates everywhere.
+   Reconciled from:
+     - brand-book.css (canonical for light surfaces, type, radii, brand)
+     - Exascale Trading Dashboard.html (canonical for dark trading surfaces)
+   See /DESIGN-DECISIONS.md for reconciliation notes.
+   ===================================================== */
+
+/* ─── Light theme (marketing / onboarding / methodology) ───
+   Selectors include both :root and bare [data-theme="light"] so a page can
+   scope a theme to any wrapper div (e.g. <div data-theme="light"> inside a
+   dark page). Without the second selector the dark theme set on a div would
+   silently fall back to light tokens. */
+:root,
+:root[data-theme="light"],
+[data-theme="light"] {
+  /* Surfaces */
+  --canvas:           #FAFAF7;   /* page background (warm cream) */
+  --elevated:         #FFFFFF;   /* cards, raised surfaces */
+  --sunken:           #F2EEE3;   /* subtle/recessed sections */
+  --inverse:          #0E0E0E;   /* dark inverse blocks within light pages */
+
+  /* Text */
+  --text:             #0E0E0E;
+  --text-2:           #4A4A45;   /* secondary text */
+  --text-3:           #8A8A82;   /* tertiary, eyebrows, meta */
+  --text-inverse:     #EAE6DA;   /* text on dark inverse blocks */
+  --text-on-accent:   #0E0E0E;   /* text on lime brand accent */
+
+  /* Borders */
+  --border:           #E4E0D6;
+  --border-strong:    #C9C5B8;
+  --border-on-dark:   rgba(234, 230, 218, 0.16);
+  --border-focus:     #C8F25C;   /* focus ring = brand lime */
+
+  /* Semantic — institutional financial */
+  --pos:              #16A34A;   /* gains / buy / long */
+  --pos-soft:         rgba(22, 163, 74, 0.12);
+  --neg:              #DC2626;   /* losses / sell / short */
+  --neg-soft:         rgba(220, 38, 38, 0.12);
+  --warn:             #D97706;
+  --info:             #0369A1;
+}
+
+/* ─── Dark theme (trading app: /trade, /markets/*, /wallet, /portfolio) ───
+   Same dual-selector pattern as light — needed because the app layout sets
+   data-theme="dark" on a wrapper div, not on :root. */
+:root[data-theme="dark"],
+[data-theme="dark"],
+.dark {
+  /* Surfaces (slightly cooler than brand-book inverse to match trading UI) */
+  --canvas:           #0A0B0E;
+  --elevated:         #14161B;
+  --overlay:          #1C1F26;
+  --hover:            #1F2229;
+  --inverse:          #FAFAF7;   /* light inverse for light blocks within dark pages */
+
+  /* Text */
+  --text:             #E8E6E0;
+  --text-2:           #9A9A95;
+  --text-3:           #5F5F5C;
+  --text-inverse:     #0E0E0E;
+  --text-on-accent:   #0E0E0E;
+
+  /* Borders */
+  --border:           rgba(255, 255, 255, 0.08);
+  --border-strong:    rgba(255, 255, 255, 0.14);
+  --border-on-dark:   rgba(255, 255, 255, 0.08);
+  --border-focus:     #C8F25C;
+
+  /* Semantic — trading UI tuned (slightly brighter, reads on dark) */
+  --pos:              #19C37D;
+  --pos-soft:         rgba(25, 195, 125, 0.12);
+  --pos-bar:          rgba(25, 195, 125, 0.16);
+  --neg:              #EF4444;
+  --neg-soft:         rgba(239, 68, 68, 0.12);
+  --neg-bar:          rgba(239, 68, 68, 0.16);
+  --warn:             #F59E0B;
+  --info:             #4A90E2;
+}
+
+/* ─── Cross-theme primitives — never change between themes ─── */
+:root {
+  /* Brand — locked across themes */
+  --brand:            #C8F25C;
+  --brand-hov:        #B8E548;
+  --brand-orange:     #F5A623;
+  --brand-blue:       #4A90E2;
+  --brand-yellow:     #F5D24B;
+  --accent:           #4A90E2;   /* alias for compatibility */
+
+  /* Typography stacks */
+  --font-display:     'Inter Tight', 'Inter', system-ui, -apple-system, sans-serif;
+  --font-sans:        'Inter Tight', 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono:        'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* Spacing scale — 4px base. Use ONLY these. */
+  --sp-1:  4px;
+  --sp-2:  8px;
+  --sp-3:  12px;
+  --sp-4:  16px;
+  --sp-5:  24px;
+  --sp-6:  32px;
+  --sp-7:  48px;
+  --sp-8:  64px;
+  --sp-9:  96px;
+  --sp-10: 128px;
+
+  /* Radii — sharp, institutional */
+  --radius-none: 0;
+  --radius-sm:   2px;
+  --radius-md:   4px;
+  --radius-lg:   6px;
+  --radius-xl:   8px;
+  --radius-full: 999px;
+
+  /* Type scale */
+  --fs-tiny: 10px;   /* uppercase labels */
+  --fs-xs:   11px;
+  --fs-sm:   13px;
+  --fs-base: 14px;   /* body in dense UI */
+  --fs-md:   16px;   /* body in marketing */
+  --fs-lg:   18px;
+  --fs-xl:   22px;
+  --fs-2xl:  28px;
+  --fs-3xl:  32px;
+  --fs-4xl:  48px;
+  --fs-5xl:  52px;
+  --fs-6xl:  64px;
+  --fs-7xl:  96px;   /* hero display */
+
+  /* Line heights */
+  --lh-tight:  1.05;
+  --lh-snug:   1.2;
+  --lh-base:   1.45;
+  --lh-relax:  1.6;
+
+  /* Letter spacing */
+  --ls-tight:  -0.04em;   /* hero display */
+  --ls-snug:   -0.03em;   /* section title */
+  --ls-near:   -0.015em;  /* h4 */
+  --ls-base:    0;
+  --ls-tab:     0.06em;   /* uppercase meta */
+  --ls-wide:    0.18em;   /* uppercase labels */
+  --ls-extra:   0.24em;   /* hero eyebrow */
+
+  /* Motion */
+  --dur-fast:   120ms;
+  --dur:        180ms;
+  --dur-slow:   320ms;
+  --ease:       cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Shadows */
+  --shadow-1:   0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-2:   0 4px 16px rgba(0, 0, 0, 0.3);
+
+  /* Layout */
+  --nav-w:      280px;       /* brand-book sidebar */
+  --app-sb-w:   64px;        /* trading-app icon sidebar */
+  --topbar-h:   56px;
+  --content-max: 1280px;
+}

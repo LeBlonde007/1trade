@@ -1,0 +1,35 @@
+# Exascale — editor defaults shared by every agent and contributor.
+# See docs/plans/ENGINEERING_STANDARDS.md §4 for the per-language rationale.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+max_line_length = 100
+
+# Go uses tabs (gofmt is law).
+[*.go]
+indent_style = tab
+indent_size = 4
+
+[*.{mod,sum}]
+indent_style = tab
+
+# Python (inference runtime) — PEP 8 / ruff.
+[*.py]
+indent_size = 4
+
+# Markdown — keep trailing whitespace off but allow hard line breaks where intended.
+[*.md]
+trim_trailing_whitespace = false
+
+# Makefiles require tabs.
+[Makefile]
+indent_style = tab
+
+[{*.mk,**/Makefile}]
+indent_style = tab

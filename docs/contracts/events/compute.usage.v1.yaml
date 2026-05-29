@@ -1,0 +1,44 @@
+# Exascale event contract — compute.usage.v1
+# One event per metered GPU-usage interval, emitted by compute-control. Consumed by credit-ledger
+# (drives the gpu_* debit) and settlement-trust (partner payout attribution via supply_source_id).
+# Owned by compute-platform. Debit is idempotent on usage_id.
+
+subject: compute.usage.v1
+transport: NATS JetStream
+version: 1.0.0
+description: Billable GPU usage for one metered interval (per-second metering, batched per interval).
+
+payload_schema:
+  $schema: "https://json-schema.org/draft/2020-12/schema"
+  title: ComputeUsageV1
+  type: object
+  additionalProperties: false
+  required: [usage_id, tenant_id, instance_id, credit_type, gpu_seconds, units, supply_source_id, is_paper, ts]
+  properties:
+    usage_id:       { type: string, description: "unique per interval; the ledger debit idempotency key" }
+    tenant_id:      { type: string, format: uuid }
+    sub_account_id: { type: [string, "null"], format: uuid }
+    instance_id:    { type: string, description: "GPU instance or cluster node id" }
+    credit_type:
+      type: string
+      description: "the GPU tier to debit"
+      enum: [gpu_h100, gpu_h200]
+    gpu_seconds:    { type: string, description: "GPU-seconds consumed in this interval, fixed-point string" }
+    units:          { type: string, description: "billable amount to debit (gpu_seconds → GPU-hours × rate), fixed-point string" }
+    reserved:       { type: boolean, description: "true if served from the tenant's reserved capacity (discounted)" }
+    supply_source_id: { type: string, description: "owned DC or partner id that provided the GPU (drives payout)" }
+    is_paper:       { type: boolean }
+    ts:             { type: string, format: date-time }
+
+example:
+  usage_id: "cuse_01Hf…"
+  tenant_id: "1f2e…"
+  sub_account_id: null
+  instance_id: "gpu-h100-7c2a"
+  credit_type: gpu_h100
+  gpu_seconds: "60.000000"
+  units: "0.016667"
+  reserved: false
+  supply_source_id: "dc-owned-1"
+  is_paper: true
+  ts: "2026-06-01T12:00:00Z"

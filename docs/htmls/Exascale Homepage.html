@@ -1,0 +1,1260 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Exascale — The commodity market for AI compute</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<style>
+  :root {
+    --surface-canvas: #F8F7F4;
+    --surface-elevated: #FFFFFF;
+    --surface-overlay: #FFFFFF;
+    --surface-inverse: #0A0B0E;
+    --text-primary: #0A0B0E;
+    --text-secondary: #5F5F5C;
+    --text-tertiary: #9A9A95;
+    --text-on-inverse: #E8E6E0;
+    --border: rgba(0,0,0,0.08);
+    --border-strong: rgba(0,0,0,0.16);
+    --border-on-dark: rgba(255,255,255,0.10);
+    --brand-primary: #C8F25C;
+    --brand-primary-hover: #B8E548;
+    --brand-accent: #4A90E2;
+    --positive: #19C37D;
+    --positive-subtle: rgba(25,195,125,0.12);
+    --negative: #EF4444;
+    --negative-subtle: rgba(239,68,68,0.12);
+    --warning: #F59E0B;
+  }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--surface-canvas);
+    color: var(--text-primary);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-feature-settings: 'tnum' on, 'ss01' on, 'cv11' on;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  .font-display { font-family: 'Inter Tight', 'Inter', sans-serif; }
+  .font-mono { font-family: 'JetBrains Mono', ui-monospace, SF Mono, Menlo, monospace; }
+  .tnum { font-variant-numeric: tabular-nums; }
+
+  /* Subtle grid backdrop, market-depth allusion */
+  .grid-bg {
+    background-image:
+      linear-gradient(rgba(0,0,0,0.022) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,0,0,0.022) 1px, transparent 1px);
+    background-size: 56px 56px;
+  }
+
+  /* Eyebrow label */
+  .eyebrow {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    font-weight: 500;
+    color: var(--text-tertiary);
+  }
+  .eyebrow .dot {
+    display: inline-block;
+    width: 6px; height: 6px;
+    background: var(--brand-primary);
+    margin-right: 10px;
+    vertical-align: 2px;
+  }
+
+  /* Section header */
+  .s-head {
+    font-family: 'Inter Tight';
+    font-size: 56px;
+    font-weight: 700;
+    line-height: 1.02;
+    letter-spacing: -0.035em;
+    color: var(--text-primary);
+  }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 44px;
+    padding: 0 22px;
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: -0.005em;
+    border-radius: 2px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background 150ms, border-color 150ms, color 150ms, transform 150ms;
+    white-space: nowrap;
+  }
+  .btn-primary { background: var(--brand-primary); color: var(--text-primary); }
+  .btn-primary:hover { background: var(--brand-primary-hover); }
+  .btn-secondary { background: transparent; color: var(--text-primary); border-color: var(--border-strong); }
+  .btn-secondary:hover { background: rgba(0,0,0,0.04); }
+  .btn-text { color: var(--text-primary); padding: 0; height: auto; background: transparent; }
+  .btn-text:hover { color: var(--brand-accent); }
+  .btn-lg { height: 52px; padding: 0 28px; font-size: 15px; }
+
+  /* Nav */
+  nav.top {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    transition: background-color 200ms, backdrop-filter 200ms, border-color 200ms;
+    background-color: transparent;
+    border-bottom: 1px solid transparent;
+  }
+  nav.top.scrolled {
+    background-color: rgba(248, 247, 244, 0.82);
+    -webkit-backdrop-filter: saturate(140%) blur(14px);
+    backdrop-filter: saturate(140%) blur(14px);
+    border-bottom-color: var(--border);
+  }
+  nav.top a.nav-link {
+    color: var(--text-secondary);
+    font-size: 14px;
+    letter-spacing: -0.005em;
+    transition: color 150ms;
+  }
+  nav.top a.nav-link:hover { color: var(--text-primary); }
+
+  /* Live ticker */
+  .ticker {
+    display: inline-flex;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 18px;
+    background: var(--surface-elevated);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+  }
+  .ticker .live-dot {
+    width: 7px; height: 7px;
+    background: var(--positive);
+    border-radius: 50%;
+    position: relative;
+  }
+  .ticker .live-dot::after {
+    content: '';
+    position: absolute; inset: -4px;
+    border-radius: 50%;
+    border: 1px solid var(--positive);
+    opacity: 0.5;
+    animation: ping 2s ease-out infinite;
+  }
+  @keyframes ping {
+    0%   { transform: scale(0.9); opacity: 0.6; }
+    100% { transform: scale(1.8); opacity: 0; }
+  }
+  .ticker .label {
+    color: var(--text-tertiary);
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+  .ticker .value {
+    color: var(--text-primary);
+    font-weight: 500;
+    transition: color 600ms ease-out;
+  }
+  .ticker .value.flash-up { color: var(--positive); }
+  .ticker .value.flash-down { color: var(--negative); }
+  .ticker .delta { color: var(--positive); font-weight: 500; }
+  .ticker .delta.neg { color: var(--negative); }
+  .ticker .meta {
+    color: var(--text-tertiary);
+    font-size: 11px;
+  }
+
+  /* Sparkline */
+  .sparkline {
+    width: 240px;
+    height: 64px;
+    overflow: visible;
+  }
+  .sparkline path.line {
+    fill: none;
+    stroke: var(--text-primary);
+    stroke-width: 1.5;
+    stroke-dasharray: 1200;
+    stroke-dashoffset: 1200;
+    animation: draw 1.6s cubic-bezier(0.2, 0, 0, 1) 0.3s forwards;
+  }
+  .sparkline path.fill {
+    fill: var(--brand-primary);
+    fill-opacity: 0.15;
+    opacity: 0;
+    animation: fadein 1.4s ease-out 0.9s forwards;
+  }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+  @keyframes fadein { to { opacity: 1; } }
+
+  /* Big stat number */
+  .stat {
+    font-family: 'Inter Tight';
+    font-size: 96px;
+    font-weight: 700;
+    line-height: 0.9;
+    letter-spacing: -0.04em;
+    color: var(--text-primary);
+  }
+  .stat .lime {
+    background: var(--brand-primary);
+    padding: 0 0.04em;
+  }
+
+  /* Section padding */
+  section.band { padding: 128px 0; }
+  .container-x { max-width: 1280px; margin: 0 auto; padding: 0 32px; }
+
+  /* Card */
+  .card {
+    background: var(--surface-elevated);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+  }
+  .card-inv {
+    background: var(--surface-inverse);
+    color: var(--text-on-inverse);
+    border-radius: 2px;
+  }
+
+  /* Product card row */
+  .product-card {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr;
+    gap: 64px;
+    align-items: stretch;
+    border: 1px solid var(--border);
+    background: var(--surface-elevated);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .product-card .left { padding: 56px 56px 56px 64px; display: flex; flex-direction: column; }
+  .product-card .right { background: var(--surface-inverse); color: var(--text-on-inverse); padding: 40px; display: flex; align-items: center; justify-content: center; }
+
+  /* Order book mini */
+  .ob-mini {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    width: 100%;
+    max-width: 360px;
+  }
+  .ob-mini .ob-head {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(232,230,224,0.5);
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-on-dark);
+  }
+  .ob-mini .ob-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    padding: 3px 0;
+    position: relative;
+  }
+  .ob-mini .ob-row .bar {
+    position: absolute;
+    right: 0; top: 0; bottom: 0;
+  }
+  .ob-mini .ob-row.ask { color: var(--text-on-inverse); }
+  .ob-mini .ob-row.ask .px { color: var(--negative); }
+  .ob-mini .ob-row.ask .bar { background: rgba(239,68,68,0.10); }
+  .ob-mini .ob-row.bid .px { color: var(--positive); }
+  .ob-mini .ob-row.bid .bar { background: rgba(25,195,125,0.10); }
+  .ob-mini .ob-row > * { position: relative; text-align: right; }
+  .ob-mini .ob-row > .px { text-align: left; }
+  .ob-mini .ob-mid {
+    text-align: center;
+    padding: 6px 0;
+    font-family: 'Inter Tight';
+    font-size: 13px;
+    font-weight: 600;
+    border-top: 1px solid var(--border-on-dark);
+    border-bottom: 1px solid var(--border-on-dark);
+    margin: 4px 0;
+  }
+
+  /* Terminal */
+  .term {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    line-height: 1.65;
+    color: var(--text-on-inverse);
+    width: 100%;
+    max-width: 420px;
+  }
+  .term .prompt { color: rgba(232,230,224,0.5); }
+  .term .ok { color: var(--brand-primary); }
+  .term .dim { color: rgba(232,230,224,0.55); }
+
+  /* Trust strip */
+  .trust-strip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0;
+  }
+  .trust-strip > * {
+    padding: 24px 32px;
+    border-right: 1px solid var(--border);
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+  }
+  .trust-strip > *:last-child { border-right: none; }
+  .trust-strip .lbl {
+    display: block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    margin-bottom: 6px;
+  }
+
+  /* Tooltip on chart cursor */
+  .chart-tip {
+    position: absolute;
+    pointer-events: none;
+    background: var(--surface-inverse);
+    color: var(--text-on-inverse);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    padding: 8px 12px;
+    border-radius: 2px;
+    border: 1px solid var(--border-on-dark);
+    transform: translate(-50%, -120%);
+    transition: opacity 100ms;
+    opacity: 0;
+    white-space: nowrap;
+    z-index: 5;
+  }
+  .chart-tip .lbl { color: rgba(232,230,224,0.55); font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; }
+  .chart-tip .val { color: var(--text-on-inverse); font-size: 14px; }
+
+  /* Diagram (three-sided market) */
+  .market-diagram {
+    width: 100%;
+    max-width: 880px;
+    margin: 0 auto;
+  }
+
+  /* Three audience cols hover */
+  .aud-card {
+    border-top: 1px solid var(--border);
+    padding-top: 32px;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+  .aud-card h4 {
+    font-family: 'Inter Tight';
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    margin-bottom: 16px;
+  }
+  .aud-card p { color: var(--text-secondary); font-size: 15px; line-height: 1.55; margin-bottom: 20px; }
+  .aud-card ul { list-style: none; padding: 0; margin: 0 0 24px; display: flex; flex-direction: column; gap: 8px; }
+  .aud-card li {
+    font-size: 14px;
+    color: var(--text-secondary);
+    padding-left: 18px;
+    position: relative;
+    line-height: 1.5;
+  }
+  .aud-card li::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 8px;
+    width: 8px; height: 1px;
+    background: var(--text-tertiary);
+  }
+  .aud-card .link {
+    color: var(--text-primary);
+    font-weight: 500;
+    font-size: 14px;
+    margin-top: auto;
+    text-decoration: none;
+    border-bottom: 1px solid var(--text-primary);
+    align-self: flex-start;
+    padding-bottom: 1px;
+  }
+
+  /* Footer */
+  footer.site {
+    background: var(--surface-inverse);
+    color: var(--text-on-inverse);
+    padding: 80px 0 32px;
+    border-top: 1px solid var(--border-on-dark);
+  }
+  footer.site h6 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: rgba(232,230,224,0.5);
+    margin-bottom: 16px;
+  }
+  footer.site a {
+    color: rgba(232,230,224,0.7);
+    font-size: 14px;
+    text-decoration: none;
+    transition: color 150ms;
+  }
+  footer.site a:hover { color: var(--text-on-inverse); }
+  footer.site .col-links li { margin-bottom: 10px; }
+
+  /* Pulse dot for status */
+  .status-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--positive);
+    margin-right: 8px;
+    position: relative;
+    vertical-align: 1px;
+  }
+  .status-dot::after {
+    content: '';
+    position: absolute; inset: -3px;
+    border-radius: 50%;
+    border: 1px solid var(--positive);
+    animation: ping 2.4s ease-out infinite;
+  }
+
+  /* Index chart wrapper */
+  .chart-wrap {
+    position: relative;
+    background: var(--surface-elevated);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 32px;
+  }
+  .chart-wrap .ch-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 24px;
+  }
+
+  /* Number color helpers */
+  .pos { color: var(--positive); }
+  .neg { color: var(--negative); }
+
+  /* Pull quote */
+  .pullquote {
+    font-family: 'Inter Tight';
+    font-size: 56px;
+    font-weight: 500;
+    line-height: 1.1;
+    letter-spacing: -0.025em;
+    color: var(--text-primary);
+    font-style: italic;
+    text-align: center;
+    max-width: 1000px;
+    margin: 0 auto;
+    position: relative;
+  }
+  .pullquote::before {
+    content: '"';
+    color: var(--brand-primary);
+    font-style: normal;
+    font-weight: 700;
+    font-size: 96px;
+    line-height: 0;
+    margin-right: 6px;
+    vertical-align: -8px;
+  }
+  .quote-attr {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    text-align: center;
+    margin-top: 40px;
+  }
+  .quote-attr .name { color: var(--text-primary); }
+
+  /* Mark up/down */
+  .mk-up::before  { content: '▲'; color: var(--positive); font-size: 0.8em; margin-right: 4px; }
+  .mk-down::before{ content: '▼'; color: var(--negative); font-size: 0.8em; margin-right: 4px; }
+
+  /* Small responsive shim */
+  @media (max-width: 900px) {
+    .product-card { grid-template-columns: 1fr; }
+    .product-card .left { padding: 40px; }
+    .trust-strip { grid-template-columns: repeat(2, 1fr); }
+    .stat { font-size: 64px; }
+    .s-head { font-size: 40px; }
+    .pullquote { font-size: 32px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ====================================================================
+     NAV
+     ==================================================================== -->
+<nav class="top" id="topNav">
+  <div class="container-x" style="display:flex; align-items:center; justify-content:space-between; height: 72px;">
+    <a href="#" class="font-display font-bold text-[20px] tracking-[-0.02em]" style="color: var(--text-primary);">
+      <span style="display:inline-block; width:14px; height:14px; background: var(--brand-primary); vertical-align:-1px; margin-right: 10px;"></span>Exascale
+    </a>
+    <div style="display:flex; gap:32px;">
+      <a class="nav-link" href="#markets">Markets</a>
+      <a class="nav-link" href="#index">Index</a>
+      <a class="nav-link" href="#products">Compute</a>
+      <a class="nav-link" href="#">Docs</a>
+      <a class="nav-link" href="#">About</a>
+    </div>
+    <div style="display:flex; gap:16px; align-items:center;">
+      <a class="nav-link" href="#">Sign in</a>
+      <a href="#cta" class="btn btn-primary">Open account</a>
+    </div>
+  </div>
+</nav>
+
+
+<!-- ====================================================================
+     HERO
+     ==================================================================== -->
+<section class="grid-bg" style="padding: 80px 0 128px; position: relative;">
+  <div class="container-x">
+    <div class="eyebrow"><span class="dot"></span>The commodity market for AI compute</div>
+
+    <h1 class="font-display tnum"
+        style="font-size: 128px; font-weight: 700; line-height: 0.92; letter-spacing: -0.045em; margin-top: 32px; margin-bottom: 32px; max-width: 1180px;">
+      AI compute,<br/>but <span style="background: var(--brand-primary); padding: 0 0.04em; line-height: 0.65">tradeable</span>.
+    </h1>
+
+    <p style="font-size: 22px; line-height: 1.5; max-width: 720px; color: var(--text-secondary); margin-bottom: 48px; letter-spacing: -0.005em;">
+      Tradeable credits connecting GPU datacenters, traders, and AI companies. Owned underlying for credibility. Partner-supplied scale.
+    </p>
+
+    <!-- Live ticker + sparkline -->
+    <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: center; margin-bottom: 48px;">
+      <div class="ticker" id="heroTicker">
+        <span class="live-dot"></span>
+        <div>
+          <div class="label">Exascale AI Index</div>
+          <div style="display:flex; align-items:baseline; gap:14px; margin-top:2px;">
+            <span class="value" id="tk-value">$1 = <span id="tk-num">1,002.4</span> AI credits</span>
+            <span class="delta" id="tk-delta">▲ 0.18% (24h)</span>
+          </div>
+        </div>
+        <span style="height: 22px; width: 1px; background: var(--border); margin: 0 4px;"></span>
+        <span class="meta">Last print 16:00 UTC · Next in <span id="tk-next">3h 24m</span></span>
+      </div>
+
+      <svg class="sparkline" id="heroSpark" viewBox="0 0 240 64" preserveAspectRatio="none" aria-hidden="true">
+        <path class="fill" id="sparkFill"></path>
+        <path class="line" id="sparkLine"></path>
+      </svg>
+    </div>
+
+    <div style="display: flex; gap: 20px; align-items: center;">
+      <a href="#cta" class="btn btn-primary btn-lg">Open account</a>
+      <a href="#markets" class="btn btn-text" style="font-size: 15px;">View markets →</a>
+    </div>
+  </div>
+</section>
+
+
+<!-- ====================================================================
+     THE PROBLEM
+     ==================================================================== -->
+<section class="band" style="background: var(--surface-elevated); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
+  <div class="container-x">
+    <div class="eyebrow" style="text-align:center; margin-bottom: 48px;"><span class="dot"></span>The problem</div>
+
+    <p class="pullquote">There needs to be a market for compute. No solution yet.</p>
+    <div class="quote-attr">— <span class="name">Larry Fink</span> · CEO, BlackRock · 2026</div>
+
+    <div style="margin-top: 112px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 64px;">
+      <div>
+        <div class="stat tnum"><span class="lime">$200B+</span></div>
+        <div style="margin-top: 16px; font-size: 14px; color: var(--text-secondary); line-height: 1.5; max-width: 28ch;">
+          Annual global GPU compute spend, untraded.
+        </div>
+      </div>
+      <div>
+        <div class="stat tnum"><span class="lime">5–10×</span></div>
+        <div style="margin-top: 16px; font-size: 14px; color: var(--text-secondary); line-height: 1.5; max-width: 28ch;">
+          Spread between reserved and spot pricing.
+        </div>
+      </div>
+      <div>
+        <div class="stat tnum"><span class="lime">0</span></div>
+        <div style="margin-top: 16px; font-size: 14px; color: var(--text-secondary); line-height: 1.5; max-width: 28ch;">
+          Functioning venues for AI compute as an asset class.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ====================================================================
+     HOW IT WORKS — three-sided market diagram
+     ==================================================================== -->
+<section class="band" id="markets">
+  <div class="container-x">
+    <div style="text-align:center;">
+      <div class="eyebrow" style="margin-bottom: 16px; justify-content: center; display: flex;"><span class="dot"></span>How it works</div>
+      <h2 class="s-head">Three sides. One venue.</h2>
+    </div>
+
+    <!-- Diagram -->
+    <div class="market-diagram" style="margin-top: 80px;">
+      <svg viewBox="0 0 880 440" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto;">
+        <defs>
+          <marker id="arr" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6 Z" fill="#5F5F5C"/>
+          </marker>
+        </defs>
+
+        <!-- Central venue -->
+        <rect x="330" y="170" width="220" height="100" rx="2" fill="#0A0B0E"/>
+        <text x="440" y="206" text-anchor="middle" font-family="JetBrains Mono" font-size="11" letter-spacing="3" fill="#9A9A95">— EXASCALE</text>
+        <text x="440" y="236" text-anchor="middle" font-family="Inter Tight" font-weight="700" font-size="24" fill="#E8E6E0" letter-spacing="-0.5">Trading venue</text>
+
+        <!-- Supply node -->
+        <g>
+          <rect x="40" y="40" width="220" height="92" rx="2" fill="#FFFFFF" stroke="#E4E0D6"/>
+          <rect x="40" y="40" width="4" height="92" fill="#19C37D"/>
+          <text x="60" y="68" font-family="JetBrains Mono" font-size="10" letter-spacing="2.5" fill="#5F5F5C">— SUPPLY</text>
+          <text x="60" y="98" font-family="Inter Tight" font-weight="600" font-size="20" fill="#0A0B0E" letter-spacing="-0.4">GPU datacenters</text>
+          <text x="60" y="118" font-family="Inter" font-size="11" fill="#5F5F5C">Owned + partner capacity</text>
+        </g>
+
+        <!-- Liquidity node -->
+        <g>
+          <rect x="330" y="0" width="220" height="92" rx="2" fill="#FFFFFF" stroke="#E4E0D6"/>
+          <rect x="330" y="0" width="4" height="92" fill="#F59E0B"/>
+          <text x="350" y="28" font-family="JetBrains Mono" font-size="10" letter-spacing="2.5" fill="#5F5F5C">— LIQUIDITY</text>
+          <text x="350" y="58" font-family="Inter Tight" font-weight="600" font-size="20" fill="#0A0B0E" letter-spacing="-0.4">Traders</text>
+          <text x="350" y="78" font-family="Inter" font-size="11" fill="#5F5F5C">Prop firms · hedge funds · MMs</text>
+        </g>
+
+        <!-- Demand node -->
+        <g>
+          <rect x="620" y="40" width="220" height="92" rx="2" fill="#FFFFFF" stroke="#E4E0D6"/>
+          <rect x="620" y="40" width="4" height="92" fill="#4A90E2"/>
+          <text x="640" y="68" font-family="JetBrains Mono" font-size="10" letter-spacing="2.5" fill="#5F5F5C">— DEMAND</text>
+          <text x="640" y="98" font-family="Inter Tight" font-weight="600" font-size="20" fill="#0A0B0E" letter-spacing="-0.4">AI companies</text>
+          <text x="640" y="118" font-family="Inter" font-size="11" fill="#5F5F5C">Frontier labs · enterprises</text>
+        </g>
+
+        <!-- Arrows in -->
+        <path d="M 195 132 L 360 175" stroke="#5F5F5C" stroke-width="1" fill="none" marker-end="url(#arr)" opacity="0.55"/>
+        <path d="M 440 92  L 440 165" stroke="#5F5F5C" stroke-width="1" fill="none" marker-end="url(#arr)" opacity="0.55"/>
+        <path d="M 685 132 L 520 175" stroke="#5F5F5C" stroke-width="1" fill="none" marker-end="url(#arr)" opacity="0.55"/>
+
+        <!-- Arrows out (demand flow) -->
+        <path d="M 360 265 L 195 305" stroke="#5F5F5C" stroke-width="1" fill="none" marker-end="url(#arr)" opacity="0.35" stroke-dasharray="4 4"/>
+        <path d="M 520 265 L 685 305" stroke="#5F5F5C" stroke-width="1" fill="none" marker-end="url(#arr)" opacity="0.35" stroke-dasharray="4 4"/>
+
+        <!-- Bottom labels for nodes' verb -->
+        <g>
+          <rect x="40" y="290" width="220" height="64" rx="2" fill="#F8F7F4"/>
+          <text x="150" y="318" text-anchor="middle" font-family="Inter" font-size="13" fill="#5F5F5C">List idle credits</text>
+          <text x="150" y="338" text-anchor="middle" font-family="Inter" font-size="13" fill="#5F5F5C">Receive payment</text>
+        </g>
+        <g>
+          <rect x="620" y="290" width="220" height="64" rx="2" fill="#F8F7F4"/>
+          <text x="730" y="318" text-anchor="middle" font-family="Inter" font-size="13" fill="#5F5F5C">Buy credits ahead</text>
+          <text x="730" y="338" text-anchor="middle" font-family="Inter" font-size="13" fill="#5F5F5C">Redeem for compute</text>
+        </g>
+        <g>
+          <rect x="330" y="380" width="220" height="50" rx="2" fill="#F8F7F4"/>
+          <text x="440" y="403" text-anchor="middle" font-family="Inter" font-size="13" fill="#5F5F5C">Provide liquidity</text>
+          <text x="440" y="421" text-anchor="middle" font-family="Inter" font-size="13" fill="#5F5F5C">Earn spread + maker rebates</text>
+        </g>
+      </svg>
+    </div>
+
+    <!-- Three columns explaining each role -->
+    <div style="margin-top: 72px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 56px;">
+      <div>
+        <div class="eyebrow" style="color: var(--positive);"><span class="dot" style="background: var(--positive);"></span>Supply</div>
+        <h4 class="font-display" style="font-size: 24px; font-weight: 600; letter-spacing: -0.02em; margin: 12px 0 14px;">GPU datacenters</h4>
+        <p style="font-size: 15px; color: var(--text-secondary); line-height: 1.6; margin: 0 0 18px;">List unused capacity for sale as standardized credits. Cryptographic SLA receipts on every listing.</p>
+        <ul style="font-size: 14px; color: var(--text-secondary); line-height: 1.55; padding-left: 18px; list-style: none;">
+          <li style="position: relative; margin-bottom: 6px;"><span style="position: absolute; left: -18px; opacity: 0.4;">·</span>Owned datacenter (H100 / H200)</li>
+          <li style="position: relative; margin-bottom: 6px;"><span style="position: absolute; left: -18px; opacity: 0.4;">·</span>Partner neoclouds at scale</li>
+          <li style="position: relative;"><span style="position: absolute; left: -18px; opacity: 0.4;">·</span>Per-second metering</li>
+        </ul>
+      </div>
+      <div>
+        <div class="eyebrow" style="color: var(--warning);"><span class="dot" style="background: var(--warning);"></span>Liquidity</div>
+        <h4 class="font-display" style="font-size: 24px; font-weight: 600; letter-spacing: -0.02em; margin: 12px 0 14px;">Traders</h4>
+        <p style="font-size: 15px; color: var(--text-secondary); line-height: 1.6; margin: 0 0 18px;">Prop firms, commodity hedge funds, and quant desks bring price discovery to an asset class that hasn't had any.</p>
+        <ul style="font-size: 14px; color: var(--text-secondary); line-height: 1.55; padding-left: 18px; list-style: none;">
+          <li style="position: relative; margin-bottom: 6px;"><span style="position: absolute; left: -18px; opacity: 0.4;">·</span>Maker-taker fee schedule</li>
+          <li style="position: relative; margin-bottom: 6px;"><span style="position: absolute; left: -18px; opacity: 0.4;">·</span>Paper trading from day one</li>
+          <li style="position: relative;"><span style="position: absolute; left: -18px; opacity: 0.4;">·</span>Surveillance + market integrity</li>
+        </ul>
+      </div>
+      <div>
+        <div class="eyebrow" style="color: var(--brand-accent);"><span class="dot" style="background: var(--brand-accent);"></span>Demand</div>
+        <h4 class="font-display" style="font-size: 24px; font-weight: 600; letter-spacing: -0.02em; margin: 12px 0 14px;">AI companies</h4>
+        <p style="font-size: 15px; color: var(--text-secondary); line-height: 1.6; margin: 0 0 18px;">Frontier labs, mid-market AI, and financial-services teams hedge spend ahead of need. Redeem for real compute.</p>
+        <ul style="font-size: 14px; color: var(--text-secondary); line-height: 1.55; padding-left: 18px; list-style: none;">
+          <li style="position: relative; margin-bottom: 6px;"><span style="position: absolute; left: -18px; opacity: 0.4;">·</span>Lock in cost months ahead</li>
+          <li style="position: relative; margin-bottom: 6px;"><span style="position: absolute; left: -18px; opacity: 0.4;">·</span>OpenAI-compatible inference</li>
+          <li style="position: relative;"><span style="position: absolute; left: -18px; opacity: 0.4;">·</span>Treasury-grade reporting</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ====================================================================
+     THE PRODUCTS — three stacked cards
+     ==================================================================== -->
+<section class="band" id="products" style="background: var(--surface-elevated); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
+  <div class="container-x">
+    <div class="eyebrow" style="margin-bottom: 16px;"><span class="dot"></span>The products</div>
+    <h2 class="s-head" style="max-width: 800px;">One venue. Three<br/>integrated layers.</h2>
+
+    <div style="margin-top: 72px; display: flex; flex-direction: column; gap: 32px;">
+
+      <!-- Trading -->
+      <div class="product-card">
+        <div class="left">
+          <div class="eyebrow" style="color: var(--positive);"><span class="dot" style="background: var(--positive);"></span>Trading layer</div>
+          <h3 class="font-display" style="font-size: 40px; font-weight: 700; line-height: 1.02; letter-spacing: -0.03em; margin: 16px 0 18px;">Order book.<br/>Market maker.<br/>Daily index.</h3>
+          <p style="font-size: 16px; color: var(--text-secondary); line-height: 1.55; max-width: 44ch;">
+            AI credits and GPU credits as tradeable instruments. Maker-taker fees, volume-tiered. Surveillance from day one.
+          </p>
+          <a href="#" class="btn btn-text" style="margin-top: auto; padding-top: 24px;">Explore the trading layer →</a>
+        </div>
+        <div class="right">
+          <!-- Order book mini -->
+          <div class="ob-mini">
+            <div class="ob-head"><span>Price</span><span style="text-align:right;">Size</span><span style="text-align:right;">Total</span></div>
+            <div class="ob-row ask"><div class="bar" style="width: 18%;"></div><span class="px">1010.4</span><span>128.4</span><span>128.4</span></div>
+            <div class="ob-row ask"><div class="bar" style="width: 26%;"></div><span class="px">1009.2</span><span>186.0</span><span>314.4</span></div>
+            <div class="ob-row ask"><div class="bar" style="width: 42%;"></div><span class="px">1008.0</span><span>298.7</span><span>613.1</span></div>
+            <div class="ob-row ask"><div class="bar" style="width: 60%;"></div><span class="px">1006.5</span><span>421.3</span><span>1,034.4</span></div>
+            <div class="ob-row ask"><div class="bar" style="width: 74%;"></div><span class="px">1004.8</span><span>529.1</span><span>1,563.5</span></div>
+            <div class="ob-mid tnum" id="obMid">1,002.4 <span style="font-family: 'JetBrains Mono'; font-size: 10px; opacity: 0.5; margin-left: 8px;">spread 0.20%</span></div>
+            <div class="ob-row bid"><div class="bar" style="width: 70%;"></div><span class="px">1000.4</span><span>498.2</span><span>498.2</span></div>
+            <div class="ob-row bid"><div class="bar" style="width: 58%;"></div><span class="px">999.8</span><span>412.8</span><span>911.0</span></div>
+            <div class="ob-row bid"><div class="bar" style="width: 40%;"></div><span class="px">998.1</span><span>285.5</span><span>1,196.5</span></div>
+            <div class="ob-row bid"><div class="bar" style="width: 24%;"></div><span class="px">996.7</span><span>170.1</span><span>1,366.6</span></div>
+            <div class="ob-row bid"><div class="bar" style="width: 16%;"></div><span class="px">994.2</span><span>114.0</span><span>1,480.6</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Inference -->
+      <div class="product-card">
+        <div class="left">
+          <div class="eyebrow" style="color: var(--warning);"><span class="dot" style="background: var(--warning);"></span>Inference layer</div>
+          <h3 class="font-display" style="font-size: 40px; font-weight: 700; line-height: 1.02; letter-spacing: -0.03em; margin: 16px 0 18px;">Curated SoTA models.<br/>OpenAI-compatible API.</h3>
+          <p style="font-size: 16px; color: var(--text-secondary); line-height: 1.55; max-width: 44ch;">
+            Top 3–5 open models per category — text, speech, image, video, niche. Multi-tenant per GPU. Quarterly catalog refresh.
+          </p>
+          <a href="#" class="btn btn-text" style="margin-top: auto; padding-top: 24px;">Read the API docs →</a>
+        </div>
+        <div class="right">
+          <pre class="term">
+<span class="prompt">POST</span> https://api.exascale.com/v1/chat/completions
+<span class="dim">Authorization: Bearer ex_live_...</span>
+<span class="dim">Content-Type: application/json</span>
+
+{
+  <span class="ok">"model"</span>: <span class="ok">"meta/llama-3.3-70b"</span>,
+  <span class="ok">"messages"</span>: [
+    { <span class="ok">"role"</span>: <span class="ok">"user"</span>, <span class="ok">"content"</span>: <span class="ok">"Summarize..."</span> }
+  ]
+}
+
+<span class="dim">→ 200 OK · 412 ms · 1,284 tokens · 1.55 text credits</span></pre>
+        </div>
+      </div>
+
+      <!-- Compute -->
+      <div class="product-card">
+        <div class="left">
+          <div class="eyebrow" style="color: var(--brand-accent);"><span class="dot" style="background: var(--brand-accent);"></span>Compute layer</div>
+          <h3 class="font-display" style="font-size: 40px; font-weight: 700; line-height: 1.02; letter-spacing: -0.03em; margin: 16px 0 18px;">H100 / H200 capacity.<br/>CLI-first. Free egress.</h3>
+          <p style="font-size: 16px; color: var(--text-secondary); line-height: 1.55; max-width: 44ch;">
+            Owned datacenter underlying for trade settlement. Per-second metering. Pay with credits or cash. No region lock-in.
+          </p>
+          <a href="#" class="btn btn-text" style="margin-top: auto; padding-top: 24px;">Browse instance types →</a>
+        </div>
+        <div class="right">
+          <pre class="term">
+<span class="prompt">$</span> exascale instances launch \
+    --type   h100.8x \
+    --hours  24 \
+    --pay-with credits
+
+<span class="ok">✓</span> Reserved · 8 × H100 80GB · TYO-1
+  Hourly         <span class="dim">$2.99 / GPU-hr</span>
+  Estimated cost <span class="dim">$574.08 → 5,710 H100 credits</span>
+  SSH ready in   <span class="dim">~ 90s</span>
+
+<span class="ok">✓</span> Connected   <span class="dim">ssh ubuntu@ex-h100-tyo1-04.exascale.com</span></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ====================================================================
+     THE INDEX
+     ==================================================================== -->
+<section class="band" id="index">
+  <div class="container-x">
+    <div class="eyebrow" style="margin-bottom: 16px;"><span class="dot"></span>The Exascale AI Index</div>
+    <h2 class="s-head" style="max-width: 880px;">The price of AI compute,<br/>published daily.</h2>
+    <p style="margin-top: 24px; font-size: 18px; color: var(--text-secondary); max-width: 640px; line-height: 1.55;">
+      An audited, methodology-public reference index. Trimmed mean across constituent venues with volume floors and ECP attestation.
+    </p>
+
+    <div class="chart-wrap" style="margin-top: 56px;">
+      <div class="ch-head">
+        <div>
+          <div class="eyebrow" style="margin-bottom: 6px;"><span class="dot"></span>EXASCALE AI INDEX · 365D</div>
+          <div class="font-display tnum" style="font-size: 36px; font-weight: 700; letter-spacing: -0.02em;">
+            1.0024 <span class="pos" style="font-size: 18px; font-weight: 500;">▲ 0.18%</span>
+          </div>
+        </div>
+        <div style="display:flex; gap:16px; align-items:center;">
+          <a class="btn btn-text" style="font-size: 13px;">View methodology →</a>
+        </div>
+      </div>
+      <div style="position: relative; height: 320px;">
+        <canvas id="indexChart"></canvas>
+        <div class="chart-tip" id="chartTip">
+          <div class="lbl">— Index</div>
+          <div class="val tnum" id="chartTipVal">1.0024</div>
+          <div style="font-size: 10px; opacity:0.6;" id="chartTipDate">19 May 2026</div>
+        </div>
+      </div>
+
+      <!-- Stats row -->
+      <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 0; margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--border);">
+        <div>
+          <div class="eyebrow" style="margin-bottom: 8px;">— Current</div>
+          <div class="font-mono tnum" style="font-size: 22px; font-weight: 500;">1.0024</div>
+        </div>
+        <div>
+          <div class="eyebrow" style="margin-bottom: 8px;">— Yesterday</div>
+          <div class="font-mono tnum" style="font-size: 22px; font-weight: 500;">1.0006</div>
+        </div>
+        <div>
+          <div class="eyebrow" style="margin-bottom: 8px;">— 7d</div>
+          <div class="font-mono tnum neg" style="font-size: 22px; font-weight: 500;">−0.42%</div>
+        </div>
+        <div>
+          <div class="eyebrow" style="margin-bottom: 8px;">— 30d</div>
+          <div class="font-mono tnum pos" style="font-size: 22px; font-weight: 500;">+2.31%</div>
+        </div>
+        <div>
+          <div class="eyebrow" style="margin-bottom: 8px;">— YTD</div>
+          <div class="font-mono tnum pos" style="font-size: 22px; font-weight: 500;">+4.18%</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ====================================================================
+     FOR DIFFERENT AUDIENCES
+     ==================================================================== -->
+<section class="band" style="background: var(--surface-elevated); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
+  <div class="container-x">
+    <div class="eyebrow" style="margin-bottom: 16px;"><span class="dot"></span>Built for</div>
+    <h2 class="s-head" style="max-width: 700px;">Three audiences.<br/>One product.</h2>
+
+    <div style="margin-top: 72px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 56px;">
+      <div class="aud-card">
+        <h4>For traders</h4>
+        <p>Maker-taker fees from 1% / 0.5% down to 0.10% / 0.00% above $1B notional. Paper trading from day one; real money in v1.5.</p>
+        <ul>
+          <li>Maker rebates on volume tiers</li>
+          <li>FIX gateway (Q3 2026)</li>
+          <li>Level-2 market data, 25ms tick</li>
+          <li>Cross-venue arbitrage routing</li>
+        </ul>
+        <a href="#" class="link">Fee schedule →</a>
+      </div>
+      <div class="aud-card">
+        <h4>For AI companies</h4>
+        <p>Buy credits ahead, redeem for actual compute or inference. Multi-currency (USD, JPY). Bulk procurement with treasury controls.</p>
+        <ul>
+          <li>Bulk credit purchase with NET-30</li>
+          <li>OpenAI-compatible API, drop-in</li>
+          <li>Free egress, no region lock-in</li>
+          <li>Per-team spend caps + reporting</li>
+        </ul>
+        <a href="#" class="link">Talk to enterprise sales →</a>
+      </div>
+      <div class="aud-card">
+        <h4>For datacenter partners</h4>
+        <p>Monetize idle reserved capacity. Standardized credit issuance with cryptographic receipts. Settlement via existing payment rails.</p>
+        <ul>
+          <li>Market access on day one</li>
+          <li>Per-instance utilization API</li>
+          <li>Custodial credit issuance</li>
+          <li>Pay-outs USD, JPY, stablecoin (v2)</li>
+        </ul>
+        <a href="#" class="link">Partner program →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ====================================================================
+     TRUST INDICATORS
+     ==================================================================== -->
+<section style="padding: 64px 0; background: var(--surface-canvas);">
+  <div class="container-x">
+    <div class="trust-strip card" style="border-radius: 2px;">
+      <div>
+        <span class="lbl">— Security</span>
+        SOC 2 Type I path · Annual audits
+      </div>
+      <div>
+        <span class="lbl">— Index</span>
+        Methodology audited externally
+      </div>
+      <div>
+        <span class="lbl">— Market integrity</span>
+        Surveillance from day one
+      </div>
+      <div>
+        <span class="lbl">— Anchor partner</span>
+        UBS Japan · Financial services
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ====================================================================
+     FOOTER CTA
+     ==================================================================== -->
+<section id="cta" class="band" style="background: var(--surface-canvas); padding-top: 128px; padding-bottom: 128px;">
+  <div class="container-x" style="text-align: center;">
+    <h2 class="font-display" style="font-size: 88px; font-weight: 700; line-height: 0.96; letter-spacing: -0.04em; max-width: 1100px; margin: 0 auto;">
+      Open an account<br/>in <span style="background: var(--brand-primary); padding: 0 0.04em;">5 minutes</span>.
+    </h2>
+    <p style="margin-top: 32px; font-size: 19px; color: var(--text-secondary); max-width: 640px; margin-left: auto; margin-right: auto; line-height: 1.5;">
+      Paper trading available immediately. Real-money trading in v1.5 with full KYC. Bring your own custody at launch.
+    </p>
+    <div style="margin-top: 48px; display: flex; gap: 20px; justify-content: center; align-items: center; flex-wrap: wrap;">
+      <a href="#" class="btn btn-primary btn-lg">Open account</a>
+      <a href="#" class="btn btn-text" style="font-size: 15px;">Talk to enterprise sales →</a>
+    </div>
+  </div>
+</section>
+
+
+<!-- ====================================================================
+     FOOTER
+     ==================================================================== -->
+<footer class="site">
+  <div class="container-x">
+    <div style="display: grid; grid-template-columns: 2fr repeat(5, 1fr); gap: 48px; padding-bottom: 56px; border-bottom: 1px solid var(--border-on-dark);">
+      <div>
+        <div class="font-display font-bold" style="font-size: 20px; letter-spacing: -0.02em;">
+          <span style="display:inline-block; width:14px; height:14px; background: var(--brand-primary); vertical-align:-1px; margin-right: 10px;"></span>Exascale
+        </div>
+        <p style="margin-top: 20px; color: rgba(232,230,224,0.55); font-size: 13px; line-height: 1.6; max-width: 28ch;">
+          The commodity market for AI compute. Tradeable credits backed by owned datacenter capacity.
+        </p>
+      </div>
+
+      <div>
+        <h6>Product</h6>
+        <ul class="col-links" style="list-style:none; padding:0; margin:0;">
+          <li><a>Trading</a></li>
+          <li><a>Inference</a></li>
+          <li><a>Compute</a></li>
+          <li><a>Index</a></li>
+          <li><a>API</a></li>
+        </ul>
+      </div>
+      <div>
+        <h6>Markets</h6>
+        <ul class="col-links" style="list-style:none; padding:0; margin:0;">
+          <li><a>AI Index</a></li>
+          <li><a>Text credits</a></li>
+          <li><a>Image credits</a></li>
+          <li><a>Video credits</a></li>
+          <li><a>GPU credits</a></li>
+        </ul>
+      </div>
+      <div>
+        <h6>Compute</h6>
+        <ul class="col-links" style="list-style:none; padding:0; margin:0;">
+          <li><a>H100 instances</a></li>
+          <li><a>H200 instances</a></li>
+          <li><a>Inference catalog</a></li>
+          <li><a>Storage</a></li>
+          <li><a>Status</a></li>
+        </ul>
+      </div>
+      <div>
+        <h6>Company</h6>
+        <ul class="col-links" style="list-style:none; padding:0; margin:0;">
+          <li><a>About</a></li>
+          <li><a>Methodology</a></li>
+          <li><a>Partners</a></li>
+          <li><a>Careers</a></li>
+          <li><a>Press</a></li>
+        </ul>
+      </div>
+      <div>
+        <h6>Legal</h6>
+        <ul class="col-links" style="list-style:none; padding:0; margin:0;">
+          <li><a>Terms</a></li>
+          <li><a>Privacy</a></li>
+          <li><a>Trading rules</a></li>
+          <li><a>Disclosures</a></li>
+          <li><a>Compliance</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 28px; flex-wrap: wrap; gap: 16px;">
+      <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: rgba(232,230,224,0.5); letter-spacing: 0.04em;">
+        © 2026 Exascale, Inc. · contact@exascale.com · San Francisco · Tokyo
+      </div>
+      <div style="display:flex; gap: 24px; align-items: center; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: rgba(232,230,224,0.6); letter-spacing: 0.04em;">
+        <span><span class="status-dot"></span>All systems operational</span>
+        <span style="height: 12px; width: 1px; background: var(--border-on-dark);"></span>
+        <span class="tnum">AI Index · $1 = <span id="footerIdx" style="color: var(--text-on-inverse);">1,002.4</span> · <span class="pos">▲ 0.18%</span></span>
+      </div>
+    </div>
+  </div>
+</footer>
+
+
+<!-- ====================================================================
+     SCRIPTS
+     ==================================================================== -->
+<script>
+  /* ===== Sticky nav scroll state ===== */
+  const nav = document.getElementById('topNav');
+  const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 24);
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  /* ===== Live AI Index ticker ===== */
+  const tkNum = document.getElementById('tk-num');
+  const tkValue = document.getElementById('tk-value');
+  const tkDelta = document.getElementById('tk-delta');
+  const tkNext = document.getElementById('tk-next');
+  const obMid = document.getElementById('obMid');
+  const footerIdx = document.getElementById('footerIdx');
+
+  let indexValue = 1.0024; // normalized
+  let dayChange = 0.0018;  // +0.18%
+  const target = 1.00;     // mean reversion target
+
+  const fmt = (n) => n.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+  function tick() {
+    // Brownian motion with weak mean reversion
+    const drift = (target - indexValue) * 0.05;
+    const noise = (Math.random() - 0.5) * 0.0008;
+    const change = drift + noise;
+    indexValue = Math.max(0.985, Math.min(1.018, indexValue + change));
+    dayChange = (indexValue - 1.0006) / 1.0006; // delta vs yesterday close
+
+    const display = (indexValue * 1000); // "1 USD = N credits" form ≈ 1000–1010 range
+    const text = fmt(display);
+    tkNum.textContent = text;
+    obMid && (obMid.firstChild ? obMid.firstChild.nodeValue = text + ' ' : null);
+    footerIdx.textContent = text;
+
+    const up = change > 0;
+    const cls = up ? 'flash-up' : 'flash-down';
+    tkValue.classList.remove('flash-up','flash-down');
+    void tkValue.offsetWidth; // force reflow
+    tkValue.classList.add(cls);
+    setTimeout(() => tkValue.classList.remove(cls), 700);
+
+    const dpct = (dayChange * 100).toFixed(2);
+    const sign = dayChange >= 0 ? '▲' : '▼';
+    tkDelta.textContent = sign + ' ' + Math.abs(dpct) + '% (24h)';
+    tkDelta.classList.toggle('neg', dayChange < 0);
+  }
+
+  setInterval(tick, 5000);
+
+  /* Count down "next print" */
+  let next = 3 * 3600 + 24 * 60;
+  setInterval(() => {
+    next = Math.max(0, next - 1);
+    const h = Math.floor(next / 3600);
+    const m = Math.floor((next % 3600) / 60);
+    tkNext.textContent = h + 'h ' + String(m).padStart(2,'0') + 'm';
+  }, 60000);
+
+  /* ===== Sparkline (30-day mock) ===== */
+  (function buildSparkline() {
+    const W = 240, H = 64;
+    const days = 30;
+    let v = 0.987;
+    const pts = [];
+    for (let i = 0; i < days; i++) {
+      v += (1.00 - v) * 0.05 + (Math.random() - 0.48) * 0.008;
+      pts.push(v);
+    }
+    pts[pts.length - 1] = 1.0024; // anchor today
+    const min = Math.min(...pts), max = Math.max(...pts);
+    const range = max - min || 1;
+    const pad = 6;
+    const usableH = H - pad * 2;
+    const stepX = W / (pts.length - 1);
+    const path = pts.map((p, i) => {
+      const x = i * stepX;
+      const y = pad + usableH - ((p - min) / range) * usableH;
+      return (i === 0 ? 'M' : 'L') + x.toFixed(1) + ' ' + y.toFixed(1);
+    }).join(' ');
+    document.getElementById('sparkLine').setAttribute('d', path);
+    document.getElementById('sparkFill').setAttribute('d', path + ' L ' + W + ' ' + H + ' L 0 ' + H + ' Z');
+  })();
+
+  /* ===== Index chart (365 days) ===== */
+  (function buildIndexChart() {
+    // Build 365 days of plausible index history (drift up with drawdowns)
+    const days = 365;
+    let v = 0.962;
+    const data = [];
+    const labels = [];
+    const now = new Date('2026-05-19');
+    for (let i = 0; i < days; i++) {
+      // baseline drift up + noise + occasional drawdown
+      const drawdownTrigger = Math.random() < 0.018 ? -(0.005 + Math.random() * 0.01) : 0;
+      const drift = 0.0002;
+      const noise = (Math.random() - 0.48) * 0.0035;
+      v = Math.max(0.94, Math.min(1.05, v + drift + noise + drawdownTrigger));
+      data.push(+v.toFixed(4));
+      const d = new Date(now);
+      d.setDate(d.getDate() - (days - 1 - i));
+      labels.push(d);
+    }
+    data[data.length - 1] = 1.0024;
+
+    const ctx = document.getElementById('indexChart');
+    const grad = ctx.getContext('2d').createLinearGradient(0, 0, 0, 320);
+    grad.addColorStop(0, 'rgba(200,242,92,0.30)');
+    grad.addColorStop(1, 'rgba(200,242,92,0.00)');
+
+    const chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          data: data,
+          borderColor: '#0A0B0E',
+          borderWidth: 1.5,
+          backgroundColor: grad,
+          fill: true,
+          pointRadius: 0,
+          pointHoverRadius: 0,
+          tension: 0.3
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 900, easing: 'easeOutCubic' },
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: { enabled: false },
+        },
+        scales: {
+          x: {
+            type: 'time',
+            time: { unit: 'month', displayFormats: { month: 'MMM' } },
+            grid: { display: false, drawBorder: false },
+            ticks: {
+              color: '#9A9A95',
+              font: { family: 'JetBrains Mono', size: 10 },
+              maxTicksLimit: 8,
+              maxRotation: 0,
+            }
+          },
+          y: {
+            position: 'right',
+            grid: { color: 'rgba(0,0,0,0.04)', drawBorder: false },
+            ticks: {
+              color: '#9A9A95',
+              font: { family: 'JetBrains Mono', size: 10 },
+              callback: v => v.toFixed(3),
+            }
+          }
+        }
+      }
+    });
+
+    // Custom crosshair + tooltip
+    const tip = document.getElementById('chartTip');
+    const tipVal = document.getElementById('chartTipVal');
+    const tipDate = document.getElementById('chartTipDate');
+    const wrap = ctx.parentElement;
+
+    function onMove(e) {
+      const rect = ctx.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const ds = chart.data.datasets[0].data;
+      // find nearest index by x position
+      const xScale = chart.scales.x;
+      const xValue = xScale.getValueForPixel(x);
+      let nearest = 0;
+      let bestDist = Infinity;
+      for (let i = 0; i < labels.length; i++) {
+        const dist = Math.abs(labels[i].getTime() - xValue);
+        if (dist < bestDist) { bestDist = dist; nearest = i; }
+      }
+      const px = xScale.getPixelForValue(labels[nearest]);
+      const yScale = chart.scales.y;
+      const py = yScale.getPixelForValue(ds[nearest]);
+      tip.style.left = px + 'px';
+      tip.style.top  = py + 'px';
+      tip.style.opacity = '1';
+      tipVal.textContent = ds[nearest].toFixed(4);
+      tipDate.textContent = labels[nearest].toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+    ctx.addEventListener('mousemove', onMove);
+    ctx.addEventListener('mouseleave', () => { tip.style.opacity = '0'; });
+  })();
+</script>
+
+</body>
+</html>

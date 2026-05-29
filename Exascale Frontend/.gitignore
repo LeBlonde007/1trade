@@ -1,0 +1,25 @@
+# Nuxt
+.nuxt/
+.output/
+
+# Node
+node_modules/
+.npm
+
+# Development
+.DS_Store
+*.swp
+*.swo
+*~
+.vscode
+.idea
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build
+.cache/
+build/
+dist

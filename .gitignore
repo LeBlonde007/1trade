@@ -1,0 +1,67 @@
+# Exascale — root gitignore. Per-app ignores live alongside the app (e.g. apps/web/.gitignore).
+# Rule of thumb: source, tests, migrations, contracts, and docs are IN; everything generated,
+# secret, or huge is OUT. See docs/plans/REPO_LAYOUT.md §6.
+
+# --- secrets (never commit; Vault is the source of truth) ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*-credentials.json
+vault-token
+
+# --- Go ---
+/bin/
+/vendor/
+*.test
+*.out
+coverage.*
+
+# --- Node / Nuxt (frontend) ---
+node_modules/
+.nuxt/
+.output/
+.nitro/
+.cache/
+dist/
+*.tsbuildinfo
+
+# --- Python (inference runtime) ---
+__pycache__/
+*.py[cod]
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# --- Terraform / infra state (state lives in remote backend, never in git) ---
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfvars
+!*.tfvars.example
+
+# --- Kubernetes / local clusters ---
+kubeconfig
+*.kubeconfig
+
+# --- model weights / large artifacts (mounted from object storage, not committed) ---
+*.safetensors
+*.bin
+*.gguf
+*.pt
+/models/
+
+# --- build / SBOM outputs ---
+/deploy/sbom/*.json
+
+# --- editor / OS ---
+.DS_Store
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+!.vscode/extensions.json

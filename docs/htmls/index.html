@@ -1,0 +1,896 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Exascale — Pitch Deck</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<deck-stage data-hl="rough">
+
+<!-- ============================================================
+     SLIDE 01 — COVER
+     ============================================================ -->
+<section class="dark" data-screen-label="01 Cover">
+  <header class="topbar">
+    <div class="pageno">01</div>
+    <div class="brand-block">
+      <div class="brand-line"><span class="brand-name">EXASCALE</span> <span class="dot">·</span> <span class="tag">Market-as-a-Service for GPU compute</span></div>
+    </div>
+  </header>
+
+  <div class="main" style="gap: 64px;">
+    <div class="headline-block" style="padding-top: 32px;">
+      <h1 class="display">
+        Every GPU hour,<br/>
+        fully utilized,<br/>
+        priced, and <span class="hl">tradeable</span>.
+      </h1>
+      <p class="tagline" style="max-width: 980px;">
+        An infrastructure layer that turns idle GPU capacity into liquid, priced, tradeable inventory — and makes AI compute as efficient as electricity.
+      </p>
+    </div>
+
+    <div class="pillar-row" style="margin-top: auto;">
+      <div class="pillar">
+        <div class="col-label"><span class="dash">—</span>Pillar One</div>
+        <div class="col-bar lime"></div>
+        <h4>Marketplace</h4>
+        <p>Verified, signed inventory.</p>
+      </div>
+      <div class="pillar">
+        <div class="col-label"><span class="dash">—</span>Pillar Two</div>
+        <div class="col-bar orange"></div>
+        <h4>Price Index</h4>
+        <p>The benchmark for compute hours.</p>
+      </div>
+      <div class="pillar">
+        <div class="col-label"><span class="dash">—</span>Pillar Three</div>
+        <div class="col-bar blue"></div>
+        <h4>Smart Router</h4>
+        <p>Drop-in API, cheaper inference.</p>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div class="divider"></div>
+    <div class="footrow">
+      <span><span class="contact-email">contact@exascale.com</span> · Launch 2026 · San Francisco / Riyadh</span>
+      <span>Page 01 of 13</span>
+    </div>
+  </footer>
+</section>
+
+
+<!-- ============================================================
+     SLIDE 02 — THE PROBLEM
+     ============================================================ -->
+<section class="dark" data-screen-label="02 The Problem">
+  <header class="topbar">
+    <div class="pageno">02</div>
+    <div class="brand-block">
+      <div class="brand-line"><span class="brand-name">EXASCALE</span> <span class="dot">·</span> <span class="tag">Market-as-a-Service for GPU compute</span></div>
+      <div class="section-label">— The problem</div>
+    </div>
+  </header>
+
+  <div class="main" style="gap: 72px;">
+    <div class="headline-block">
+      <h1 class="display small">
+        $7.5 billion<br/>
+        in GPU compute paid for<br/>
+        but <span class="hl">never used</span>.
+      </h1>
+    </div>
+
+    <div class="grid-3" style="gap: 72px;">
+      <div class="cell">
+        <div class="bignum">50<span style="font-size:0.65em">%</span></div>
+        <p>Average utilization on reserved GPU contracts at neoclouds.</p>
+      </div>
+      <div class="cell">
+        <div class="bignum">5&ndash;10<span style="font-size:0.65em">×</span></div>
+        <p>Price spread between reserved capacity and on-demand spot pricing.</p>
+      </div>
+      <div class="cell">
+        <div class="bignum">$0</div>
+        <p>Secondary market for idle reserved hours today.</p>
+      </div>
+    </div>
+
+    <div style="margin-top: auto;">
+      <div class="divider-line" style="margin-bottom: 28px;"></div>
+      <p class="conclusion">
+        <strong>The result:</strong> Wasted capital. Rationed buyers. No price discovery. The largest commodity in the world without a functioning market.
+      </p>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div class="divider"></div>
+    <div class="footrow">
+      <span><span class="contact-email">contact@exascale.com</span> · Launch 2026 · San Francisco / Riyadh</span>
+      <span>Page 02 of 13</span>
+    </div>
+  </footer>
+</section>
+
+
+<!-- ============================================================
+     SLIDE 03 — THE SOLUTION
+     ============================================================ -->
+<section class="cream" data-screen-label="03 The Solution">
+  <header class="topbar">
+    <div class="pageno">03</div>
+    <div class="brand-block">
+      <div class="brand-line"><span class="brand-name">EXASCALE</span> <span class="dot">·</span> <span class="tag">Market-as-a-Service for GPU compute</span></div>
+      <div class="section-label">— The solution</div>
+    </div>
+  </header>
+
+  <div class="main" style="gap: 48px;">
+    <div class="headline-block">
+      <h1 class="display small">
+        A neutral<br/>
+        <span class="hl">market layer</span><br/>
+        for GPU compute.
+      </h1>
+      <p class="tagline">
+        One platform with three connected products that together create the missing market infrastructure for AI compute — verified, priced, and routed.
+      </p>
+    </div>
+
+    <div class="solution-pillars">
+      <div class="row">
+        <div class="dot" style="background: var(--lime);"></div>
+        <h4>Verified<br/>marketplace.</h4>
+        <p>Cryptographically signed receipts on every listing. Three trust tiers (Gold, Silver, Bronze) backed by SLA insurance. Buyers know what they're getting; sellers know they'll be paid.</p>
+      </div>
+      <div class="row">
+        <div class="dot" style="background: var(--orange);"></div>
+        <h4>Reference price index<br/>+ futures.</h4>
+        <p>A daily, audited "compute hour" price benchmark — the Bloomberg of GPU pricing. Futures contracts let companies lock in costs months ahead.</p>
+      </div>
+      <div class="row">
+        <div class="dot" style="background: var(--blue);"></div>
+        <h4>Semantic-cache-<br/>powered router.</h4>
+        <p>Drop-in OpenAI-compatible API that caches semantically equivalent queries and routes new ones to the optimal backend. 30–50% cost reduction vs. single-vendor stacks.</p>
+      </div>
+      <div class="row">
+        <div class="dot" style="background: var(--yellow);"></div>
+        <h4>Cross-vendor<br/>neutrality.</h4>
+        <p>We work across every neocloud and hyperscaler. They sell their own capacity; we sell the market structure that sits across all of them.</p>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div class="divider"></div>
+    <div class="footrow">
+      <span><span class="contact-email">contact@exascale.com</span> · Launch 2026 · San Francisco / Riyadh</span>
+      <span>Page 03 of 13</span>
+    </div>
+  </footer>
+</section>
+
+
+<!-- ============================================================
+     SLIDE 04 — THE THREE FOUNDATIONS
+     ============================================================ -->
+<section class="dark" data-screen-label="04 Three Foundations">
+  <header class="topbar">
+    <div class="pageno">04</div>
+    <div class="brand-block">
+      <div class="brand-line"><span class="brand-name">EXASCALE</span> <span class="dot">·</span> <span class="tag">Market-as-a-Service for GPU compute</span></div>
+      <div class="section-label">— The three foundations</div>
+    </div>
+  </header>
+
+  <div class="main" style="gap: 48px;">
+    <div class="headline-block">
+      <h1 class="display small">
+        Three products<br/>
+        in <span class="hl">one ecosystem</span>.
+      </h1>
+      <p class="tagline">
+        Each product is a viable business standalone. Together they form a flywheel: supply, price discovery, and demand reinforcing each other in a way no competitor can replicate with a single product.
+      </p>
+    </div>
+
+    <div class="grid-3" style="margin-top: 24px;">
+      <div class="cell">
+        <div class="col-label" style="color: var(--lime);"><span class="dash">—</span>01</div>
+        <div class="col-bar lime"></div>
+        <h3>Marketplace</h3>
+        <p style="font-weight:500; opacity:0.85;">Liquidity for idle reserved capacity.</p>
+        <p>Enterprise neocloud customers list unused reserved GPU hours. Spot buyers book at 30–50% below on-demand. Cryptographic verification eliminates fraud.</p>
+      </div>
+      <div class="cell">
+        <div class="col-label" style="color: var(--orange);"><span class="dash">—</span>02</div>
+        <div class="col-bar orange"></div>
+        <h3>Price Exchange</h3>
+        <p style="font-weight:500; opacity:0.85;">Price discovery for compute hours.</p>
+        <p>Daily reference price index, evolving to cash-settled forwards and (with CME/ICE partnership) cleared futures contracts. The financial scaffolding the market is missing.</p>
+      </div>
+      <div class="cell">
+        <div class="col-label" style="color: var(--blue);"><span class="dash">—</span>03</div>
+        <div class="col-bar blue"></div>
+        <h3>Smart Router</h3>
+        <p style="font-weight:500; opacity:0.85;">Cost optimization through caching and routing.</p>
+        <p>Drop-in OpenAI-compatible API with true vector-similarity caching plus real-time routing across all major inference providers. Customer sees one bill; we find the cheapest viable backend.</p>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div class="divider"></div>
+    <div class="footrow">
+      <span><span class="contact-email">contact@exascale.com</span> · Launch 2026 · San Francisco / Riyadh</span>
+      <span>Page 04 of 13</span>
+    </div>
+  </footer>
+</section>
+
+
+<!-- ============================================================
+     SLIDE 05 — THE PRODUCT
+     ============================================================ -->
+<section class="cream" data-screen-label="05 The Product">
+  <header class="topbar">
+    <div class="pageno">05</div>
+    <div class="brand-block">
+      <div class="brand-line"><span class="brand-name">EXASCALE</span> <span class="dot">·</span> <span class="tag">Market-as-a-Service for GPU compute</span></div>
+      <div class="section-label">— The product</div>
+    </div>
+  </header>
+
+  <div class="main" style="gap: 48px;">
+    <div class="headline-block">
+      <h1 class="display small">
+        Three interfaces,<br/>
+        <span class="hl">one economy</span>.
+      </h1>
+      <p class="tagline">
+        A single integrated economy where capacity holders monetize idle hours, buyers access better prices, and developers reduce inference costs — all anchored by a transparent price benchmark.
+      </p>
+    </div>
+
+    <div class="product-cols" style="margin-top: 16px;">
+      <div class="col">
+        <div class="col-bar lime"></div>
+        <h3>Marketplace<br/>Console</h3>
+        <div class="sublabel">— Web + Partner API</div>
+        <ul>
+          <li>List unused hours in 3 minutes</li>
+          <li>Smart auto-listing rules</li>
+          <li>3-tier verification system</li>
+          <li>SLA insurance pool</li>
+          <li>ACH + wire + stablecoin (v2)</li>
+        </ul>
+      </div>
+      <div class="col">
+        <div class="col-bar orange"></div>
+        <h3>Trading<br/>Desk</h3>
+        <div class="sublabel">— Institutional + Retail</div>
+        <ul>
+          <li>Real-time price index</li>
+          <li>Forward contracts (OTC)</li>
+          <li>Hedging &amp; risk dashboard</li>
+          <li>Daily settlement</li>
+          <li>KYC + accreditation built-in</li>
+        </ul>
+      </div>
+      <div class="col">
+        <div class="col-bar blue"></div>
+        <h3>Router<br/>API</h3>
+        <div class="sublabel">— Developer-first</div>
+        <ul>
+          <li>OpenAI-compatible drop-in</li>
+          <li>Vector-similarity cache</li>
+          <li>Cross-provider routing</li>
+          <li>Real-time cost dashboard</li>
+          <li>Per-tenant isolation</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div class="divider"></div>
+    <div class="footrow">
+      <span><span class="contact-email">contact@exascale.com</span> · Launch 2026 · San Francisco / Riyadh</span>
+      <span>Page 05 of 13</span>
+    </div>
+  </footer>
+</section>
+
+
+<!-- ============================================================
+     SLIDE 06 — MARKET SIZE
+     ============================================================ -->
+<section class="dark" data-screen-label="06 Market Size">
+  <header class="topbar">
+    <div class="pageno">06</div>
+    <div class="brand-block">
+      <div class="brand-line"><span class="brand-name">EXASCALE</span> <span class="dot">·</span> <span class="tag">Market-as-a-Service for GPU compute</span></div>
+      <div class="section-label">— Market size</div>
+    </div>
+  </header>
+
+  <div class="main" style="gap: 48px;">
+    <div class="headline-block">
+      <h1 class="display small">
+        The largest commodity<br/>
+        without a <span class="hl">futures market</span>.
+      </h1>
+      <p class="tagline">
+        Every other major commodity has price discovery, hedging, and a secondary market. GPU compute has none of these. The infrastructure gap is structural.
+      </p>
+    </div>
+
+    <div class="tam-row">
+      <div class="tam">
+        <div class="col-label"><span class="dash">—</span>TAM</div>
+        <div class="sub">Total Market</div>
+        <div class="num">$200B+</div>
+        <p class="desc">Global annual GPU compute spend (hyperscalers + neoclouds + enterprise).</p>
+      </div>
+      <div class="tam">
+        <div class="col-label"><span class="dash">—</span>SAM</div>
+        <div class="sub">Serviceable Market</div>
+        <div class="num">$15B</div>
+        <p class="desc">Annual reserved capacity at neoclouds where secondary market is viable.</p>
+      </div>
+      <div class="tam">
+        <div class="col-label"><span class="dash">—</span>SOM</div>
+        <div class="sub">Target Capture</div>
+        <div class="num">$2.5B</div>
+        <p class="desc">Year 4 target marketplace + routing GMV at ~10% take rate.</p>
+      </div>
+    </div>
+
+    <div style="margin-top: auto;">
+      <div class="divider-line" style="margin-bottom: 22px;"></div>
+      <ul class="tick-list" style="display:grid; grid-template-columns: repeat(3, 1fr); gap: 32px;">
+        <li>$7.5B/year of reserved capacity sits idle — the recoverable surplus is larger than the GMV of most public marketplaces.</li>
+        <li>No existing platform serves the three sides together: capacity holders, spot buyers, and inference developers.</li>
+        <li>Hyperscalers structurally cannot offer cross-vendor neutrality. This is our defensible moat.</li>
+      </ul>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div class="divider"></div>
+    <div class="footrow">
+      <span><span class="contact-email">contact@exascale.com</span> · Launch 2026 · San Francisco / Riyadh</span>
+      <span>Page 06 of 13</span>
+    </div>
+  </footer>
+</section>
+
+
+<!-- ============================================================
+     SLIDE 07 — BUSINESS MODEL
+     ============================================================ -->
+<section class="cream" data-screen-label="07 Business Model">
+  <header class="topbar">
+    <div class="pageno">07</div>
+    <div class="brand-block">
+      <div class="brand-line"><span class="brand-name">EXASCALE</span> <span class="dot">·</span> <span class="tag">Market-as-a-Service for GPU compute</span></div>
+      <div class="section-label">— Business model</div>
+    </div>
+  </header>
+
+  <div class="main" style="gap: 48px;">
+    <div class="headline-block">
+      <h1 class="display small">
+        Revenue scales with<br/>
+        <span class="hl">volume</span>, not headcount.
+      </h1>
+      <p class="tagline">
+        B2B-first, then developer-led growth. Marketplace economics with platform leverage.
+      </p>
+    </div>
+
+    <div class="rev-cols">
+      <div class="rev">
+        <div class="col-bar lime"></div>
+        <div class="label">— Primary</div>
+        <h3 class="name">Marketplace<br/>take rate</h3>
+        <p>8–12% of GMV on every marketplace transaction. Standard model.</p>
+      </div>
+      <div class="rev">
+        <div class="col-bar orange"></div>
+        <div class="label">— Secondary</div>
+        <h3 class="name">Router margin<br/>+ cache subsidy</h3>
+        <p>Per-cache-hit pricing (~$0.0001) at near-100% margin; small markup on routed inference. Cache hits subsidize the routing layer.</p>
+      </div>
+      <div class="rev">
+        <div class="col-bar blue"></div>
+        <div class="label">— Phase 2+</div>
+        <h3 class="name">Index licensing<br/>+ futures fees</h3>
+        <p>Subscription revenue on the daily price index. Per-contract fees on cleared futures (revenue share with CME/ICE in Stage 2).</p>
+      </div>
+    </div>
+
+    <div class="unit-callout" style="margin-top: auto;">
+      <div class="lbl">— Unit economics</div>
+      <div class="body">
+        <strong>Month 6:</strong> 5 partners × $200K avg listed capacity = $1M GMV → $100K revenue. &nbsp; <strong>Year 4:</strong> 200 partners × $600K avg + $50M router GMV + $2M index subscriptions = $300M+ GMV → $30M+ ARR.
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div class="divider"></div>
+    <div class="footrow">
+      <span><span class="contact-email">contact@exascale.com</span> · Launch 2026 · San Francisco / Riyadh</span>
+      <span>Page 07 of 13</span>
+    </div>
+  </footer>
+</section>
+
+
+<!-- ============================================================
+     SLIDE 08 — PARTNERSHIPS & TRACTION
+     ============================================================ -->
+<section class="cream" data-screen-label="08 Partnerships">
+  <header class="topbar">
+    <div class="pageno">08</div>
+    <div class="brand-block">
+      <div class="brand-line"><span class="brand-name">EXASCALE</span> <span class="dot">·</span> <span class="tag">Market-as-a-Service for GPU compute</span></div>
+      <div class="section-label">— Partnerships &amp; traction</div>
+    </div>
+  </header>
+
+  <div class="main" style="gap: 36px;">
+    <div class="headline-block">
+      <h1 class="display tiny" style="font-size: 88px;">
+        Datacenter live.<br/>
+        Price index <span class="hl">in build</span>.<br/>
+        Router beta live.
+      </h1>
+      <p class="tagline">Real institutional commitments — not slogans.</p>
+    </div>
+
+    <div class="partner-grid">
+      <div class="pcard">
+        <div class="status-pill"><span class="dot" style="background: var(--lime);"></span>Advisor signed</div>
+        <h5>UBS Japan &mdash; COO</h5>
+        <p>Senior institutional advisor anchoring the price index and OTC forwards rollout. Direct line into Tokyo banking desks and global UBS rates.</p>
+      </div>
+      <div class="pcard">
+        <div class="status-pill"><span class="dot" style="background: var(--lime);"></span>Active build</div>
+        <h5>Banking &amp; Compliance</h5>
+        <p>Stripe Connect for US settlement. Persona for KYC. Mercury for treasury. Regulatory counsel engaged (Wilson Sonsini).</p>
+      </div>
+      <div class="pcard">
+        <div class="status-pill"><span class="dot" style="background: var(--yellow);"></span>In pilot</div>
+        <h5>Compute Price Index</h5>
+        <p>Daily reference price methodology under audit-firm review. First 20 institutional subscribers identified.</p>
+      </div>
+      <div class="pcard">
+        <div class="status-pill"><span class="dot" style="background: var(--blue);"></span>Discussions</div>
+        <h5>CFTC / Exchange conversations</h5>
+        <p>Early conversations with CME and ICE on Stage 2 cleared futures partnership. Conservative legal opinion in progress.</p>
+      </div>
+    </div>
+
+    <div class="kpi-strip" style="margin-top: auto;">
+      <div>
+        <div class="kpi-num">50</div>
+        <div class="kpi-lbl">Reserve holders in pilot</div>
+      </div>
+      <div>
+        <div class="kpi-num">3</div>
+        <div class="kpi-lbl">Verified neocloud partner conversations</div>
+      </div>
+      <div>
+        <div class="kpi-num">$10M</div>
+        <div class="kpi-lbl">Target Q4 GMV</div>
+      </div>
+      <div>
+        <div class="kpi-num">6 mo</div>
+        <div class="kpi-lbl">To public marketplace launch</div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div class="divider"></div>
+    <div class="footrow">
+      <span><span class="contact-email">contact@exascale.com</span> · Launch 2026 · San Francisco / Riyadh</span>
+      <span>Page 08 of 13</span>
+    </div>
+  </footer>
+</section>
+
+
+<!-- ============================================================
+     SLIDE 09 — COMPETITION
+     ============================================================ -->
+<section class="dark" data-screen-label="09 Competition">
+  <header class="topbar">
+    <div class="pageno">09</div>
+    <div class="brand-block">
+      <div class="brand-line"><span class="brand-name">EXASCALE</span> <span class="dot">·</span> <span class="tag">Market-as-a-Service for GPU compute</span></div>
+      <div class="section-label">— Competition</div>
+    </div>
+  </header>
+
+  <div class="main" style="gap: 36px;">
+    <div class="headline-block">
+      <h1 class="display tiny">
+        No competitor <span class="hl">closes the loop</span>.
+      </h1>
+      <p class="tagline">Each competitor solves one piece. <span class="brand-name">Exascale</span> integrates all three.</p>
+    </div>
+
+    <table class="comp-table" style="margin-top: 8px;">
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th>AWS / Azure</th>
+          <th>CoreWeave</th>
+          <th>Vast.ai</th>
+          <th>io.net</th>
+          <th>Together</th>
+          <th class="brand-col"><span class="brand-name">Exascale</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Verified marketplace for idle capacity</td>
+          <td class="x">✗</td><td class="x">✗</td><td class="partial">~</td><td class="partial">~</td><td class="x">✗</td>
+          <td class="brand-col check">✓</td>
+        </tr>
+        <tr>
+          <td>Cryptographic SLA receipts</td>
+          <td class="x">✗</td><td class="x">✗</td><td class="x">✗</td><td class="x">✗</td><td class="x">✗</td>
+          <td class="brand-col check">✓</td>
+        </tr>
+        <tr>
+          <td>Reference price index</td>
+          <td class="x">✗</td><td class="x">✗</td><td class="x">✗</td><td class="x">✗</td><td class="x">✗</td>
+          <td class="brand-col check">✓</td>
+        </tr>
+        <tr>
+          <td>Futures / hedging instruments</td>
+          <td class="x">✗</td><td class="x">✗</td><td class="x">✗</td><td class="x">✗</td><td class="x">✗</td>
+          <td class="brand-col check">✓</td>
+        </tr>
+        <tr>
+          <td>True semantic caching</td>
+          <td class="x">✗</td><td class="x">✗</td><td class="x">✗</td><td class="x">✗</td><td class="x">✗</td>
+          <td class="brand-col check">✓</td>
+        </tr>
+        <tr>
+          <td>Cross-vendor inference routing</td>
+          <td class="x">✗</td><td class="x">✗</td><td class="x">✗</td><td class="x">✗</td><td class="partial">~</td>
+          <td class="brand-col check">✓</td>
+        </tr>
+        <tr>
+          <td>Cross-vendor neutrality (structural)</td>
+          <td class="x">✗</td><td class="x">✗</td><td class="check">✓</td><td class="check">✓</td><td class="partial">~</td>
+          <td class="brand-col check">✓</td>
+        </tr>
+        <tr>
+          <td>Enterprise-grade SLA + insurance</td>
+          <td class="check">✓</td><td class="check">✓</td><td class="x">✗</td><td class="x">✗</td><td class="check">✓</td>
+          <td class="brand-col check">✓</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <footer class="footer">
+    <div class="divider"></div>
+    <div class="footrow">
+      <span><span class="contact-email">contact@exascale.com</span> · Launch 2026 · San Francisco / Riyadh</span>
+      <span>Page 09 of 13</span>
+    </div>
+  </footer>
+</section>
+
+
+<!-- ============================================================
+     SLIDE 10 — GO-TO-MARKET
+     ============================================================ -->
+<section class="cream" data-screen-label="10 Go-to-Market">
+  <header class="topbar">
+    <div class="pageno">10</div>
+    <div class="brand-block">
+      <div class="brand-line"><span class="brand-name">EXASCALE</span> <span class="dot">·</span> <span class="tag">Market-as-a-Service for GPU compute</span></div>
+      <div class="section-label">— Go-to-market</div>
+    </div>
+  </header>
+
+  <div class="main" style="gap: 48px;">
+    <div class="headline-block">
+      <h1 class="display small">
+        Partners list.<br/>
+        Buyers route.<br/>
+        The <span class="hl">flywheel turns</span>.
+      </h1>
+      <p class="tagline">
+        A staged rollout: supply first, demand second, financial primitives third. Each stage feeds the next.
+      </p>
+    </div>
+
+    <div class="phase-cols">
+      <div class="phase">
+        <div class="meta">
+          <span>— Phase 1</span>
+          <span>M1 — M6</span>
+        </div>
+        <h4>Pilot launch</h4>
+        <ul>
+          <li>Owned GPU fleet online (Tokyo)</li>
+          <li>50 reserve-holder sellers</li>
+          <li>$1M monthly GMV</li>
+          <li>Router beta with 6 backends</li>
+          <li>Price index v1 published</li>
+        </ul>
+      </div>
+      <div class="phase">
+        <div class="meta">
+          <span style="color: var(--orange);">— Phase 2</span>
+          <span>M7 — M14</span>
+        </div>
+        <h4>Multi-partner scale</h4>
+        <ul>
+          <li>3–5 additional neocloud partners</li>
+          <li>500+ sellers; 2,000+ buyers</li>
+          <li>$10M monthly GMV</li>
+          <li>Router GA + cache-hit dashboard</li>
+          <li>Index audited + institutionalized</li>
+        </ul>
+      </div>
+      <div class="phase">
+        <div class="meta">
+          <span style="color: var(--blue);">— Phase 3</span>
+          <span>M15 — M24</span>
+        </div>
+        <h4>National rollout + financial layer</h4>
+        <ul>
+          <li>10+ partners across US + EU</li>
+          <li>5,000+ active accounts</li>
+          <li>$25M+ monthly GMV</li>
+          <li>CFX Stage 1 (OTC forwards) live</li>
+          <li>CFX Stage 2 (cleared futures) partnership</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div class="divider"></div>
+    <div class="footrow">
+      <span><span class="contact-email">contact@exascale.com</span> · Launch 2026 · San Francisco / Riyadh</span>
+      <span>Page 10 of 13</span>
+    </div>
+  </footer>
+</section>
+
+
+<!-- ============================================================
+     SLIDE 11 — FINANCIAL PROJECTIONS
+     ============================================================ -->
+<section class="dark" data-screen-label="11 Financials">
+  <header class="topbar">
+    <div class="pageno">11</div>
+    <div class="brand-block">
+      <div class="brand-line"><span class="brand-name">EXASCALE</span> <span class="dot">·</span> <span class="tag">Market-as-a-Service for GPU compute</span></div>
+      <div class="section-label">— Financial projections</div>
+    </div>
+  </header>
+
+  <div class="main" style="gap: 40px;">
+    <div class="headline-block">
+      <h1 class="display small">
+        $1M in month 6.<br/>
+        $300M GMV by <span class="hl">year 4</span>.
+      </h1>
+    </div>
+
+    <table class="proj-table">
+      <thead>
+        <tr>
+          <th>Period</th>
+          <th>Stage</th>
+          <th>Partners</th>
+          <th>Active Buyers</th>
+          <th>GMV</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Month 3</td><td>MVP</td><td>1</td><td>50</td><td>—</td></tr>
+        <tr><td>Month 6</td><td>Pilot</td><td>5</td><td>200</td><td>$1M</td></tr>
+        <tr><td>Year 1</td><td>Growth</td><td>25+</td><td>2,000+</td><td>$15M+</td></tr>
+        <tr><td>Year 2</td><td>Scale</td><td>75+</td><td>10,000+</td><td>$60M+</td></tr>
+        <tr><td>Year 4</td><td>Expansion</td><td>200+</td><td>50,000+</td><td>$300M+</td></tr>
+      </tbody>
+    </table>
+
+    <div class="grid-2" style="margin-top: auto; gap: 32px;">
+      <div class="callout">
+        <div class="label">— Month 6 · Benchmark</div>
+        <div class="big lime">$100K revenue</div>
+        <div class="desc">10% blended take rate on $1M GMV — fully marketplace-driven.</div>
+      </div>
+      <div class="callout">
+        <div class="label">— Year 4 · Steady state</div>
+        <div class="big lime">$30M+ ARR</div>
+        <div class="desc">Marketplace (60%) + Router (25%) + Index/Futures (15%). Diversified across three product lines.</div>
+      </div>
+    </div>
+
+    <div class="footnote">* All post-month-6 figures are internal model assumptions. Audited financials available in data room.</div>
+  </div>
+
+  <footer class="footer">
+    <div class="divider"></div>
+    <div class="footrow">
+      <span><span class="contact-email">contact@exascale.com</span> · Launch 2026 · San Francisco / Riyadh</span>
+      <span>Page 11 of 13</span>
+    </div>
+  </footer>
+</section>
+
+
+<!-- ============================================================
+     SLIDE 12 — COMPLIANCE & TRUST
+     ============================================================ -->
+<section class="dark" data-screen-label="12 Compliance">
+  <header class="topbar">
+    <div class="pageno">12</div>
+    <div class="brand-block">
+      <div class="brand-line"><span class="brand-name">EXASCALE</span> <span class="dot">·</span> <span class="tag">Market-as-a-Service for GPU compute</span></div>
+      <div class="section-label">— Compliance &amp; trust</div>
+    </div>
+  </header>
+
+  <div class="main" style="gap: 48px;">
+    <div class="headline-block">
+      <h1 class="display small">
+        Built for enterprise<br/>
+        and regulators <span class="hl">from day one</span>.
+      </h1>
+      <p class="tagline">
+        Regulatory compliance is the highest competitive moat in financial infrastructure. We architect for it before launch, not after.
+      </p>
+    </div>
+
+    <div class="compliance-grid">
+      <div class="ccard">
+        <div class="pill"><span class="dot" style="background: var(--lime);"></span>Legal opinion secured</div>
+        <h5>CFTC Positioning</h5>
+        <p>OTC forwards structured as commodity-linked contracts under CFTC jurisdiction. Eligible Contract Participant verification on every counterparty.</p>
+      </div>
+      <div class="ccard">
+        <div class="pill"><span class="dot" style="background: var(--yellow);"></span>Audit Q3 2026</div>
+        <h5>SOC 2 Type II</h5>
+        <p>Full SOC 2 Type II certification path with annual audits. Penetration testing quarterly.</p>
+      </div>
+      <div class="ccard">
+        <div class="pill"><span class="dot" style="background: var(--lime);"></span>Persona + Parallel Markets</div>
+        <h5>KYC + AML</h5>
+        <p>Identity verification, accreditation, transaction monitoring. SAR filing process operational.</p>
+      </div>
+      <div class="ccard">
+        <div class="pill"><span class="dot" style="background: var(--lime);"></span>Stripe Connect handled</div>
+        <h5>PCI + Payment Security</h5>
+        <p>Stripe Connect manages money transmission license. No raw card data ever touches our infrastructure.</p>
+      </div>
+      <div class="ccard">
+        <div class="pill"><span class="dot" style="background: var(--yellow);"></span>Per-region by v2</div>
+        <h5>GDPR + Data Residency</h5>
+        <p>Right-to-be-forgotten implemented. EU data residency option in v2. Per-tenant isolation on all data flows.</p>
+      </div>
+      <div class="ccard">
+        <div class="pill"><span class="dot" style="background: var(--blue);"></span>Reinsurance partner in talks</div>
+        <h5>SLA Insurance Pool</h5>
+        <p>Pool funded by listing fees protects buyers against SLA breaches on Bronze-tier inventory.</p>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div class="divider"></div>
+    <div class="footrow">
+      <span><span class="contact-email">contact@exascale.com</span> · Launch 2026 · San Francisco / Riyadh</span>
+      <span>Page 12 of 13</span>
+    </div>
+  </footer>
+</section>
+
+
+<!-- ============================================================
+     SLIDE 13 — JOIN THE CIRCLE / CTA
+     ============================================================ -->
+<section class="cream" data-screen-label="13 Join the Circle">
+  <header class="topbar">
+    <div class="pageno">13</div>
+    <div class="brand-block">
+      <div class="brand-line"><span class="brand-name">EXASCALE</span> <span class="dot">·</span> <span class="tag">Market-as-a-Service for GPU compute</span></div>
+      <div class="section-label">— Join the circle</div>
+    </div>
+  </header>
+
+  <div class="main" style="gap: 40px;">
+    <div class="headline-block">
+      <h1 class="display smaller">
+        Build the <span class="hl">market structure</span><br/>
+        for AI's largest expense.
+      </h1>
+      <p class="pullquote">
+        <span class="brand-name">Exascale</span> is the operating system for AI compute markets — where every idle hour becomes inventory, every transaction sets a price, and every request finds the cheapest viable home.
+      </p>
+    </div>
+
+    <div class="exit-cols" style="margin-top: 8px;">
+      <div class="exit">
+        <div class="col-label" style="margin-bottom: 14px;"><span class="dash">—</span>Scenario 01</div>
+        <h5>Independent IPO</h5>
+        <p>Following the CoreWeave / Nebius public-listing path once we hit sustained $50M+ ARR across the three product lines.</p>
+      </div>
+      <div class="exit">
+        <div class="col-label" style="margin-bottom: 14px;"><span class="dash">—</span>Scenario 02</div>
+        <h5>Strategic acquisition</h5>
+        <p>Acquisition by a hyperscaler (Microsoft, Google) wanting cross-vendor neutrality, or by a neocloud (CoreWeave-class) wanting the demand-side stack.</p>
+      </div>
+      <div class="exit">
+        <div class="col-label" style="margin-bottom: 14px;"><span class="dash">—</span>Scenario 03</div>
+        <h5>Public-private market infrastructure</h5>
+        <p>Become the regulated reference benchmark for GPU compute pricing — the CME-equivalent for AI infrastructure.</p>
+      </div>
+    </div>
+
+    <div class="closing-row" style="margin-top: auto;">
+      <div class="item">
+        <div class="label">&mdash; Lead advisor</div>
+        <div class="val">UBS Japan &mdash; COO</div>
+      </div>
+      <div class="item">
+        <div class="label">— Banking partner</div>
+        <div class="val">Stripe + Mercury</div>
+      </div>
+      <div class="item">
+        <div class="label">— Contact</div>
+        <div class="val contact-email">contact@exascale.com</div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div class="divider"></div>
+    <div class="footrow">
+      <span><span class="contact-email">contact@exascale.com</span> · Launch 2026 · San Francisco / Riyadh</span>
+      <span>Page 13 of 13</span>
+    </div>
+  </footer>
+</section>
+
+</deck-stage>
+
+<!-- Tweaks panel mount point -->
+<div id="tweaks-root"></div>
+
+<!-- Deck stage shell -->
+<script src="deck-stage.js"></script>
+
+<!-- React + Babel for tweaks panel -->
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="tweaks-app.jsx"></script>
+
+</body>
+</html>

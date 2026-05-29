@@ -1,0 +1,952 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Exascale · Open an account</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+  :root {
+    --canvas:     #F8F7F4;
+    --elevated:   #FFFFFF;
+    --sunken:     #F2EEE3;
+    --inverse:    #0A0B0E;
+    --text:       #0A0B0E;
+    --text-2:     #5F5F5C;
+    --text-3:     #9A9A95;
+    --text-inv:   #E8E6E0;
+    --border:     rgba(0,0,0,0.08);
+    --border-2:   rgba(0,0,0,0.16);
+    --brand:      #C8F25C;
+    --brand-hov:  #B8E548;
+    --accent:     #4A90E2;
+    --pos:        #19C37D;
+    --pos-sub:    rgba(25,195,125,0.12);
+    --neg:        #EF4444;
+    --neg-sub:    rgba(239,68,68,0.12);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--canvas);
+    color: var(--text);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-size: 15px;
+    line-height: 1.55;
+    font-feature-settings: 'tnum' on, 'ss01' on, 'cv11' on;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  .mono { font-family: 'JetBrains Mono', ui-monospace, SF Mono, Menlo, monospace; font-variant-numeric: tabular-nums; }
+  .font-display { font-family: 'Inter Tight', 'Inter', sans-serif; }
+  a { color: var(--text); }
+  .lbl {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.20em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    font-weight: 500;
+  }
+
+  /* ============================================================
+     SPLIT SHELL
+     ============================================================ */
+  .page {
+    display: grid;
+    grid-template-columns: 60fr 40fr;
+    min-height: 100vh;
+  }
+
+  /* ===== LEFT — FORM ===== */
+  .form-side {
+    background: var(--canvas);
+    padding: 40px 80px 64px;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 64px;
+  }
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-family: 'Inter Tight';
+    font-weight: 700;
+    font-size: 16px;
+    letter-spacing: -0.01em;
+    color: var(--text);
+    text-decoration: none;
+  }
+  .brand .mark { width: 14px; height: 14px; background: var(--brand); }
+  .topbar .step {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--text-2);
+  }
+  .topbar .step .total { color: var(--text-3); }
+
+  .form-card {
+    max-width: 540px;
+    width: 100%;
+    margin: 0 auto;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  h1.title {
+    font-family: 'Inter Tight';
+    font-size: 36px;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.05;
+    margin: 0 0 12px;
+  }
+  .subhead {
+    font-size: 16px;
+    color: var(--text-2);
+    margin: 0 0 36px;
+  }
+
+  /* Account-type cards */
+  .acct-types {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 32px;
+  }
+  .acct {
+    background: var(--elevated);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 18px 16px 16px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    position: relative;
+    transition: background 150ms, border-color 150ms, transform 100ms;
+    text-align: left;
+  }
+  .acct:hover { border-color: var(--border-2); }
+  .acct .ic-wrap {
+    width: 28px; height: 28px;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--text-2);
+    background: var(--sunken);
+    border-radius: 2px;
+  }
+  .acct .ic-wrap [data-lucide] { width: 16px; height: 16px; stroke-width: 1.6; }
+  .acct .nm {
+    font-family: 'Inter Tight';
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--text);
+  }
+  .acct .l1 { font-size: 12.5px; color: var(--text-2); line-height: 1.4; }
+  .acct .l2 { font-size: 12.5px; color: var(--text-3); line-height: 1.4; }
+  .acct .check {
+    position: absolute;
+    top: 12px; right: 12px;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    border: 1.5px solid var(--border-2);
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: background 120ms, border-color 120ms;
+  }
+  .acct .check::after {
+    content: '';
+    width: 6px; height: 6px;
+    background: var(--text);
+    border-radius: 50%;
+    opacity: 0;
+    transition: opacity 120ms;
+  }
+  .acct.active {
+    background: rgba(200,242,92,0.10);
+    border-color: var(--brand);
+  }
+  .acct.active .check {
+    background: var(--brand);
+    border-color: var(--brand);
+  }
+  .acct.active .check::after { opacity: 1; background: var(--text); }
+  .acct.active .ic-wrap { color: var(--text); background: rgba(255,255,255,0.6); }
+
+  /* Form fields */
+  .field {
+    display: flex; flex-direction: column; gap: 8px;
+    margin-bottom: 18px;
+  }
+  .field .row {
+    display: flex; justify-content: space-between; align-items: baseline;
+  }
+  .field .hint {
+    font-size: 12px;
+    color: var(--text-3);
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.02em;
+  }
+  .field input {
+    height: 48px;
+    background: var(--elevated);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 0 16px;
+    font-family: 'Inter';
+    font-size: 15px;
+    color: var(--text);
+    outline: none;
+    transition: border-color 120ms, box-shadow 120ms;
+    width: 100%;
+  }
+  .field input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(74,144,226,0.12);
+  }
+  .field .input-with-toggle {
+    position: relative;
+  }
+  .field .input-with-toggle .toggle {
+    position: absolute;
+    right: 12px; top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    color: var(--text-3);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 2px;
+  }
+  .field .input-with-toggle .toggle:hover { color: var(--text); }
+  .field .input-with-toggle .toggle [data-lucide] { width: 16px; height: 16px; }
+
+  .strength {
+    display: flex;
+    gap: 4px;
+    margin-top: 8px;
+  }
+  .strength div {
+    flex: 1;
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    transition: background 120ms;
+  }
+  .strength.s1 div:nth-child(-n+1) { background: var(--neg); }
+  .strength.s2 div:nth-child(-n+2) { background: #F59E0B; }
+  .strength.s3 div:nth-child(-n+3) { background: var(--brand); }
+  .strength.s4 div:nth-child(-n+4) { background: var(--pos); }
+  .strength-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin-top: 6px;
+  }
+  .strength-label .s1 { color: var(--neg); }
+  .strength-label .s2 { color: #D97706; }
+  .strength-label .s3 { color: var(--text); }
+  .strength-label .s4 { color: var(--pos); }
+
+  /* Divider */
+  .or {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 24px 0 18px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-3);
+  }
+  .or::before, .or::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* OAuth buttons */
+  .oauth-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 28px;
+  }
+  .oauth {
+    height: 48px;
+    background: var(--elevated);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    font-family: 'Inter';
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+    width: 100%;
+    transition: background 120ms, border-color 120ms;
+  }
+  .oauth:hover { background: var(--sunken); border-color: var(--border-2); }
+  .oauth svg { display: block; }
+
+  /* Terms */
+  .terms {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 18px;
+    font-size: 13px;
+    color: var(--text-2);
+    line-height: 1.5;
+  }
+  .terms input[type="checkbox"] {
+    appearance: none;
+    width: 16px; height: 16px;
+    margin: 2px 0 0 0;
+    border: 1.5px solid var(--border-2);
+    border-radius: 2px;
+    background: var(--elevated);
+    cursor: pointer;
+    flex-shrink: 0;
+    position: relative;
+    transition: background 120ms, border-color 120ms;
+  }
+  .terms input[type="checkbox"]:checked {
+    background: var(--text);
+    border-color: var(--text);
+  }
+  .terms input[type="checkbox"]:checked::after {
+    content: '✓';
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    color: var(--brand);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .terms a {
+    color: var(--text);
+    text-decoration: underline;
+    text-decoration-color: var(--border-2);
+    text-underline-offset: 3px;
+  }
+  .terms a:hover { color: var(--accent); text-decoration-color: var(--accent); }
+
+  .submit {
+    height: 52px;
+    width: 100%;
+    background: var(--brand);
+    color: var(--text);
+    border: none;
+    border-radius: 2px;
+    font-family: 'Inter Tight';
+    font-weight: 600;
+    font-size: 15px;
+    letter-spacing: -0.005em;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: background 120ms;
+  }
+  .submit:hover { background: var(--brand-hov); }
+  .submit [data-lucide] { width: 16px; height: 16px; }
+
+  .signin-link {
+    margin-top: 18px;
+    text-align: center;
+    font-size: 13.5px;
+    color: var(--text-2);
+  }
+  .signin-link a {
+    color: var(--text);
+    font-weight: 500;
+    text-decoration: none;
+    border-bottom: 1px solid var(--text);
+    padding-bottom: 1px;
+  }
+  .signin-link a:hover { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* ============================================================
+     RIGHT — REASSURANCE PANEL
+     ============================================================ */
+  .panel {
+    background: var(--inverse);
+    color: var(--text-inv);
+    padding: 40px 56px 56px;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    position: relative;
+    overflow: hidden;
+  }
+  .panel::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+    background-size: 48px 48px;
+    pointer-events: none;
+  }
+  .panel > * { position: relative; z-index: 1; }
+
+  .panel-top { display: flex; justify-content: flex-end; }
+  .panel-top a {
+    color: rgba(232,230,224,0.5);
+    font-size: 13px;
+    text-decoration: none;
+    font-family: 'Inter';
+  }
+  .panel-top a:hover { color: var(--text-inv); }
+
+  .value-prop-wrap {
+    margin-top: 56px;
+    min-height: 200px;
+    display: flex;
+    align-items: flex-start;
+  }
+  .value-prop {
+    font-family: 'Inter Tight';
+    font-size: 40px;
+    font-weight: 600;
+    line-height: 1.08;
+    letter-spacing: -0.025em;
+    color: var(--text-inv);
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 600ms cubic-bezier(0.2,0,0,1), transform 600ms cubic-bezier(0.2,0,0,1);
+  }
+  .value-prop.in {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .value-prop em {
+    font-style: normal;
+    background: var(--brand);
+    color: var(--text);
+    padding: 0 0.08em;
+  }
+  .value-prop-dots {
+    display: flex;
+    gap: 6px;
+    margin-top: 28px;
+  }
+  .value-prop-dots div {
+    width: 18px;
+    height: 2px;
+    background: rgba(255,255,255,0.16);
+    transition: background 200ms;
+  }
+  .value-prop-dots div.active { background: var(--brand); }
+
+  /* Live ticker */
+  .ticker {
+    margin-top: 48px;
+    background: rgba(255,255,255,0.025);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 2px;
+    padding: 18px 20px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .ticker .head {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .ticker .head .live-dot {
+    width: 7px; height: 7px;
+    background: var(--pos);
+    border-radius: 50%;
+    position: relative;
+  }
+  .ticker .head .live-dot::after {
+    content: '';
+    position: absolute; inset: -4px;
+    border-radius: 50%;
+    border: 1px solid var(--pos);
+    opacity: 0.5;
+    animation: ping 2s ease-out infinite;
+  }
+  @keyframes ping {
+    0%   { transform: scale(0.9); opacity: 0.6; }
+    100% { transform: scale(1.8); opacity: 0; }
+  }
+  .ticker .head .label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(232,230,224,0.55);
+  }
+  .ticker .head .badge {
+    margin-left: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    color: var(--pos);
+    background: rgba(25,195,125,0.12);
+    padding: 2px 8px;
+    border-radius: 2px;
+  }
+  .ticker .row-2 {
+    display: flex; align-items: baseline; gap: 12px;
+    margin-top: 4px;
+  }
+  .ticker .price {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: -0.025em;
+    transition: color 600ms;
+  }
+  .ticker .price.flash-up { color: var(--pos); }
+  .ticker .price.flash-down { color: var(--neg); }
+  .ticker .delta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    color: var(--pos);
+  }
+  .ticker .delta.neg { color: var(--neg); }
+  .ticker .meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: rgba(232,230,224,0.4);
+    margin-top: 8px;
+  }
+
+  /* 30d chart */
+  .mini-chart {
+    margin-top: 14px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 2px;
+    padding: 14px 16px 10px;
+  }
+  .mini-chart .mc-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 8px;
+  }
+  .mini-chart .mc-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(232,230,224,0.5);
+  }
+  .mini-chart .mc-stat {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--pos);
+  }
+  .mini-chart svg {
+    width: 100%;
+    height: 90px;
+    display: block;
+    overflow: visible;
+  }
+  .mini-chart svg .line {
+    fill: none;
+    stroke: var(--brand);
+    stroke-width: 1.5;
+    stroke-dasharray: 1400;
+    stroke-dashoffset: 1400;
+    animation: draw 1.4s cubic-bezier(0.2,0,0,1) 0.3s forwards;
+  }
+  .mini-chart svg .fill {
+    fill: var(--brand);
+    fill-opacity: 0;
+    animation: fadein 1.2s ease-out 0.8s forwards;
+  }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+  @keyframes fadein { to { fill-opacity: 0.10; } }
+  .mini-chart .ax {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9.5px;
+    color: rgba(232,230,224,0.35);
+    letter-spacing: 0.06em;
+    margin-top: 6px;
+  }
+
+  /* Trust marks */
+  .trust {
+    margin-top: auto;
+    padding-top: 40px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+  }
+  .trust .item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .trust .item .ico {
+    width: 24px; height: 24px;
+    color: var(--brand);
+    margin-bottom: 6px;
+  }
+  .trust .item .ico [data-lucide] { width: 18px; height: 18px; stroke-width: 1.6; }
+  .trust .item .nm {
+    font-family: 'Inter Tight';
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text-inv);
+    letter-spacing: -0.005em;
+  }
+  .trust .item .sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    color: rgba(232,230,224,0.5);
+  }
+
+  /* Responsive */
+  @media (max-width: 1100px) {
+    .form-side { padding: 32px 40px 64px; }
+    .panel { padding: 32px 40px; }
+  }
+  @media (max-width: 800px) {
+    .page { grid-template-columns: 1fr; }
+    .panel { display: none; }
+    .form-side { padding: 24px 24px 64px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <!-- =============================================================
+       LEFT — FORM
+       ============================================================= -->
+  <section class="form-side">
+    <div class="topbar">
+      <a href="#" class="brand"><span class="mark"></span>Exascale</a>
+      <span class="step">Step <span style="color: var(--text);">1</span> <span class="total">of 2</span></span>
+    </div>
+
+    <div class="form-card">
+      <h1 class="title">Open an Exascale account</h1>
+      <p class="subhead">5 minutes. No credit card required for paper trading.</p>
+
+      <span class="lbl" style="display:block; margin-bottom:10px;">— Account type</span>
+      <div class="acct-types" id="acctTypes">
+        <button class="acct active" data-key="trader">
+          <span class="check"></span>
+          <span class="ic-wrap"><i data-lucide="candlestick-chart"></i></span>
+          <span class="nm">Trader</span>
+          <span class="l1">Trade credits</span>
+          <span class="l2">Paper or real money</span>
+        </button>
+        <button class="acct" data-key="ai">
+          <span class="check"></span>
+          <span class="ic-wrap"><i data-lucide="terminal"></i></span>
+          <span class="nm">AI Company</span>
+          <span class="l1">Use credits</span>
+          <span class="l2">Inference &amp; compute</span>
+        </button>
+        <button class="acct" data-key="ent">
+          <span class="check"></span>
+          <span class="ic-wrap"><i data-lucide="building-2"></i></span>
+          <span class="nm">Enterprise</span>
+          <span class="l1">Multi-user SSO</span>
+          <span class="l2">Procurement-friendly</span>
+        </button>
+      </div>
+
+      <div class="field">
+        <div class="row"><span class="lbl">— Work email</span></div>
+        <input type="email" id="email" value="you@firm.com" />
+      </div>
+
+      <div class="field">
+        <div class="row"><span class="lbl">— Password</span><span class="hint" id="strLabel"></span></div>
+        <div class="input-with-toggle">
+          <input type="password" id="password" value="••••••••••••" />
+          <button class="toggle" id="pwToggle" type="button" title="Show password">
+            <i data-lucide="eye" id="pwEye"></i>
+          </button>
+        </div>
+        <div class="strength s3" id="strBars">
+          <div></div><div></div><div></div><div></div>
+        </div>
+      </div>
+
+      <div class="or">Or continue with</div>
+
+      <div class="oauth-stack">
+        <button class="oauth">
+          <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+            <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.79 2.71v2.26h2.9c1.7-1.56 2.69-3.87 2.69-6.61z"/>
+            <path fill="#34A853" d="M9 18c2.43 0 4.47-.81 5.96-2.19l-2.9-2.26c-.81.54-1.84.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.96v2.33A8.999 8.999 0 0 0 9 18z"/>
+            <path fill="#FBBC05" d="M3.95 10.69A5.41 5.41 0 0 1 3.66 9c0-.59.1-1.16.29-1.69V4.98H.96A8.997 8.997 0 0 0 0 9c0 1.45.35 2.83.96 4.02l2.99-2.33z"/>
+            <path fill="#EA4335" d="M9 3.58c1.32 0 2.51.45 3.44 1.35l2.58-2.58A8.998 8.998 0 0 0 9 0C5.48 0 2.44 2.02.96 4.98l2.99 2.33C4.66 5.18 6.65 3.58 9 3.58z"/>
+          </svg>
+          Continue with Google
+        </button>
+        <button class="oauth">
+          <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="#0A0B0E" d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1.1-.8.1-.8.1-.8 1.2.1 1.9 1.3 1.9 1.3 1.1 1.9 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-6 0-1.3.5-2.4 1.3-3.2-.1-.3-.6-1.6.1-3.2 0 0 1-.3 3.3 1.2a11.4 11.4 0 0 1 6 0c2.3-1.6 3.3-1.2 3.3-1.2.7 1.6.2 2.9.1 3.2.8.8 1.3 1.9 1.3 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3"/>
+          </svg>
+          Continue with GitHub
+        </button>
+        <button class="oauth">
+          <svg width="18" height="18" viewBox="0 0 21 21" aria-hidden="true">
+            <rect x="1" y="1" width="9" height="9" fill="#F25022"/>
+            <rect x="11" y="1" width="9" height="9" fill="#7FBA00"/>
+            <rect x="1" y="11" width="9" height="9" fill="#00A4EF"/>
+            <rect x="11" y="11" width="9" height="9" fill="#FFB900"/>
+          </svg>
+          Continue with Microsoft
+        </button>
+      </div>
+
+      <label class="terms">
+        <input type="checkbox" checked />
+        <span>I agree to Exascale's <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>. Real-money trading requires further verification at v1.5.</span>
+      </label>
+
+      <button class="submit">Open Account <i data-lucide="arrow-right"></i></button>
+
+      <div class="signin-link">Already have an account? <a href="#">Sign in →</a></div>
+    </div>
+  </section>
+
+  <!-- =============================================================
+       RIGHT — REASSURANCE PANEL
+       ============================================================= -->
+  <section class="panel">
+    <div class="panel-top">
+      <a href="#">Need help? Contact sales →</a>
+    </div>
+
+    <div class="value-prop-wrap">
+      <div class="value-prop in" id="valueProp">
+        Start trading in <em>paper&nbsp;mode</em> immediately — no funding needed.
+      </div>
+    </div>
+
+    <div class="value-prop-dots" id="vpDots">
+      <div class="active"></div>
+      <div></div>
+      <div></div>
+    </div>
+
+    <div class="ticker">
+      <div class="head">
+        <span class="live-dot"></span>
+        <span class="label">Exascale AI Index · Live</span>
+        <span class="badge" id="tkBadge">PUBLISHED DAILY</span>
+      </div>
+      <div class="row-2">
+        <span class="price" id="tkPrice">$0.001005</span>
+        <span class="delta" id="tkDelta">▲ 0.18% (24h)</span>
+      </div>
+      <div class="meta">Last print 16:00 UTC · Next in <span id="tkNext">3h 24m</span></div>
+    </div>
+
+    <div class="mini-chart">
+      <div class="mc-head">
+        <span class="mc-title">— 30D index history</span>
+        <span class="mc-stat" id="mcStat">▲ +2.31% (30d)</span>
+      </div>
+      <svg id="miniSvg" viewBox="0 0 320 90" preserveAspectRatio="none">
+        <path class="fill" id="miniFill"></path>
+        <path class="line" id="miniLine"></path>
+      </svg>
+      <div class="ax">
+        <span>30D AGO</span>
+        <span>NOW</span>
+      </div>
+    </div>
+
+    <div class="trust">
+      <div class="item">
+        <span class="ico"><i data-lucide="shield-check"></i></span>
+        <span class="nm">SOC 2 Type I path</span>
+        <span class="sub">AUDIT Q3 2026</span>
+      </div>
+      <div class="item">
+        <span class="ico"><i data-lucide="badge-check"></i></span>
+        <span class="nm">Audited externally</span>
+        <span class="sub">INDEX METHODOLOGY</span>
+      </div>
+      <div class="item">
+        <span class="ico"><i data-lucide="banknote"></i></span>
+        <span class="nm">UBS Japan anchor</span>
+        <span class="sub">FINANCIAL SERVICES</span>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+/* ============================================================
+   ACCOUNT TYPE selection
+   ============================================================ */
+document.querySelectorAll('.acct').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.acct').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+  });
+});
+
+/* ============================================================
+   PASSWORD show/hide + strength
+   ============================================================ */
+const pw = document.getElementById('password');
+const pwToggle = document.getElementById('pwToggle');
+pwToggle.addEventListener('click', () => {
+  const showing = pw.type === 'text';
+  pw.type = showing ? 'password' : 'text';
+  document.getElementById('pwEye').setAttribute('data-lucide', showing ? 'eye' : 'eye-off');
+  if (window.lucide) lucide.createIcons();
+});
+
+function scorePw(v) {
+  if (!v) return 0;
+  if (v.length < 6) return 1;
+  if (v.length < 10) return 2;
+  let s = 2;
+  if (/[A-Z]/.test(v)) s++;
+  if (/[0-9]/.test(v) && /[^A-Za-z0-9]/.test(v)) s++;
+  return Math.min(4, s);
+}
+const STR = ['', 'Weak', 'Fair', 'Strong', 'Excellent'];
+function refreshStrength() {
+  const s = scorePw(pw.value);
+  const bars = document.getElementById('strBars');
+  bars.classList.remove('s1','s2','s3','s4');
+  if (s) bars.classList.add('s' + s);
+  const lbl = document.getElementById('strLabel');
+  lbl.innerHTML = s ? `<span class="s${s}" style="color: var(--text);">${STR[s].toUpperCase()}</span>` : '';
+}
+pw.addEventListener('input', refreshStrength);
+refreshStrength();
+
+/* ============================================================
+   VALUE PROP rotator
+   ============================================================ */
+const VPROPS = [
+  'Start trading in <em>paper&nbsp;mode</em> immediately — no funding needed.',
+  'Real-time <em>AI Index</em>, published daily.',
+  '<em>Free egress</em> on all compute. Always.',
+];
+let vpIdx = 0;
+function rotateProp() {
+  const el = document.getElementById('valueProp');
+  el.classList.remove('in');
+  setTimeout(() => {
+    vpIdx = (vpIdx + 1) % VPROPS.length;
+    el.innerHTML = VPROPS[vpIdx];
+    document.querySelectorAll('#vpDots div').forEach((d, i) => d.classList.toggle('active', i === vpIdx));
+    requestAnimationFrame(() => el.classList.add('in'));
+  }, 320);
+}
+setInterval(rotateProp, 6000);
+
+/* ============================================================
+   LIVE INDEX TICKER
+   ============================================================ */
+const fmtPx = (n) => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 6, maximumFractionDigits: 6 });
+let indexPrice = 0.001005;
+const baseline24h = 0.001003;
+
+function tick() {
+  const drift = (0.001005 - indexPrice) * 0.05;
+  const noise = (Math.random() - 0.5) * 0.0000028;
+  const next = Math.max(0.000990, Math.min(0.001020, indexPrice + drift + noise));
+  const up = next > indexPrice;
+  indexPrice = next;
+
+  const el = document.getElementById('tkPrice');
+  el.textContent = fmtPx(indexPrice);
+  el.classList.remove('flash-up','flash-down');
+  void el.offsetWidth;
+  el.classList.add(up ? 'flash-up' : 'flash-down');
+  setTimeout(() => el.classList.remove('flash-up','flash-down'), 700);
+
+  const dpct = ((indexPrice - baseline24h) / baseline24h) * 100;
+  const dEl = document.getElementById('tkDelta');
+  dEl.textContent = (dpct >= 0 ? '▲ ' : '▼ ') + Math.abs(dpct).toFixed(2) + '% (24h)';
+  dEl.classList.toggle('neg', dpct < 0);
+}
+setInterval(tick, 5000);
+
+/* Countdown to next print */
+let next = 3 * 3600 + 24 * 60;
+setInterval(() => {
+  next = Math.max(0, next - 60);
+  const h = Math.floor(next / 3600);
+  const m = Math.floor((next % 3600) / 60);
+  document.getElementById('tkNext').textContent = h + 'h ' + String(m).padStart(2,'0') + 'm';
+}, 60000);
+
+/* ============================================================
+   30D MINI CHART
+   ============================================================ */
+(function buildMini() {
+  const W = 320, H = 90;
+  const days = 30;
+  let v = 0.000982;
+  const pts = [];
+  for (let i = 0; i < days; i++) {
+    const drift = 0.0000003;
+    const dd = Math.random() < 0.05 ? -(0.000008 + Math.random() * 0.000010) : 0;
+    v += drift + (Math.random() - 0.48) * 0.0000060 + dd;
+    v = Math.max(0.000960, Math.min(0.001020, v));
+    pts.push(v);
+  }
+  pts[pts.length - 1] = 0.001005;
+  const min = Math.min(...pts), max = Math.max(...pts);
+  const range = max - min || 1;
+  const stepX = W / (pts.length - 1);
+  const pad = 6;
+  const usableH = H - pad * 2;
+  const path = pts.map((p, i) => {
+    const x = i * stepX;
+    const y = pad + usableH - ((p - min) / range) * usableH;
+    return (i === 0 ? 'M' : 'L') + x.toFixed(1) + ' ' + y.toFixed(1);
+  }).join(' ');
+  document.getElementById('miniLine').setAttribute('d', path);
+  document.getElementById('miniFill').setAttribute('d', path + ` L ${W} ${H} L 0 ${H} Z`);
+})();
+
+/* Boot */
+document.addEventListener('DOMContentLoaded', () => {
+  if (window.lucide) lucide.createIcons();
+});
+</script>
+
+</body>
+</html>

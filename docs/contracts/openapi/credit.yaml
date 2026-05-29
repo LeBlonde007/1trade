@@ -1,0 +1,311 @@
+openapi: 3.0.3
+info:
+  title: Exascale Credit Ledger API
+  version: 1.0.0
+  description: >
+    Per-tenant prepaid credit balances, append-only hash-chained transactions, purchases, and
+    conversions. Owned by `credit-ledger`; see docs/contracts/credit-types.md and
+    docs/plans/features/F05-prepaid-credit-ledger.md. ALL amounts are fixed-point decimals
+    serialized as STRINGS (never JSON numbers) to avoid float error. Every mutating call takes an
+    Idempotency-Key. Every balance/transaction carries is_paper. Trading settlement (debit on
+    fill) is Phase 2 and not in v1.
+
+servers:
+  - url: https://api.exascale.io
+    description: prod
+  - url: http://localhost:8080
+    description: local (k3d ingress)
+
+tags:
+  - name: customer
+    description: Customer-facing, called via the gateway with a tenant JWT.
+  - name: internal
+    description: Service-to-service, called with a service token (inference-gateway, compute-control, platform-core, settlement-trust). Not exposed to customers.
+
+paths:
+  /v1/credits/balances:
+    get:
+      tags: [customer]
+      summary: List the tenant's balances (one per credit type).
+      operationId: listBalances
+      parameters:
+        - $ref: '#/components/parameters/IsPaperQuery'
+      responses:
+        '200':
+          description: Balances.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  balances:
+                    type: array
+                    items: { $ref: '#/components/schemas/Balance' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/credits/transactions:
+    get:
+      tags: [customer]
+      summary: List the tenant's ledger transactions (newest first, paginated).
+      operationId: listTransactions
+      parameters:
+        - $ref: '#/components/parameters/IsPaperQuery'
+        - { name: credit_type, in: query, schema: { type: string }, description: filter by credit type }
+        - { name: from, in: query, schema: { type: string, format: date-time } }
+        - { name: to,   in: query, schema: { type: string, format: date-time } }
+        - { name: limit,  in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: cursor, in: query, schema: { type: string }, description: opaque pagination cursor }
+      responses:
+        '200':
+          description: A page of transactions.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transactions:
+                    type: array
+                    items: { $ref: '#/components/schemas/Transaction' }
+                  next_cursor: { type: string, nullable: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/credits/purchase:
+    post:
+      tags: [internal]
+      summary: Book a prepaid purchase (cash → credits). Called by platform-core after payment settles.
+      operationId: purchase
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PurchaseRequest' }
+      responses:
+        '200': { description: Booked., content: { application/json: { schema: { $ref: '#/components/schemas/Transaction' } } } }
+        '409': { $ref: '#/components/responses/IdempotencyConflict' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /v1/credits/convert:
+    post:
+      tags: [customer]
+      summary: Convert between credit types at the published rate (bidirectional, 1% spread — see credit-types.md §3).
+      operationId: convert
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConvertRequest' }
+      responses:
+        '200':
+          description: Converted; returns both transaction legs.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  debit:  { $ref: '#/components/schemas/Transaction' }
+                  credit: { $ref: '#/components/schemas/Transaction' }
+        '402': { $ref: '#/components/responses/InsufficientCredit' }
+        '409': { $ref: '#/components/responses/IdempotencyConflict' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /v1/credits/conversion-rates:
+    get:
+      tags: [customer]
+      summary: Current conversion rates + spread.
+      operationId: getConversionRates
+      responses:
+        '200':
+          description: Rates.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  spread: { type: string, description: "house spread as a decimal fraction, e.g. '0.01'" }
+                  rates:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        from: { type: string }
+                        to:   { type: string }
+                        rate: { type: string, description: "decimal string: 'to' units per 1 'from' unit, pre-spread" }
+
+  /v1/credits/debit:
+    post:
+      tags: [internal]
+      summary: Debit a credit on consumption. Called by inference-gateway and compute-control.
+      operationId: debit
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DebitRequest' }
+      responses:
+        '200': { description: Debited., content: { application/json: { schema: { $ref: '#/components/schemas/Transaction' } } } }
+        '402': { $ref: '#/components/responses/InsufficientCredit' }
+        '409': { $ref: '#/components/responses/IdempotencyConflict' }
+
+  /v1/credits/mint:
+    post:
+      tags: [internal]
+      summary: Mint GPU credits against attested capacity. Called by settlement-trust (backing-checked).
+      operationId: mint
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/MintBurnRequest' } } }
+      responses:
+        '200': { description: Minted., content: { application/json: { schema: { $ref: '#/components/schemas/Transaction' } } } }
+        '409': { $ref: '#/components/responses/IdempotencyConflict' }
+        '422': { description: Would exceed backing ratio., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+
+  /v1/credits/burn:
+    post:
+      tags: [internal]
+      summary: Burn GPU credits on redemption/expiry. Called by settlement-trust.
+      operationId: burn
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/MintBurnRequest' } } }
+      responses:
+        '200': { description: Burned., content: { application/json: { schema: { $ref: '#/components/schemas/Transaction' } } } }
+        '409': { $ref: '#/components/responses/IdempotencyConflict' }
+
+  /v1/credits/audit/chain-verify:
+    get:
+      tags: [internal]
+      summary: Verify the hash chain is intact for a tenant (or globally). Zero mismatches expected.
+      operationId: chainVerify
+      parameters:
+        - { name: tenant_id, in: query, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Verification result.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  checked: { type: integer }
+                  first_bad_tx_id: { type: string, nullable: true }
+
+components:
+  securitySchemes:
+    tenantJwt:   { type: http, scheme: bearer, bearerFormat: JWT, description: "Customer tenant JWT from platform-core." }
+    serviceToken: { type: http, scheme: bearer, description: "Service-to-service token (internal endpoints)." }
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, maxLength: 255 }
+      description: Required on every mutating call. Repeats with the same key return the original result; no double-apply.
+    IsPaperQuery:
+      name: is_paper
+      in: query
+      schema: { type: boolean, default: true }
+      description: Which ledger to read. Paper and real are never mixed.
+
+  schemas:
+    Decimal:
+      type: string
+      description: Fixed-point decimal as a string (NUMERIC(20,6)). Never a JSON number.
+      pattern: '^-?\\d{1,14}(\\.\\d{1,6})?$'
+      example: "100.000000"
+    CreditType:
+      type: string
+      description: One of the codes in docs/contracts/credit-types.md.
+      enum: [ai_index, text, speech, image, video, embeddings, gpu_h100, gpu_h200]
+    Balance:
+      type: object
+      required: [credit_type, balance, locked_amount, is_paper]
+      properties:
+        credit_type:   { $ref: '#/components/schemas/CreditType' }
+        balance:       { $ref: '#/components/schemas/Decimal' }
+        locked_amount: { $ref: '#/components/schemas/Decimal', description: "reserved for resting orders (Phase 2); 0 in Phase 1" }
+        is_paper:      { type: boolean }
+        sub_account_id: { type: string, format: uuid, nullable: true }
+    Transaction:
+      type: object
+      required: [tx_id, credit_type, operation, amount, balance_after, is_paper, created_at, chain_hash]
+      properties:
+        tx_id:          { type: string, format: uuid }
+        tenant_id:      { type: string, format: uuid }
+        sub_account_id: { type: string, format: uuid, nullable: true }
+        credit_type:    { $ref: '#/components/schemas/CreditType' }
+        operation:      { type: string, enum: [purchase, consumption, conversion, mint, burn, refund, trade] }
+        amount:         { $ref: '#/components/schemas/Decimal', description: "signed delta applied to the balance" }
+        reference_id:   { type: string, nullable: true, description: "e.g. stripe event id, usage event id" }
+        balance_after:  { $ref: '#/components/schemas/Decimal' }
+        is_paper:       { type: boolean }
+        created_at:     { type: string, format: date-time }
+        chain_hash:     { type: string }
+    PurchaseRequest:
+      type: object
+      required: [tenant_id, credit_type, amount, is_paper, currency]
+      properties:
+        tenant_id:    { type: string, format: uuid }
+        sub_account_id: { type: string, format: uuid, nullable: true }
+        credit_type:  { $ref: '#/components/schemas/CreditType' }
+        amount:       { $ref: '#/components/schemas/Decimal' }
+        currency:     { type: string, enum: [USD, JPY], description: "source currency (recorded in metadata)" }
+        reference_id: { type: string, description: "payment reference (Stripe event id / wire ref)" }
+        is_paper:     { type: boolean }
+    ConvertRequest:
+      type: object
+      required: [from, to, amount, is_paper]
+      properties:
+        from:     { $ref: '#/components/schemas/CreditType' }
+        to:       { $ref: '#/components/schemas/CreditType' }
+        amount:   { $ref: '#/components/schemas/Decimal', description: "amount of `from` to convert" }
+        is_paper: { type: boolean }
+    DebitRequest:
+      type: object
+      required: [tenant_id, credit_type, amount, is_paper, usage_event_id]
+      properties:
+        tenant_id:     { type: string, format: uuid }
+        sub_account_id: { type: string, format: uuid, nullable: true }
+        credit_type:   { $ref: '#/components/schemas/CreditType' }
+        amount:        { $ref: '#/components/schemas/Decimal' }
+        usage_event_id: { type: string, description: "id of the usage event driving this debit (idempotency anchor)" }
+        is_paper:      { type: boolean }
+    MintBurnRequest:
+      type: object
+      required: [tenant_id, credit_type, amount, is_paper, reference_id]
+      properties:
+        tenant_id:    { type: string, format: uuid }
+        credit_type:  { $ref: '#/components/schemas/CreditType', description: "a gpu_* tier" }
+        amount:       { $ref: '#/components/schemas/Decimal' }
+        reference_id: { type: string, description: "capacity/attestation reference" }
+        is_paper:     { type: boolean }
+    ApiError:
+      type: object
+      required: [code, message]
+      properties:
+        code:    { type: string, example: INSUFFICIENT_CREDIT }
+        message: { type: string }
+        details: { type: object, additionalProperties: true }
+
+  responses:
+    Unauthorized:
+      description: Missing/invalid auth.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+    Error:
+      description: Validation error.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+    InsufficientCredit:
+      description: Balance would go negative.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ApiError', example: { code: INSUFFICIENT_CREDIT, message: "balance too low" } } } }
+    IdempotencyConflict:
+      description: Idempotency-Key reused with a different payload.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ApiError', example: { code: IDEMPOTENCY_CONFLICT, message: "key reused with different body" } } } }
+
+security:
+  - tenantJwt: []

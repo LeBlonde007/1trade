@@ -1,0 +1,650 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Exascale — D2 · Verify email + Welcome</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --canvas:        #F8F7F4;
+  --elevated:      #FFFFFF;
+  --text:          #0A0B0E;
+  --text-2:        #5F5F5C;
+  --text-3:        #9A9A95;
+  --border:        rgba(0,0,0,0.08);
+  --border-strong: rgba(0,0,0,0.16);
+  --brand:         #C8F25C;
+  --brand-hov:     #B8E548;
+  --accent:        #4A90E2;
+  --pos:           #19C37D;
+  --neg:           #EF4444;
+  --warn:          #F59E0B;
+
+  --font-display: 'Inter Tight', system-ui, sans-serif;
+  --font-sans:    'Inter', system-ui, sans-serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, monospace;
+
+  --r-sm: 2px;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  background: var(--canvas);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+body { font-feature-settings: 'tnum' 1, 'ss01' 1; }
+
+.tnum { font-variant-numeric: tabular-nums; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* ============================================================
+   Screen frame
+   ============================================================ */
+.screen {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px dashed var(--border);
+}
+
+.screen-label {
+  position: absolute;
+  top: 16px; left: 16px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  padding: 4px 8px;
+  background: rgba(0,0,0,0.03);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  z-index: 10;
+}
+
+/* Minimal top chrome */
+.chrome {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 28px 48px;
+  flex-shrink: 0;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  text-decoration: none;
+}
+.brand .mark {
+  display: inline-block;
+  width: 12px; height: 12px;
+  background: var(--brand);
+}
+
+.chrome-link {
+  color: var(--text-2);
+  text-decoration: none;
+  font-size: 13px;
+  transition: color 160ms ease;
+}
+.chrome-link:hover { color: var(--text); }
+
+.center {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+/* ============================================================
+   SCREEN A — Verify card
+   ============================================================ */
+.verify-card {
+  width: 100%;
+  max-width: 460px;
+  background: var(--elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 48px 40px;
+  text-align: center;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.02);
+}
+
+.icon-box {
+  width: 56px; height: 56px;
+  margin: 0 auto 24px;
+  background: rgba(0,0,0,0.035);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text);
+}
+
+.verify-card h2 {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  margin-bottom: 10px;
+}
+
+.verify-card .sent-to {
+  color: var(--text-2);
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+.verify-card .sent-to strong {
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.verify-card .hint {
+  color: var(--text-3);
+  font-size: 12px;
+  margin-bottom: 28px;
+  line-height: 1.65;
+}
+
+.btn-row {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: center;
+}
+
+.btn-resend {
+  width: 100%;
+  height: 44px;
+  background: var(--elevated);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+.btn-resend:hover:not(:disabled) {
+  background: rgba(0,0,0,0.03);
+  border-color: var(--text);
+}
+.btn-resend:disabled {
+  color: var(--text-2);
+  cursor: default;
+}
+.btn-resend .countdown {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  margin-left: 6px;
+  color: var(--text-3);
+}
+
+.change-link {
+  background: none; border: none; padding: 0;
+  color: var(--text-2);
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+  cursor: pointer;
+  font-family: var(--font-sans);
+}
+.change-link:hover { color: var(--text); }
+
+/* Live ticker bar (Screen A footer) */
+.ticker {
+  flex-shrink: 0;
+  padding: 14px 48px;
+  border-top: 1px solid var(--border);
+  background: var(--elevated);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+.ticker .left {
+  display: inline-flex; align-items: center; gap: 12px;
+  color: var(--text-2);
+}
+.ticker .label {
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.1em;
+}
+.ticker .px {
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.ticker .delta {
+  color: var(--pos);
+  font-weight: 600;
+}
+.ticker .right {
+  display: inline-flex; align-items: center; gap: 10px;
+  color: var(--text-2);
+}
+
+.dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--pos);
+  display: inline-block;
+  animation: pulse 2.4s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.55; transform: scale(0.85); }
+}
+
+/* ============================================================
+   SCREEN B — Welcome
+   ============================================================ */
+.welcome-wrap {
+  width: 100%;
+  max-width: 1100px;
+  text-align: center;
+}
+
+.welcome h1 {
+  font-family: var(--font-display);
+  font-size: 52px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.08;
+  margin-bottom: 12px;
+  color: var(--text);
+  opacity: 0;
+  animation: fadeUp 700ms var(--ease) 80ms forwards;
+}
+
+.welcome .sub {
+  font-size: 17px;
+  color: var(--text-2);
+  margin-bottom: 48px;
+  opacity: 0;
+  animation: fadeUp 700ms var(--ease) 200ms forwards;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 40px;
+  text-align: left;
+}
+
+.card {
+  background: var(--elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 24px;
+  opacity: 0;
+  transform: translateY(8px);
+  animation: cardIn 600ms var(--ease) forwards;
+  transition: border-color 160ms ease;
+  min-height: 168px;
+  display: flex;
+  flex-direction: column;
+}
+.card:nth-child(1) { animation-delay: 340ms; }
+.card:nth-child(2) { animation-delay: 420ms; }
+.card:nth-child(3) { animation-delay: 500ms; }
+.card:hover { border-color: var(--border-strong); }
+
+@keyframes cardIn { to { opacity: 1; transform: translateY(0); } }
+
+.card .cap {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 18px;
+}
+
+.card .big {
+  font-family: var(--font-mono);
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  line-height: 1.1;
+  margin-bottom: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.card .sub-line {
+  font-size: 13px;
+  color: var(--text-2);
+}
+.card .sub-line .pos { color: var(--pos); font-weight: 600; }
+
+/* Card 3 — markets list */
+.markets-list { display: flex; flex-direction: column; gap: 0; }
+.market-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 9px 0;
+  font-family: var(--font-mono);
+}
+.market-row + .market-row { border-top: 1px solid var(--border); }
+.market-row .sym {
+  color: var(--text); font-weight: 600;
+  font-size: 11px; letter-spacing: 0.06em;
+}
+.market-row .mkt-px {
+  color: var(--text); font-variant-numeric: tabular-nums;
+  font-size: 13px; font-weight: 500;
+}
+.market-row .mkt-delta {
+  font-size: 11px; font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.cta-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  opacity: 0;
+  animation: fadeUp 700ms var(--ease) 620ms forwards;
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 15px 30px;
+  background: var(--brand);
+  color: var(--text);
+  border: 1px solid var(--brand);
+  border-radius: var(--r-sm);
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 15px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease, transform 80ms ease;
+}
+.btn-primary:hover { background: var(--brand-hov); border-color: var(--brand-hov); }
+.btn-primary:active { transform: translateY(1px); }
+
+.tour-link {
+  color: var(--text-2);
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+  background: none; border: none; cursor: pointer;
+  font-family: var(--font-sans);
+}
+.tour-link:hover { color: var(--text); }
+
+@media (max-width: 900px) {
+  .cards { grid-template-columns: 1fr; }
+  .welcome h1 { font-size: 36px; }
+  .chrome, .ticker { padding-left: 24px; padding-right: 24px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ============================================================ -->
+<!-- SCREEN A — VERIFICATION WAITING                              -->
+<!-- ============================================================ -->
+<section class="screen" id="screen-a">
+  <span class="screen-label">Screen A · Verification waiting</span>
+
+  <header class="chrome">
+    <a href="#" class="brand"><span class="mark"></span>Exascale</a>
+    <a href="#" class="chrome-link">Need help? Contact support →</a>
+  </header>
+
+  <div class="center">
+    <div class="verify-card">
+      <div class="icon-box">
+        <!-- Lucide: mail -->
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="2" y="4" width="20" height="16"></rect>
+          <path d="m22 6-10 7L2 6"></path>
+        </svg>
+      </div>
+
+      <h2>Verify your email</h2>
+      <p class="sent-to">We sent a verification link to <strong>jane.doe@walmart.com</strong></p>
+      <p class="hint">It can take up to a minute to arrive. Check spam or promotions if it doesn't appear. The link expires in 60 minutes.</p>
+
+      <div class="btn-row">
+        <button class="btn-resend" id="resendBtn" type="button">
+          <span class="label">Resend email</span>
+        </button>
+        <button class="change-link" type="button">Change email →</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="ticker" aria-label="Live AI index">
+    <div class="left">
+      <span class="dot" aria-hidden="true"></span>
+      <span class="label">AI INDEX</span>
+      <span>·</span>
+      <span>$1 =</span>
+      <span class="px" id="tkrIdx">1,002.4</span>
+      <span>credits</span>
+      <span>·</span>
+      <span class="delta" id="tkrDelta">▲ 0.18% (24h)</span>
+    </div>
+    <div class="right">
+      <span>MARKETS OPEN</span>
+      <span>·</span>
+      <span id="tkrTime">14:32:08 UTC</span>
+    </div>
+  </div>
+</section>
+
+
+<!-- ============================================================ -->
+<!-- SCREEN B — FIRST-LOGIN WELCOME                                -->
+<!-- ============================================================ -->
+<section class="screen" id="screen-b">
+  <span class="screen-label">Screen B · First-login welcome</span>
+
+  <header class="chrome">
+    <a href="#" class="brand"><span class="mark"></span>Exascale</a>
+    <a href="#" class="chrome-link">Sign out</a>
+  </header>
+
+  <div class="center">
+    <div class="welcome-wrap welcome">
+      <h1>Welcome to Exascale, Jane.</h1>
+      <p class="sub">Your paper trading account is ready.</p>
+
+      <div class="cards">
+        <div class="card">
+          <div class="cap">Paper balance</div>
+          <div class="big">$10,000.00</div>
+          <div class="sub-line">USD ready · risk-free practice</div>
+        </div>
+
+        <div class="card">
+          <div class="cap">AI Index live</div>
+          <div class="big">$1 = <span id="welIdx">1,002.4</span></div>
+          <div class="sub-line">credits per dollar · <span class="pos" id="welDelta">▲ 0.18%</span></div>
+        </div>
+
+        <div class="card">
+          <div class="cap">Markets open</div>
+          <div class="markets-list">
+            <div class="market-row">
+              <span class="sym">EAI-IDX</span>
+              <span class="mkt-px" id="m1">$0.001005</span>
+              <span class="mkt-delta pos" style="color:var(--pos)">▲ 0.18%</span>
+            </div>
+            <div class="market-row">
+              <span class="sym">TEXT-SPOT</span>
+              <span class="mkt-px" id="m2">$0.001210</span>
+              <span class="mkt-delta pos" style="color:var(--pos)">▲ 1.84%</span>
+            </div>
+            <div class="market-row">
+              <span class="sym">H100-SPOT</span>
+              <span class="mkt-px" id="m3">$2.99</span>
+              <span class="mkt-delta pos" style="color:var(--pos)">▲ 0.18%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="cta-row">
+        <a href="#" class="btn-primary">Start trading →</a>
+        <button class="tour-link" type="button">Or take the 60-second tour</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+/* ----------------------------------------------------------
+   Screen A — Resend cooldown (60s)
+   Starts at 47s remaining to demonstrate "recently sent" state.
+   ---------------------------------------------------------- */
+(function () {
+  var COOLDOWN = 60;
+  var btn = document.getElementById('resendBtn');
+  var remaining = 47;
+  var timer = null;
+
+  function render() {
+    if (remaining > 0) {
+      btn.disabled = true;
+      var m = Math.floor(remaining / 60);
+      var s = remaining % 60;
+      btn.innerHTML = '<span class="label">Resend in</span>'
+        + '<span class="countdown">' + m + ':' + String(s).padStart(2, '0') + '</span>';
+    } else {
+      btn.disabled = false;
+      btn.innerHTML = '<span class="label">Resend email</span>';
+    }
+  }
+
+  function startTimer() {
+    if (timer) return;
+    timer = setInterval(function () {
+      remaining--;
+      render();
+      if (remaining <= 0) { clearInterval(timer); timer = null; }
+    }, 1000);
+  }
+
+  btn.addEventListener('click', function () {
+    if (remaining > 0) return;
+    remaining = COOLDOWN;
+    render();
+    startTimer();
+  });
+
+  render();
+  startTimer();
+})();
+
+/* ----------------------------------------------------------
+   Live AI Index — brownian motion with mean reversion to 1.0024.
+   Updates: footer ticker (Screen A) + welcome card #2 + market rows (Screen B).
+   ---------------------------------------------------------- */
+(function () {
+  var v = 1.0024;
+  var pct = 0.18;
+
+  function fmtIdx(x) {
+    return (x * 1000).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  }
+  function fmtDelta(p, withParen) {
+    var arrow = p >= 0 ? '▲' : '▼';
+    var txt = arrow + ' ' + Math.abs(p).toFixed(2) + '%';
+    return withParen ? txt + ' (24h)' : txt;
+  }
+
+  function tick() {
+    v = v + (1.0024 - v) * 0.04 + (Math.random() - 0.5) * 0.0006;
+    v = Math.max(0.992, Math.min(1.015, v));
+    pct = (v - 1.0) * 100;
+
+    var color = pct >= 0 ? 'var(--pos)' : 'var(--neg)';
+    var idx = fmtIdx(v);
+
+    var tkrIdx = document.getElementById('tkrIdx');
+    var tkrDelta = document.getElementById('tkrDelta');
+    var welIdx = document.getElementById('welIdx');
+    var welDelta = document.getElementById('welDelta');
+
+    if (tkrIdx)   tkrIdx.textContent = idx;
+    if (tkrDelta) { tkrDelta.textContent = fmtDelta(pct, true);  tkrDelta.style.color = color; }
+    if (welIdx)   welIdx.textContent = idx;
+    if (welDelta) { welDelta.textContent = fmtDelta(pct, false); welDelta.style.color = color; }
+
+    var ratio = v / 1.0024;
+    var m1 = 0.001005 * ratio + (Math.random() - 0.5) * 0.0000004;
+    var m2 = 0.001210 * ratio + (Math.random() - 0.5) * 0.0000008;
+    var m3 = 2.99     * ratio + (Math.random() - 0.5) * 0.004;
+    var e1 = document.getElementById('m1');
+    var e2 = document.getElementById('m2');
+    var e3 = document.getElementById('m3');
+    if (e1) e1.textContent = '$' + m1.toFixed(6);
+    if (e2) e2.textContent = '$' + m2.toFixed(6);
+    if (e3) e3.textContent = '$' + m3.toFixed(2);
+  }
+
+  function tickTime() {
+    var d = new Date();
+    var h = String(d.getUTCHours()).padStart(2, '0');
+    var m = String(d.getUTCMinutes()).padStart(2, '0');
+    var s = String(d.getUTCSeconds()).padStart(2, '0');
+    var el = document.getElementById('tkrTime');
+    if (el) el.textContent = h + ':' + m + ':' + s + ' UTC';
+  }
+
+  tick();
+  tickTime();
+  setInterval(tick, 2400);
+  setInterval(tickTime, 1000);
+})();
+</script>
+
+</body>
+</html>

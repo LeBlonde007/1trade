@@ -1,0 +1,45 @@
+# Exascale event contract — credit.tx.v1
+# One event per committed ledger movement. Owned by credit-ledger; consumed by observability,
+# settlement-trust (payout reconciliation), and the realtime wallet (frontend via a fan-out).
+# See docs/plans/CONTRACTS.md and docs/contracts/credit-types.md.
+
+subject: credit.tx.v1            # NATS subject. Breaking changes => credit.tx.v2 (both fan out).
+transport: NATS JetStream
+version: 1.0.0
+description: Emitted AFTER a credit transaction commits (atomically with the balance update).
+
+payload_schema:
+  $schema: "https://json-schema.org/draft/2020-12/schema"
+  title: CreditTxV1
+  type: object
+  additionalProperties: false
+  required: [tx_id, tenant_id, credit_type, operation, amount, balance_after, is_paper, created_at, chain_hash]
+  properties:
+    tx_id:          { type: string, format: uuid }
+    tenant_id:      { type: string, format: uuid }
+    sub_account_id: { type: [string, "null"], format: uuid }
+    credit_type:
+      type: string
+      enum: [ai_index, text, speech, image, video, embeddings, gpu_h100, gpu_h200]
+    operation:
+      type: string
+      enum: [purchase, consumption, conversion, mint, burn, refund, trade]
+    amount:         { type: string, description: "signed fixed-point decimal delta (NUMERIC(20,6)) as a string" }
+    reference_id:   { type: [string, "null"] }
+    balance_after:  { type: string, description: "fixed-point decimal string" }
+    is_paper:       { type: boolean, description: "consumers MUST filter; paper and real never mix" }
+    created_at:     { type: string, format: date-time }
+    chain_hash:     { type: string, description: "sha256(prev_chain_hash || canonical_json(row))" }
+
+example:
+  tx_id: "8b9d…"
+  tenant_id: "1f2e…"
+  sub_account_id: null
+  credit_type: text
+  operation: consumption
+  amount: "-12.500000"
+  reference_id: "infreq_01Hf…"
+  balance_after: "987.500000"
+  is_paper: true
+  created_at: "2026-06-01T12:00:00Z"
+  chain_hash: "f3a1…"

@@ -1,0 +1,1274 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Exascale — Brand Book v0.1</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="brand-book.css" />
+
+<template id="__bundler_thumbnail" data-bg-color="#0E0E0E">
+  <svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+    <rect width="1200" height="800" fill="#0E0E0E"/>
+    <rect x="380" y="320" width="440" height="160" fill="#C8F25C"/>
+    <text x="600" y="430" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-weight="700" font-size="96" letter-spacing="-3" fill="#0E0E0E">Exascale</text>
+    <text x="600" y="540" text-anchor="middle" font-family="ui-monospace, monospace" font-size="22" letter-spacing="6" fill="#8A8A82">— BRAND BOOK · v0.1 —</text>
+  </svg>
+</template>
+<style>
+  /* ===== Print-ready overrides ===== */
+  @page {
+    size: A4 landscape;
+    margin: 12mm 14mm 12mm 14mm;
+  }
+
+  @media print {
+    html, body {
+      background: #FFFFFF !important;
+    }
+    body {
+      font-size: 10pt;
+      line-height: 1.45;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    /* Drop the shell — sidebar gone, content flows full-width */
+    .shell {
+      display: block;
+    }
+    .sidebar { display: none !important; }
+    .section-badge { display: none !important; }
+
+    .content section {
+      padding: 14mm 0 16mm;
+      border-bottom: none;
+      break-after: page;
+      page-break-after: always;
+    }
+    .content section:last-of-type { break-after: auto; page-break-after: auto; }
+    .content section > * { max-width: 100% !important; }
+
+    /* Hero is the cover page */
+    .hero {
+      padding: 24mm 0 14mm;
+      break-after: page;
+      page-break-after: always;
+      min-height: 170mm;
+    }
+    .hero h1 { font-size: 52pt !important; line-height: 0.96 !important; max-width: 240mm; }
+    .hero .sub { font-size: 13pt !important; max-width: 200mm; }
+    .hero .meta {
+      grid-template-columns: repeat(4, max-content) !important;
+      gap: 28pt !important;
+    }
+
+    /* Section titles + ledes */
+    .s-title { font-size: 32pt; line-height: 1.04; margin-bottom: 10pt; max-width: 220mm; }
+    .s-lede  { font-size: 13pt; margin-bottom: 18pt; max-width: 200mm; }
+    .s-eyebrow { font-size: 8pt; margin-bottom: 8pt; }
+
+    h3.sub { font-size: 9pt; margin: 22pt 0 10pt; padding-top: 10pt; }
+    h4 { font-size: 12pt; margin: 14pt 0 6pt; }
+    p, ul, ol { font-size: 10pt; line-height: 1.5; margin: 0 0 8pt; }
+    li { margin-bottom: 3pt; }
+    table { font-size: 9pt; margin: 8pt 0; }
+    th, td { padding: 6pt 8pt; }
+    thead th { font-size: 8pt; }
+    .tbl-compact th, .tbl-compact td { padding: 4pt 6pt; font-size: 8.5pt; }
+
+    /* Grid items should not split mid-tile */
+    .grid-2, .grid-3, .grid-4 { gap: 8pt; }
+    .grid-3 { grid-template-columns: repeat(3, 1fr); }
+    .grid-4 { grid-template-columns: repeat(4, 1fr); }
+    .tile, .swatch, .logo-card, .voice .col, .demo-block, .specimen, .misuse, .surface-strip, .chart-card, .orderbook, .demo-table, .callout, .tokens {
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+    .specimen .sample { font-size: 36pt !important; }
+    .specimen pre { font-size: 9pt; }
+
+    /* Force surface examples to stay together */
+    .surface-strip { margin-bottom: 8pt; }
+
+    /* Dark sections render their backgrounds */
+    .content section.dark,
+    .hero,
+    .book-foot {
+      background: #0E0E0E !important;
+      color: #EAE6DA !important;
+    }
+    .content section.cream { background: #F2EEE3 !important; }
+
+    /* Buttons / inputs should not look interactive */
+    .btn { box-shadow: none !important; }
+
+    /* Scrollspy script does nothing in print */
+    .motion-row { padding: 4pt 0; }
+
+    /* Ensure SVG charts render at full width */
+    svg { max-width: 100%; height: auto; }
+
+    /* Avoid orphaned headings */
+    h1, h2, h3, h4, h5 {
+      break-after: avoid;
+      page-break-after: avoid;
+      break-inside: avoid;
+    }
+
+    /* Footer should sit on its own page */
+    .book-foot {
+      padding: 24mm 0 !important;
+      break-before: page;
+      page-break-before: always;
+    }
+
+    /* Remove sticky positioning anywhere */
+    * { position: static !important; }
+  }
+
+  /* Screen-only: signal this is the print version */
+  @media screen {
+    body::before {
+      content: 'Print preview · save as PDF via browser print dialog';
+      display: block;
+      background: #C8F25C;
+      color: #0E0E0E;
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding: 8px 16px;
+      text-align: center;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- ====================== SIDEBAR ====================== -->
+  <aside class="sidebar">
+    <div class="brand"><span class="mark"></span>EXASCALE</div>
+    <div class="meta">
+      <div class="row"><span>Document</span><span class="val">Brand Book</span></div>
+      <div class="row"><span>Version</span><span class="val">v0.1 — Draft</span></div>
+      <div class="row"><span>Status</span><span class="val">Directional</span></div>
+    </div>
+    <nav>
+      <a href="#hero"><span class="num">00</span><span>Cover</span></a>
+      <a href="#foundation"><span class="num">01</span><span>Brand foundation</span></a>
+      <a href="#logo"><span class="num">02</span><span>Logo system</span></a>
+      <a href="#typography"><span class="num">03</span><span>Typography</span></a>
+      <a href="#color"><span class="num">04</span><span>Color</span></a>
+      <a href="#layout"><span class="num">05</span><span>Layout &amp; grid</span></a>
+      <a href="#components"><span class="num">06</span><span>Components</span></a>
+      <a href="#dataviz"><span class="num">07</span><span>Data visualization</span></a>
+      <a href="#motion"><span class="num">08</span><span>Motion</span></a>
+      <a href="#imagery"><span class="num">09</span><span>Imagery &amp; video</span></a>
+      <a href="#voice"><span class="num">10</span><span>Voice &amp; tone</span></a>
+      <a href="#a11y"><span class="num">11</span><span>Accessibility</span></a>
+      <a href="#surfaces"><span class="num">12</span><span>Applied surfaces</span></a>
+    </nav>
+    <div class="foot">
+      Internal · For review<br/>
+      Cross-reference w/ prior book once received.
+    </div>
+  </aside>
+
+  <!-- ====================== CONTENT ====================== -->
+  <main class="content">
+
+    <!-- =================================================
+         HERO
+         ================================================= -->
+    <section class="hero" id="hero" data-section="00">
+      <div class="eyebrow"><span class="dot"></span>Exascale · Brand book · v0.1</div>
+      <h1>The brand for a <em>commodity&nbsp;market</em><br/>that doesn't yet exist.</h1>
+      <p class="sub">A directional brand book for Exascale — the commodity market for AI compute. Institutional, technical, financial, modern. Built for traders, hedgers, and the engineers who consume the underlying.</p>
+      <div class="meta">
+        <div><div class="lbl">Audience</div><div class="val">Traders · CTOs · CFOs</div></div>
+        <div><div class="lbl">Surfaces</div><div class="val">Marketing · Trading UI · Deck</div></div>
+        <div><div class="lbl">Stack</div><div class="val">Vue · Tauri · Figma</div></div>
+        <div><div class="lbl">Owner</div><div class="val">Engineering + Design</div></div>
+      </div>
+    </section>
+
+    <!-- =================================================
+         01 — BRAND FOUNDATION
+         ================================================= -->
+    <section id="foundation" data-section="01">
+      <div class="s-eyebrow"><span class="dot"></span>01 / 12 · Brand foundation</div>
+      <h1 class="s-title">What Exascale is.<br/>What it isn't.</h1>
+      <p class="s-lede">A three-sided commodity venue connecting GPU datacenters, traders, and AI companies. Closest analogues: CME, Coinbase, ICE, Bloomberg Terminal. Not CoreWeave. Not Lambda. Not Together.</p>
+
+      <h3 class="sub">— Positioning</h3>
+      <div class="callout">
+        <strong>The commodity market for AI compute.</strong> Real underlying. Real liquidity. Real settlement.
+      </div>
+      <p>The brand must feel <strong>institutional</strong> (Fortune 500 procurement and frontier-lab CTOs should trust it), <strong>technical</strong> (engineers should recognize craft and substance), <strong>financial</strong> (traders should recognize a credible venue), and <strong>modern</strong> (not bank-stodgy, not consumer-fintech-cute).</p>
+
+      <h3 class="sub">— Anchors and anti-anchors</h3>
+      <div class="grid-2">
+        <div class="tile">
+          <h4 style="margin-top:0">Look toward</h4>
+          <ul>
+            <li><strong>Bloomberg Terminal</strong> — dense, professional, information-rich</li>
+            <li><strong>Stripe</strong> — calm confidence, elegant typography</li>
+            <li><strong>Linear</strong> — modern, performant, dark-native</li>
+            <li><strong>Vercel</strong> — minimal, technical, designer-credible</li>
+            <li><strong>Polymarket</strong> — clean trading for non-finance users</li>
+            <li><strong>CME web</strong> — institutional gravitas without being boring</li>
+          </ul>
+        </div>
+        <div class="tile">
+          <h4 style="margin-top:0">Look away from</h4>
+          <ul>
+            <li><strong>Robinhood</strong> — friendly green, consumer cheer</li>
+            <li><strong>Coinbase consumer</strong> — playful blue, animation-heavy</li>
+            <li><strong>AI-startup purple gradients</strong> — generic SaaS</li>
+            <li><strong>Web3 neon</strong> — glitch, decentralization tropes</li>
+            <li><strong>Bank navy + gold</strong> — old institution clichés</li>
+            <li><strong>Hyperscaler PowerPoint</strong> — AWS / Azure corporate</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3 class="sub">— Brand promise</h3>
+      <p style="font-size:24px; line-height:1.4; color: var(--text); max-width: 720px; font-weight: 400; letter-spacing: -0.01em;">Every visual decision should reinforce: <strong>this is a credible market venue you'd trust with real money.</strong></p>
+    </section>
+
+    <!-- =================================================
+         02 — LOGO SYSTEM
+         ================================================= -->
+    <section id="logo" data-section="02" class="cream">
+      <div class="s-eyebrow"><span class="dot"></span>02 / 12 · Logo system</div>
+      <h1 class="s-title">Three directions<br/>under exploration.</h1>
+      <p class="s-lede">The prior brand book contains a logo to cross-reference. Until received, these are the three directional explorations. None is final.</p>
+
+      <h3 class="sub">— Directional explorations</h3>
+      <div class="grid-3">
+        <div class="logo-card">
+          <div class="display">
+            <!-- Direction A: geometric mark + sans wordmark -->
+            <div style="display:flex; align-items:center; gap:14px;">
+              <svg width="44" height="44" viewBox="0 0 44 44" fill="none" aria-hidden="true">
+                <rect x="3" y="3" width="38" height="38" stroke="#C8F25C" stroke-width="2"/>
+                <rect x="11" y="11" width="22" height="22" fill="#C8F25C"/>
+              </svg>
+              <span style="font-family: 'Inter Tight'; font-weight: 700; font-size: 28px; letter-spacing: -0.02em; color: #EAE6DA;">Exascale</span>
+            </div>
+          </div>
+          <div class="desc">
+            <div class="name">— Direction A · Mark + wordmark</div>
+            <p>Geometric mark suggests market structure / order book. Sans-serif wordmark in a precise modern face. Reference: Stripe, Linear, Vercel.</p>
+          </div>
+        </div>
+
+        <div class="logo-card">
+          <div class="display">
+            <!-- Direction B: typographic-only wordmark -->
+            <span style="font-family: 'Inter Tight'; font-weight: 700; font-size: 44px; letter-spacing: -0.04em; color: #EAE6DA;">Exascale<span style="color: #C8F25C;">.</span></span>
+          </div>
+          <div class="desc">
+            <div class="name">— Direction B · Typographic-only</div>
+            <p>Custom letterforms or carefully-tuned typeface. Wordmark stands alone; possible monogram for tiny applications. Reference: Bloomberg wordmark, Mailchimp.</p>
+          </div>
+        </div>
+
+        <div class="logo-card">
+          <div class="display">
+            <!-- Direction C: abstract market symbol + wordmark -->
+            <div style="display:flex; align-items:center; gap:14px;">
+              <svg width="50" height="44" viewBox="0 0 50 44" fill="none" aria-hidden="true">
+                <line x1="2" y1="34" x2="48" y2="34" stroke="#EAE6DA" stroke-width="1" opacity="0.4"/>
+                <rect x="6" y="20" width="6" height="14" fill="#EAE6DA"/>
+                <rect x="16" y="14" width="6" height="20" fill="#EAE6DA"/>
+                <rect x="26" y="8" width="6" height="26" fill="#C8F25C"/>
+                <rect x="36" y="22" width="6" height="12" fill="#EAE6DA"/>
+              </svg>
+              <span style="font-family: 'Inter Tight'; font-weight: 700; font-size: 28px; letter-spacing: -0.02em; color: #EAE6DA;">Exascale</span>
+            </div>
+          </div>
+          <div class="desc">
+            <div class="name">— Direction C · Market symbol + wordmark</div>
+            <p>Symbol references order-book depth or candlestick price action. Wordmark sets context. Reference: Coinbase "C", Robinhood feather.</p>
+          </div>
+        </div>
+      </div>
+
+      <h3 class="sub">— Required deliverables (any direction)</h3>
+      <table>
+        <thead>
+          <tr><th>Asset</th><th>Sizes / Contexts</th><th>Constraints</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Favicon</td><td class="mono">16×16, 32×32, 64×64 px</td><td>Optical hinting; legible at smallest size</td></tr>
+          <tr><td>App icon</td><td class="mono">1024×1024 master</td><td>Squircle-safe, no edge bleeding</td></tr>
+          <tr><td>Wordmark</td><td>Light, dark, monochrome</td><td>Legible at 100px width</td></tr>
+          <tr><td>Lockup (animated)</td><td>Video opens, product splash</td><td>≤1s entry, no bounce</td></tr>
+          <tr><td>Email signature</td><td class="mono">200–400px wide</td><td>Renders cleanly in dark-mode email clients</td></tr>
+          <tr><td>Monochrome</td><td>CMYK, grayscale, black-only</td><td>For partnership marketing, print</td></tr>
+        </tbody>
+      </table>
+
+      <h3 class="sub">— Clear space &amp; minimum size</h3>
+      <p>Clear-space rule: <strong>0.5× cap-height</strong> on all sides of the wordmark. Minimum width 96px digital, 24mm print. The mark may appear standalone at 24px+; below that, use the wordmark.</p>
+
+      <h3 class="sub">— Misuse</h3>
+      <div class="grid-3">
+        <div class="misuse bad">
+          <span class="lbl-bad">— Don't · Skew</span>
+          <span style="font-family: 'Inter Tight'; font-weight: 700; font-size: 24px; letter-spacing: -0.02em; color: var(--text); transform: skewX(-12deg); display: inline-block;">Exascale</span>
+        </div>
+        <div class="misuse bad">
+          <span class="lbl-bad">— Don't · Gradient</span>
+          <span style="font-family: 'Inter Tight'; font-weight: 700; font-size: 24px; letter-spacing: -0.02em; background: linear-gradient(90deg, #C8F25C, #4A90E2); -webkit-background-clip: text; background-clip: text; color: transparent;">Exascale</span>
+        </div>
+        <div class="misuse bad">
+          <span class="lbl-bad">— Don't · Outline</span>
+          <span style="font-family: 'Inter Tight'; font-weight: 700; font-size: 24px; letter-spacing: -0.02em; -webkit-text-stroke: 1px var(--text); color: transparent;">Exascale</span>
+        </div>
+      </div>
+      <p style="margin-top: 16px; font-size: 14px;"><strong>Also forbidden:</strong> drop shadows · rotation · re-coloring outside the brand palette · placing the mark on busy photography · stretching disproportionately · using the mark where the full lockup will fit.</p>
+    </section>
+
+    <!-- =================================================
+         03 — TYPOGRAPHY
+         ================================================= -->
+    <section id="typography" data-section="03">
+      <div class="s-eyebrow"><span class="dot"></span>03 / 12 · Typography</div>
+      <h1 class="s-title">One voice. Three faces.<br/>Tabular by default.</h1>
+      <p class="s-lede">Inter Tight for display, Inter for body, JetBrains Mono for code and trading data. Open licenses, extensive weight range, tabular figures across the system.</p>
+
+      <h3 class="sub">— Family selection</h3>
+      <div class="grid-3">
+        <div class="tile">
+          <div class="s-eyebrow" style="margin-bottom: 8px;"><span class="dot"></span>Display + body</div>
+          <h4 style="font-family: 'Inter Tight'; font-size: 48px; line-height: 1; letter-spacing: -0.03em; margin: 8px 0 6px;">Inter Tight</h4>
+          <p style="font-size: 13px;">Variable axis · 9 weights · open license. Tighter optical sizing for headlines. Companion <code>Inter</code> for body.</p>
+        </div>
+        <div class="tile">
+          <div class="s-eyebrow" style="margin-bottom: 8px;"><span class="dot"></span>Mono + data</div>
+          <h4 style="font-family: 'JetBrains Mono'; font-size: 36px; line-height: 1.1; letter-spacing: -0.02em; margin: 8px 0 6px;">JetBrains Mono</h4>
+          <p style="font-size: 13px;">Tabular alignment · designed for IDE use · open license. Used in UI labels, code samples, and every numeric column.</p>
+        </div>
+        <div class="tile">
+          <div class="s-eyebrow" style="margin-bottom: 8px;"><span class="dot"></span>Bilingual</div>
+          <h4 style="font-family: 'Inter Tight'; font-size: 36px; line-height: 1.1; letter-spacing: -0.02em; margin: 8px 0 6px;">Noto Sans JP</h4>
+          <p style="font-size: 13px;">Open license, pairs cleanly with Inter. Required for UBS Japan and Asian-market surfaces. Reserve for localized layouts only.</p>
+        </div>
+      </div>
+
+      <h3 class="sub">— Type scale</h3>
+      <table class="tbl-compact">
+        <thead>
+          <tr><th>Level</th><th>Token</th><th>Size · Weight</th><th>Use</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Display XXL</td><td class="mono">type.display.xxl</td><td class="mono">96–128 / 700</td><td>Deck headlines, marketing hero</td></tr>
+          <tr><td>Display XL</td><td class="mono">type.display.xl</td><td class="mono">56–72 / 700</td><td>Marketing H1</td></tr>
+          <tr><td>Display L</td><td class="mono">type.display.l</td><td class="mono">40–48 / 600</td><td>Section heads</td></tr>
+          <tr><td>Heading 1</td><td class="mono">type.h1</td><td class="mono">32 / 600</td><td>App page titles</td></tr>
+          <tr><td>Heading 2</td><td class="mono">type.h2</td><td class="mono">24 / 600</td><td>Section headings</td></tr>
+          <tr><td>Heading 3</td><td class="mono">type.h3</td><td class="mono">20 / 600</td><td>Subsections</td></tr>
+          <tr><td>Heading 4</td><td class="mono">type.h4</td><td class="mono">18 / 600</td><td>Card titles</td></tr>
+          <tr><td>Body large</td><td class="mono">type.body.lg</td><td class="mono">18 / 400</td><td>Marketing body</td></tr>
+          <tr><td>Body</td><td class="mono">type.body</td><td class="mono">16 / 400</td><td>UI default</td></tr>
+          <tr><td>Body small</td><td class="mono">type.body.sm</td><td class="mono">14 / 400</td><td>Secondary UI</td></tr>
+          <tr><td>Caption</td><td class="mono">type.caption</td><td class="mono">12 / 500</td><td>Labels, metadata</td></tr>
+          <tr><td>Eyebrow</td><td class="mono">type.eyebrow</td><td class="mono">10 / 600 · 0.18em</td><td>Section eyebrows (uppercase)</td></tr>
+        </tbody>
+      </table>
+
+      <h3 class="sub">— Specimens</h3>
+      <div class="specimen" style="margin-bottom: 12px;">
+        <div class="label"><span>Display XXL · Inter Tight 700</span><span>96 px</span></div>
+        <div class="sample" style="font-size: 96px;">Trade compute.</div>
+      </div>
+      <div class="specimen" style="margin-bottom: 12px;">
+        <div class="label"><span>Display L · Inter Tight 600</span><span>40 px</span></div>
+        <div class="sample" style="font-size: 40px; line-height: 1.15;">The Bloomberg of AI compute.</div>
+      </div>
+      <div class="specimen" style="margin-bottom: 12px;">
+        <div class="label"><span>Body · Inter 400</span><span>16 px</span></div>
+        <p style="font-family: 'Inter'; font-size: 16px; line-height: 1.6; color: var(--text); font-weight: 400; margin: 0;">AI credits and GPU credits trade on a single venue. We publish a daily reference index, run an order book, and own datacenter capacity so every credit redeems into real compute. Settlement is physical or cash; the underlying is real.</p>
+      </div>
+      <div class="specimen">
+        <div class="label"><span>Mono · JetBrains Mono 500 · tabular</span><span>14 px</span></div>
+        <pre style="font-family: 'JetBrains Mono'; font-size: 14px; line-height: 1.6; color: var(--text); margin: 0; font-variant-numeric: tabular-nums;">$ exascale orders place \
+  --asset  AI-INDEX \
+  --side   buy \
+  --qty    1,000 \
+  --price  2.4775
+order_id: 0x7a3...c91   filled: 1,000 / 1,000   @ $2.4775</pre>
+      </div>
+
+      <h3 class="sub">— Numeric rules</h3>
+      <ul>
+        <li><strong>Tabular figures</strong> for all prices, balances, P&amp;L, volumes — non-negotiable in trading UI</li>
+        <li><strong>Decimal alignment</strong> across price/balance columns; right-align all numeric data</li>
+        <li><strong>Proportional figures</strong> only in narrative prose</li>
+        <li><strong>No italic</strong> for technical content — reserve for editorial emphasis</li>
+      </ul>
+    </section>
+
+    <!-- =================================================
+         04 — COLOR
+         ================================================= -->
+    <section id="color" data-section="04">
+      <div class="s-eyebrow"><span class="dot"></span>04 / 12 · Color</div>
+      <h1 class="s-title">Tokens, not values.<br/>Restraint, not range.</h1>
+      <p class="s-lede">Near-black + warm off-white anchor every surface. Lime is the single brand accent. Positive / negative semantic colors are reserved exclusively for trading state.</p>
+
+      <h3 class="sub">— Brand</h3>
+      <div class="grid-4">
+        <div class="swatch">
+          <div class="chip" style="background: #C8F25C;"></div>
+          <div class="meta">
+            <span class="name">Brand accent — Lime</span>
+            <span class="token">brand.primary</span>
+            <span class="hex">#C8F25C</span>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background: #F5A623;"></div>
+          <div class="meta">
+            <span class="name">Brand secondary — Orange</span>
+            <span class="token">brand.secondary</span>
+            <span class="hex">#F5A623</span>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background: #4A90E2;"></div>
+          <div class="meta">
+            <span class="name">Brand tertiary — Blue</span>
+            <span class="token">brand.tertiary</span>
+            <span class="hex">#4A90E2</span>
+          </div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background: #F5D24B;"></div>
+          <div class="meta">
+            <span class="name">Brand support — Yellow</span>
+            <span class="token">brand.support</span>
+            <span class="hex">#F5D24B</span>
+          </div>
+        </div>
+      </div>
+      <p style="margin-top: 16px; font-size: 14px;">Lime is the primary accent. Orange, blue, and yellow are <strong>categorical accents</strong> for differentiating three or four parallel concepts (e.g., three product layers, four revenue streams) — never used decoratively.</p>
+
+      <h3 class="sub">— Surfaces</h3>
+      <div class="grid-4">
+        <div class="swatch outlined">
+          <div class="chip" style="background: #FAFAF7;"></div>
+          <div class="meta"><span class="name">Canvas (light)</span><span class="token">surface.canvas</span><span class="hex">#FAFAF7</span></div>
+        </div>
+        <div class="swatch outlined">
+          <div class="chip" style="background: #FFFFFF;"></div>
+          <div class="meta"><span class="name">Elevated (light)</span><span class="token">surface.elevated</span><span class="hex">#FFFFFF</span></div>
+        </div>
+        <div class="swatch outlined">
+          <div class="chip" style="background: #F2EEE3;"></div>
+          <div class="meta"><span class="name">Sunken (light)</span><span class="token">surface.sunken</span><span class="hex">#F2EEE3</span></div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background: #0E0E0E;"></div>
+          <div class="meta"><span class="name">Inverse</span><span class="token">surface.inverse</span><span class="hex">#0E0E0E</span></div>
+        </div>
+      </div>
+      <p style="margin-top: 12px; font-size: 13px; color: var(--text-tertiary);">Pure black (<code>#000000</code>) is forbidden — too harsh. <code>#0E0E0E</code> reads as black at every viewing condition without the contrast cliff.</p>
+
+      <h3 class="sub">— Text</h3>
+      <div class="grid-4">
+        <div class="swatch has-border">
+          <div class="chip" style="background: #0E0E0E;"></div>
+          <div class="meta"><span class="name">Primary</span><span class="token">text.primary</span><span class="hex">#0E0E0E</span></div>
+        </div>
+        <div class="swatch has-border">
+          <div class="chip" style="background: #4A4A45;"></div>
+          <div class="meta"><span class="name">Secondary</span><span class="token">text.secondary</span><span class="hex">#4A4A45</span></div>
+        </div>
+        <div class="swatch has-border">
+          <div class="chip" style="background: #8A8A82;"></div>
+          <div class="meta"><span class="name">Tertiary</span><span class="token">text.tertiary</span><span class="hex">#8A8A82</span></div>
+        </div>
+        <div class="swatch has-border">
+          <div class="chip" style="background: #EAE6DA;"></div>
+          <div class="meta"><span class="name">On inverse</span><span class="token">text.inverse</span><span class="hex">#EAE6DA</span></div>
+        </div>
+      </div>
+
+      <h3 class="sub">— Semantic (trading state)</h3>
+      <div class="grid-4">
+        <div class="swatch">
+          <div class="chip" style="background: #16A34A;"></div>
+          <div class="meta"><span class="name"><span class="mark-up"></span>Positive · Bullish</span><span class="token">semantic.positive</span><span class="hex">#16A34A</span></div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background: #DC2626;"></div>
+          <div class="meta"><span class="name"><span class="mark-down"></span>Negative · Bearish</span><span class="token">semantic.negative</span><span class="hex">#DC2626</span></div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background: #D97706;"></div>
+          <div class="meta"><span class="name">Warning</span><span class="token">semantic.warning</span><span class="hex">#D97706</span></div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background: #0369A1;"></div>
+          <div class="meta"><span class="name">Info</span><span class="token">semantic.info</span><span class="hex">#0369A1</span></div>
+        </div>
+      </div>
+      <div class="callout">
+        <strong>Color-blindness rule.</strong> Positive / negative are <em>always</em> paired with shape — <span class="mark-up"></span>for gains, <span class="mark-down"></span>for losses. Color alone is never sufficient to communicate direction.
+      </div>
+
+      <h3 class="sub">— Token export</h3>
+      <div class="tokens">
+<span class="c">/* surfaces */</span>
+<span class="k">--surface-canvas</span>: <span class="v">#FAFAF7</span>;
+<span class="k">--surface-elevated</span>: <span class="v">#FFFFFF</span>;
+<span class="k">--surface-sunken</span>: <span class="v">#F2EEE3</span>;
+<span class="k">--surface-inverse</span>: <span class="v">#0E0E0E</span>;
+<span class="c">/* text */</span>
+<span class="k">--text-primary</span>: <span class="v">#0E0E0E</span>;
+<span class="k">--text-secondary</span>: <span class="v">#4A4A45</span>;
+<span class="k">--text-tertiary</span>: <span class="v">#8A8A82</span>;
+<span class="k">--text-inverse</span>: <span class="v">#EAE6DA</span>;
+<span class="c">/* brand */</span>
+<span class="k">--brand-primary</span>: <span class="v">#C8F25C</span>;
+<span class="k">--brand-secondary</span>: <span class="v">#F5A623</span>;
+<span class="k">--brand-tertiary</span>: <span class="v">#4A90E2</span>;
+<span class="c">/* semantic */</span>
+<span class="k">--semantic-positive</span>: <span class="v">#16A34A</span>;
+<span class="k">--semantic-negative</span>: <span class="v">#DC2626</span>;
+<span class="k">--semantic-warning</span>: <span class="v">#D97706</span>;
+<span class="k">--semantic-info</span>: <span class="v">#0369A1</span>;
+      </div>
+    </section>
+
+    <!-- =================================================
+         05 — LAYOUT
+         ================================================= -->
+    <section id="layout" data-section="05" class="cream">
+      <div class="s-eyebrow"><span class="dot"></span>05 / 12 · Layout &amp; grid</div>
+      <h1 class="s-title">Three surfaces.<br/>Three grids.</h1>
+      <p class="s-lede">Marketing breathes. Trading is dense. Compute is utilitarian. Each surface has its own grid contract — but all share the same spacing scale.</p>
+
+      <h3 class="sub">— Spacing scale (base 4)</h3>
+      <table class="tbl-compact">
+        <thead><tr><th>Token</th><th>Px</th><th>Use</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">space.0</td><td class="mono">0</td><td>No spacing</td></tr>
+          <tr><td class="mono">space.1</td><td class="mono">4</td><td>Tight inline</td></tr>
+          <tr><td class="mono">space.2</td><td class="mono">8</td><td>Default inline gap</td></tr>
+          <tr><td class="mono">space.3</td><td class="mono">12</td><td>Compact UI</td></tr>
+          <tr><td class="mono">space.4</td><td class="mono">16</td><td>Default UI gap</td></tr>
+          <tr><td class="mono">space.5</td><td class="mono">24</td><td>Section spacing · card padding</td></tr>
+          <tr><td class="mono">space.6</td><td class="mono">32</td><td>Internal card spacing</td></tr>
+          <tr><td class="mono">space.7</td><td class="mono">48</td><td>Section gaps</td></tr>
+          <tr><td class="mono">space.8</td><td class="mono">64</td><td>Page section breaks</td></tr>
+          <tr><td class="mono">space.9</td><td class="mono">96</td><td>Hero / display</td></tr>
+        </tbody>
+      </table>
+
+      <h3 class="sub">— Breakpoints</h3>
+      <table class="tbl-compact">
+        <thead><tr><th>Name</th><th>Range</th><th>Use</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">xs</td><td class="mono">0 – 479</td><td>Mobile portrait · read-only</td></tr>
+          <tr><td class="mono">sm</td><td class="mono">480 – 767</td><td>Mobile landscape</td></tr>
+          <tr><td class="mono">md</td><td class="mono">768 – 1023</td><td>Tablet, small laptop</td></tr>
+          <tr><td class="mono">lg</td><td class="mono">1024 – 1439</td><td>Default desktop</td></tr>
+          <tr><td class="mono">xl</td><td class="mono">1440 – 1919</td><td>Trading UI native</td></tr>
+          <tr><td class="mono">2xl</td><td class="mono">1920+</td><td>Multi-monitor trader setups</td></tr>
+        </tbody>
+      </table>
+
+      <h3 class="sub">— Grids per surface</h3>
+      <div class="grid-3">
+        <div class="tile">
+          <h4 style="margin-top:0">Marketing</h4>
+          <p style="font-size: 14px;"><strong>12-column</strong>, 1280px max-width default, 1440px for trading UI. Gutter 24px. Outer margin 80px on large displays.</p>
+          <p style="font-size: 14px;">Single-column flow. Max 720px reading column for prose. Full-width for hero modules.</p>
+        </div>
+        <div class="tile">
+          <h4 style="margin-top:0">Trading interface</h4>
+          <p style="font-size: 14px;"><strong>Dense, multi-pane.</strong> Draggable / resizable panels. Bloomberg Terminal as the upper bound of information density.</p>
+          <p style="font-size: 14px;">Required regions: order book, chart, position panel, account balance, news rail.</p>
+        </div>
+        <div class="tile">
+          <h4 style="margin-top:0">Compute &amp; billing</h4>
+          <p style="font-size: 14px;"><strong>CLI-primary.</strong> Web UI is monitoring and provisioning, not a power-user workflow.</p>
+          <p style="font-size: 14px;">Simple list/detail patterns. Heavy use of tables. Minimal forms.</p>
+        </div>
+      </div>
+
+      <h3 class="sub">— Border radius</h3>
+      <p>The radius system encodes brand personality. <strong>Sharp wins</strong> for institutional positioning.</p>
+      <table class="tbl-compact">
+        <thead><tr><th>Token</th><th>Px</th><th>Use</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">radius.none</td><td class="mono">0</td><td>Trading tables, data grids</td></tr>
+          <tr><td class="mono">radius.sm</td><td class="mono">2</td><td>Default — buttons, inputs, cards</td></tr>
+          <tr><td class="mono">radius.md</td><td class="mono">4</td><td>Modals, larger surfaces</td></tr>
+          <tr><td class="mono">radius.lg</td><td class="mono">6</td><td>Marketing-only accents</td></tr>
+          <tr><td class="mono">radius.full</td><td class="mono">9999</td><td>Pills, status badges only</td></tr>
+        </tbody>
+      </table>
+      <p style="font-size: 14px;"><strong>Forbidden:</strong> radii ≥ 12px anywhere in the product. Consumer-fintech rounding (16-24px) is off-brand.</p>
+    </section>
+
+    <!-- =================================================
+         06 — COMPONENTS
+         ================================================= -->
+    <section id="components" data-section="06">
+      <div class="s-eyebrow"><span class="dot"></span>06 / 12 · Components</div>
+      <h1 class="s-title">Square, restrained,<br/>state-aware.</h1>
+      <p class="s-lede">Sharp corners. Single primary CTA per surface. Every interactive element defines hover, focus, active, disabled, loading, and error states.</p>
+
+      <h3 class="sub">— Buttons · hierarchy</h3>
+      <div class="demo-block">
+        <span class="lbl">— Variants · default 40px height</span>
+        <div class="btn-row">
+          <button class="btn btn-primary">Place Order</button>
+          <button class="btn btn-secondary">Cancel</button>
+          <button class="btn btn-tertiary">View Details</button>
+          <button class="btn btn-destructive">Withdraw</button>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-top: 16px;">
+        <div class="demo-block">
+          <span class="lbl">— Sizing</span>
+          <div class="btn-row">
+            <button class="btn btn-primary btn-sm">Small · 32</button>
+            <button class="btn btn-primary">Medium · 40</button>
+            <button class="btn btn-primary btn-lg">Large · 48</button>
+          </div>
+        </div>
+        <div class="demo-block">
+          <span class="lbl">— Trading buy / sell</span>
+          <div class="btn-row">
+            <button class="btn btn-buy"><span class="mark-up" style="color: #fff;"></span>Buy AI-INDEX</button>
+            <button class="btn btn-sell"><span class="mark-down" style="color: #fff;"></span>Sell AI-INDEX</button>
+          </div>
+        </div>
+      </div>
+
+      <h3 class="sub">— Form inputs</h3>
+      <div class="grid-3">
+        <div class="input">
+          <label>— Email</label>
+          <input type="email" placeholder="you@firm.com" />
+        </div>
+        <div class="input num">
+          <label>— Order quantity</label>
+          <input type="text" value="1,000.00" />
+        </div>
+        <div class="input num">
+          <label>— Limit price (USD)</label>
+          <input type="text" value="2.4775" />
+        </div>
+      </div>
+      <p style="margin-top: 16px; font-size: 14px;">Number inputs use mono digits, right-aligned, with tabular figures. Focus ring is 2px brand accent with 1px offset — non-negotiable.</p>
+
+      <h3 class="sub">— Cards</h3>
+      <div class="grid-3">
+        <div class="tile">
+          <div class="s-eyebrow" style="margin-bottom: 8px;"><span class="dot"></span>Surface-flat</div>
+          <h4 style="margin-top: 8px;">No elevation</h4>
+          <p style="font-size: 13px;">Inline content blocks. No shadow, 1px border only when separation is needed.</p>
+        </div>
+        <div class="tile" style="box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
+          <div class="s-eyebrow" style="margin-bottom: 8px;"><span class="dot"></span>Card-default</div>
+          <h4 style="margin-top: 8px;">Subtle elevation</h4>
+          <p style="font-size: 13px;">Standard card. 1px border + 2px shadow. Used for most product surfaces.</p>
+        </div>
+        <div class="tile" style="box-shadow: 0 4px 12px rgba(0,0,0,0.06); border-color: var(--border-strong);">
+          <div class="s-eyebrow" style="margin-bottom: 8px;"><span class="dot"></span>Card-prominent</div>
+          <h4 style="margin-top: 8px;">Strong elevation</h4>
+          <p style="font-size: 13px;">Modals, dropdowns, focused panels. 4–8px shadow, stronger border.</p>
+        </div>
+      </div>
+
+      <h3 class="sub">— Glass / frosted use</h3>
+      <div class="grid-2">
+        <div class="tile">
+          <h4 style="margin-top: 0; color: var(--positive);">Where glass works</h4>
+          <ul style="font-size: 14px;">
+            <li>Modal overlays where order book context should stay visible</li>
+            <li>Sticky top nav over scrolling content (subtle blur only)</li>
+            <li>Hover popovers in trading UI</li>
+          </ul>
+        </div>
+        <div class="tile">
+          <h4 style="margin-top: 0; color: var(--negative);">Where glass is wrong</h4>
+          <ul style="font-size: 14px;">
+            <li>Primary content cards — loses information density</li>
+            <li>Marketing hero — looks consumer-app</li>
+            <li>Anything text-bearing where contrast matters</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3 class="sub">— Status badges &amp; pills</h3>
+      <div class="btn-row">
+        <span style="display:inline-flex; align-items:center; gap:6px; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; padding: 4px 10px; border-radius: 999px; background: rgba(22,163,74,0.12); color: var(--positive);"><span style="width:6px;height:6px;border-radius:50%;background:var(--positive);"></span>Live</span>
+        <span style="display:inline-flex; align-items:center; gap:6px; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; padding: 4px 10px; border-radius: 999px; background: rgba(217,119,6,0.12); color: var(--warning);"><span style="width:6px;height:6px;border-radius:50%;background:var(--warning);"></span>Pending</span>
+        <span style="display:inline-flex; align-items:center; gap:6px; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; padding: 4px 10px; border-radius: 999px; background: rgba(220,38,38,0.12); color: var(--negative);"><span style="width:6px;height:6px;border-radius:50%;background:var(--negative);"></span>Halted</span>
+        <span style="display:inline-flex; align-items:center; gap:6px; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; padding: 4px 10px; border-radius: 999px; background: rgba(3,105,161,0.12); color: var(--info);"><span style="width:6px;height:6px;border-radius:50%;background:var(--info);"></span>Paper</span>
+      </div>
+
+      <h3 class="sub">— Required states (every interactive element)</h3>
+      <ul>
+        <li><code>default</code> — resting</li>
+        <li><code>hover</code> — pointer over (touch devices skip)</li>
+        <li><code>focus-visible</code> — 2px brand-accent ring, 1px offset (mandatory)</li>
+        <li><code>active</code> — pressed (1px y-translate; never scale)</li>
+        <li><code>disabled</code> — 40% opacity, no cursor</li>
+        <li><code>loading</code> — spinner or skeleton, never shimmer</li>
+        <li><code>error</code> — semantic.negative border + helper text</li>
+      </ul>
+    </section>
+
+    <!-- =================================================
+         07 — DATA VISUALIZATION
+         ================================================= -->
+    <section id="dataviz" data-section="07" class="dark">
+      <div class="s-eyebrow"><span class="dot"></span>07 / 12 · Data visualization</div>
+      <h1 class="s-title">The most important<br/>visual system.</h1>
+      <p class="s-lede">Most brand books skip this. Ours leads with it. Trading UI is dark by default — bullish green and bearish red read more vividly against #0E0E0E.</p>
+
+      <h3 class="sub">— Candlestick chart</h3>
+      <div class="chart-card">
+        <div class="head">
+          <div class="ttl">AI-INDEX · 1H</div>
+          <div class="px up">$2.4775 <span style="font-size: 13px; opacity: 0.7;">+0.024 (+0.98%)</span></div>
+        </div>
+        <svg viewBox="0 0 600 220" preserveAspectRatio="none">
+          <!-- crosshair grid -->
+          <g stroke="rgba(234,230,218,0.06)" stroke-width="1">
+            <line x1="0" y1="40" x2="600" y2="40"/>
+            <line x1="0" y1="80" x2="600" y2="80"/>
+            <line x1="0" y1="120" x2="600" y2="120"/>
+            <line x1="0" y1="160" x2="600" y2="160"/>
+          </g>
+          <!-- candles -->
+          <g>
+            <!-- bullish/bearish helper: green = #16A34A, red = #DC2626 -->
+            <line x1="20" y1="90" x2="20" y2="160" stroke="#16A34A" stroke-width="1.5"/><rect x="15" y="120" width="10" height="30" fill="#16A34A"/>
+            <line x1="40" y1="80" x2="40" y2="150" stroke="#16A34A" stroke-width="1.5"/><rect x="35" y="105" width="10" height="35" fill="#16A34A"/>
+            <line x1="60" y1="95" x2="60" y2="155" stroke="#DC2626" stroke-width="1.5"/><rect x="55" y="115" width="10" height="30" fill="#DC2626"/>
+            <line x1="80" y1="100" x2="80" y2="170" stroke="#DC2626" stroke-width="1.5"/><rect x="75" y="130" width="10" height="30" fill="#DC2626"/>
+            <line x1="100" y1="80" x2="100" y2="140" stroke="#16A34A" stroke-width="1.5"/><rect x="95" y="100" width="10" height="32" fill="#16A34A"/>
+            <line x1="120" y1="60" x2="120" y2="130" stroke="#16A34A" stroke-width="1.5"/><rect x="115" y="80" width="10" height="40" fill="#16A34A"/>
+            <line x1="140" y1="70" x2="140" y2="120" stroke="#16A34A" stroke-width="1.5"/><rect x="135" y="80" width="10" height="32" fill="#16A34A"/>
+            <line x1="160" y1="65" x2="160" y2="115" stroke="#DC2626" stroke-width="1.5"/><rect x="155" y="80" width="10" height="28" fill="#DC2626"/>
+            <line x1="180" y1="80" x2="180" y2="130" stroke="#DC2626" stroke-width="1.5"/><rect x="175" y="98" width="10" height="25" fill="#DC2626"/>
+            <line x1="200" y1="90" x2="200" y2="140" stroke="#16A34A" stroke-width="1.5"/><rect x="195" y="100" width="10" height="32" fill="#16A34A"/>
+            <line x1="220" y1="70" x2="220" y2="115" stroke="#16A34A" stroke-width="1.5"/><rect x="215" y="80" width="10" height="30" fill="#16A34A"/>
+            <line x1="240" y1="60" x2="240" y2="105" stroke="#16A34A" stroke-width="1.5"/><rect x="235" y="68" width="10" height="32" fill="#16A34A"/>
+            <line x1="260" y1="55" x2="260" y2="100" stroke="#DC2626" stroke-width="1.5"/><rect x="255" y="65" width="10" height="28" fill="#DC2626"/>
+            <line x1="280" y1="70" x2="280" y2="115" stroke="#DC2626" stroke-width="1.5"/><rect x="275" y="85" width="10" height="22" fill="#DC2626"/>
+            <line x1="300" y1="85" x2="300" y2="125" stroke="#DC2626" stroke-width="1.5"/><rect x="295" y="95" width="10" height="25" fill="#DC2626"/>
+            <line x1="320" y1="80" x2="320" y2="120" stroke="#16A34A" stroke-width="1.5"/><rect x="315" y="90" width="10" height="25" fill="#16A34A"/>
+            <line x1="340" y1="68" x2="340" y2="110" stroke="#16A34A" stroke-width="1.5"/><rect x="335" y="78" width="10" height="28" fill="#16A34A"/>
+            <line x1="360" y1="60" x2="360" y2="100" stroke="#16A34A" stroke-width="1.5"/><rect x="355" y="68" width="10" height="28" fill="#16A34A"/>
+            <line x1="380" y1="58" x2="380" y2="95" stroke="#16A34A" stroke-width="1.5"/><rect x="375" y="65" width="10" height="25" fill="#16A34A"/>
+            <line x1="400" y1="50" x2="400" y2="85" stroke="#16A34A" stroke-width="1.5"/><rect x="395" y="58" width="10" height="22" fill="#16A34A"/>
+            <line x1="420" y1="55" x2="420" y2="92" stroke="#DC2626" stroke-width="1.5"/><rect x="415" y="62" width="10" height="22" fill="#DC2626"/>
+            <line x1="440" y1="65" x2="440" y2="100" stroke="#DC2626" stroke-width="1.5"/><rect x="435" y="75" width="10" height="20" fill="#DC2626"/>
+            <line x1="460" y1="60" x2="460" y2="90" stroke="#16A34A" stroke-width="1.5"/><rect x="455" y="68" width="10" height="18" fill="#16A34A"/>
+            <line x1="480" y1="50" x2="480" y2="85" stroke="#16A34A" stroke-width="1.5"/><rect x="475" y="58" width="10" height="22" fill="#16A34A"/>
+            <line x1="500" y1="45" x2="500" y2="78" stroke="#16A34A" stroke-width="1.5"/><rect x="495" y="50" width="10" height="22" fill="#16A34A"/>
+            <line x1="520" y1="40" x2="520" y2="75" stroke="#16A34A" stroke-width="1.5"/><rect x="515" y="48" width="10" height="20" fill="#16A34A"/>
+            <line x1="540" y1="38" x2="540" y2="70" stroke="#16A34A" stroke-width="1.5"/><rect x="535" y="45" width="10" height="18" fill="#16A34A"/>
+            <line x1="560" y1="35" x2="560" y2="65" stroke="#16A34A" stroke-width="1.5"/><rect x="555" y="42" width="10" height="18" fill="#16A34A"/>
+            <line x1="580" y1="30" x2="580" y2="62" stroke="#16A34A" stroke-width="1.5"/><rect x="575" y="38" width="10" height="16" fill="#16A34A"/>
+          </g>
+        </svg>
+        <div style="display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 10px; color: rgba(234,230,218,0.5); margin-top: 8px; letter-spacing: 0.06em;">
+          <span>09:30</span><span>11:00</span><span>12:30</span><span>14:00</span><span>15:30</span>
+        </div>
+      </div>
+      <ul>
+        <li>Bullish candle: <code>semantic.positive</code> solid fill. Bearish: <code>semantic.negative</code> solid fill.</li>
+        <li>Wick is the lighter shade of the body color; no separate highlight wick.</li>
+        <li>Time axis bottom, price axis right — matches Bloomberg / TradingView convention.</li>
+        <li>No grid stripes. Subtle horizontal lines only at price ticks.</li>
+      </ul>
+
+      <h3 class="sub">— Order book</h3>
+      <div class="orderbook">
+        <div class="ob-header"><span>Price (USD)</span><span style="text-align: right;">Size</span><span style="text-align: right;">Total</span></div>
+
+        <div class="row ask"><div class="bar" style="width: 18%;"></div><span class="px">2.4810</span><span style="text-align:right">128.4</span><span style="text-align:right">128.4</span></div>
+        <div class="row ask"><div class="bar" style="width: 26%;"></div><span class="px">2.4805</span><span style="text-align:right">186.0</span><span style="text-align:right">314.4</span></div>
+        <div class="row ask"><div class="bar" style="width: 42%;"></div><span class="px">2.4800</span><span style="text-align:right">298.7</span><span style="text-align:right">613.1</span></div>
+        <div class="row ask"><div class="bar" style="width: 60%;"></div><span class="px">2.4790</span><span style="text-align:right">421.3</span><span style="text-align:right">1,034.4</span></div>
+        <div class="row ask"><div class="bar" style="width: 74%;"></div><span class="px">2.4780</span><span style="text-align:right">529.1</span><span style="text-align:right">1,563.5</span></div>
+
+        <div class="mid">$2.4775 <span style="font-size: 12px; font-family: var(--font-mono); color: rgba(234,230,218,0.5); margin-left: 8px;">spread 0.0010</span></div>
+
+        <div class="row bid"><div class="bar" style="width: 70%;"></div><span class="px">2.4765</span><span style="text-align:right">498.2</span><span style="text-align:right">498.2</span></div>
+        <div class="row bid"><div class="bar" style="width: 58%;"></div><span class="px">2.4760</span><span style="text-align:right">412.8</span><span style="text-align:right">911.0</span></div>
+        <div class="row bid"><div class="bar" style="width: 40%;"></div><span class="px">2.4755</span><span style="text-align:right">285.5</span><span style="text-align:right">1,196.5</span></div>
+        <div class="row bid"><div class="bar" style="width: 24%;"></div><span class="px">2.4750</span><span style="text-align:right">170.1</span><span style="text-align:right">1,366.6</span></div>
+        <div class="row bid"><div class="bar" style="width: 16%;"></div><span class="px">2.4740</span><span style="text-align:right">114.0</span><span style="text-align:right">1,480.6</span></div>
+      </div>
+
+      <h3 class="sub">— Data table</h3>
+      <div class="demo-table">
+        <table class="tbl-compact">
+          <thead>
+            <tr><th>Market</th><th>Last</th><th>24h Δ</th><th>24h Vol</th><th>Spread</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>AI-INDEX</td><td class="num">2.4775</td><td class="num" style="color: var(--positive);">+0.98%</td><td class="num">$12.4M</td><td class="num">0.0010</td></tr>
+            <tr><td>H100-USD</td><td class="num">2.9912</td><td class="num" style="color: var(--positive);">+0.41%</td><td class="num">$8.1M</td><td class="num">0.0021</td></tr>
+            <tr><td>H200-USD</td><td class="num">3.8450</td><td class="num" style="color: var(--negative);">−0.27%</td><td class="num">$3.7M</td><td class="num">0.0034</td></tr>
+            <tr><td>TEXT-INDEX</td><td class="num">0.0042</td><td class="num" style="color: var(--positive);">+1.84%</td><td class="num">$2.2M</td><td class="num">0.0001</td></tr>
+            <tr><td>IMAGE-INDEX</td><td class="num">0.0218</td><td class="num" style="color: var(--negative);">−0.62%</td><td class="num">$0.9M</td><td class="num">0.0003</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <ul>
+        <li>Tabular figures for every numeric column. Decimal alignment on all prices.</li>
+        <li>Right-align numbers; left-align text. Subtle row separators; no heavy borders.</li>
+        <li>Hover state: slight background tint, never color shift.</li>
+        <li>Sortable columns indicated with clear arrows.</li>
+      </ul>
+
+      <h3 class="sub">— Forbidden chart patterns</h3>
+      <ul>
+        <li>Pie or donut charts with more than 5 categories — use a horizontal bar instead</li>
+        <li>Stacked area charts where layers overlap ambiguously</li>
+        <li>3D anything — perspective distortion hides data</li>
+        <li>Animated count-ups longer than 600ms</li>
+        <li>Color alone communicating bullish / bearish without shape pairing</li>
+      </ul>
+    </section>
+
+    <!-- =================================================
+         08 — MOTION
+         ================================================= -->
+    <section id="motion" data-section="08">
+      <div class="s-eyebrow"><span class="dot"></span>08 / 12 · Motion</div>
+      <h1 class="s-title">Calm. Fast. Purposeful.</h1>
+      <p class="s-lede">Every animation serves a function. Nothing slower than 500ms in product UI. Spring physics belong on consumer apps — this isn't one. Respects <code>prefers-reduced-motion</code>.</p>
+
+      <h3 class="sub">— Duration tokens</h3>
+      <div class="motion-row"><span class="name">motion.instant</span><div class="track"><div class="dot"></div></div><span class="dur">0 ms</span></div>
+      <div class="motion-row"><span class="name">motion.fast</span><div class="track"><div class="dot" style="left: 30%;"></div></div><span class="dur">150 ms</span></div>
+      <div class="motion-row"><span class="name">motion.medium</span><div class="track"><div class="dot" style="left: 55%;"></div></div><span class="dur">250 ms</span></div>
+      <div class="motion-row"><span class="name">motion.slow</span><div class="track"><div class="dot" style="left: 78%;"></div></div><span class="dur">400 ms</span></div>
+      <div class="motion-row"><span class="name">motion.deliberate</span><div class="track"><div class="dot" style="left: 95%;"></div></div><span class="dur">600 ms</span></div>
+
+      <h3 class="sub">— Easing curves</h3>
+      <table class="tbl-compact">
+        <thead><tr><th>Token</th><th>Curve</th><th>Use</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">ease.standard</td><td class="mono">cubic-bezier(0.2, 0, 0, 1)</td><td>Default — fast out, slow in</td></tr>
+          <tr><td class="mono">ease.in</td><td class="mono">cubic-bezier(0.4, 0, 1, 1)</td><td>Exit animations</td></tr>
+          <tr><td class="mono">ease.out</td><td class="mono">cubic-bezier(0, 0, 0.2, 1)</td><td>Entrance animations</td></tr>
+          <tr><td class="mono">ease.spring</td><td class="mono">— forbidden in product —</td><td>Marketing only, sparingly</td></tr>
+        </tbody>
+      </table>
+
+      <h3 class="sub">— Trading UI motion (unique constraints)</h3>
+      <ul>
+        <li><strong>Price ticks:</strong> 200ms color flash (green up, red down). Never on every tick — only on the user's own positions or watchlisted assets.</li>
+        <li><strong>Order book updates:</strong> visible but not distracting. No flash except on user's own orders.</li>
+        <li><strong>Chart updates:</strong> smooth interpolation, never jumping. Hold the previous frame until the new one is fully drawn.</li>
+        <li><strong>No decorative motion anywhere in trading UI.</strong> No hover wiggles, no parallax, no "reveal" on scroll.</li>
+      </ul>
+
+      <h3 class="sub">— Forbidden patterns</h3>
+      <div class="voice">
+        <div class="col no-col"><div class="lbl">— Don't</div><p>Bouncing / spring physics in product UI</p></div>
+        <div class="col no-col"><div class="lbl">— Don't</div><p>Auto-playing carousels</p></div>
+        <div class="col no-col"><div class="lbl">— Don't</div><p>Parallax scrolling on marketing</p></div>
+        <div class="col no-col"><div class="lbl">— Don't</div><p>"Magic" reveals that hide content</p></div>
+      </div>
+    </section>
+
+    <!-- =================================================
+         09 — IMAGERY & VIDEO
+         ================================================= -->
+    <section id="imagery" data-section="09" class="cream">
+      <div class="s-eyebrow"><span class="dot"></span>09 / 12 · Imagery &amp; video</div>
+      <h1 class="s-title">No photography by default.</h1>
+      <p class="s-lede">Direction A primary: zero photography, diagrams and type carrying the marketing surfaces. Direction B (datacenter / infrastructure) reserved for specific "underlying" contexts only.</p>
+
+      <h3 class="sub">— Strategy</h3>
+      <div class="grid-3">
+        <div class="tile">
+          <h4 style="margin-top: 0;">Direction A · Default</h4>
+          <p style="font-size: 14px;"><strong>No photography.</strong> Diagrams, charts, abstract illustration only. Reference: Stripe, Linear. Cheap, consistent, scales globally.</p>
+        </div>
+        <div class="tile">
+          <h4 style="margin-top: 0;">Direction B · Selective</h4>
+          <p style="font-size: 14px;"><strong>Datacenter / infrastructure.</strong> Moody, low-light, hardware-focused. Used only for "the underlying" sections and partnership pages.</p>
+        </div>
+        <div class="tile" style="opacity: 0.5;">
+          <h4 style="margin-top: 0;">Direction C · Avoided</h4>
+          <p style="font-size: 14px;"><strong>Editorial finance imagery.</strong> Too cliché — trading floors, skyscrapers, handshakes. Not for Exascale.</p>
+        </div>
+      </div>
+
+      <h3 class="sub">— Image treatment</h3>
+      <ul>
+        <li>Subtle desaturation (10–15%) for consistency across sources</li>
+        <li>Aspect ratios: 16:9 standard · 4:3 editorial · 1:1 social</li>
+        <li>Text-over-image: solid color block over the text-bearing portion, never gradient overlay</li>
+        <li>Resolution: 2× for retina; AVIF / WebP for web</li>
+      </ul>
+
+      <h3 class="sub">— Forbidden imagery</h3>
+      <ul>
+        <li><strong>AI-generated images</strong> — creates "AI startup" association regardless of subject</li>
+        <li><strong>Stock photography of "diverse team in conference room"</strong></li>
+        <li><strong>Generic futuristic cityscapes</strong> or data-flow abstractions</li>
+        <li><strong>Cliché finance imagery</strong> — handshakes, bulls, towering buildings, dollar bills</li>
+      </ul>
+
+      <h3 class="sub">— Video</h3>
+      <table class="tbl-compact">
+        <thead><tr><th>Context</th><th>Length</th><th>Style</th></tr></thead>
+        <tbody>
+          <tr><td>Marketing</td><td class="mono">30 – 90 s</td><td>Motion graphics; type-driven; no voiceover-overload</td></tr>
+          <tr><td>Social cutdown</td><td class="mono">15 s</td><td>Mute-friendly; large type; tabular figures on data</td></tr>
+          <tr><td>Product demo</td><td class="mono">30 – 180 s</td><td>Screen recording with selective annotation</td></tr>
+          <tr><td>Investor / partnership</td><td class="mono">2 – 5 min</td><td>Higher production; founder-on-camera optional</td></tr>
+        </tbody>
+      </table>
+      <p>Music: instrumental, modern minimal. No "tech startup energy" stock tracks. Subtitles mandatory.</p>
+    </section>
+
+    <!-- =================================================
+         10 — VOICE & TONE
+         ================================================= -->
+    <section id="voice" data-section="10">
+      <div class="s-eyebrow"><span class="dot"></span>10 / 12 · Voice &amp; tone</div>
+      <h1 class="s-title">Direct. Specific.<br/>Confident. Technical. Honest.</h1>
+      <p class="s-lede">A senior trader explains the venue to a colleague over lunch. Not a hype merchant, not a banking lawyer, not a friendly chatbot.</p>
+
+      <h3 class="sub">— Attributes in practice</h3>
+      <div class="voice">
+        <div class="col yes-col">
+          <div class="lbl">— Yes · Direct</div>
+          <p>"H100 at $2.99/hr. Per second."</p>
+        </div>
+        <div class="col no-col">
+          <div class="lbl">— No · Vague</div>
+          <p>"Discover blazing-fast GPU compute."</p>
+        </div>
+      </div>
+      <div class="voice">
+        <div class="col yes-col">
+          <div class="lbl">— Yes · Specific</div>
+          <p>"Order book depth: $50K within 1%."</p>
+        </div>
+        <div class="col no-col">
+          <div class="lbl">— No · Generic</div>
+          <p>"Deep liquidity for serious traders."</p>
+        </div>
+      </div>
+      <div class="voice">
+        <div class="col yes-col">
+          <div class="lbl">— Yes · Confident</div>
+          <p>"The commodity market for AI compute."</p>
+        </div>
+        <div class="col no-col">
+          <div class="lbl">— No · Hedged</div>
+          <p>"One of the leading AI compute marketplaces."</p>
+        </div>
+      </div>
+      <div class="voice">
+        <div class="col yes-col">
+          <div class="lbl">— Yes · Honest</div>
+          <p>"Paper trading v1, real-money testing in parallel."</p>
+        </div>
+        <div class="col no-col">
+          <div class="lbl">— No · Misleading</div>
+          <p>"Real money trading available now."</p>
+        </div>
+      </div>
+
+      <h3 class="sub">— Words to favor</h3>
+      <table class="tbl-compact">
+        <thead><tr><th>Use</th><th>Not</th></tr></thead>
+        <tbody>
+          <tr><td>Market</td><td>Platform</td></tr>
+          <tr><td>Venue</td><td>Service</td></tr>
+          <tr><td>Order</td><td>Request</td></tr>
+          <tr><td>Settle</td><td>Complete</td></tr>
+          <tr><td>Underlying</td><td>Backend</td></tr>
+          <tr><td>Trade</td><td>Purchase <span style="color: var(--text-tertiary);">(in trading context)</span></td></tr>
+          <tr><td>Buy / sell credits</td><td>Earn / spend credits</td></tr>
+        </tbody>
+      </table>
+
+      <h3 class="sub">— Words to avoid</h3>
+      <p style="font-family: var(--font-mono); font-size: 13px; line-height: 2; color: var(--text-secondary);">
+        revolutionary · disruptive · game-changing · next-gen · cutting-edge · powered by AI · AI-driven · seamless · frictionless · magical · best-in-class · world-class · anything ending in <em>-as-a-service</em>
+      </p>
+
+      <h3 class="sub">— Tone by context</h3>
+      <ul>
+        <li><strong>Marketing headlines</strong> — confident, declarative, headline-style</li>
+        <li><strong>Product UI labels</strong> — terse, technical, action-oriented (≤3 words where possible)</li>
+        <li><strong>Documentation</strong> — clear, didactic, code-first</li>
+        <li><strong>Error messages</strong> — what happened + what to do next; never blame the user</li>
+        <li><strong>Trading interface</strong> — minimal language, maximum information density</li>
+        <li><strong>Compliance / legal</strong> — precise, conservative</li>
+      </ul>
+
+      <h3 class="sub">— Error message pattern</h3>
+      <div class="grid-2">
+        <div class="tile" style="border-left: 3px solid var(--positive);">
+          <div class="s-eyebrow" style="margin-bottom: 8px; color: var(--positive);"><span class="dot"></span>Yes</div>
+          <p style="font-family: var(--font-mono); font-size: 13px; margin: 0; color: var(--text);">Order rejected. Insufficient balance: $1,200 available, $1,500 required. <a href="#">Add funds →</a></p>
+        </div>
+        <div class="tile" style="border-left: 3px solid var(--negative);">
+          <div class="s-eyebrow" style="margin-bottom: 8px; color: var(--negative);"><span class="dot"></span>No</div>
+          <p style="font-family: var(--font-mono); font-size: 13px; margin: 0; color: var(--text);">Oops! Something went wrong. Please try again later.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================
+         11 — ACCESSIBILITY
+         ================================================= -->
+    <section id="a11y" data-section="11" class="cream">
+      <div class="s-eyebrow"><span class="dot"></span>11 / 12 · Accessibility</div>
+      <h1 class="s-title">WCAG 2.1 AA.<br/>Baseline, not aspiration.</h1>
+      <p class="s-lede">Compliance is the floor. The trading interface adds platform-specific obligations: directional shapes, screen-reader chart alternatives, multi-channel alerts.</p>
+
+      <h3 class="sub">— Targets</h3>
+      <table class="tbl-compact">
+        <thead><tr><th>Requirement</th><th>Standard</th></tr></thead>
+        <tbody>
+          <tr><td>Body text contrast</td><td>4.5 : 1 minimum</td></tr>
+          <tr><td>Large text / UI components</td><td>3 : 1 minimum</td></tr>
+          <tr><td>Focus indicators</td><td>2px visible ring on every interactive element</td></tr>
+          <tr><td>Keyboard navigation</td><td>Full app navigable without mouse</td></tr>
+          <tr><td>Screen reader</td><td>Semantic HTML; ARIA only where needed</td></tr>
+          <tr><td>Reduced motion</td><td><code>prefers-reduced-motion</code> disables non-essential animation</td></tr>
+          <tr><td>Color-blind safe</td><td>Never rely on color alone for critical information</td></tr>
+        </tbody>
+      </table>
+
+      <h3 class="sub">— Trading-specific commitments</h3>
+      <ul>
+        <li>Buy / sell distinguishable without color (<span class="mark-up"></span>/<span class="mark-down"></span> shapes)</li>
+        <li>Order book readable in monochrome</li>
+        <li>Every chart has a data-table alternative for screen-reader users</li>
+        <li>Critical alerts (margin call, budget exceeded) use multiple channels: visual + sound + push</li>
+      </ul>
+
+      <h3 class="sub">— Testing</h3>
+      <ul>
+        <li>Automated axe-core or Lighthouse checks in CI</li>
+        <li>Manual screen-reader testing for primary flows (signup, trade execution, billing)</li>
+        <li>Keyboard-only navigation testing for the trading interface</li>
+        <li>Color-blindness simulation review (deuteranopia, protanopia)</li>
+      </ul>
+    </section>
+
+    <!-- =================================================
+         12 — APPLIED SURFACES
+         ================================================= -->
+    <section id="surfaces" data-section="12">
+      <div class="s-eyebrow"><span class="dot"></span>12 / 12 · Applied surfaces</div>
+      <h1 class="s-title">The system, applied.</h1>
+      <p class="s-lede">Six surfaces share one design system. Each obeys the same tokens; each respects its own information-density contract.</p>
+
+      <h3 class="sub">— Marketing hero</h3>
+      <div class="surface-strip">
+        <div class="head"><span>— Marketing · exascale.com / Hero</span><span>1440 × 720</span></div>
+        <div style="background: var(--surface-inverse); color: var(--text-inverse); padding: 56px 48px; min-height: 380px; display: flex; flex-direction: column; justify-content: center;">
+          <div style="font-family: 'JetBrains Mono'; font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; color: rgba(234,230,218,0.5); margin-bottom: 24px; display: flex; align-items: center; gap: 10px;"><span style="width:6px;height:6px;background:var(--brand-accent);display:inline-block;"></span>The Bloomberg of AI Compute</div>
+          <h2 style="font-family: 'Inter Tight'; font-weight: 700; font-size: 64px; letter-spacing: -0.04em; line-height: 0.96; margin: 0 0 24px;">AI compute,<br/>but <span style="background: var(--brand-accent); color: var(--text); padding: 0 0.06em;">tradeable</span>.</h2>
+          <p style="font-size: 18px; color: rgba(234,230,218,0.7); max-width: 540px; line-height: 1.5; margin: 0 0 32px;">A commodity venue for GPU compute. Order book, daily reference index, owned underlying.</p>
+          <div style="display: flex; gap: 12px;">
+            <button class="btn btn-primary">Open an account</button>
+            <button class="btn" style="background: transparent; color: var(--text-inverse); border-color: rgba(234,230,218,0.3);">Read the docs</button>
+          </div>
+        </div>
+      </div>
+
+      <h3 class="sub">— Trading dashboard</h3>
+      <div class="surface-strip">
+        <div class="head"><span>— Product · Trading UI · Dark mode</span><span>1920 × 1080</span></div>
+        <div style="background: #0E0E0E; color: var(--text-inverse); padding: 0; display: grid; grid-template-columns: 60px 1fr 320px;">
+          <!-- icon rail -->
+          <div style="border-right: 1px solid rgba(234,230,218,0.08); padding: 16px 0; display: flex; flex-direction: column; gap: 12px; align-items: center;">
+            <div style="width: 28px; height: 28px; background: var(--brand-accent); border-radius: 2px;"></div>
+            <div style="width: 28px; height: 28px; border: 1px solid rgba(234,230,218,0.2); border-radius: 2px;"></div>
+            <div style="width: 28px; height: 28px; border: 1px solid rgba(234,230,218,0.2); border-radius: 2px;"></div>
+            <div style="width: 28px; height: 28px; border: 1px solid rgba(234,230,218,0.2); border-radius: 2px;"></div>
+          </div>
+          <!-- main pane -->
+          <div style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <div style="font-family: 'JetBrains Mono'; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(234,230,218,0.55); margin-bottom: 4px;">— AI-INDEX · 1H</div>
+                <div style="font-family: 'JetBrains Mono'; font-size: 28px; font-variant-numeric: tabular-nums; font-weight: 600; color: var(--positive);">$2.4775 <span style="font-size: 14px; opacity: 0.7;">+0.98%</span></div>
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <button class="btn btn-sm btn-buy" style="height: 30px;">Buy</button>
+                <button class="btn btn-sm btn-sell" style="height: 30px;">Sell</button>
+              </div>
+            </div>
+            <div style="background: #161616; border-radius: 2px; padding: 12px;">
+              <svg viewBox="0 0 400 100" preserveAspectRatio="none" style="width: 100%; height: 100px;">
+                <polyline points="0,80 30,72 60,76 90,60 120,55 150,62 180,48 210,52 240,40 270,35 300,42 330,28 360,22 400,18" fill="none" stroke="#C8F25C" stroke-width="1.5"/>
+                <polyline points="0,80 30,72 60,76 90,60 120,55 150,62 180,48 210,52 240,40 270,35 300,42 330,28 360,22 400,18 400,100 0,100" fill="#C8F25C" fill-opacity="0.08"/>
+              </svg>
+            </div>
+          </div>
+          <!-- right rail -->
+          <div style="border-left: 1px solid rgba(234,230,218,0.08); padding: 20px 16px; font-family: var(--font-mono); font-size: 11px; color: rgba(234,230,218,0.65); font-variant-numeric: tabular-nums;">
+            <div style="text-transform: uppercase; letter-spacing: 0.18em; font-size: 10px; margin-bottom: 12px; color: rgba(234,230,218,0.5);">— Order book</div>
+            <div style="display: flex; justify-content: space-between; padding: 3px 0;"><span style="color: var(--negative);">2.4790</span><span>421.3</span></div>
+            <div style="display: flex; justify-content: space-between; padding: 3px 0;"><span style="color: var(--negative);">2.4785</span><span>298.7</span></div>
+            <div style="display: flex; justify-content: space-between; padding: 3px 0;"><span style="color: var(--negative);">2.4780</span><span>186.0</span></div>
+            <div style="text-align: center; padding: 6px 0; font-family: var(--font-sans); color: var(--text-inverse); font-size: 14px; font-weight: 600; border-top: 1px solid rgba(234,230,218,0.12); border-bottom: 1px solid rgba(234,230,218,0.12); margin: 6px 0;">2.4775</div>
+            <div style="display: flex; justify-content: space-between; padding: 3px 0;"><span style="color: var(--positive);">2.4765</span><span>498.2</span></div>
+            <div style="display: flex; justify-content: space-between; padding: 3px 0;"><span style="color: var(--positive);">2.4760</span><span>412.8</span></div>
+            <div style="display: flex; justify-content: space-between; padding: 3px 0;"><span style="color: var(--positive);">2.4755</span><span>285.5</span></div>
+          </div>
+        </div>
+      </div>
+
+      <h3 class="sub">— CLI output</h3>
+      <div class="surface-strip">
+        <div class="head"><span>— Compute · CLI · `exascale orders place`</span><span>Terminal · 80 cols</span></div>
+        <pre style="background: #0E0E0E; color: var(--text-inverse); font-family: 'JetBrains Mono'; font-size: 13px; line-height: 1.7; padding: 24px; margin: 0; overflow-x: auto;">
+<span style="color: rgba(234,230,218,0.5);">$</span> exascale orders place --asset AI-INDEX --side buy --qty 1000 --price 2.4775
+
+<span style="color: var(--brand-accent);">✓</span> Order placed                <span style="color: rgba(234,230,218,0.5);">0x7a3c91...</span>
+  Asset                       AI-INDEX
+  Side                        BUY
+  Quantity                    1,000.00
+  Price (limit)               $2.4775
+  Estimated cost              $2,477.50
+
+<span style="color: var(--brand-accent);">✓</span> Filled · 1,000 / 1,000 @ avg $2.4775
+  Fees (0.5% maker)           $12.39
+  Net debit                   $2,489.89   <span style="color: rgba(234,230,218,0.5);">→ balance $47,510.11</span>
+        </pre>
+      </div>
+
+      <h3 class="sub">— Email · transactional</h3>
+      <div class="surface-strip">
+        <div class="head"><span>— Email · Trade confirmation</span><span>600px wide</span></div>
+        <div style="background: var(--surface-elevated); padding: 32px 40px; color: var(--text); font-family: var(--font-sans);">
+          <div style="font-family: 'Inter Tight'; font-weight: 700; font-size: 16px; letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 32px;"><span style="display:inline-block; width:14px; height:14px; background:var(--brand-accent); vertical-align:-2px; margin-right:8px;"></span>EXASCALE</div>
+          <h3 style="font-family: 'Inter Tight'; font-weight: 600; font-size: 28px; letter-spacing: -0.02em; margin: 0 0 12px;">Order filled.</h3>
+          <p style="margin: 0 0 24px; color: var(--text-secondary);">Your buy order for 1,000 AI-INDEX credits has settled.</p>
+          <div style="border: 1px solid var(--border); border-radius: 2px; padding: 20px;">
+            <div style="display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px;"><span style="color: var(--text-tertiary); font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;">Asset</span><span style="font-family: var(--font-mono);">AI-INDEX</span></div>
+            <div style="display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px;"><span style="color: var(--text-tertiary); font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;">Quantity</span><span style="font-family: var(--font-mono); font-variant-numeric: tabular-nums;">1,000.00</span></div>
+            <div style="display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px;"><span style="color: var(--text-tertiary); font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;">Avg price</span><span style="font-family: var(--font-mono); font-variant-numeric: tabular-nums;">$2.4775</span></div>
+            <div style="display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px;"><span style="color: var(--text-tertiary); font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;">Fees</span><span style="font-family: var(--font-mono); font-variant-numeric: tabular-nums;">$12.39</span></div>
+            <div style="display: flex; justify-content: space-between; padding: 12px 0 0; margin-top: 8px; border-top: 1px solid var(--border); font-size: 16px; font-weight: 600;"><span>Net debit</span><span style="font-family: var(--font-mono); font-variant-numeric: tabular-nums;">$2,489.89</span></div>
+          </div>
+          <p style="margin: 24px 0 0; color: var(--text-tertiary); font-size: 12px;">Settlement reference 0x7a3c91 · 19 May 2026, 14:22 UTC</p>
+        </div>
+      </div>
+
+      <h3 class="sub">— Pitch deck</h3>
+      <div class="surface-strip">
+        <div class="head"><span>— Investor deck · Cover slide</span><span>1920 × 1080</span></div>
+        <div style="background: var(--surface-inverse); color: var(--text-inverse); padding: 48px 56px; display: flex; flex-direction: column; min-height: 380px;">
+          <div style="display: flex; justify-content: space-between; font-family: 'JetBrains Mono'; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(234,230,218,0.5);">
+            <span>01</span>
+            <span>EXASCALE · The Bloomberg of AI Compute</span>
+          </div>
+          <div style="margin: auto 0;">
+            <h2 style="font-family: 'Inter Tight'; font-weight: 700; font-size: 72px; line-height: 0.95; letter-spacing: -0.04em; margin: 0;">The <span style="background: var(--brand-accent); color: var(--text); padding: 0 0.06em;">commodity market</span><br/>for AI compute.</h2>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-family: 'JetBrains Mono'; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(234,230,218,0.5); padding-top: 12px; border-top: 1px solid rgba(234,230,218,0.18);">
+            <span>contact@exascale.com · Launch 2026</span><span>Page 01 of 13</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================
+         BOOK FOOT
+         ================================================= -->
+    <footer class="book-foot">
+      <div class="row">
+        <div>
+          <div class="mark"><span style="display:inline-block; width:14px; height:14px; background:var(--brand-accent); vertical-align:-2px; margin-right:8px;"></span>EXASCALE · Brand Book v0.1</div>
+          <p style="margin: 12px 0 0; color: rgba(234,230,218,0.5); font-family: var(--font-mono); font-size: 11px;">Directional draft. Cross-reference with prior brand book once received.</p>
+        </div>
+        <div style="text-align: right;">
+          <p style="margin: 0; color: rgba(234,230,218,0.5); font-family: var(--font-mono); font-size: 11px;">19 May 2026 · Internal · For review</p>
+          <p style="margin: 6px 0 0; color: rgba(234,230,218,0.5); font-family: var(--font-mono); font-size: 11px;">contact@exascale.com</p>
+        </div>
+      </div>
+    </footer>
+
+  </main>
+</div>
+
+<div class="section-badge" id="section-badge">— Section 00 / Cover</div>
+
+<script>
+  // Scrollspy: highlight active nav item + update badge
+  const sections = document.querySelectorAll('.content section, .content footer, .hero');
+  const navLinks = document.querySelectorAll('.sidebar nav a');
+  const badge = document.getElementById('section-badge');
+
+  const linkById = {};
+  navLinks.forEach(a => { linkById[a.getAttribute('href').slice(1)] = a; });
+
+  function setActive(id, label) {
+    navLinks.forEach(a => a.classList.remove('active'));
+    if (linkById[id]) linkById[id].classList.add('active');
+    if (label) badge.textContent = label;
+  }
+
+  const io = new IntersectionObserver((entries) => {
+    // pick the entry with the largest intersection ratio that is intersecting
+    let best = null;
+    for (const e of entries) {
+      if (e.isIntersecting && (!best || e.intersectionRatio > best.intersectionRatio)) best = e;
+    }
+    if (best) {
+      const id = best.target.id || 'hero';
+      const num = best.target.getAttribute('data-section') || '00';
+      const link = linkById[id];
+      const label = link ? link.querySelector('span:last-child').textContent : 'Cover';
+      setActive(id, `— Section ${num} / ${label}`);
+    }
+  }, { rootMargin: '-30% 0px -60% 0px', threshold: [0, 0.25, 0.5, 0.75, 1] });
+
+  sections.forEach(s => { if (s.id || s.classList.contains('hero')) io.observe(s); });
+</script>
+
+<script>
+  // Auto-print: wait for fonts + a tick to settle, then open the print dialog.
+  (async () => {
+    try {
+      if (document.fonts && document.fonts.ready) {
+        await document.fonts.ready;
+      }
+    } catch (e) { /* ignore */ }
+    // small extra buffer for any final layout / image decode
+    await new Promise(r => setTimeout(r, 500));
+    window.print();
+  })();
+</script>
+
+</body>
+</html>

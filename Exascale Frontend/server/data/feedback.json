@@ -1,0 +1,53 @@
+[
+  {
+    "id": "fb_1uupep5lmpk0nnn1",
+    "sessionId": "tour_test01",
+    "persona": "trader",
+    "stepId": "trader.markets.list",
+    "screen": "/markets",
+    "section": "Markets index",
+    "rating": 4,
+    "feedback": "the sparkline column should match the chart timeframe",
+    "ts": "2026-05-24T16:00:00Z",
+    "userAgent": "",
+    "receivedAt": "2026-05-24T16:53:15.757Z"
+  },
+  {
+    "id": "fb_n0qpc2uxmpk0npt2",
+    "sessionId": "tour_test01",
+    "persona": "lab",
+    "stepId": "lab.compute.list",
+    "screen": "/compute",
+    "section": "Compute instances",
+    "rating": 5,
+    "feedback": "",
+    "ts": "2026-05-24T16:53:18.566Z",
+    "userAgent": "",
+    "receivedAt": "2026-05-24T16:53:18.566Z"
+  },
+  {
+    "id": "fb_nvefat9hmpk192f6",
+    "sessionId": "tour_4mqigt8wmpk16leb",
+    "persona": "trader",
+    "stepId": "trader.portfolio",
+    "screen": "/portfolio",
+    "section": "Portfolio",
+    "rating": null,
+    "feedback": "tai",
+    "ts": "2026-05-24T17:09:55.292Z",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
+    "receivedAt": "2026-05-24T17:09:54.690Z"
+  },
+  {
+    "id": "fb_11dugw0pmpk1wbrt",
+    "sessionId": "tour_smoke",
+    "persona": "trader",
+    "stepId": "trader.signup",
+    "screen": "/signup",
+    "section": "Signup form",
+    "feedback": "works on signup page now",
+    "ts": "2026-05-24T17:27:59.897Z",
+    "userAgent": "",
+    "receivedAt": "2026-05-24T17:27:59.897Z"
+  }
+]

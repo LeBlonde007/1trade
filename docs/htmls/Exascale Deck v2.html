@@ -1,0 +1,888 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Exascale — Pitch Deck (v2)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<deck-stage data-hl="rough">
+
+<!-- ============================================================
+     SLIDE 01 — COVER
+     ============================================================ -->
+<section class="dark" data-screen-label="01 Cover">
+  <header class="topbar">
+    <div class="pageno">01</div>
+    <div class="brand-block">
+      <div class="brand-line"><span class="brand-name">EXASCALE</span> <span class="dot">·</span> <span class="tag">The Bloomberg of AI Compute</span></div>
+    </div>
+  </header>
+
+  <div class="main" style="gap: 56px;">
+    <div class="headline-block" style="padding-top: 24px;">
+      <h1 class="display small">
+        The <span class="hl">commodity market</span><br/>
+        for AI compute.<br/>
+        Real underlying. Real liquidity.
+      </h1>
+      <p class="tagline" style="max-width: 1040px;">
+        Tradeable credits backed by owned datacenter capacity. Spot, sub-credits, GPU credits, and a unified AI index. Built for traders, hedgers, and the AI engineering teams who consume the underlying.
+      </p>
+    </div>
+
+    <div class="pillar-row" style="margin-top: auto;">
+      <div class="pillar">
+        <div class="col-label"><span class="dash">—</span>Layer 1</div>
+        <div class="col-bar lime"></div>
+        <h4>Trading</h4>
+        <p>Order book · market maker · index</p>
+      </div>
+      <div class="pillar">
+        <div class="col-label"><span class="dash">—</span>Layer 2</div>
+        <div class="col-bar orange"></div>
+        <h4>Inference</h4>
+        <p>Curated SoTA models, multi-tenant per GPU</p>
+      </div>
+      <div class="pillar">
+        <div class="col-label"><span class="dash">—</span>Layer 3</div>
+        <div class="col-bar blue"></div>
+        <h4>Compute</h4>
+        <p>Owned datacenter — H100 / H200</p>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div class="divider"></div>
+    <div class="footrow">
+      <span><span class="contact-email">contact@exascale.com</span> · Launch 2026 · Page 01 of 13</span>
+      <span class="brand-name">Exascale</span>
+    </div>
+  </footer>
+</section>
+
+
+<!-- ============================================================
+     SLIDE 02 — THE PROBLEM
+     ============================================================ -->
+<section class="dark" data-screen-label="02 The Problem">
+  <header class="topbar">
+    <div class="pageno">02</div>
+    <div class="brand-block">
+      <div class="brand-line"><span class="brand-name">EXASCALE</span> <span class="dot">·</span> <span class="tag">The Bloomberg of AI Compute</span></div>
+      <div class="section-label">— The problem</div>
+    </div>
+  </header>
+
+  <div class="main" style="gap: 56px;">
+    <div class="headline-block">
+      <h1 class="display small">
+        The largest commodity<br/>
+        in the world<br/>
+        has <span class="hl">no market</span>.
+      </h1>
+      <p class="tagline">
+        AI compute is now a top-3 line item in every AI company's budget — and the only major commodity with no transparent price, no hedging mechanism, no tradeable instrument. Companies plan blind, CFOs guess at runway, and traders sit on the sidelines.
+      </p>
+    </div>
+
+    <div class="grid-3" style="gap: 72px;">
+      <div class="cell">
+        <div class="bignum">$200B+</div>
+        <p>Annual global GPU compute spend — the largest untraded commodity in the world.</p>
+      </div>
+      <div class="cell">
+        <div class="bignum">5&ndash;10<span style="font-size:0.65em">×</span></div>
+        <p>Spread between reserved and spot pricing — no market connects them.</p>
+      </div>
+      <div class="cell">
+        <div class="bignum">0</div>
+        <p>Functioning venues where AI compute trades as a tradeable asset class.</p>
+      </div>
+    </div>
+
+    <div style="margin-top: auto;">
+      <div class="divider-line" style="margin-bottom: 22px;"></div>
+      <p class="conclusion" style="font-size: 22px;">
+        Every other major commodity — oil, electricity, weather, even carbon — has tradeable markets. AI compute does not. <strong>Companies forecast blind. Traders have no venue.</strong> The infrastructure layer everyone depends on is the one with the least price discovery.
+      </p>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div class="divider"></div>
+    <div class="footrow">
+      <span><span class="contact-email">contact@exascale.com</span> · Launch 2026 · Page 02 of 13</span>
+      <span class="brand-name">Exascale</span>
+    </div>
+  </footer>
+</section>
+
+
+<!-- ============================================================
+     SLIDE 03 — THE SOLUTION
+     ============================================================ -->
+<section class="cream" data-screen-label="03 The Solution">
+  <header class="topbar">
+    <div class="pageno">03</div>
+    <div class="brand-block">
+      <div class="brand-line"><span class="brand-name">EXASCALE</span> <span class="dot">·</span> <span class="tag">The Bloomberg of AI Compute</span></div>
+      <div class="section-label">— The solution</div>
+    </div>
+  </header>
+
+  <div class="main" style="gap: 36px;">
+    <div class="headline-block">
+      <h1 class="display small">
+        A <span class="hl">commodity exchange</span><br/>
+        for AI compute.<br/>
+        Owned underlying for delivery.
+      </h1>
+      <p class="tagline">
+        Exascale runs the venue, publishes the index, and owns the datacenter capacity that makes settlement credible. Like CME for oil — but for compute.
+      </p>
+    </div>
+
+    <div class="solution-pillars">
+      <div class="row">
+        <div class="dot" style="background: var(--lime);"></div>
+        <h4>Two tradeable<br/>asset classes.</h4>
+        <p>AI credits (unified inference index, redeemable into text / speech / image / video sub-credits) and GPU credits (per tier — H100, H200, and growing). Each with its own order book.</p>
+      </div>
+      <div class="row">
+        <div class="dot" style="background: var(--orange);"></div>
+        <h4>Real underlying<br/>for credible settlement.</h4>
+        <p>We own datacenter capacity. Credits redeem into actual inference calls and actual GPU time. The market isn't synthetic — every credit can be converted to real compute.</p>
+      </div>
+      <div class="row">
+        <div class="dot" style="background: var(--blue);"></div>
+        <h4>Market-making and<br/>surveillance from day one.</h4>
+        <p>Exascale acts as internal market maker to seed liquidity. Trade surveillance, position limits, and index methodology audit built in from v1.</p>
+      </div>
+      <div class="row">
+        <div class="dot" style="background: var(--yellow);"></div>
+        <h4>Paper-trading customer-facing,<br/>real-money internal testing.</h4>
+        <p>We prove the market mechanic with paper trades while validating real-money economics in parallel. Customer-facing real-money trading in v1.5 once economics are validated.</p>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div class="divider"></div>
+    <div class="footrow">
+      <span><span class="contact-email">contact@exascale.com</span> · Launch 2026 · Page 03 of 13</span>
+      <span class="brand-name">Exascale</span>
+    </div>
+  </footer>
+</section>
+
+
+<!-- ============================================================
+     SLIDE 04 — THE ARCHITECTURE
+     ============================================================ -->
+<section class="dark" data-screen-label="04 Architecture">
+  <header class="topbar">
+    <div class="pageno">04</div>
+    <div class="brand-block">
+      <div class="brand-line"><span class="brand-name">EXASCALE</span> <span class="dot">·</span> <span class="tag">The Bloomberg of AI Compute</span></div>
+      <div class="section-label">— The architecture</div>
+    </div>
+  </header>
+
+  <div class="main" style="gap: 48px;">
+    <div class="headline-block">
+      <h1 class="display small">
+        Three integrated layers.<br/>
+        One <span class="hl">unified venue</span>.
+      </h1>
+      <p class="tagline">
+        Trading is the headline product. Inference and compute provide the credible underlying that makes credits redeemable for real value.
+      </p>
+    </div>
+
+    <div class="grid-3" style="margin-top: 16px;">
+      <div class="cell">
+        <div class="col-label" style="color: var(--lime);"><span class="dash">—</span>01</div>
+        <div class="col-bar lime"></div>
+        <h3>Trading Layer</h3>
+        <p style="font-weight:500; opacity:0.85;">Order book, market maker, index, ledger.</p>
+        <p>Two asset classes: AI credits (unified index + sub-credits) and GPU credits (per tier). Paper trading v1, real-money internal testing. Maker-taker fees, volume-tiered.</p>
+      </div>
+      <div class="cell">
+        <div class="col-label" style="color: var(--orange);"><span class="dash">—</span>02</div>
+        <div class="col-bar orange"></div>
+        <h3>Inference Layer</h3>
+        <p style="font-weight:500; opacity:0.85;">Curated SoTA model catalog.</p>
+        <p>Top 3–5 OSS models per category — text, speech, image, video, niche. Multi-tenant per GPU. Quarterly catalog refresh. OpenAI-compatible API.</p>
+      </div>
+      <div class="cell">
+        <div class="col-label" style="color: var(--blue);"><span class="dash">—</span>03</div>
+        <div class="col-bar blue"></div>
+        <h3>Compute Layer</h3>
+        <p style="font-weight:500; opacity:0.85;">Owned datacenter (not hyperscale yet).</p>
+        <p>H100 and H200 capacity. No B200 / B300 yet — we build up to hyperscale as the market grows. Capital-light by design.</p>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div class="divider"></div>
+    <div class="footrow">
+      <span><span class="contact-email">contact@exascale.com</span> · Launch 2026 · Page 04 of 13</span>
+      <span class="brand-name">Exascale</span>
+    </div>
+  </footer>
+</section>
+
+
+<!-- ============================================================
+     SLIDE 05 — CREDIT ARCHITECTURE
+     ============================================================ -->
+<section class="cream" data-screen-label="05 Credit Architecture">
+  <header class="topbar">
+    <div class="pageno">05</div>
+    <div class="brand-block">
+      <div class="brand-line"><span class="brand-name">EXASCALE</span> <span class="dot">·</span> <span class="tag">The Bloomberg of AI Compute</span></div>
+      <div class="section-label">— The credit architecture</div>
+    </div>
+  </header>
+
+  <div class="main" style="gap: 32px;">
+    <div class="headline-block">
+      <h1 class="display tiny" style="font-size: 88px;">
+        <span class="hl">One unified index</span>.<br/>
+        Five sub-credits. Two asset classes.
+      </h1>
+      <p class="tagline">
+        The unified AI index is the headline tradeable asset. Sub-credits provide redemption optionality. GPU credits trade separately as raw capacity. This structure is what makes the market liquid.
+      </p>
+    </div>
+
+    <div class="credit-arch">
+      <div class="ca-col">
+        <div class="ca-label">— AI Credits</div>
+        <div class="ca-sub">The inference market</div>
+        <h3>Unified Index</h3>
+        <div class="ca-headline">Headline tradeable asset · $1 = N AI credits (published daily)</div>
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; opacity: 0.55; margin: 6px 0 8px;">Redeemable into</div>
+        <ul>
+          <li><strong>Text credits</strong> → LLM tokens</li>
+          <li><strong>Speech credits</strong> → STT / TTS minutes</li>
+          <li><strong>Image credits</strong> → generations</li>
+          <li><strong>Video credits</strong> → seconds generated</li>
+          <li><strong>Niche credits</strong> → embeddings, rerankers</li>
+        </ul>
+        <div class="ca-foot">Settles: physical (inference delivery) or cash.</div>
+      </div>
+
+      <div class="divider-col"></div>
+
+      <div class="ca-col">
+        <div class="ca-label">— GPU Credits</div>
+        <div class="ca-sub">The raw compute market</div>
+        <h3>Per-Tier Markets</h3>
+        <div class="ca-headline">Separate asset class · One order book per tier</div>
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; opacity: 0.55; margin: 6px 0 8px;">Tiers</div>
+        <ul>
+          <li><strong>H100 80GB</strong> credits</li>
+          <li><strong>H200</strong> credits</li>
+          <li class="dim"><strong>B200</strong> credits &nbsp;<span style="opacity:0.6">[v2]</span></li>
+          <li class="dim"><strong>B300</strong> credits &nbsp;<span style="opacity:0.6">[v2]</span></li>
+        </ul>
+        <div class="ca-foot">Settles: physical (GPU time) or cash. Used for training, fine-tuning, custom workloads.</div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div class="divider"></div>
+    <div class="footrow">
+      <span><span class="contact-email">contact@exascale.com</span> · Launch 2026 · Page 05 of 13</span>
+      <span class="brand-name">Exascale</span>
+    </div>
+  </footer>
+</section>
+
+
+<!-- ============================================================
+     SLIDE 06 — MARKET PARTICIPANTS
+     ============================================================ -->
+<section class="dark" data-screen-label="06 Who Trades">
+  <header class="topbar">
+    <div class="pageno">06</div>
+    <div class="brand-block">
+      <div class="brand-line"><span class="brand-name">EXASCALE</span> <span class="dot">·</span> <span class="tag">The Bloomberg of AI Compute</span></div>
+      <div class="section-label">— Who trades</div>
+    </div>
+  </header>
+
+  <div class="main" style="gap: 48px;">
+    <div class="headline-block">
+      <h1 class="display small">
+        <span class="hl">Traders first</span>.<br/>
+        Hedgers second.
+      </h1>
+      <p class="tagline">
+        Three participant roles — buyers, sellers, market makers. Our primary customer is the trader treating AI compute as a new commodity asset class. AI engineering teams come along as hedgers buying credits ahead.
+      </p>
+    </div>
+
+    <div class="grid-3" style="margin-top: 16px;">
+      <div class="cell">
+        <div class="col-label" style="color: var(--lime);"><span class="dash">—</span>Primary ICP</div>
+        <div class="col-bar lime"></div>
+        <h3>The Trader</h3>
+        <p>Prop trading firms, commodity hedge funds, crypto market makers, quant funds with AI thesis, AI-specific prop desks.</p>
+        <p style="font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.06em; opacity: 0.65; margin-top: 8px;">~30–100 firms globally with this mandate</p>
+      </div>
+      <div class="cell">
+        <div class="col-label" style="color: var(--orange);"><span class="dash">—</span>Secondary ICP</div>
+        <div class="col-bar orange"></div>
+        <h3>The Hedger</h3>
+        <p>AI startups, frontier-adjacent labs, financial-services AI teams. Buy credits ahead for predictable spend; redeem against actual usage.</p>
+        <p style="font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.06em; opacity: 0.65; margin-top: 8px;">~10,000+ AI companies with meaningful compute spend</p>
+      </div>
+      <div class="cell">
+        <div class="col-label" style="color: var(--blue);"><span class="dash">—</span>Tertiary (Supply)</div>
+        <div class="col-bar blue"></div>
+        <h3>The Supplier</h3>
+        <p>Exascale's own datacenter v1. Third-party neoclouds v2. Enterprises with idle reserved hours v3.</p>
+        <p style="font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.06em; opacity: 0.65; margin-top: 8px;">Multi-vendor supply onboarded as market matures</p>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div class="divider"></div>
+    <div class="footrow">
+      <span><span class="contact-email">contact@exascale.com</span> · Launch 2026 · Page 06 of 13</span>
+      <span class="brand-name">Exascale</span>
+    </div>
+  </footer>
+</section>
+
+
+<!-- ============================================================
+     SLIDE 07 — MARKET SIZE
+     ============================================================ -->
+<section class="cream" data-screen-label="07 Market Size">
+  <header class="topbar">
+    <div class="pageno">07</div>
+    <div class="brand-block">
+      <div class="brand-line"><span class="brand-name">EXASCALE</span> <span class="dot">·</span> <span class="tag">The Bloomberg of AI Compute</span></div>
+      <div class="section-label">— Market size</div>
+    </div>
+  </header>
+
+  <div class="main" style="gap: 40px;">
+    <div class="headline-block">
+      <h1 class="display small">
+        The largest commodity<br/>
+        <span class="hl">without a market</span>.
+      </h1>
+      <p class="tagline">
+        If 1% of global AI compute spend trades through our venue at our fee schedule, the venue alone is a $200M+ revenue business — before any consumption revenue from the underlying.
+      </p>
+    </div>
+
+    <div class="tam-row">
+      <div class="tam">
+        <div class="col-label"><span class="dash">—</span>TAM</div>
+        <div class="sub">Total Addressable</div>
+        <div class="num">$200B+</div>
+        <p class="desc">Global annual AI compute spend (hyperscalers + neoclouds + enterprise).</p>
+      </div>
+      <div class="tam">
+        <div class="col-label"><span class="dash">—</span>SAM</div>
+        <div class="sub">Serviceable Addressable</div>
+        <div class="num">$50B</div>
+        <p class="desc">Compute spend among customers structurally inclined to hedge or trade — frontier-adjacent labs, mid-market AI, financial-services AI.</p>
+      </div>
+      <div class="tam">
+        <div class="col-label"><span class="dash">—</span>SOM</div>
+        <div class="sub">Year-4 Target</div>
+        <div class="num">$30M+</div>
+        <p class="desc">Combined ARR from trading fees + consumption + index licensing.</p>
+      </div>
+    </div>
+
+    <div style="margin-top: auto;">
+      <div class="divider-line" style="margin-bottom: 22px;"></div>
+      <ul class="tick-list" style="display:grid; grid-template-columns: repeat(3, 1fr); gap: 32px;">
+        <li>The trading-venue mechanic is capital-light. CME doesn't own oil refineries. We don't need to own hyperscale capacity.</li>
+        <li>Carbon markets formed in ~5 years, growing from concept to $850B annual volume. AI compute has more obvious commodity properties.</li>
+        <li>Hyperscalers structurally cannot offer tradeable credits — breaks their enterprise sales model. The window is open.</li>
+      </ul>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div class="divider"></div>
+    <div class="footrow">
+      <span><span class="contact-email">contact@exascale.com</span> · Launch 2026 · Page 07 of 13</span>
+      <span class="brand-name">Exascale</span>
+    </div>
+  </footer>
+</section>
+
+
+<!-- ============================================================
+     SLIDE 08 — TEAM & PARTNERS
+     ============================================================ -->
+<section class="cream" data-screen-label="08 Team & Partners">
+  <header class="topbar">
+    <div class="pageno">08</div>
+    <div class="brand-block">
+      <div class="brand-line"><span class="brand-name">EXASCALE</span> <span class="dot">·</span> <span class="tag">The Bloomberg of AI Compute</span></div>
+      <div class="section-label">— Team &amp; partners</div>
+    </div>
+  </header>
+
+  <div class="main" style="gap: 24px;">
+    <div class="headline-block">
+      <h1 class="display tiny" style="font-size: 76px;">
+        Frontier-lab engineering.<br/>
+        Financial-services anchor.<br/>
+        <span class="hl">Building now</span>.
+      </h1>
+      <p class="tagline">
+        The right team for a credit-market venue: senior AI infrastructure engineers, financial-services partnerships, and active build with internal MVP in development.
+      </p>
+    </div>
+
+    <div class="partner-grid">
+      <div class="pcard">
+        <div class="status-pill"><span class="dot" style="background: var(--lime);"></span>Strategic anchor</div>
+        <h5>UBS Japan — COO</h5>
+        <p>Executive sponsor and strategic advisor. Opens financial-services AI segment, Japanese banking distribution, and credibility with institutional traders.</p>
+      </div>
+      <div class="pcard">
+        <div class="status-pill"><span class="dot" style="background: var(--lime);"></span>Engineering team</div>
+        <h5>Senior frontier-lab engineering</h5>
+        <p>Engineers from Anthropic (×2), OpenAI (×1), Google DeepMind (×1). Plus banking-systems experience for trading-engine work.</p>
+      </div>
+      <div class="pcard">
+        <div class="status-pill"><span class="dot" style="background: var(--yellow);"></span>Building now</div>
+        <h5>Internal MVP in active development</h5>
+        <p>Customer-facing v1 launch in 6 months. Trading engine in early build. SOC 2 Type I in same window. Real-money testing in parallel with paper-trading customer launch.</p>
+      </div>
+      <div class="pcard">
+        <div class="status-pill"><span class="dot" style="background: var(--blue);"></span>Owned underlying</div>
+        <h5>Datacenter with H100 / H200</h5>
+        <p>Owned datacenter capacity online. Not hyperscale — we don't yet own B200 / B300. Capacity scales as market demands; capital-light approach.</p>
+      </div>
+    </div>
+
+    <div class="kpi-strip" style="margin-top: auto;">
+      <div>
+        <div class="kpi-num">H100 / H200</div>
+        <div class="kpi-lbl">GPU tiers operational</div>
+      </div>
+      <div>
+        <div class="kpi-num">4+</div>
+        <div class="kpi-lbl">Frontier-lab engineers committed</div>
+      </div>
+      <div>
+        <div class="kpi-num">6 mo</div>
+        <div class="kpi-lbl">To customer-facing v1</div>
+      </div>
+      <div>
+        <div class="kpi-num">2</div>
+        <div class="kpi-lbl">Asset classes — AI credits + GPU credits</div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div class="divider"></div>
+    <div class="footrow">
+      <span><span class="contact-email">contact@exascale.com</span> · Launch 2026 · Page 08 of 13</span>
+      <span class="brand-name">Exascale</span>
+    </div>
+  </footer>
+</section>
+
+
+<!-- ============================================================
+     SLIDE 09 — COMPETITION
+     ============================================================ -->
+<section class="dark" data-screen-label="09 Competition">
+  <header class="topbar">
+    <div class="pageno">09</div>
+    <div class="brand-block">
+      <div class="brand-line"><span class="brand-name">EXASCALE</span> <span class="dot">·</span> <span class="tag">The Bloomberg of AI Compute</span></div>
+      <div class="section-label">— Competition</div>
+    </div>
+  </header>
+
+  <div class="main" style="gap: 32px;">
+    <div class="headline-block">
+      <h1 class="display tiny">
+        A category <span class="hl">nobody else</span> is in.
+      </h1>
+      <p class="tagline">Every other player sells compute. We trade it. The closest analogues are CME and Coinbase, not CoreWeave or Together.</p>
+    </div>
+
+    <table class="comp-table" style="margin-top: 0;">
+      <thead>
+        <tr>
+          <th>Capability</th>
+          <th>AWS / Azure</th>
+          <th>CoreWeave</th>
+          <th>Lambda</th>
+          <th>Together</th>
+          <th>Groq</th>
+          <th class="brand-col"><span class="brand-name">Exascale</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Owned compute capacity</td>
+          <td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="partial">~</td><td class="check">✓</td>
+          <td class="brand-col check">✓ <span style="font-size:12px; opacity:0.7; font-weight:400;">(modest)</span></td>
+        </tr>
+        <tr>
+          <td>Managed inference catalog</td>
+          <td class="check">✓</td><td class="x">✗</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td>
+          <td class="brand-col check">✓ <span style="font-size:12px; opacity:0.7; font-weight:400;">(curated)</span></td>
+        </tr>
+        <tr>
+          <td>Tradeable compute credits</td>
+          <td class="x">✗</td><td class="x">✗</td><td class="x">✗</td><td class="x">✗</td><td class="x">✗</td>
+          <td class="brand-col check">✓</td>
+        </tr>
+        <tr>
+          <td>Published reference index</td>
+          <td class="x">✗</td><td class="x">✗</td><td class="x">✗</td><td class="x">✗</td><td class="x">✗</td>
+          <td class="brand-col check">✓</td>
+        </tr>
+        <tr>
+          <td>Order book + market maker</td>
+          <td class="x">✗</td><td class="x">✗</td><td class="x">✗</td><td class="x">✗</td><td class="x">✗</td>
+          <td class="brand-col check">✓</td>
+        </tr>
+        <tr>
+          <td>Forward contracts / hedging</td>
+          <td class="x">✗</td><td class="x">✗</td><td class="x">✗</td><td class="x">✗</td><td class="x">✗</td>
+          <td class="brand-col check">✓ <span style="font-size:12px; opacity:0.7; font-weight:400;">(v1.5)</span></td>
+        </tr>
+        <tr>
+          <td>Trading surveillance</td>
+          <td class="x">✗</td><td class="x">✗</td><td class="x">✗</td><td class="x">✗</td><td class="x">✗</td>
+          <td class="brand-col check">✓</td>
+        </tr>
+        <tr>
+          <td>Multi-currency (USD + JPY)</td>
+          <td class="check">✓</td><td class="x">✗</td><td class="x">✗</td><td class="x">✗</td><td class="x">✗</td>
+          <td class="brand-col check">✓</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <footer class="footer">
+    <div class="divider"></div>
+    <div class="footrow">
+      <span><span class="contact-email">contact@exascale.com</span> · Launch 2026 · Page 09 of 13</span>
+      <span class="brand-name">Exascale</span>
+    </div>
+  </footer>
+</section>
+
+
+<!-- ============================================================
+     SLIDE 10 — REVENUE MODEL
+     ============================================================ -->
+<section class="cream" data-screen-label="10 Revenue Model">
+  <header class="topbar">
+    <div class="pageno">10</div>
+    <div class="brand-block">
+      <div class="brand-line"><span class="brand-name">EXASCALE</span> <span class="dot">·</span> <span class="tag">The Bloomberg of AI Compute</span></div>
+      <div class="section-label">— Revenue model</div>
+    </div>
+  </header>
+
+  <div class="main" style="gap: 32px;">
+    <div class="headline-block">
+      <h1 class="display small">
+        <span class="hl">Trading fees</span> as headline.<br/>
+        Consumption as anchor.
+      </h1>
+      <p class="tagline">
+        Four revenue streams. Trading fees scale with venue volume; consumption revenue scales with credit redemption; index licensing scales with market maturity; spread on Exascale market-making at scale.
+      </p>
+    </div>
+
+    <div class="grid-4" style="gap: 32px;">
+      <div class="cell">
+        <div class="col-label" style="color: var(--text-on-light);"><span class="dash">—</span>Primary</div>
+        <div class="col-bar lime"></div>
+        <h3 style="font-size: 28px;">Trading Fees</h3>
+        <p>Maker-taker volume-tiered. Starts 1% taker / 0.5% maker. Drops to 0.1% / 0% at $1B+ volume. Coinbase-pattern.</p>
+      </div>
+      <div class="cell">
+        <div class="col-label" style="color: var(--orange);"><span class="dash">—</span>Secondary</div>
+        <div class="col-bar orange"></div>
+        <h3 style="font-size: 28px;">Consumption<br/>Revenue</h3>
+        <p>GPU rental at competitive rates, inference at OpenAI-compatible per-token pricing. Customers pay with credits or cash.</p>
+      </div>
+      <div class="cell">
+        <div class="col-label" style="color: var(--blue);"><span class="dash">—</span>Tertiary</div>
+        <div class="col-bar blue"></div>
+        <h3 style="font-size: 28px;">Index<br/>Licensing</h3>
+        <p>Subscription access to detailed market data, historical prints, constituent transparency. Bloomberg-style.</p>
+      </div>
+      <div class="cell">
+        <div class="col-label" style="color: #c89a1f;"><span class="dash">—</span>Quaternary</div>
+        <div class="col-bar yellow"></div>
+        <h3 style="font-size: 28px;">Market-Maker<br/>Spread</h3>
+        <p>Exascale-as-market-maker earns spread between bid and ask. Sandbox v1; real-money meaningful at scale.</p>
+      </div>
+    </div>
+
+    <div class="fee-schedule" style="margin-top: auto;">
+      <div class="lbl">— Maker-taker fee schedule &nbsp;·&nbsp; taker / maker</div>
+      <div class="rows">
+        <div class="tier"><span class="vol">$0–10K</span><span class="rate">1.00 / 0.50<span style="opacity:0.5">%</span></span></div>
+        <div class="tier"><span class="vol">$10K–100K</span><span class="rate">0.80 / 0.40<span style="opacity:0.5">%</span></span></div>
+        <div class="tier"><span class="vol">$100K–1M</span><span class="rate">0.60 / 0.30<span style="opacity:0.5">%</span></span></div>
+        <div class="tier"><span class="vol">$1M–10M</span><span class="rate">0.40 / 0.20<span style="opacity:0.5">%</span></span></div>
+        <div class="tier"><span class="vol">$10M–100M</span><span class="rate">0.20 / 0.10<span style="opacity:0.5">%</span></span></div>
+        <div class="tier"><span class="vol">$100M–1B</span><span class="rate">0.15 / 0.05<span style="opacity:0.5">%</span></span></div>
+        <div class="tier"><span class="vol">$1B+</span><span class="rate">0.10 / 0.00<span style="opacity:0.5">%</span></span></div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div class="divider"></div>
+    <div class="footrow">
+      <span><span class="contact-email">contact@exascale.com</span> · Launch 2026 · Page 10 of 13</span>
+      <span class="brand-name">Exascale</span>
+    </div>
+  </footer>
+</section>
+
+
+<!-- ============================================================
+     SLIDE 11 — FINANCIAL PROJECTIONS
+     ============================================================ -->
+<section class="dark" data-screen-label="11 Projections">
+  <header class="topbar">
+    <div class="pageno">11</div>
+    <div class="brand-block">
+      <div class="brand-line"><span class="brand-name">EXASCALE</span> <span class="dot">·</span> <span class="tag">The Bloomberg of AI Compute</span></div>
+      <div class="section-label">— Projections</div>
+    </div>
+  </header>
+
+  <div class="main" style="gap: 32px;">
+    <div class="headline-block">
+      <h1 class="display small">
+        $300K MRR at Month 6.<br/>
+        $30M+ ARR by <span class="hl">Year 4</span>.
+      </h1>
+    </div>
+
+    <table class="proj-table">
+      <thead>
+        <tr>
+          <th>Period</th>
+          <th>Stage</th>
+          <th>Trading Vol</th>
+          <th>Active Traders</th>
+          <th>MRR / ARR</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Month 3</td><td>Alpha</td><td>$50K/day paper</td><td>15</td><td>—</td></tr>
+        <tr><td>Month 6</td><td>GA</td><td>$1M/day paper + $100K/day internal real-money</td><td>75</td><td>$300K MRR</td></tr>
+        <tr><td>Year 1</td><td>Scale</td><td>$10M+/day real-money</td><td>500+</td><td>$5M+ ARR</td></tr>
+        <tr><td>Year 2</td><td>Expansion</td><td>$100M+/day</td><td>2,000+</td><td>$15M+ ARR</td></tr>
+        <tr><td>Year 4</td><td>Maturity</td><td>$1B+/day</td><td>10,000+</td><td>$30M+ ARR</td></tr>
+      </tbody>
+    </table>
+
+    <div class="grid-2" style="margin-top: auto; gap: 32px;">
+      <div class="callout">
+        <div class="label">— Month 6 · GA milestone</div>
+        <div class="big lime">$300K MRR</div>
+        <div class="desc">75 active traders on paper + internal real-money. 300+ hedger customers. Index publishing daily. SOC 2 Type I achieved.</div>
+      </div>
+      <div class="callout">
+        <div class="label">— Year 4 · Diversified revenue</div>
+        <div class="big lime">$30M+ ARR</div>
+        <div class="desc">Trading fees (50%) + Consumption (35%) + Index licensing (10%) + Spread (5%). Three asset classes trading. Multi-region operations.</div>
+      </div>
+    </div>
+
+    <div class="footnote">* Trading volumes during paper-trading phase represent venue activity, not financial volume. Real-money trading customer-facing in v1.5.</div>
+  </div>
+
+  <footer class="footer">
+    <div class="divider"></div>
+    <div class="footrow">
+      <span><span class="contact-email">contact@exascale.com</span> · Launch 2026 · Page 11 of 13</span>
+      <span class="brand-name">Exascale</span>
+    </div>
+  </footer>
+</section>
+
+
+<!-- ============================================================
+     SLIDE 12 — RISK & COMPLIANCE
+     ============================================================ -->
+<section class="dark" data-screen-label="12 Risk & Compliance">
+  <header class="topbar">
+    <div class="pageno">12</div>
+    <div class="brand-block">
+      <div class="brand-line"><span class="brand-name">EXASCALE</span> <span class="dot">·</span> <span class="tag">The Bloomberg of AI Compute</span></div>
+      <div class="section-label">— Risk &amp; compliance</div>
+    </div>
+  </header>
+
+  <div class="main" style="gap: 40px;">
+    <div class="headline-block">
+      <h1 class="display small">
+        Built for traders.<br/>
+        Architected <span class="hl">for regulators</span>.
+      </h1>
+      <p class="tagline">
+        A trading venue earns trust through structural integrity. Index methodology, surveillance, KYC, and compliance are not features — they are the product.
+      </p>
+    </div>
+
+    <div class="compliance-grid">
+      <div class="ccard">
+        <div class="pill"><span class="dot" style="background: var(--lime);"></span>Audited externally</div>
+        <h5>Index methodology</h5>
+        <p>Public methodology document; trimmed mean; volume floors; constituent transparency; cryptographic audit chain.</p>
+      </div>
+      <div class="ccard">
+        <div class="pill"><span class="dot" style="background: var(--yellow);"></span>Rule-based v1, ML v2</div>
+        <h5>Trade surveillance</h5>
+        <p>Wash trades, spoofing, layering, marking-the-close all detected from day one. Human-review workflow.</p>
+      </div>
+      <div class="ccard">
+        <div class="pill"><span class="dot" style="background: var(--lime);"></span>Light → full as activity scales</div>
+        <h5>KYC tiered by activity</h5>
+        <p>Light KYC for paper trading; full KYC for real-money; institutional onboarding for high-volume accounts.</p>
+      </div>
+      <div class="ccard">
+        <div class="pill"><span class="dot" style="background: var(--lime);"></span>Credits as prepaid services</div>
+        <h5>Conservative legal posture</h5>
+        <p>AI credits and GPU credits framed as prepaid service units, not securities. Counsel engaged. Jurisdiction strategy under review.</p>
+      </div>
+      <div class="ccard">
+        <div class="pill"><span class="dot" style="background: var(--yellow);"></span>Type I year one</div>
+        <h5>SOC 2 path</h5>
+        <p>SOC 2 Type I in v1 (months 0–6). Type II in v1.5. Vanta automation. Audit-grade everything from day one.</p>
+      </div>
+      <div class="ccard">
+        <div class="pill"><span class="dot" style="background: var(--blue);"></span>Internal accounts segregated</div>
+        <h5>Real-money isolation</h5>
+        <p>Real-money testing accounts strictly separated from customer paper trading. Daily reconciliation. Quarterly internal audit.</p>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div class="divider"></div>
+    <div class="footrow">
+      <span><span class="contact-email">contact@exascale.com</span> · Launch 2026 · Page 12 of 13</span>
+      <span class="brand-name">Exascale</span>
+    </div>
+  </footer>
+</section>
+
+
+<!-- ============================================================
+     SLIDE 13 — THE PATH FORWARD
+     ============================================================ -->
+<section class="cream" data-screen-label="13 The Path Forward">
+  <header class="topbar">
+    <div class="pageno">13</div>
+    <div class="brand-block">
+      <div class="brand-line"><span class="brand-name">EXASCALE</span> <span class="dot">·</span> <span class="tag">The Bloomberg of AI Compute</span></div>
+      <div class="section-label">— The path forward</div>
+    </div>
+  </header>
+
+  <div class="main" style="gap: 32px;">
+    <div class="headline-block">
+      <h1 class="display smaller" style="font-size: 112px;">
+        Be part of building<br/>
+        the <span class="hl">Bloomberg</span><br/>
+        of AI compute.
+      </h1>
+      <p class="pullquote" style="font-size: 30px;">
+        AI compute is the largest commodity in the world without a tradeable market. We're building the venue, publishing the index, and providing the credible underlying that makes settlement real. Like CME for oil — but for the asset class that powers everything else.
+      </p>
+    </div>
+
+    <div class="exit-cols" style="margin-top: 8px;">
+      <div class="exit">
+        <div class="col-label" style="margin-bottom: 14px;"><span class="dash">—</span>Scenario 01</div>
+        <h5>Independent exchange</h5>
+        <p>Reach the CME / NYMEX / Coinbase trajectory as the reference venue for AI compute. Public listing once trading volumes mature.</p>
+      </div>
+      <div class="exit">
+        <div class="col-label" style="margin-bottom: 14px;"><span class="dash">—</span>Scenario 02</div>
+        <h5>Strategic acquisition</h5>
+        <p>Acquisition by an existing financial exchange (CME, ICE, Cboe) wanting to enter AI commodities, or by a hyperscaler wanting credit products they can't build.</p>
+      </div>
+      <div class="exit">
+        <div class="col-label" style="margin-bottom: 14px;"><span class="dash">—</span>Scenario 03</div>
+        <h5>Index licensing dominance</h5>
+        <p>Become the reference benchmark — the price of AI as quotable as the price of oil. Index licensing as the dominant revenue line.</p>
+      </div>
+    </div>
+
+    <div class="closing-row" style="margin-top: auto;">
+      <div class="item">
+        <div class="label">— Anchor partner</div>
+        <div class="val">UBS Japan</div>
+      </div>
+      <div class="item">
+        <div class="label">— Engineering</div>
+        <div class="val">Ex-Anthropic / OpenAI / DeepMind</div>
+      </div>
+      <div class="item">
+        <div class="label">— Contact</div>
+        <div class="val contact-email">contact@exascale.com</div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div class="divider"></div>
+    <div class="footrow">
+      <span><span class="contact-email">contact@exascale.com</span> · Launch 2026 · Page 13 of 13</span>
+      <span class="brand-name">Exascale</span>
+    </div>
+  </footer>
+</section>
+
+</deck-stage>
+
+<!-- Tweaks panel mount point -->
+<div id="tweaks-root"></div>
+
+<!-- Deck stage shell -->
+<script src="deck-stage.js"></script>
+
+<!-- React + Babel for tweaks panel -->
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="tweaks-app.jsx"></script>
+
+</body>
+</html>
