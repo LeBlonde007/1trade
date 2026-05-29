@@ -253,7 +253,7 @@ components:
         name:      { type: string }
         kind:      { type: string, enum: [individual, org] }
         is_paper:  { type: boolean }
-        created_at:{ type: string, format: date-time }
+        created_at: { type: string, format: date-time }
     User:
       type: object
       properties:
