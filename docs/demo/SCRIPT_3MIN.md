@@ -16,7 +16,7 @@ AI compute is the most valuable commodity on earth — and the hardest to buy. T
 price for an H100-hour, no order book, no way to hedge a budget. Every commodity that became liquid
 — oil, electricity, currencies — made a fortune for whoever built the marketplace. Compute is the
 last one without one. Exascale is the world's first exchange and platform for AI and GPU compute —
-and it's already earning revenue.
+and the platform that powers it is live today.
 
 **(0:24 — Inference)**
 It starts with inference. An AI startup connects to our platform — one API endpoint — and runs a
@@ -50,14 +50,17 @@ maker, and a published price index. Standardized credits for tokens, images, and
 get exposure to compute prices the way they trade oil or currencies — and that liquidity makes the
 price honest for everyone.
 
-**(2:36 — Why now + traction)**
+**(2:36 — Why now + trajectory)**
 Why now? Demand has outrun supply, hundreds of datacenters have capacity and no buyers, and the
-clearing stack is finally commodity software. And this isn't a deck — it's running software: a
-full product, a live platform, a verified financial core.
+clearing stack is finally commodity software. And this isn't a deck — it's running software: a full
+product, a live platform, a verified financial core. The platform turns revenue on the moment
+customers consume — and it's the on-ramp to a market we're driving toward a hundred million in
+annual revenue and a hundred billion in compute traded.
 
 **(2:54 — Ask + close)**
 We're raising to take the platform to general availability, sign our first datacenters and AI
-customers, and open the market. Exascale — the commodity market for AI compute.
+customers, and scale toward that hundred-million-ARR, hundred-billion-volume market. Exascale —
+the commodity market for AI compute.
 
 ---
 
@@ -72,7 +75,7 @@ customers, and open the market. Exascale — the commodity market for AI compute
 | 1:32 | "For enterprises, that becomes control…" | `/enterprise/billing` (burn meter / MTD / projected) → `/enterprise/teams` (budgets) → `/enterprise/sso` | Let the burn meter animate |
 | 1:52 | "Supply comes from our own datacenter…" | `/datacenter` dashboard (capacity, fill rate, settlements) → `/datacenter/register` | KPI strip animating |
 | 2:12 | "Which is what powers the market." | `/trade` (candles tick, order book flickers, tape rolls) → `/markets` → `/portfolio` (P&L vs index) | The Bloomberg-density money shot; let data move |
-| 2:36 | "Why now? Demand has outrun supply…" | Montage: a rising token-volume chart → the running app → a terminal/STATUS view showing the deployed service + green tests | "Running software, not a deck" — flash real proof |
+| 2:36 | "Why now? Demand has outrun supply…" | Montage: a rising token-volume chart → the running app → a terminal showing the deployed service + green tests → a trajectory slide ("$100M ARR · $100B GMV — target") | "Running software, not a deck" → then the trajectory; label the numbers **target** |
 | 2:54 | "We're raising to take the platform…" | Brand-mark end card | Hold ~3s over soft ambient track |
 
 **End card:**
@@ -95,8 +98,11 @@ exascale.com · raising [round]
   move). Record at **1440px**. Dark theme for the product/trade screens, light for enterprise admin.
 - **Easiest capture route:** drive the persona tour at `/onboarding/tour` (AI Company → Datacenter
   → Trader) — it sequences most of these screens for you.
-- **Numbers:** the VO intentionally avoids hard figures (no TAM/%, etc.) so nothing needs a
-  disclaimer. If you add any on-screen number, treat it as illustrative until confirmed.
+- **Numbers / revenue framing:** the only figures in the VO are the **$100M ARR** and **$100B GMV
+  (trading volume)** — say them as **forward-looking targets**, not current results. We're pre-revenue
+  today; the framing is "the platform is live and turns on revenue as customers consume, and it's
+  the on-ramp to" those targets. On screen, label them **"target" / "projection"** (never a current
+  KPI). Everything else in the VO avoids hard figures.
 - **Two assets from one script:** this VO also makes a clean ~3-min audio-only overview for
   warm-intro emails.
 - **Music:** one restrained ambient/tech bed, low under VO, slight lift at 2:12 (the exchange) and
