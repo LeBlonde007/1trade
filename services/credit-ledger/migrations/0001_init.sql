@@ -12,8 +12,11 @@ CREATE TABLE IF NOT EXISTS credit_balances (
     balance         NUMERIC(20,6) NOT NULL DEFAULT 0 CHECK (balance >= 0),
     locked_amount   NUMERIC(20,6) NOT NULL DEFAULT 0 CHECK (locked_amount >= 0),
     is_paper        BOOLEAN NOT NULL,
+    last_chain_hash TEXT NOT NULL DEFAULT '',   -- tip of this balance's per-balance hash chain
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE (tenant_id, sub_account_id, credit_type, is_paper)
+    -- NULLS NOT DISTINCT (PG15+): a NULL sub_account_id still dedupes. Without it Postgres treats
+    -- NULLs as distinct, so every no-sub-account movement would create a NEW balance row.
+    UNIQUE NULLS NOT DISTINCT (tenant_id, sub_account_id, credit_type, is_paper)
 );
 
 -- Append-only transaction log. amount is the SIGNED delta. chain_hash extends the audit chain.
@@ -37,7 +40,9 @@ CREATE TABLE IF NOT EXISTS credit_transactions (
 
 CREATE INDEX IF NOT EXISTS idx_credit_tx_tenant_time ON credit_transactions (tenant_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_credit_tx_ref         ON credit_transactions (reference_id);
-CREATE UNIQUE INDEX IF NOT EXISTS uq_credit_tx_idem  ON credit_transactions (operation, idempotency_key)
+-- Idempotency is PER TENANT: a tenant's key must not collide with another tenant's. (A global
+-- (operation, key) unique would let tenant B receive tenant A's transaction on a shared key.)
+CREATE UNIQUE INDEX IF NOT EXISTS uq_credit_tx_idem  ON credit_transactions (tenant_id, operation, idempotency_key)
     WHERE idempotency_key IS NOT NULL;
 
 -- Append-only guard: block UPDATE/DELETE on the transaction log at the DB layer.
