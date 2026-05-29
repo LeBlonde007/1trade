@@ -1,0 +1,25 @@
+# syntax=docker/dockerfile:1.6
+# Exascale — shared Go service image. Build with: SERVICE=<name> (cmd/<name>/main.go).
+# Distroless + non-root + static binary. See docs/plans/DEPLOYMENT.md §2.
+ARG GO_VERSION=1.23
+
+FROM golang:${GO_VERSION}-alpine AS build
+WORKDIR /src
+ARG SERVICE
+ARG VERSION=dev
+RUN apk add --no-cache git ca-certificates
+COPY go.* ./
+RUN --mount=type=cache,target=/go/pkg/mod go mod download
+COPY . .
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=linux \
+    go build -trimpath -ldflags="-s -w -X main.Version=${VERSION}" \
+        -o /out/app ./cmd/${SERVICE}
+
+FROM gcr.io/distroless/static-debian12:nonroot
+COPY --from=build /out/app /usr/local/bin/app
+COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+USER nonroot:nonroot
+EXPOSE 8000
+ENTRYPOINT ["/usr/local/bin/app"]

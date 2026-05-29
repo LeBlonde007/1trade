@@ -1,0 +1,29 @@
+# Exascale — local k3d (k3s-in-Docker) cluster. Same k3s as prod (ADR-0001), so local == prod.
+# Create: k3d cluster create --config deploy/k8s/local/k3d.yaml   (or `make up`)
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: exascale
+servers: 1
+agents: 1
+ports:
+  # k3s ships Traefik on the loadbalancer; expose it on :8080 as the API ingress (Kong arrives M3).
+  - port: 8080:80
+    nodeFilters:
+      - loadbalancer
+  - port: 8443:443
+    nodeFilters:
+      - loadbalancer
+options:
+  k3d:
+    wait: true
+    timeout: "120s"
+  k3s:
+    nodeLabels:
+      # Mark the agent as a GPU node placeholder; real GPU scheduling needs GPU=1 + NVIDIA toolkit.
+      - label: exascale.io/gpu=mock
+        nodeFilters:
+          - agent:0
+  kubeconfig:
+    updateDefaultKubeconfig: true
+    switchCurrentContext: true

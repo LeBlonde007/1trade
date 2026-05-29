@@ -1,0 +1,13 @@
+# syntax=docker/dockerfile:1.6
+# Exascale — vLLM inference runtime (inference-ml). Built once per vLLM release, pushed to the
+# org registry, pulled by every inference pod. Model weights are MOUNTED (PVC), never baked in.
+# See docs/plans/DEPLOYMENT.md §4 and docs/plans/features/F09-vllm-deployment.md.
+FROM nvcr.io/nvidia/pytorch:24.10-py3 AS base
+ARG VLLM_VERSION=0.6.3.post1
+WORKDIR /app
+RUN pip install --no-cache-dir vllm==${VLLM_VERSION} \
+    prometheus-client fastapi "uvicorn[standard]"
+COPY services/inference-runtime/python /app
+EXPOSE 8000 8001
+ENV PYTHONUNBUFFERED=1
+ENTRYPOINT ["python", "-m", "exascale_runtime"]

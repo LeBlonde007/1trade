@@ -1,0 +1,19 @@
+# syntax=docker/dockerfile:1.6
+# Exascale — Nuxt frontend (Node SSR). Required by the password gate (Nitro runtime).
+# See docs/plans/DEPLOYMENT.md §3. Build context = the Nuxt app dir.
+FROM node:20-alpine AS build
+WORKDIR /src
+COPY package.json package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm npm ci
+COPY . .
+ENV NODE_ENV=production
+RUN npm run build
+
+FROM node:20-alpine AS runtime
+WORKDIR /app
+COPY --from=build /src/.output ./.output
+ENV NODE_ENV=production
+# Gate secrets are injected at runtime (NUXT_SITE_PASSWORD / NUXT_GATE_SECRET), never baked in.
+USER node
+EXPOSE 3000
+CMD ["node", ".output/server/index.mjs"]

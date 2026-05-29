@@ -1,6 +1,14 @@
 # F01 — Foundation infra
 
 > Ship in **Milestone 1**. Owner: `infra-sre`. **Blocks everything.**
+>
+> **Progress (branch `feat/f01-foundation-infra`, target v0.1.0):** repo foundation scaffolded —
+> `Makefile` (dev entrypoint), `deploy/docker/Dockerfile.{go-service,nuxt,vllm}`,
+> `deploy/k8s/local/{k3d.yaml,Tiltfile,install-data-plane.sh,seed.sh}`, `.github/workflows/ci.yml`,
+> root `README.md` + `.env.example`, `services/` + `apps/` layout markers. **Verified:** the k3d
+> cluster boots from the config (2 nodes Ready). **Pending:** full `make up` data-plane install,
+> observability dashboards, staging/prod-paper/prod-real clusters, SOPS-sealed secrets, CI-green,
+> backup/restore drill, `make test-e2e` skeleton.
 
 ## Spec
 
