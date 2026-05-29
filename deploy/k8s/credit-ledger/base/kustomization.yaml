@@ -1,0 +1,10 @@
+# credit-ledger base. Per-env overlays (dev/staging/prod-paper/prod-real) live alongside under
+# ../overlays/ and patch replicas, image tag, and secret sources. See docs/plans/DEPLOYMENT.md §6.
+# The credit-ledger-migrations ConfigMap (types.sql + 0001_init.sql) is created out-of-band
+# (Tiltfile locally / CI), since it sources files from two repo locations.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - configmap.yaml
+  - deployment.yaml
+  - service.yaml

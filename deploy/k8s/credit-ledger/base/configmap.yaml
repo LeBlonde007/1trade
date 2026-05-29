@@ -1,0 +1,11 @@
+# credit-ledger non-secret config. DB password is dev-only here; in staging/prod it comes from a
+# SOPS-sealed Secret / Vault (ADR-0001), and DATABASE_URL is assembled from that.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: credit-ledger-env
+data:
+  EXASCALE_ENV: "dev"
+  LEDGER_ADDR: ":8002"
+  DATABASE_URL: "postgres://exascale:exascale@postgres.data.svc.cluster.local:5432/exascale"
+  NATS_URL: "nats://nats.data.svc.cluster.local:4222"

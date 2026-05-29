@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: credit-ledger
+  labels: { app: credit-ledger }
+spec:
+  replicas: 1                       # local; HPA + 5 replicas in prod overlay (DEPLOYMENT.md §7)
+  selector:
+    matchLabels: { app: credit-ledger }
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+  template:
+    metadata:
+      labels: { app: credit-ledger }
+    spec:
+      # Apply migrations before the service starts (idempotent: CREATE ... IF NOT EXISTS).
+      # SQL comes from the credit-ledger-migrations ConfigMap (shared types.sql + 0001_init.sql).
+      initContainers:
+        - name: migrate
+          image: postgres:16-alpine
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              for f in /migrations/types.sql /migrations/0001_init.sql; do
+                echo "applying $f"; psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"
+              done
+          env:
+            - { name: DATABASE_URL, valueFrom: { configMapKeyRef: { name: credit-ledger-env, key: DATABASE_URL } } }
+          volumeMounts:
+            - { name: migrations, mountPath: /migrations }
+      containers:
+        - name: credit-ledger
+          image: exascale/credit-ledger:dev
+          ports: [{ containerPort: 8002 }]
+          envFrom:
+            - configMapRef: { name: credit-ledger-env }
+          livenessProbe:
+            httpGet: { path: /healthz, port: 8002 }
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: { path: /readyz, port: 8002 }
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: "1", memory: 256Mi }
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532          # distroless 'nonroot' UID — numeric so kubelet can verify non-root
+            runAsGroup: 65532
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+      volumes:
+        - name: migrations
+          configMap: { name: credit-ledger-migrations }

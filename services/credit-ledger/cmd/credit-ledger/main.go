@@ -34,9 +34,22 @@ func main() {
 	}
 	defer st.Close()
 
+	// Use NATS for credit.tx.v1 when configured; otherwise log-only (best-effort either way).
+	var pub events.Publisher = events.LogPublisher{}
+	if cfg.NATSURL != "" {
+		np, err := events.NewNatsPublisher(cfg.NATSURL)
+		if err != nil {
+			slog.Error("connect NATS — falling back to log publisher", "err", err)
+		} else {
+			defer np.Close()
+			pub = np
+			slog.Info("publishing credit.tx.v1 to NATS", "url", cfg.NATSURL)
+		}
+	}
+
 	srv := &http.Server{
 		Addr:              cfg.Addr,
-		Handler:           api.New(cfg, st, events.LogPublisher{}),
+		Handler:           api.New(cfg, st, pub),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	slog.Info("credit-ledger listening", "addr", cfg.Addr, "env", cfg.Env, "version", Version)

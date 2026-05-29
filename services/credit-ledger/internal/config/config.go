@@ -9,6 +9,7 @@ type Config struct {
 	Env          string // dev | staging | prod
 	Addr         string // listen address, e.g. ":8002"
 	DatabaseURL  string // Postgres DSN
+	NATSURL      string // NATS URL for credit.tx.v1 (empty → log-only publisher)
 	JWTSecret    string // HS256 secret shared with platform-core (verifies tenant JWTs)
 	ServiceToken string // bearer token gating internal service-to-service endpoints
 }
@@ -19,6 +20,7 @@ func Load() Config {
 		Env:          envOr("EXASCALE_ENV", "dev"),
 		Addr:         envOr("LEDGER_ADDR", ":8002"),
 		DatabaseURL:  os.Getenv("DATABASE_URL"),
+		NATSURL:      os.Getenv("NATS_URL"),
 		JWTSecret:    os.Getenv("PLATFORM_JWT_SECRET"),
 		ServiceToken: os.Getenv("SERVICE_TOKEN"),
 	}

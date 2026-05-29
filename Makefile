@@ -31,7 +31,7 @@ data-plane:
 ## tilt: start Tilt (builds + deploys services into the cluster, live-reload on save)
 .PHONY: tilt
 tilt:
-	@cd deploy/k8s/local && tilt up
+	@tilt up
 
 ## down: delete the local cluster
 .PHONY: down
