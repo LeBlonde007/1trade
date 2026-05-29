@@ -151,7 +151,7 @@ Status legend: ⬜ Not started · 🔵 In progress · ✅ Done · ⚠️ At risk
 | F02 | Auth — email/OAuth (M1); SAML/SCIM/2FA (M4) | Platform | M1 / M4 | ⬜ | 0% | Contract authored (openapi/platform-core.yaml + JWT claims); implementation not started. |
 | F03 | Accounts, orgs, sub-accounts, RBAC, audit log | Platform | M1 / M4 | ⬜ | 0% | Sub-accounts M4. |
 | F04 | `exascale` CLI (login → infer → gpu → billing) | Platform | M1→M6 | ⬜ | 0% | Primary engineer interface. |
-| F05 | Prepaid credit ledger (balances, append-only tx, hash chain) | Ledger | M1→M4 | 🔵 | ~40% | Domain core (exact fixed-point money, hash chain, Apply invariants) + schema done, 6/6 unit tests pass. Store/API/deploy pending. See STATUS.md. |
+| F05 | Prepaid credit ledger (balances, append-only tx, hash chain) | Ledger | M1→M4 | 🔵 | ~80% | Domain + Postgres store (atomic, idempotent per-tenant) + HTTP API all **verified against real Postgres** (domain/store/api tests green). Remaining: NATS event publish + Dockerfile/k8s deploy. See STATUS.md. |
 | F06 | Credit purchase / billing (Stripe → ACH/wire → multi-currency) | Platform + Ledger | M2 / M3 | ⬜ | 0% | The revenue rails. |
 | F07 | Credit conversion (AI ↔ sub-credits, GPU tiers) | Ledger | M2 / M3 | ⬜ | 0% | |
 | F08 | Inference gateway (OpenAI-compatible, auth, debit) | Inference | M2 | ⬜ | 0% | Fastest revenue path. |

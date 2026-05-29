@@ -35,12 +35,12 @@ Exascale
 │   └── ⬜ Hardening            CI green on GitHub · ledger backup/restore drill · make test-e2e skeleton
 │
 ├── 🟩 Revenue path — Phase 1 critical path (inference dollar → first customer)
-│   ├── 🟩 F05 credit-ledger   (~40%) — the financial heart
-│   │   ├── ✅ Domain core       fixed-point Money (exact) · hash chain · Apply (balance + insufficient-credit + chain) — 6/6 tests pass
-│   │   ├── ✅ Schema            migrations/0001_init.sql (append-only trigger, idempotency unique, is_paper)
-│   │   ├── ⬜ Store             Postgres: atomic balance+tx in one DB tx · reconciliation replay
-│   │   ├── ⬜ API               credit.yaml endpoints behind auth · emit credit.tx.v1
-│   │   └── ⬜ Deploy            Dockerfile · k8s manifests · integration tests vs live Postgres
+│   ├── 🟩 F05 credit-ledger   (~80%) — the financial heart — VERIFIED vs real Postgres
+│   │   ├── ✅ Domain core       fixed-point Money (exact) · hash chain · Apply (balance + insufficient-credit + chain) — 6/6 tests
+│   │   ├── ✅ Schema            migrations/0001_init.sql (append-only trigger · per-tenant idempotency · NULLS NOT DISTINCT · is_paper)
+│   │   ├── ✅ Store             Postgres atomic balance+tx (one DB tx, per-balance lock) · idempotency · chain-verify — integration test green
+│   │   ├── ✅ API               credit.yaml endpoints + auth (JWT/service) — httptest integration green; /convert→501 (F07)
+│   │   └── ⬜ Deploy            credit.tx.v1 NATS publish · Dockerfile · k8s manifest · Tilt wiring
 │   ├── ⬜ F02 auth             email/OAuth (contract ✅, impl not started) · SAML/SCIM/2FA (M4)
 │   ├── ⬜ F03 accounts/orgs/RBAC + audit log
 │   ├── ⬜ F04 exascale CLI
