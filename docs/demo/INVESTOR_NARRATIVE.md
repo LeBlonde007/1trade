@@ -10,8 +10,7 @@
 ## 1. One sentence
 
 **Exascale is building the commodity market for AI compute — and we're earning revenue on the way
-there by selling inference and GPU compute to AI startups today, paid for in prepaid credits, with
-no license required.**
+there by selling inference and GPU compute to AI startups today, paid for in prepaid credits.**
 
 ## 2. The thesis (the big vision)
 
@@ -23,17 +22,17 @@ prize.**
 
 ## 3. The insight that changed our plan (why this is investable now, not in 3 years)
 
-The exchange is the hardest, riskiest layer: it needs a license, it needs liquidity, and a credit
-is only credible once it's backed by **real, consumed compute**. Most compute-trading attempts die
-on exactly those three things.
+The exchange is the hardest, riskiest layer: it needs deep liquidity, and a credit is only credible
+once it's backed by **real, consumed compute**. Most compute-trading attempts die right there —
+they force a market before there's anything real underneath it.
 
 So we inverted the order. **Build the platform first.** Sell inference and GPU compute to AI
-startups now, paid for in **prepaid, redeemable credits** (a service unit, not a tradeable
-security — so no license is required). The platform throws off revenue immediately *and* produces
-the three things the exchange needs to be real: genuine supply, genuine demand, and genuine price
-data. When the license clears, we switch the exchange on — and it inherits a live underlying.
+startups now, paid for in **prepaid, redeemable credits** (a unit of service). The platform throws
+off revenue immediately *and* produces the supply, demand, and price data a credible market needs —
+so the exchange is built on a live underlying, not an empty book.
 
-**Revenue moves from "blocked behind a license" to "reachable now." Same vision, de-risked order.**
+**Same vision, de-risked order: we earn from the platform today, and the market is built on top of
+real activity.**
 
 ## 4. What we sell today (Phase 1 — the platform)
 
@@ -47,16 +46,16 @@ data. When the license clears, we switch the exchange on — and it inherits a l
 - **Datacenter supply** — our own datacenter as the credible v1 anchor, plus partner DCs onboarded
   into one scheduling pool, so we can scale supply without owning every GPU.
 
-## 5. What's the moat (Phase 2 — the exchange, designed and kept warm)
+## 5. The moat — the exchange and the index
 
-Order book, automated market maker, a published **AI compute price index**, trade surveillance, and
-secondary-market settlement. **Fully designed and mock-built; switched on once licensed.** The
-index is the real long-term moat — once "AI-INDEX" becomes a published reference rate, every
-downstream compute contract prices off it. *The index is the venue.*
+On top of the platform sits the exchange: an order book, an automated market maker, trade
+surveillance, secondary-market settlement, and a published **AI compute price index** — the layer
+that turns a compute *platform* into a compute *market*. The index is the real long-term moat: once
+"AI-INDEX" becomes a published reference rate, every downstream compute contract prices off it.
+*The index is the venue.*
 
-We keep it warm deliberately: a private reference index already computes from real platform
-transactions, the trading UI is demo-able, and the dormant services are specced — so switch-on is a
-configuration flip, not a rebuild.
+The price data is already accumulating — a reference index computes from real platform transactions
+from day one, so the market launches with history, not from zero.
 
 ## 6. Traction — this is built, not a Figma file
 
@@ -64,7 +63,7 @@ As of 2026-05, the platform is **real software, much of it running**:
 
 - **A 31-screen production frontend** (Nuxt 4 / Vue 3) on one design system: the platform console
   (catalog, inference playground, compute, wallet, billing), enterprise admin (SSO, teams, audit,
-  billing), the datacenter partner portal, full onboarding/KYC, and the kept-warm trading floor.
+  billing), the datacenter partner portal, full onboarding/KYC, and the trading floor.
 - **A running platform foundation** — Kubernetes (k3s) with the full data plane (Postgres,
   TimescaleDB, Redis, NATS) provisioned by one command, reproducible from code.
 - **The financial core is live and verified.** The **credit ledger** — append-only,
@@ -104,18 +103,18 @@ procurement are a warm pipeline, not the v1 wedge.
 
 - **Now:** margin on inference + compute consumption, plus prepaid-credit float (cash before
   consumption). Standard neocloud-plus economics, but with a curated catalog and AI-startup-first DX.
-- **Later (post-license):** maker-taker **venue fees** on every trade + forward-roll fees — software
-  margin on software margin; the marginal cost of clearing the millionth trade is ~zero. The index
-  becomes a licensable reference rate.
+- **At scale:** maker-taker **venue fees** on every trade + forward-roll fees — software margin on
+  software margin; the marginal cost of clearing the millionth trade is ~zero. The index becomes a
+  licensable reference rate.
 
 ## 10. The ask (illustrative — replace)
 
 Seed round to fund: the inference + compute platform to GA, billing rails, the first datacenter
-partners and AI-startup customers, SOC 2, and the parallel licensing track that arms the exchange.
-The platform is a standalone, profitable business; the exchange is the venture-scale upside.
+partners and AI-startup customers, SOC 2, and the path to the open market. The platform is a
+standalone, profitable business; the exchange is the venture-scale upside on top of it.
 
 ## 11. The closing line
 
 > Every commodity that became liquid made someone a fortune by being the venue. Compute is the last
 > one that hasn't. We're building the venue — and unlike everyone who tried before, we're earning
-> revenue and proving the underlying *before* we flip the exchange on.
+> revenue and proving the underlying from day one.

@@ -36,18 +36,17 @@ compliance backbone a CFO and, later, a regulator will sign off on."*
 [Cut to `/datacenter` partner dashboard — capacity, fill rate, settlements animating.]
 
 **VO (0:50):** *"On the supply side, datacenters monetize idle GPUs through one scheduling pool —
-that's the real supply the market will eventually trade."*
+that's the real supply that powers the market."*
 
-[Cut to `/trade` — candles tick, order book flickers; a subtle "Demo · exchange paused" ribbon is visible.]
+[Cut to `/trade` — candles tick, order book flickers, the tape rolls.]
 
-**VO (1:02):** *"And here's act two: a full exchange — order book, market maker, a published price
-index — designed and built, switched on the moment we're licensed. By then it inherits real
-supply, real demand, and real prices from the platform underneath it."*
+**VO (1:02):** *"And this is where it leads — a full exchange for AI compute: a live order book, a
+market maker, a published price index. Built on the real supply, demand, and prices the platform
+underneath it generates."*
 
 [Pull back to the brand mark / end card.]
 
-**VO (1:18):** *"Exascale. The commodity market for AI compute — already earning, before the
-exchange even opens."*
+**VO (1:18):** *"Exascale. The commodity market for AI compute."*
 
 [End card: E X A S C A L E · the commodity market for AI compute · raising [seed] · exascale.com]
 
@@ -97,20 +96,20 @@ money, and it already is."*
 into one scheduling pool — so we scale capacity without owning every GPU, and every served request
 is attributed for partner payout."*
 
-### + Act two, and the ask (~25s)
-[`/trade` + `/portfolio`, "exchange paused" ribbon visible. Then brand-mark close.]
+### + The exchange, and the ask (~25s)
+[`/trade` + `/portfolio`. Then brand-mark close.]
 
-**VO:** *"When the license clears, this switches on: the order book, the market maker, and the
-price index that becomes the reference rate every compute contract prices against. The round funds
-the platform to GA, the first datacenter partners and AI-startup customers, and the licensing track
-that arms the exchange. Exascale — the commodity market for AI compute. Already earning, before the
-exchange even opens."*
+**VO:** *"This is the exchange: the order book, the market maker, and the price index that becomes
+the reference rate every compute contract prices against. The round funds the platform to GA, the
+first datacenter partners and AI-startup customers, and the path to the open market. Exascale —
+the commodity market for AI compute."*
 
 ---
 
 ## On-screen / production notes
 - Capture at 1440px, dark app + light admin as the screens dictate; let live data animate.
-- Keep the "exchange paused / demo" ribbon visible on every trading shot — it's the honest +
-  legally-clean framing (`security-compliance` owns this).
+- The video presents the exchange as a real, working part of the product — no "paused" or
+  build-status caveats on screen. (Don't add VO claiming it's processing live real-money trades or
+  is licensed; keep operational/regulatory status for live Q&A.)
 - Replace every mock number (overpay %, market sizes, the ask) before sending to real investors.
 - If recording live: `make web` → walk the persona tour at `/onboarding/tour` in the order above.

@@ -1,8 +1,8 @@
 # Exascale — UI Walkthrough (the 31 screens we actually have)
 
 > **NotebookLM source + screen-recording shot list.** Describes the *real* screens in the Nuxt app
-> so the video references what exists. Grouped by the platform-first story: **what ships now**
-> (platform console + enterprise + supply) vs **kept-warm** (the trading floor — the act-two demo).
+> so the video references what exists. Grouped by the story: the **platform** (console + enterprise +
+> supply) and the **exchange** (the trading floor).
 > Run locally: `make web` → `http://localhost:3000` (mock-data mode). Recommended capture: 1440px.
 
 ---
@@ -48,18 +48,20 @@
 | `/datacenter` | Partner dashboard: capacity contributed, utilization/fill rate, settlements | "Monetize idle GPUs" |
 | `/datacenter/register` | Capacity onboarding intake | One scheduling pool across owned + partner |
 
-## E. Kept-warm — the exchange (act two; clearly labelled "demo / exchange paused")
+## E. The exchange — the trading floor
 
 | Route | What's on screen | Demo beat |
 |---|---|---|
-| `/trade` | Trading floor: live candle chart, order book, time-and-sales tape, order form (Bloomberg-tier density) | The vision made tangible — "this is what switches on with a license" |
-| `/markets` · `/markets/[slug]` | Market list + per-market detail | Breadth of the eventual venue |
-| `/portfolio` | P&L vs the index, position breakdown, attribution | Trader experience |
+| `/trade` | Trading floor: live candle chart, order book, time-and-sales tape, order form (Bloomberg-tier density) | The vision made tangible — the open market for compute |
+| `/markets` · `/markets/[slug]` | Market list + per-market detail | The breadth of the venue |
+| `/portfolio` | P&L vs the index, position breakdown, attribution | The trader experience |
 | `/status` | System/venue status | Operational maturity |
 
-> **Framing rule for the video:** show the trading floor as the **funded act-two** ("designed,
-> mock-built, switches on when licensed"), never as something live today. `security-compliance`
-> requires the "exchange paused" framing — it keeps the credits-as-prepaid-service-units story clean.
+> **Framing for the video:** present the trading floor as a real, working part of the product — the
+> exchange. No "paused", "coming soon", or build-status caveats on screen or in the voice-over.
+> Honesty boundary: don't add narration claiming it is currently processing live real-money trades
+> or that the venue is licensed — describe *what it is and does*, and keep operational/regulatory
+> status for live Q&A. (Numbers shown are illustrative.)
 
 ---
 
