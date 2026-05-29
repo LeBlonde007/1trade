@@ -109,6 +109,35 @@ func (s *Store) GetUserByEmail(ctx context.Context, email string) (AuthUser, boo
 	return u, true, nil
 }
 
+// Identity is the current-user view returned by /v1/auth/me.
+type Identity struct {
+	UserID, Email, TenantID, OrgID string
+	Roles                          []domain.Role
+	IsPaper                        bool
+}
+
+// GetUserByID loads a user's identity by id (for /me). ok=false if not found.
+func (s *Store) GetUserByID(ctx context.Context, id string) (Identity, bool, error) {
+	var idn Identity
+	var org *string
+	var roles []string
+	err := s.pool.QueryRow(ctx,
+		`SELECT u.id, u.email, u.tenant_id, u.org_id, u.roles, t.is_paper
+		 FROM users u JOIN tenants t ON t.id = u.tenant_id WHERE u.id = $1`, id).
+		Scan(&idn.UserID, &idn.Email, &idn.TenantID, &org, &roles, &idn.IsPaper)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Identity{}, false, nil
+	}
+	if err != nil {
+		return Identity{}, false, err
+	}
+	if org != nil {
+		idn.OrgID = *org
+	}
+	idn.Roles = toRoles(roles)
+	return idn, true, nil
+}
+
 // CreateAPIKey persists a key's metadata + hash (the secret itself is never stored).
 func (s *Store) CreateAPIKey(ctx context.Context, tenantID, name, prefix, hash string, scopes []string) (string, error) {
 	id := uuid.NewString()
