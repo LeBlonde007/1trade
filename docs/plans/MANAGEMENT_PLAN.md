@@ -147,7 +147,7 @@ Status legend: ⬜ Not started · 🔵 In progress · ✅ Done · ⚠️ At risk
 
 | ID | Feature | Owner team | Target | Status | % | Notes |
 |---|---|---|---|---|---|---|
-| F01 | Foundation infra (K8s, data plane, CI/CD, observability, secrets) | Infra/SRE | M1 | ⬜ | 0% | Blocks everything. |
+| F01 | Foundation infra (K8s, data plane, CI/CD, observability, secrets) | Infra/SRE | M1 | 🔵 | ~50% | Scaffold + **core data plane (Postgres/TimescaleDB/Redis/NATS) verified on k3d** (all 1/1 Ready). Pending: FULL=1 scheduling+observability, real envs (staging/prod), SOPS secrets, CI-green, backup/restore + e2e skeleton. |
 | F02 | Auth — email/OAuth (M1); SAML/SCIM/2FA (M4) | Platform | M1 / M4 | ⬜ | 0% | |
 | F03 | Accounts, orgs, sub-accounts, RBAC, audit log | Platform | M1 / M4 | ⬜ | 0% | Sub-accounts M4. |
 | F04 | `exascale` CLI (login → infer → gpu → billing) | Platform | M1→M6 | ⬜ | 0% | Primary engineer interface. |

@@ -1,0 +1,70 @@
+# Exascale CI — lint, test, contract-check. See docs/plans/DEPLOYMENT.md §8.
+# Fails closed; build/deploy stages are added as services land (M1+).
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  hygiene:
+    name: hygiene (secrets + pre-commit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: gitleaks (no secrets)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - name: pre-commit
+        run: pipx install pre-commit && pre-commit run --all-files --show-diff-on-failure
+
+  contracts:
+    name: contract check (OpenAPI + event schemas)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - name: lint OpenAPI specs
+        run: |
+          if ls docs/contracts/openapi/*.yaml >/dev/null 2>&1; then
+            npx --yes @redocly/cli@latest lint "docs/contracts/openapi/*.yaml"
+          else
+            echo "no OpenAPI specs yet"
+          fi
+      - name: validate event + k8s YAML parses
+        run: |
+          python3 - <<'PY'
+          import glob, sys, yaml
+          bad = 0
+          for f in glob.glob('docs/contracts/events/*.yaml') + glob.glob('deploy/k8s/local/*.yaml'):
+              try: yaml.safe_load(open(f))
+              except Exception as e: print('INVALID', f, e); bad += 1
+          sys.exit(bad)
+          PY
+
+  go:
+    name: go build + test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: '1.23' }
+      - name: build + test (if any Go modules)
+        run: |
+          if [ -f go.work ] || ls services/*/go.mod >/dev/null 2>&1; then
+            go build ./... && go test -race ./...
+          else
+            echo "no Go modules yet"
+          fi
+      - name: golangci-lint
+        if: hashFiles('**/*.go') != ''
+        uses: golangci/golangci-lint-action@v6
+        with: { version: v1.59.1 }
