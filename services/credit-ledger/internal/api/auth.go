@@ -1,6 +1,7 @@
 package api
 
 import (
+	"crypto/subtle"
 	"fmt"
 	"net/http"
 	"strings"
@@ -53,7 +54,8 @@ func servicePrincipal(cfg config.Config, r *http.Request) (principal, error) {
 	if cfg.IsDev() && r.Header.Get("X-Dev-Tenant") != "" {
 		return principal{Service: true}, nil
 	}
-	if cfg.ServiceToken != "" && bearer(r) == cfg.ServiceToken {
+	// Constant-time compare so a wrong token can't be discovered byte-by-byte via response timing.
+	if tok := bearer(r); cfg.ServiceToken != "" && subtle.ConstantTimeCompare([]byte(tok), []byte(cfg.ServiceToken)) == 1 {
 		return principal{Service: true}, nil
 	}
 	return principal{}, fmt.Errorf("service authorization required")

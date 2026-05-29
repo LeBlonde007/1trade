@@ -6,6 +6,7 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/exascale/credit-ledger/internal/config"
@@ -50,7 +51,8 @@ func (s *Server) routes() {
 // readyz checks the DB is reachable.
 func (s *Server) readyz(w http.ResponseWriter, r *http.Request) {
 	if _, _, _, err := s.st.VerifyChain(r.Context(), "00000000-0000-0000-0000-000000000000"); err != nil {
-		writeErr(w, http.StatusServiceUnavailable, "not_ready", err.Error())
+		slog.Error("readyz: store unreachable", "err", err)
+		writeErr(w, http.StatusServiceUnavailable, "not_ready", "not ready")
 		return
 	}
 	w.WriteHeader(http.StatusOK)
@@ -60,13 +62,13 @@ func (s *Server) readyz(w http.ResponseWriter, r *http.Request) {
 func (s *Server) getBalances(w http.ResponseWriter, r *http.Request) {
 	p, err := tenantPrincipal(s.cfg, r)
 	if err != nil {
-		writeErr(w, http.StatusUnauthorized, "unauthorized", err.Error())
+		writeErr(w, http.StatusUnauthorized, "unauthorized", "authentication required")
 		return
 	}
 	isPaper := r.URL.Query().Get("is_paper") != "false"
 	bals, err := s.st.GetBalances(r.Context(), p.TenantID, isPaper)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "store_error", err.Error())
+		serverError(w, err)
 		return
 	}
 	out := make([]balanceDTO, 0, len(bals))
@@ -80,13 +82,13 @@ func (s *Server) getBalances(w http.ResponseWriter, r *http.Request) {
 func (s *Server) listTransactions(w http.ResponseWriter, r *http.Request) {
 	p, err := tenantPrincipal(s.cfg, r)
 	if err != nil {
-		writeErr(w, http.StatusUnauthorized, "unauthorized", err.Error())
+		writeErr(w, http.StatusUnauthorized, "unauthorized", "authentication required")
 		return
 	}
 	isPaper := r.URL.Query().Get("is_paper") != "false"
 	txs, err := s.st.ListTransactions(r.Context(), p.TenantID, isPaper, 50)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "store_error", err.Error())
+		serverError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"transactions": toTxDTOs(txs)})
@@ -108,7 +110,7 @@ type movementBody struct {
 func (s *Server) movement(op domain.Operation, sign int) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if _, err := servicePrincipal(s.cfg, r); err != nil {
-			writeErr(w, http.StatusUnauthorized, "unauthorized", err.Error())
+			writeErr(w, http.StatusUnauthorized, "unauthorized", "authentication required")
 			return
 		}
 		var b movementBody
@@ -150,7 +152,7 @@ func (s *Server) movement(op domain.Operation, sign int) http.HandlerFunc {
 			return
 		}
 		if err != nil {
-			writeErr(w, http.StatusInternalServerError, "store_error", err.Error())
+			serverError(w, err)
 			return
 		}
 		s.pub.PublishTx(tx)
@@ -161,7 +163,7 @@ func (s *Server) movement(op domain.Operation, sign int) http.HandlerFunc {
 // chainVerify re-derives the hash chain for a tenant (service-only).
 func (s *Server) chainVerify(w http.ResponseWriter, r *http.Request) {
 	if _, err := servicePrincipal(s.cfg, r); err != nil {
-		writeErr(w, http.StatusUnauthorized, "unauthorized", err.Error())
+		writeErr(w, http.StatusUnauthorized, "unauthorized", "authentication required")
 		return
 	}
 	tenantID := r.URL.Query().Get("tenant_id")
@@ -171,7 +173,7 @@ func (s *Server) chainVerify(w http.ResponseWriter, r *http.Request) {
 	}
 	ok, checked, firstBad, err := s.st.VerifyChain(r.Context(), tenantID)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "store_error", err.Error())
+		serverError(w, err)
 		return
 	}
 	resp := map[string]any{"ok": ok, "checked": checked}
@@ -239,4 +241,11 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 // writeErr writes the contract's ApiError shape.
 func writeErr(w http.ResponseWriter, status int, code, msg string) {
 	writeJSON(w, status, map[string]string{"code": code, "message": msg})
+}
+
+// serverError logs the real error server-side and returns a generic 500 — the client never sees
+// internal detail (DB structure, driver messages), which would be an information-disclosure leak.
+func serverError(w http.ResponseWriter, err error) {
+	slog.Error("request failed", "err", err)
+	writeErr(w, http.StatusInternalServerError, "internal_error", "an internal error occurred")
 }
