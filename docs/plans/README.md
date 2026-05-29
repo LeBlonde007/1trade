@@ -175,6 +175,8 @@ Four documents:
   (e.g. ADR-0001: Kubernetes via k3s/k3d, not Dokploy). Check it before re-opening a settled call.
 - [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md) — the canonical frontend visual spec (tokens, type scale,
   number formatting, mock-data realism, aesthetic guardrails). **Every frontend change conforms.**
+- [`STATUS.md`](STATUS.md) — the build-status **tree map** (✅ done / 🟩 in progress / ⬜ not started /
+  ⏸ paused) with the ordered TO-DO. The quickest "where are we" view.
 
 ---
 
