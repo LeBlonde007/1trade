@@ -1,0 +1,58 @@
+# Production inference-runtime (GPU) — the real vLLM worker. Apply on a GPU cluster with the NVIDIA
+# GPU Operator (F12) and a node that fits the model (Llama-3.1-8b ~16 GB; 70B-INT4 ~40 GB). NOT part
+# of the local kustomize base (the dev box has no fitting GPU); the CPU stub stands in locally.
+#
+# One Deployment per model id (this one serves llama-3.1-8b). Weights mount from a PVC, not baked in.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inference-runtime-llama-8b
+  labels: { app: inference-runtime, model: llama-3.1-8b }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: inference-runtime, model: llama-3.1-8b }
+  template:
+    metadata:
+      labels: { app: inference-runtime, model: llama-3.1-8b }
+    spec:
+      nodeSelector:
+        nvidia.com/gpu.present: "true"          # schedule onto GPU nodes (labelled by the GPU Operator)
+      tolerations:
+        - { key: "nvidia.com/gpu", operator: "Exists", effect: "NoSchedule" }
+      containers:
+        - name: runtime
+          image: registry.exascale.io/inference-runtime:vllm   # built from deploy/docker/Dockerfile.vllm
+          ports: [{ containerPort: 8000 }]
+          env:
+            - { name: MODEL_ID, value: "llama-3.1-8b" }
+            - { name: MODEL_PATH, value: "/models/llama-3.1-8b" }   # PVC mount
+            - { name: MAX_MODEL_LEN, value: "8192" }
+          readinessProbe:
+            httpGet: { path: /readyz, port: 8000 }
+            initialDelaySeconds: 30               # weight load takes time
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet: { path: /healthz, port: 8000 }
+            periodSeconds: 15
+          resources:
+            # Accurate requests/limits so the pod is co-scheduled correctly and never OOMs.
+            requests: { cpu: "4", memory: 24Gi, nvidia.com/gpu: "1" }
+            limits:   { cpu: "8", memory: 32Gi, nvidia.com/gpu: "1" }
+          volumeMounts:
+            - { name: model-weights, mountPath: /models, readOnly: true }
+      volumes:
+        - name: model-weights
+          persistentVolumeClaim:
+            claimName: model-weights              # pre-populated PVC (weights cached out-of-band)
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: inference-runtime-llama-8b
+  labels: { app: inference-runtime, model: llama-3.1-8b }
+spec:
+  selector: { app: inference-runtime, model: llama-3.1-8b }
+  ports:
+    - { name: http, port: 8000, targetPort: 8000 }

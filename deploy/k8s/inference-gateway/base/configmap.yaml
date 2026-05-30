@@ -10,3 +10,5 @@ data:
   PLATFORM_CORE_URL: "http://platform-core:8001"
   CREDIT_LEDGER_URL: "http://credit-ledger:8002"
   NATS_URL: "nats://nats.data.svc.cluster.local:4222"
+  INFERENCE_BACKEND: "vllm"                       # serve via the runtime (F09); CPU stub locally
+  VLLM_BASE_URL: "http://inference-runtime:8000"

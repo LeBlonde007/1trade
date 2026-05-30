@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inference-runtime
+  labels: { app: inference-runtime }
+spec:
+  # LOCAL: the CPU stub (no GPU). It speaks the same gateway↔runtime contract as the real vLLM
+  # worker so the gateway's VLLMBackend is exercised end-to-end without a GPU. The real GPU
+  # Deployment is ../runtime-gpu.yaml (applied on a GPU node; needs F12 + the GPU Operator).
+  replicas: 1
+  selector:
+    matchLabels: { app: inference-runtime }
+  template:
+    metadata:
+      labels: { app: inference-runtime }
+    spec:
+      containers:
+        - name: runtime
+          image: exascale/inference-runtime-stub:dev
+          ports: [{ containerPort: 8000 }]
+          env:
+            - { name: MODEL_ID, value: "llama-3.1-8b" }
+          livenessProbe:
+            httpGet: { path: /healthz, port: 8000 }
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: { path: /readyz, port: 8000 }
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 25m, memory: 32Mi }
+            limits: { cpu: "500m", memory: 128Mi }
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }

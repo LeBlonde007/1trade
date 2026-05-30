@@ -49,11 +49,17 @@ k8s_yaml(kustomize('deploy/k8s/platform-core/base'))
 k8s_resource('platform-core', port_forwards='8001:8001',
              resource_deps=['platform-core-migrations', 'platform-auth'])
 
+# --- inference-runtime (F09) — CPU stub locally (real vLLM GPU worker on a GPU node) ---
+docker_build('exascale/inference-runtime-stub:dev', 'services/inference-runtime/stub',
+             dockerfile='services/inference-runtime/stub/Dockerfile')
+k8s_yaml(kustomize('deploy/k8s/inference-runtime/base'))
+k8s_resource('inference-runtime', port_forwards='8000:8000')
+
 # --- inference-gateway (F08) — the OpenAI-compatible API; authenticates customers, meters usage ---
 docker_build('exascale/inference-gateway:dev', 'services/inference-gateway',
              dockerfile='services/inference-gateway/Dockerfile')
 k8s_yaml(kustomize('deploy/k8s/inference-gateway/base'))
 k8s_resource('inference-gateway', port_forwards='8085:8085',
-             resource_deps=['platform-auth'])
+             resource_deps=['platform-auth', 'inference-runtime'])  # gateway's vllm backend needs the runtime
 
 # Future services register their own docker_build + k8s_yaml + k8s_resource blocks here.
