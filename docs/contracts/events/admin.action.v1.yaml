@@ -1,0 +1,40 @@
+# Exascale event contract — admin.action.v1
+# One event per sensitive / administrative action (signup, API-key create/revoke, org create, role
+# assignment, ...). Emitted by platform-core AFTER the action commits. Consumed by
+# security-compliance (the SOC 2 audit trail) and analytics. The authoritative record is the
+# platform-core `audit_log` table; this event is the real-time fan-out of the same row.
+
+subject: admin.action.v1
+transport: NATS JetStream
+version: 1.0.0
+description: One administrative / sensitive action, for the real-time audit trail.
+
+payload_schema:
+  $schema: "https://json-schema.org/draft/2020-12/schema"
+  title: AdminActionV1
+  type: object
+  additionalProperties: false
+  required: [id, tenant_id, action, is_paper, ts]
+  properties:
+    id:          { type: string, format: uuid, description: "audit_log row id" }
+    tenant_id:   { type: string, format: uuid }
+    actor_id:    { type: [string, "null"], format: uuid, description: "user who acted; null = system/self-serve" }
+    action:      { type: string, description: "dotted verb: tenant.signup, apikey.create, apikey.revoke, org.create, user.roles.assign" }
+    target_type: { type: [string, "null"], description: "kind of the acted-on object: api_key | org | user | tenant" }
+    target_id:   { type: [string, "null"], description: "id of the acted-on object" }
+    before:      { type: [object, "null"], additionalProperties: true, description: "prior state (for diffs); null on create" }
+    after:       { type: [object, "null"], additionalProperties: true, description: "new state; null on delete" }
+    is_paper:    { type: boolean, description: "from the actor's tenant; consumers MUST filter" }
+    ts:          { type: string, format: date-time }
+
+example:
+  id: "9b1c…"
+  tenant_id: "1f2e…"
+  actor_id: "963917af-…"
+  action: "apikey.create"
+  target_type: "api_key"
+  target_id: "32e41621-…"
+  before: null
+  after: { name: "production", scopes: ["inference:read"] }
+  is_paper: true
+  ts: "2026-05-30T12:00:00Z"
