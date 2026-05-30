@@ -62,6 +62,24 @@ func TestTokenRequiresTenant(t *testing.T) {
 	}
 }
 
+// TestNormalizeEmail checks that case + surrounding whitespace are canonicalised, so one address is
+// one identity regardless of how it was typed (prevents duplicate accounts / login mismatch).
+func TestNormalizeEmail(t *testing.T) {
+	for _, in := range []string{"CEO@Acme.ai", "  ceo@acme.ai ", "ceo@ACME.AI"} {
+		if got := NormalizeEmail(in); got != "ceo@acme.ai" {
+			t.Fatalf("NormalizeEmail(%q) = %q, want ceo@acme.ai", in, got)
+		}
+	}
+}
+
+// TestDummyPasswordCheck ensures the timing-equalizer always reports a non-match (it must never
+// authenticate anyone) — its only purpose is to spend bcrypt time on the user-not-found path.
+func TestDummyPasswordCheck(t *testing.T) {
+	if DummyPasswordCheck("anything") || DummyPasswordCheck("") {
+		t.Fatal("DummyPasswordCheck must always return false")
+	}
+}
+
 // TestAPIKey checks generation, prefix, deterministic hashing, and constant-time verify.
 func TestAPIKey(t *testing.T) {
 	k, err := GenerateAPIKey()

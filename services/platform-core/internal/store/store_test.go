@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/exascale/platform-core/internal/domain"
@@ -52,6 +53,10 @@ func TestStoreIntegration(t *testing.T) {
 	}
 	if _, ok, _ := s.GetUserByEmail(ctx, "nobody-"+uuid.NewString()+"@x.com"); ok {
 		t.Fatal("unknown email reported as found")
+	}
+	// Login is case-insensitive: the same address in a different case resolves the same account.
+	if up, ok, err := s.GetUserByEmail(ctx, strings.ToUpper(email)); err != nil || !ok || up.UserID != u.ID {
+		t.Fatalf("case-insensitive lookup failed: ok=%v err=%v", ok, err)
 	}
 
 	// api key: create → lookup by hash → revoke → lookup fails

@@ -33,6 +33,17 @@ func authPrincipal(cfg config.Config, r *http.Request) (principal, error) {
 	}, nil
 }
 
+// authed resolves the caller from the bearer JWT; on failure it writes a generic 401 and returns
+// ok=false, so handlers can guard with `p, ok := s.authed(w, r); if !ok { return }`.
+func (s *Server) authed(w http.ResponseWriter, r *http.Request) (principal, bool) {
+	p, err := authPrincipal(s.cfg, r)
+	if err != nil {
+		writeErr(w, http.StatusUnauthorized, "unauthorized", "authentication required")
+		return principal{}, false
+	}
+	return p, true
+}
+
 // bearer extracts the token from an Authorization: Bearer <token> header.
 func bearer(r *http.Request) string {
 	if after, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok {

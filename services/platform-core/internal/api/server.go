@@ -13,6 +13,7 @@ import (
 	"github.com/exascale/platform-core/internal/config"
 	"github.com/exascale/platform-core/internal/domain"
 	"github.com/exascale/platform-core/internal/store"
+	"github.com/google/uuid"
 )
 
 // Server wires config + store into an http.Handler.
@@ -50,7 +51,7 @@ func (s *Server) routes() {
 
 // readyz checks the DB is reachable.
 func (s *Server) readyz(w http.ResponseWriter, r *http.Request) {
-	if _, _, err := s.st.GetUserByEmail(r.Context(), "__readyz__@invalid"); err != nil {
+	if err := s.st.Ping(r.Context()); err != nil {
 		slog.Error("readyz: store unreachable", "err", err)
 		writeErr(w, http.StatusServiceUnavailable, "not_ready", "not ready")
 		return
@@ -106,7 +107,14 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		serverError(w, err)
 		return
 	}
-	if !ok || !domain.VerifyPassword(au.PasswordHash, b.Password) {
+	if !ok {
+		// Spend the same bcrypt time as a real check so latency doesn't reveal that the email is
+		// unregistered (account enumeration). Result is discarded — this path always 401s.
+		_ = domain.DummyPasswordCheck(b.Password)
+		writeErr(w, http.StatusUnauthorized, "invalid_credentials", "invalid email or password")
+		return
+	}
+	if !domain.VerifyPassword(au.PasswordHash, b.Password) {
 		writeErr(w, http.StatusUnauthorized, "invalid_credentials", "invalid email or password")
 		return
 	}
@@ -130,9 +138,8 @@ func (s *Server) issue(w http.ResponseWriter, status int, sub string, c domain.C
 
 // me returns the caller's identity (decoded from the token + a store lookup for email).
 func (s *Server) me(w http.ResponseWriter, r *http.Request) {
-	p, err := authPrincipal(s.cfg, r)
-	if err != nil {
-		writeErr(w, http.StatusUnauthorized, "unauthorized", "authentication required")
+	p, ok := s.authed(w, r)
+	if !ok {
 		return
 	}
 	idn, ok, err := s.st.GetUserByID(r.Context(), p.UserID)
@@ -152,9 +159,8 @@ func (s *Server) me(w http.ResponseWriter, r *http.Request) {
 
 // listKeys returns the tenant's API keys (metadata only).
 func (s *Server) listKeys(w http.ResponseWriter, r *http.Request) {
-	p, err := authPrincipal(s.cfg, r)
-	if err != nil {
-		writeErr(w, http.StatusUnauthorized, "unauthorized", "authentication required")
+	p, ok := s.authed(w, r)
+	if !ok {
 		return
 	}
 	keys, err := s.st.ListAPIKeys(r.Context(), p.TenantID)
@@ -174,9 +180,8 @@ func (s *Server) listKeys(w http.ResponseWriter, r *http.Request) {
 
 // createKey mints a scoped API key; the secret is returned ONCE.
 func (s *Server) createKey(w http.ResponseWriter, r *http.Request) {
-	p, err := authPrincipal(s.cfg, r)
-	if err != nil {
-		writeErr(w, http.StatusUnauthorized, "unauthorized", "authentication required")
+	p, ok := s.authed(w, r)
+	if !ok {
 		return
 	}
 	var b struct {
@@ -205,16 +210,20 @@ func (s *Server) createKey(w http.ResponseWriter, r *http.Request) {
 
 // revokeKey revokes one of the tenant's API keys.
 func (s *Server) revokeKey(w http.ResponseWriter, r *http.Request) {
-	p, err := authPrincipal(s.cfg, r)
-	if err != nil {
-		writeErr(w, http.StatusUnauthorized, "unauthorized", "authentication required")
+	p, ok := s.authed(w, r)
+	if !ok {
 		return
 	}
-	if err := s.st.RevokeAPIKey(r.Context(), p.TenantID, r.PathValue("id")); err != nil {
+	id := r.PathValue("id")
+	if _, err := uuid.Parse(id); err != nil { // malformed id can't match any key — don't 500 on a cast error
+		writeErr(w, http.StatusNotFound, "not_found", "key not found")
+		return
+	}
+	if err := s.st.RevokeAPIKey(r.Context(), p.TenantID, id); err != nil {
 		serverError(w, err)
 		return
 	}
-	slog.Info("audit: api key revoked", "tenant_id", p.TenantID, "key_id", r.PathValue("id"))
+	slog.Info("audit: api key revoked", "tenant_id", p.TenantID, "key_id", id)
 	w.WriteHeader(http.StatusNoContent)
 }
 

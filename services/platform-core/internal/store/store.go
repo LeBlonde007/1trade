@@ -36,6 +36,9 @@ func New(ctx context.Context, dsn string) (*Store, error) {
 // Close releases the pool.
 func (s *Store) Close() { s.pool.Close() }
 
+// Ping reports whether Postgres is reachable (used by the readiness probe).
+func (s *Store) Ping(ctx context.Context) error { return s.pool.Ping(ctx) }
+
 // User is the result of a signup (the new account's identity).
 type User struct {
 	ID       string
@@ -48,6 +51,7 @@ type User struct {
 // Signup atomically creates an individual tenant + its first (admin) user. Returns ErrEmailTaken if
 // the email is already registered.
 func (s *Store) Signup(ctx context.Context, email, passwordHash, tenantName string) (User, error) {
+	email = domain.NormalizeEmail(email) // one account per address regardless of case
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return User{}, err
@@ -89,6 +93,7 @@ type AuthUser struct {
 
 // GetUserByEmail loads the login record (joined with the tenant for is_paper). ok=false if no such user.
 func (s *Store) GetUserByEmail(ctx context.Context, email string) (AuthUser, bool, error) {
+	email = domain.NormalizeEmail(email) // match Signup's canonical form (case-insensitive login)
 	var u AuthUser
 	var org *string
 	var roles []string
