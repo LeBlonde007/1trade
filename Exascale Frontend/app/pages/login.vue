@@ -25,7 +25,7 @@ async function onCreds(e: Event) {
   submitting.value = true
   try {
     await useAuth().login(email.value, password.value)
-    await navigateTo('/inference')
+    await navigateTo('/console')
   } catch (err: unknown) {
     const ex = err as { data?: { message?: string } }
     authError.value = ex?.data?.message || 'Invalid email or password'

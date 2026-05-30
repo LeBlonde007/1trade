@@ -67,6 +67,7 @@ export default defineNuxtConfig({
     '/compute':       { ssr: false },
     '/compute/**':    { ssr: false },
     '/inference':     { ssr: false },
+    '/console':       { ssr: false },
     '/states':        { ssr: false },
   },
 
