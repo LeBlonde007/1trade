@@ -8,16 +8,30 @@ definePageMeta({ layout: false })
 useHead({ title: 'Sign in — Exascale', htmlAttrs: { 'data-theme': 'light' } })
 
 const step = ref<'creds' | '2fa'>('creds')
-const email = ref('marcus.chen@frontier.lab')
-const password = ref('•••••••••••••')
+const email = ref('')
+const password = ref('')
+const authError = ref('')
+const submitting = ref(false)
 const showPw = ref(false)
 const code = ref('428')
 const rememberDevice = ref(false)
 const codeInputs = ref<Array<HTMLInputElement | null>>([])
 
-function onCreds(e: Event) {
+// Real login via the BFF. (2FA is an M4 step; not reached until the backend supports it.)
+async function onCreds(e: Event) {
   e.preventDefault()
-  if (email.value && password.value) step.value = '2fa'
+  authError.value = ''
+  if (!email.value || !password.value) return
+  submitting.value = true
+  try {
+    await useAuth().login(email.value, password.value)
+    await navigateTo('/inference')
+  } catch (err: unknown) {
+    const ex = err as { data?: { message?: string } }
+    authError.value = ex?.data?.message || 'Invalid email or password'
+  } finally {
+    submitting.value = false
+  }
 }
 
 function setCodeDigit(i: number, raw: string) {
