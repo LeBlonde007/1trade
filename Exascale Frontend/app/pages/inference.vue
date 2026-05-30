@@ -168,6 +168,10 @@ const draft = ref('')
 const sending = ref(false)
 let streamTimer: ReturnType<typeof setInterval> | null = null
 
+// F20: in live mode (EXASCALE_API_MODE=local) send() calls the real inference gateway; in mock mode
+// it keeps the rich streaming showcase below. The live path routes to a model the gateway serves.
+const apiMode = useRuntimeConfig().public.apiMode
+
 // Rough tokens estimate (~4 chars/token)
 const draftTokens = computed(() => Math.max(0, Math.ceil(draft.value.length / 4)))
 
@@ -219,6 +223,9 @@ function send() {
   draft.value = ''
   sending.value = true
 
+  // Live mode → real inference; mock mode keeps the streaming showcase below.
+  if (apiMode === 'local') { void sendLive(text); return }
+
   // 2. Prepare a streaming assistant turn
   const assistantId = nextId()
   const fullReply = mockReplyFor(text)
@@ -257,6 +264,35 @@ function send() {
       sending.value = false
     }
   }, 60)
+}
+
+// sendLive runs the prompt through the real inference gateway (BFF) and appends the completion with
+// its true token usage. The selected showcase model is routed to one the gateway actually serves; a
+// 402 surfaces as a buy-credits hint.
+async function sendLive(text: string) {
+  const startedAt = Date.now()
+  const liveModel = ['llama-3.1-8b', 'llama-3.1-70b'].includes(selectedId.value) ? selectedId.value : 'llama-3.1-8b'
+  try {
+    const res = await useInference().run(liveModel, text, params.maxTokens)
+    turns.push({
+      id: nextId(), role: 'assistant',
+      text: res.content,
+      html: renderMarkdownLite(res.content),
+      tokens: { in: res.usage.prompt_tokens, out: res.usage.completion_tokens },
+      latencyMs: Date.now() - startedAt,
+      costUsd: mockCost(res.usage.prompt_tokens, res.usage.completion_tokens),
+      reqId: 'req_' + Math.random().toString(36).slice(2, 12),
+      backend: liveModel,
+    })
+  } catch (e: unknown) {
+    const ex = e as { data?: { code?: string; message?: string } }
+    const msg = ex?.data?.code === 'INSUFFICIENT_CREDIT'
+      ? 'Insufficient credit — buy credits in the wallet to run this model.'
+      : (ex?.data?.message || 'Inference failed.')
+    turns.push({ id: nextId(), role: 'assistant', text: msg, html: `<p>${msg}</p>` })
+  } finally {
+    sending.value = false
+  }
 }
 
 function mockReplyFor(prompt: string): string {
