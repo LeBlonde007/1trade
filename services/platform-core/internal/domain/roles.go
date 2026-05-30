@@ -23,3 +23,14 @@ var validRoles = map[Role]bool{
 
 // ValidRole reports whether r is a known role.
 func ValidRole(r Role) bool { return validRoles[r] }
+
+// HasRole reports whether the held roles satisfy `required`. Admin implicitly satisfies any role
+// (full access within its tenant).
+func HasRole(held []Role, required Role) bool {
+	for _, r := range held {
+		if r == required || r == RoleAdmin {
+			return true
+		}
+	}
+	return false
+}

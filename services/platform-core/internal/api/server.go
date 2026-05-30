@@ -64,6 +64,12 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /v1/billing/checkout", s.createCheckout)
 	s.mux.HandleFunc("POST /v1/billing/webhook/stripe", s.stripeWebhook) // auth = Stripe signature
 	s.mux.HandleFunc("GET /v1/billing/purchases", s.listPurchases)
+	s.mux.HandleFunc("GET /v1/account/audit", s.listAudit) // F03 — queryable audit trail (admin)
+	s.mux.HandleFunc("POST /v1/account/orgs", s.createOrg)
+	s.mux.HandleFunc("GET /v1/account/orgs", s.listOrgs)
+	s.mux.HandleFunc("GET /v1/account/orgs/{id}/users", s.listOrgUsers)
+	s.mux.HandleFunc("PUT /v1/account/users/{id}/roles", s.assignRoles)
+	s.mux.HandleFunc("GET /v1/account/tenants/{id}", s.getTenant)
 	// OAuth is scaffolded; real provider wiring (client secrets via Vault) is a follow-up.
 	s.mux.HandleFunc("GET /v1/auth/oauth/{provider}", notConfigured)
 	s.mux.HandleFunc("GET /v1/auth/oauth/{provider}/callback", notConfigured)
@@ -110,7 +116,11 @@ func (s *Server) signup(w http.ResponseWriter, r *http.Request) {
 		serverError(w, err)
 		return
 	}
-	slog.Info("audit: signup", "user_id", u.ID, "tenant_id", u.TenantID) // admin.action audit (NATS event is a follow-up)
+	slog.Info("audit: signup", "user_id", u.ID, "tenant_id", u.TenantID)
+	_, _ = s.st.WriteAudit(r.Context(), store.AuditEntry{
+		TenantID: u.TenantID, ActorID: u.ID, Action: "tenant.signup",
+		TargetType: "tenant", TargetID: u.TenantID, After: map[string]any{"email": b.Email}, IsPaper: u.IsPaper,
+	})
 	s.issue(w, http.StatusCreated, u.ID, domain.Claims{TenantID: u.TenantID, Roles: u.Roles, IsPaper: u.IsPaper})
 }
 
@@ -204,6 +214,9 @@ func (s *Server) createKey(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if !requireRole(w, p, domain.RoleEngineer) { // minting credentials is an engineer/admin action
+		return
+	}
 	var b struct {
 		Name   string   `json:"name"`
 		Scopes []string `json:"scopes"`
@@ -223,6 +236,10 @@ func (s *Server) createKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	slog.Info("audit: api key created", "tenant_id", p.TenantID, "key_id", id)
+	_, _ = s.st.WriteAudit(r.Context(), store.AuditEntry{
+		TenantID: p.TenantID, ActorID: p.UserID, Action: "apikey.create",
+		TargetType: "api_key", TargetID: id, After: map[string]any{"name": b.Name, "scopes": b.Scopes}, IsPaper: p.IsPaper,
+	})
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"id": id, "name": b.Name, "prefix": k.Prefix, "scopes": b.Scopes, "secret": k.Secret,
 	})
@@ -232,6 +249,9 @@ func (s *Server) createKey(w http.ResponseWriter, r *http.Request) {
 func (s *Server) revokeKey(w http.ResponseWriter, r *http.Request) {
 	p, ok := s.authed(w, r)
 	if !ok {
+		return
+	}
+	if !requireRole(w, p, domain.RoleEngineer) {
 		return
 	}
 	id := r.PathValue("id")
@@ -244,6 +264,10 @@ func (s *Server) revokeKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	slog.Info("audit: api key revoked", "tenant_id", p.TenantID, "key_id", id)
+	_, _ = s.st.WriteAudit(r.Context(), store.AuditEntry{
+		TenantID: p.TenantID, ActorID: p.UserID, Action: "apikey.revoke",
+		TargetType: "api_key", TargetID: id, IsPaper: p.IsPaper,
+	})
 	w.WriteHeader(http.StatusNoContent)
 }
 

@@ -45,6 +45,16 @@ func (s *Server) authed(w http.ResponseWriter, r *http.Request) (principal, bool
 	return p, true
 }
 
+// requireRole enforces RBAC: if the principal lacks `role` (admin satisfies any), it writes a 403
+// and returns false. Guard sensitive handlers with `if !requireRole(w, p, domain.RoleEngineer) { return }`.
+func requireRole(w http.ResponseWriter, p principal, role domain.Role) bool {
+	if domain.HasRole(p.Roles, role) {
+		return true
+	}
+	writeErr(w, http.StatusForbidden, "forbidden", "insufficient role")
+	return false
+}
+
 // serviceAuthorized reports whether the request carries the valid service-to-service token. The
 // comparison is constant-time so a wrong token can't be discovered byte-by-byte via timing. A
 // service token that is unset always denies (fail closed).

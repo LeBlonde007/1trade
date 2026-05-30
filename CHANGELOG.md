@@ -95,6 +95,24 @@ SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not da
   sandbox): asymmetric JWT so services can't mint, and a balance hold to close the pre-flight
   fail-open window.
 
+## [v0.1.2] — Milestone 1: accounts, orgs & RBAC (F03)
+
+### Added
+- **Audit log (F03):** `audit_log` table + `admin.action.v1` contract; every sensitive action
+  (signup, API-key create/revoke, org create, role assignment) records a tenant-scoped row with
+  actor + before/after. `GET /v1/account/audit` — queryable trail, admin-only (a SOC 2 control).
+- **RBAC enforcement:** `requireRole` (admin satisfies any) → 403; applied to key + org + role
+  management.
+- **Org management:** create/list orgs (admin), assign user roles (admin, role-validated + audited),
+  read own tenant (cross-tenant → 404, no info leak), list org users — all tenant-scoped. Contract
+  `platform-core.yaml` v1.4.0.
+- **Proven live in k3d:** signup → create org → audit `[org.create, tenant.signup]`; viewer-only →
+  403 on key/org create + audit read.
+
+### Notes
+- Sub-accounts + per-team budgets + the `admin.action.v1` NATS fan-out are M4 (the DB audit log is
+  authoritative today). SAML/SCIM are M4 (F02).
+
 ## [v0.1.1] — Milestone 1: auth & SSO (F02)
 
 ### Added
