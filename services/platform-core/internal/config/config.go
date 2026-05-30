@@ -8,11 +8,12 @@ import (
 
 // Config holds runtime configuration.
 type Config struct {
-	Env         string        // dev | staging | prod
-	Addr        string        // listen address, e.g. ":8001"
-	DatabaseURL string        // Postgres DSN
-	JWTSecret   string        // HS256 signing secret — SHARED with every service that verifies tokens
-	TokenTTL    time.Duration // issued-token lifetime
+	Env          string        // dev | staging | prod
+	Addr         string        // listen address, e.g. ":8001"
+	DatabaseURL  string        // Postgres DSN
+	JWTSecret    string        // HS256 signing secret — SHARED with every service that verifies tokens
+	ServiceToken string        // service-to-service token guarding internal endpoints (e.g. key introspect)
+	TokenTTL     time.Duration // issued-token lifetime
 }
 
 // Load reads configuration from the environment with sensible dev defaults.
@@ -24,11 +25,12 @@ func Load() Config {
 		}
 	}
 	return Config{
-		Env:         envOr("EXASCALE_ENV", "dev"),
-		Addr:        envOr("PLATFORM_ADDR", ":8001"),
-		DatabaseURL: os.Getenv("DATABASE_URL"),
-		JWTSecret:   os.Getenv("PLATFORM_JWT_SECRET"),
-		TokenTTL:    ttl,
+		Env:          envOr("EXASCALE_ENV", "dev"),
+		Addr:         envOr("PLATFORM_ADDR", ":8001"),
+		DatabaseURL:  os.Getenv("DATABASE_URL"),
+		JWTSecret:    os.Getenv("PLATFORM_JWT_SECRET"),
+		ServiceToken: os.Getenv("SERVICE_TOKEN"),
+		TokenTTL:     ttl,
 	}
 }
 

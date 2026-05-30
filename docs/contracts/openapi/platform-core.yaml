@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Exascale Platform-Core API (auth, accounts, RBAC, keys)
-  version: 1.1.0
+  version: 1.2.0
   description: >
     Identity for the whole platform. Owned by `platform-core`. Every other service authenticates
     inbound requests by verifying the JWT this service issues (see JwtClaims) — that's how each
@@ -166,6 +166,32 @@ paths:
       responses:
         '204': { description: Revoked. }
 
+  /v1/auth/keys/introspect:
+    post:
+      tags: [auth]
+      summary: >
+        Internal — resolve a raw API key to its tenant/scopes/is_paper. Called service-to-service
+        (e.g. the inference gateway) to authenticate a customer's `exk_...` key. Not for end users.
+      operationId: introspectKey
+      security: [{ serviceToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [api_key]
+              properties:
+                api_key: { type: string, description: "the raw key, e.g. exk_..." }
+      responses:
+        '200':
+          description: Resolved principal.
+          content: { application/json: { schema: { $ref: '#/components/schemas/KeyPrincipal' } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404':
+          description: Unknown or revoked key.
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+
   /v1/account/tenants/{id}:
     get:
       tags: [accounts]
@@ -211,6 +237,10 @@ components:
       type: http
       scheme: bearer
       description: "A scoped API key (for programmatic clients, e.g. the inference API)."
+    serviceToken:
+      type: http
+      scheme: bearer
+      description: "Service-to-service token for internal endpoints (e.g. the inference gateway introspecting an API key)."
 
   parameters:
     IdempotencyKey:
@@ -269,6 +299,15 @@ components:
         prefix:     { type: string, description: "first chars, for identification" }
         created_at: { type: string, format: date-time }
         last_used_at: { type: string, format: date-time, nullable: true }
+    KeyPrincipal:
+      type: object
+      description: The identity an API key resolves to (returned by introspect).
+      required: [tenant_id, scopes, is_paper]
+      properties:
+        tenant_id:      { type: string, format: uuid }
+        sub_account_id: { type: string, format: uuid, nullable: true }
+        scopes:         { type: array, items: { type: string } }
+        is_paper:       { type: boolean, description: "from the key's tenant; the gateway propagates it into usage events" }
     ApiError:
       type: object
       required: [code, message]

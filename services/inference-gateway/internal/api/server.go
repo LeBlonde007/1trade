@@ -8,20 +8,23 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"strings"
 
+	"github.com/exascale/inference-gateway/internal/auth"
 	"github.com/exascale/inference-gateway/internal/catalog"
 	"github.com/exascale/inference-gateway/internal/config"
 )
 
-// Server wires config into an http.Handler.
+// Server wires config + the auth resolver into an http.Handler.
 type Server struct {
-	cfg config.Config
-	mux *http.ServeMux
+	cfg  config.Config
+	auth *auth.Resolver
+	mux  *http.ServeMux
 }
 
 // New builds the routed handler.
 func New(cfg config.Config) *Server {
-	s := &Server{cfg: cfg, mux: http.NewServeMux()}
+	s := &Server{cfg: cfg, auth: auth.NewResolver(cfg), mux: http.NewServeMux()}
 	s.routes()
 	return s
 }
@@ -36,9 +39,32 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /v1/models", s.listModels)
 }
 
-// listModels serves the curated catalog in the OpenAI list shape.
-func (s *Server) listModels(w http.ResponseWriter, _ *http.Request) {
+// listModels serves the curated catalog in the OpenAI list shape (auth required).
+func (s *Server) listModels(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireAuth(w, r); !ok {
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"object": "list", "data": catalog.List()})
+}
+
+// requireAuth resolves the caller from the bearer credential (API key or tenant JWT); on failure it
+// writes a generic 401 and returns ok=false. Guard handlers with
+// `p, ok := s.requireAuth(w, r); if !ok { return }`.
+func (s *Server) requireAuth(w http.ResponseWriter, r *http.Request) (auth.Principal, bool) {
+	p, err := s.auth.Resolve(r.Context(), bearer(r))
+	if err != nil {
+		writeErr(w, http.StatusUnauthorized, "unauthorized", "a valid API key or token is required")
+		return auth.Principal{}, false
+	}
+	return p, true
+}
+
+// bearer extracts the token from an Authorization: Bearer <token> header.
+func bearer(r *http.Request) string {
+	if after, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok {
+		return strings.TrimSpace(after)
+	}
+	return ""
 }
 
 // writeJSON writes a JSON response.
