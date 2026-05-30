@@ -4,14 +4,16 @@
 
 allow_k8s_contexts('k3d-exascale')  # guard: never act on a non-local cluster
 
-# --- shared auth secret (F02) — the HS256 JWT signing key both platform-core (issuer) and
-# credit-ledger (verifier) read as PLATFORM_JWT_SECRET. Generated locally on first run and kept in
-# the cluster; never committed. Prod sources it from SOPS/Vault.
+# --- shared auth secret (F02/F08) — PLATFORM_JWT_SECRET (platform-core issues with it; credit-ledger
+# and inference-gateway verify/mint with it) and SERVICE_TOKEN (the gateway uses it to introspect API
+# keys at platform-core). Generated locally on first run, kept in the cluster, never committed. Prod
+# sources them from SOPS/Vault.
 local_resource(
     'platform-auth',
     cmd='kubectl get secret platform-auth >/dev/null 2>&1 || '
         'kubectl create secret generic platform-auth '
-        '--from-literal=PLATFORM_JWT_SECRET=$(openssl rand -base64 48)',
+        '--from-literal=PLATFORM_JWT_SECRET=$(openssl rand -base64 48) '
+        '--from-literal=SERVICE_TOKEN=$(openssl rand -base64 32)',
 )
 
 # --- credit-ledger (F05) — deployed to `default`; talks to the data plane in `data` via FQDN ---
@@ -44,5 +46,12 @@ docker_build('exascale/platform-core:dev', 'services/platform-core',
 k8s_yaml(kustomize('deploy/k8s/platform-core/base'))
 k8s_resource('platform-core', port_forwards='8001:8001',
              resource_deps=['platform-core-migrations', 'platform-auth'])
+
+# --- inference-gateway (F08) — the OpenAI-compatible API; authenticates customers, meters usage ---
+docker_build('exascale/inference-gateway:dev', 'services/inference-gateway',
+             dockerfile='services/inference-gateway/Dockerfile')
+k8s_yaml(kustomize('deploy/k8s/inference-gateway/base'))
+k8s_resource('inference-gateway', port_forwards='8085:8085',
+             resource_deps=['platform-auth'])
 
 # Future services register their own docker_build + k8s_yaml + k8s_resource blocks here.

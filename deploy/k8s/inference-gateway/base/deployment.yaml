@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inference-gateway
+  labels: { app: inference-gateway }
+spec:
+  replicas: 1                       # local; HPA + N replicas in prod overlay (DEPLOYMENT.md §7)
+  selector:
+    matchLabels: { app: inference-gateway }
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+  template:
+    metadata:
+      labels: { app: inference-gateway }
+    spec:
+      containers:
+        - name: inference-gateway
+          image: exascale/inference-gateway:dev
+          ports: [{ containerPort: 8085 }]
+          envFrom:
+            - configMapRef: { name: inference-gateway-env }
+            - secretRef: { name: platform-auth }   # PLATFORM_JWT_SECRET (verify+mint) + SERVICE_TOKEN (introspect)
+          livenessProbe:
+            httpGet: { path: /healthz, port: 8085 }
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: { path: /readyz, port: 8085 }
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: "1", memory: 256Mi }
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532          # distroless 'nonroot' UID — numeric so kubelet can verify non-root
+            runAsGroup: 65532
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }

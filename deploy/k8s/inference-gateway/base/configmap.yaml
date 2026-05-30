@@ -1,0 +1,12 @@
+# inference-gateway non-secret config. PLATFORM_JWT_SECRET + SERVICE_TOKEN come from the shared
+# `platform-auth` Secret (envFrom in the Deployment) — never here.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: inference-gateway-env
+data:
+  EXASCALE_ENV: "dev"
+  INFERENCE_ADDR: ":8085"
+  PLATFORM_CORE_URL: "http://platform-core:8001"
+  CREDIT_LEDGER_URL: "http://credit-ledger:8002"
+  NATS_URL: "nats://nats.data.svc.cluster.local:4222"

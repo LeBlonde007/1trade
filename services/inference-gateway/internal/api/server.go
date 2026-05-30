@@ -116,6 +116,10 @@ func (s *Server) chatCompletions(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "model_not_found", "unknown model: "+req.Model)
 		return
 	}
+	if m.Exascale.Modality != "text" { // chat is text-only; refuse so we never bill the wrong sub-credit
+		writeErr(w, http.StatusNotFound, "model_not_found", req.Model+" is not a chat model")
+		return
+	}
 	// Pre-flight: reject before consuming a GPU when the tenant has no credit. Fail-open on a ledger
 	// error (a balance-service blip shouldn't block inference; the event-driven debit still records it).
 	if s.credit != nil {
