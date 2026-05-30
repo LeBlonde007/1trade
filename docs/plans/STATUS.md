@@ -38,7 +38,8 @@ Exascale
 ├── ✅ M2 — First inference dollar / sandbox (shipped, except F07 + F12)
 │   ├── ✅ F06 billing           Stripe checkout → webhook (sig-verified) → idempotent ledger mint;
 │   │                            monthly budgets (v0.1.3). ACH/wire/JPY = M3.
-│   ├── ⬜ F07 credit conversion ← M2 GAP, not started (AI-index↔sub/gpu, 1% spread — ADR-0002)
+│   ├── ✅ F07 credit conversion  AI-index↔text, atomic two-leg (burn+mint, chained), rate table,
+│   │                            1% spread, idempotent (v0.2.4). M3: other modalities + GPU + UI.
 │   ├── ✅ F08 inference gateway  OpenAI-compatible /v1/chat/completions+/models, API-key auth,
 │   │                            pre-flight 402, emits inference.usage.v1. DEPLOYED.
 │   ├── 🟩 F09 vLLM runtime      gateway↔runtime contract + VLLMBackend (mock→vLLM config flip) +
@@ -65,9 +66,9 @@ Exascale
 - **M1 (Foundation):** ✅ essentially complete. Shipped F01(core)+F02+F03+F05+F20-shell. **Gaps vs plan:
   F04 (CLI v0) not started; F01 remainder (observability/SOPS/real-envs/CI-green) pending.**
 - **M2 (First inference dollar, sandbox):** ✅ the loop works end-to-end live — signup → buy credits
-  (Stripe) → run inference (gateway→runtime) → idempotent ledger debit → console shows it. **Gaps vs
-  plan: F07 (conversion) not started; F12 (compute control plane) not started (GPU-gated); F09 real
-  GPU serving deferred to a GPU node.**
+  (Stripe) → run inference (gateway→runtime) → idempotent ledger debit → console shows it; **F07
+  conversion** (AI-index↔text) live (v0.2.4). **Gaps vs plan: F12 (compute control plane) not started
+  (GPU-gated); F09 real GPU serving deferred to a GPU node.**
 - **Pulled forward:** F03 audit-log + RBAC (sequenced M4) built in M1; email-verify + budgets
   (M3-ish) shipped as gap-closers (v0.1.3).
 - **M3–M6:** ⬜ not started.
@@ -78,12 +79,13 @@ Repo: trunk = `main` (8 features merged), pushed to `origin` (ex-main). Tags v0.
 
 ## TO DO — next up (ordered, to converge on the sequencing)
 
-1. **F07 — credit conversion** (M2 gap; fully buildable + verifiable here). AI-index↔sub/gpu credits,
-   atomic two-leg ledger movement, 1% spread (ADR-0002). Lights up the wallet "convert". `/ex-start F07`.
-2. **F04 — exascale CLI v0** (M1 gap). `login`, `whoami`, `credits balance`, `infer chat` against the
-   live platform — the "primary engineer interface" + the sub-5-min commitment. `/ex-start F04`.
-3. **F12 — compute control plane** (M2 gap). Needs a GPU node + GPU Operator to be meaningful; pairs
+1. **F04 — exascale CLI v0** (M1 gap; fully buildable here). `login`, `whoami`, `credits balance`,
+   `infer chat`, `credits convert` against the live platform — the "primary engineer interface" +
+   the sub-5-min commitment. `/ex-start F04`.
+2. **F12 — compute control plane** (M2 gap). Needs a GPU node + GPU Operator to be meaningful; pairs
    with provisioning. Unblocks real F09 serving + F13 GPU lifecycle.
+3. **Wallet "convert" UI** (F20/F07 M3 sync) — small BFF route + console panel over the now-live
+   /v1/credits/convert.
 4. **F01 remainder** — observability (Prometheus /metrics + Grafana/Loki/Tempo; tasks #3/#13), SOPS
    secrets, real-env clusters, CI green. Prod-hardening before paying customers (M3).
 5. **M3 provisioning (your side)** — Stripe + domain/Cloudflare + registry + GPU node + HF token +

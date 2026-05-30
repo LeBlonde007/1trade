@@ -24,8 +24,10 @@ local_resource(
     cmd='kubectl create configmap credit-ledger-migrations '
         '--from-file=types.sql=docs/contracts/schemas/types.sql '
         '--from-file=0001_init.sql=services/credit-ledger/migrations/0001_init.sql '
+        '--from-file=0002_conversion.sql=services/credit-ledger/migrations/0002_conversion.sql '
         '--dry-run=client -o yaml | kubectl apply -f -',
-    deps=['docs/contracts/schemas/types.sql', 'services/credit-ledger/migrations/0001_init.sql'],
+    deps=['docs/contracts/schemas/types.sql', 'services/credit-ledger/migrations/0001_init.sql',
+          'services/credit-ledger/migrations/0002_conversion.sql'],
 )
 docker_build('exascale/credit-ledger:dev', 'services/credit-ledger',
              dockerfile='services/credit-ledger/Dockerfile')

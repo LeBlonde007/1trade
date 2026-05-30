@@ -23,7 +23,7 @@ spec:
           args:
             - |
               set -e
-              for f in /migrations/types.sql /migrations/0001_init.sql; do
+              for f in /migrations/types.sql /migrations/0001_init.sql /migrations/0002_conversion.sql; do
                 echo "applying $f"; psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"
               done
           env:
