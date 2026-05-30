@@ -1,21 +1,21 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: credit-ledger
-  labels: { app: credit-ledger }
+  name: platform-core
+  labels: { app: platform-core }
 spec:
-  replicas: 1                       # local; HPA + 5 replicas in prod overlay (DEPLOYMENT.md §7)
+  replicas: 1                       # local; HPA + 3 replicas in prod overlay (DEPLOYMENT.md §7)
   selector:
-    matchLabels: { app: credit-ledger }
+    matchLabels: { app: platform-core }
   strategy:
     type: RollingUpdate
     rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
   template:
     metadata:
-      labels: { app: credit-ledger }
+      labels: { app: platform-core }
     spec:
       # Apply migrations before the service starts (idempotent: CREATE ... IF NOT EXISTS).
-      # SQL comes from the credit-ledger-migrations ConfigMap (shared types.sql + 0001_init.sql).
+      # SQL comes from the platform-core-migrations ConfigMap (0001_init.sql).
       initContainers:
         - name: migrate
           image: postgres:16-alpine
@@ -23,25 +23,25 @@ spec:
           args:
             - |
               set -e
-              for f in /migrations/types.sql /migrations/0001_init.sql; do
+              for f in /migrations/0001_init.sql; do
                 echo "applying $f"; psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"
               done
           env:
-            - { name: DATABASE_URL, valueFrom: { configMapKeyRef: { name: credit-ledger-env, key: DATABASE_URL } } }
+            - { name: DATABASE_URL, valueFrom: { configMapKeyRef: { name: platform-core-env, key: DATABASE_URL } } }
           volumeMounts:
             - { name: migrations, mountPath: /migrations }
       containers:
-        - name: credit-ledger
-          image: exascale/credit-ledger:dev
-          ports: [{ containerPort: 8002 }]
+        - name: platform-core
+          image: exascale/platform-core:dev
+          ports: [{ containerPort: 8001 }]
           envFrom:
-            - configMapRef: { name: credit-ledger-env }
-            - secretRef: { name: platform-auth }   # shared PLATFORM_JWT_SECRET — verifies platform-core JWTs (F02↔F05)
+            - configMapRef: { name: platform-core-env }
+            - secretRef: { name: platform-auth }   # PLATFORM_JWT_SECRET — the signing key it issues with
           livenessProbe:
-            httpGet: { path: /healthz, port: 8002 }
+            httpGet: { path: /healthz, port: 8001 }
             periodSeconds: 10
           readinessProbe:
-            httpGet: { path: /readyz, port: 8002 }
+            httpGet: { path: /readyz, port: 8001 }
             periodSeconds: 5
           resources:
             requests: { cpu: 50m, memory: 64Mi }
@@ -55,4 +55,4 @@ spec:
             capabilities: { drop: [ALL] }
       volumes:
         - name: migrations
-          configMap: { name: credit-ledger-migrations }
+          configMap: { name: platform-core-migrations }
