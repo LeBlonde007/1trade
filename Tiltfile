@@ -38,8 +38,10 @@ local_resource(
     'platform-core-migrations',
     cmd='kubectl create configmap platform-core-migrations '
         '--from-file=0001_init.sql=services/platform-core/migrations/0001_init.sql '
+        '--from-file=0002_billing.sql=services/platform-core/migrations/0002_billing.sql '
         '--dry-run=client -o yaml | kubectl apply -f -',
-    deps=['services/platform-core/migrations/0001_init.sql'],
+    deps=['services/platform-core/migrations/0001_init.sql',
+          'services/platform-core/migrations/0002_billing.sql'],
 )
 docker_build('exascale/platform-core:dev', 'services/platform-core',
              dockerfile='services/platform-core/Dockerfile')

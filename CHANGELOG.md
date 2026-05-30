@@ -4,6 +4,29 @@ All notable changes to Exascale. Format: [Keep a Changelog](https://keepachangel
 SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not dates — see
 `docs/plans/MANAGEMENT_PLAN.md`).
 
+## [v0.2.1] — Milestone 2: credit purchase / billing (F06)
+
+### Added
+- **Credit purchase (F06), money-in side:** `POST /v1/billing/checkout` (auth → pending purchase +
+  Stripe checkout URL), `POST /v1/billing/webhook/stripe` (Stripe-signature authenticated, not
+  bearer), `GET /v1/billing/purchases`. On `checkout.session.completed` the webhook marks the
+  purchase paid and books credits to the ledger via the service-token `/v1/credits/purchase`,
+  **idempotent on the Stripe event id**. Stripe sits behind a `StripeClient` interface — a mock runs
+  the full loop locally with no keys; real Stripe is the M3 swap.
+- **Proven live in k3d:** checkout 500 text credits → signed webhook → `text` balance `0 → 500`;
+  **webhook replay → still 500** (deduped); forged signature → 401; purchase shows `paid`. Confirms
+  the platform-core → credit-ledger service-token path end to end.
+- Contract `openapi/platform-core.yaml` v1.3.0 (billing surface + `Purchase`); migration
+  `0002_billing.sql` (purchases, `stripe_event_id` UNIQUE = mint idempotency anchor).
+
+### Security
+- F06 review gate: webhook signatures verified by HMAC-SHA256 (Stripe's `t=,v1=` scheme),
+  constant-time, with a replay/skew window; **fail-closed** when no secret is configured; the mint
+  is idempotent (no double-credit on replay); `is_paper` threads tenant → purchase → ledger; checkout
+  + booking are audited; webhook body is size-limited; no Stripe secrets committed. Known follow-ups
+  (M3 / F22, non-blocking for the paper sandbox): KYC gate before real-money purchases, FX/multi-
+  currency pricing, and the real Stripe checkout-session client.
+
 ## [v0.2.0] — Milestone 2: first inference dollar (sandbox) — inference gateway (F08)
 
 ### Added
