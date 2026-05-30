@@ -4,6 +4,25 @@ All notable changes to Exascale. Format: [Keep a Changelog](https://keepachangel
 SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not dates — see
 `docs/plans/MANAGEMENT_PLAN.md`).
 
+## [v0.2.4] — Milestone 2: credit conversion (F07)
+
+### Added
+- **Credit conversion (F07):** `POST /v1/credits/convert` + `GET /v1/credits/conversion-rates` (the
+  AI-index ↔ sub/GPU mechanism — the thesis's "index converts into any compute"). M2 ships
+  `ai_index ↔ text`.
+- **Atomic + correct:** one DB transaction burns `from` and mints `to` as two chained legs (each
+  extends its own balance's hash chain), with **distinct per-leg idempotency keys** so they don't
+  shadow each other. Rate read from a `conversion_rates` table (no hardcoding); amount =
+  `floor(amount × rate × (1−spread))` in exact fixed-point (1% house spread, ADR-0002); the floor
+  means the house never over-credits.
+- **Proven live in k3d:** convert 100 ai_index → 82.227321 text (value − 1% spread); idempotent
+  replay leaves balances unchanged; insufficient → 402; unknown pair → 422; **hash chain verifies**
+  after (checked 3, ok). Tests: domain math + store integration.
+
+### Notes
+- M3: the other modalities + GPU-tier rates, and the wallet "convert" UI (copy stays
+  "convert"/"redeem", never "trade"/"exchange" — prepaid framing).
+
 ## [v0.2.3] — Milestone 2: platform console — live data layer + console (F20)
 
 ### Added

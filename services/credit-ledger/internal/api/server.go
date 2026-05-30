@@ -44,8 +44,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /v1/credits/mint", s.movement(domain.OpMint, +1))
 	s.mux.HandleFunc("POST /v1/credits/burn", s.movement(domain.OpBurn, -1))
 	s.mux.HandleFunc("GET /v1/credits/audit/chain-verify", s.chainVerify)
-	s.mux.HandleFunc("POST /v1/credits/convert", notImplemented("conversion is F07"))
-	s.mux.HandleFunc("GET /v1/credits/conversion-rates", notImplemented("conversion is F07"))
+	s.mux.HandleFunc("POST /v1/credits/convert", s.convert)
+	s.mux.HandleFunc("GET /v1/credits/conversion-rates", s.conversionRates)
 }
 
 // readyz checks the DB is reachable.

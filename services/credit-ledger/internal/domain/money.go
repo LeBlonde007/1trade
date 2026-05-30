@@ -105,3 +105,24 @@ func (m *Money) UnmarshalJSON(b []byte) error {
 	*m = parsed
 	return nil
 }
+
+// ConvertedAmount returns floor(amount × rate × (1 − spread)) at 6-dp (F07). `rate` is `to`-units per
+// 1 `from`-unit (pre-spread); `spread` is the house fraction (e.g. "0.01"). It floors — rounds down —
+// so the house never over-credits, and uses exact big.Rat math (never a float).
+func ConvertedAmount(amount Money, rate, spread string) (Money, error) {
+	r, ok := new(big.Rat).SetString(rate)
+	if !ok || r.Sign() <= 0 {
+		return Money{}, fmt.Errorf("invalid rate %q", rate)
+	}
+	sp, ok := new(big.Rat).SetString(spread)
+	if !ok || sp.Sign() < 0 || sp.Cmp(big.NewRat(1, 1)) >= 0 {
+		return Money{}, fmt.Errorf("invalid spread %q", spread)
+	}
+	amt := new(big.Rat).SetFrac(amount.i(), scaleFactor) // micros → whole-credit rational
+	oneMinus := new(big.Rat).Sub(big.NewRat(1, 1), sp)
+	res := new(big.Rat).Mul(amt, r)
+	res.Mul(res, oneMinus)
+	scaled := new(big.Rat).Mul(res, new(big.Rat).SetInt(scaleFactor)) // back to micro-units (rational)
+	micros := new(big.Int).Div(scaled.Num(), scaled.Denom())          // floor (operands non-negative)
+	return Money{micros}, nil
+}
