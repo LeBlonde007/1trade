@@ -9,19 +9,34 @@ import (
 
 	"github.com/exascale/inference-gateway/internal/api"
 	"github.com/exascale/inference-gateway/internal/config"
+	"github.com/exascale/inference-gateway/internal/events"
+	"github.com/exascale/inference-gateway/internal/model"
 )
 
 // Version is set at build time (-ldflags -X main.Version=...).
 var Version = "dev"
 
-// main wires config → HTTP server and serves until killed.
+// main wires config → model backend + usage publisher → HTTP server and serves until killed.
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
 	cfg := config.Load()
 
+	// Usage events drive ledger debits. Prefer NATS; fall back to logging so local dev still runs.
+	var usage events.Publisher
+	if np, err := events.NewNatsPublisher(cfg.NATSURL); err != nil {
+		slog.Warn("NATS unavailable; using log publisher (no debits will flow)", "err", err)
+		usage = events.LogPublisher{}
+	} else {
+		defer np.Close()
+		usage = np
+	}
+
+	// Mock backend for now; real vLLM (F09) implements the same interface and swaps in here.
+	backend := model.MockBackend{}
+
 	srv := &http.Server{
 		Addr:              cfg.Addr,
-		Handler:           api.New(cfg),
+		Handler:           api.New(cfg, backend, usage),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	slog.Info("inference-gateway listening", "addr", cfg.Addr, "env", cfg.Env, "version", Version)

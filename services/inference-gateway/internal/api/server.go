@@ -6,25 +6,33 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/exascale/inference-gateway/internal/auth"
 	"github.com/exascale/inference-gateway/internal/catalog"
 	"github.com/exascale/inference-gateway/internal/config"
+	"github.com/exascale/inference-gateway/internal/events"
+	"github.com/exascale/inference-gateway/internal/model"
+	"github.com/exascale/inference-gateway/internal/pricing"
+	"github.com/google/uuid"
 )
 
-// Server wires config + the auth resolver into an http.Handler.
+// Server wires config + the auth resolver + the model backend + the usage publisher into a handler.
 type Server struct {
-	cfg  config.Config
-	auth *auth.Resolver
-	mux  *http.ServeMux
+	cfg     config.Config
+	auth    *auth.Resolver
+	backend model.Backend
+	usage   events.Publisher
+	mux     *http.ServeMux
 }
 
 // New builds the routed handler.
-func New(cfg config.Config) *Server {
-	s := &Server{cfg: cfg, auth: auth.NewResolver(cfg), mux: http.NewServeMux()}
+func New(cfg config.Config, backend model.Backend, usage events.Publisher) *Server {
+	s := &Server{cfg: cfg, auth: auth.NewResolver(cfg), backend: backend, usage: usage, mux: http.NewServeMux()}
 	s.routes()
 	return s
 }
@@ -37,6 +45,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 	s.mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 	s.mux.HandleFunc("GET /v1/models", s.listModels)
+	s.mux.HandleFunc("POST /v1/chat/completions", s.chatCompletions)
 }
 
 // listModels serves the curated catalog in the OpenAI list shape (auth required).
@@ -65,6 +74,125 @@ func bearer(r *http.Request) string {
 		return strings.TrimSpace(after)
 	}
 	return ""
+}
+
+// chatCompletionRequest mirrors the contract's ChatCompletionRequest (the fields we use).
+type chatCompletionRequest struct {
+	Model    string `json:"model"`
+	Messages []struct {
+		Role    string `json:"role"`
+		Content string `json:"content"`
+	} `json:"messages"`
+	MaxTokens int  `json:"max_tokens"`
+	Stream    bool `json:"stream"`
+}
+
+// chatCompletions serves POST /v1/chat/completions (OpenAI-compatible): authenticate → resolve the
+// model from the catalog → serve via the backend → return the completion (JSON, or SSE when
+// stream=true) → emit exactly one inference.usage.v1 event for the ledger to debit.
+func (s *Server) chatCompletions(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+	var req chatCompletionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Model == "" || len(req.Messages) == 0 {
+		writeErr(w, http.StatusBadRequest, "bad_request", "model and messages are required")
+		return
+	}
+	m, found := catalog.Lookup(req.Model)
+	if !found {
+		writeErr(w, http.StatusNotFound, "model_not_found", "unknown model: "+req.Model)
+		return
+	}
+	// TODO(#23): pre-flight credit balance check → 402 Payment Required before serving.
+
+	msgs := make([]model.Message, len(req.Messages))
+	for i, mm := range req.Messages {
+		msgs[i] = model.Message{Role: mm.Role, Content: mm.Content}
+	}
+
+	start := time.Now()
+	res, err := s.backend.Chat(r.Context(), model.ChatRequest{Model: req.Model, Messages: msgs, MaxTokens: req.MaxTokens})
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	latency := int(time.Since(start).Milliseconds())
+	total := res.PromptTokens + res.CompletionTokens
+	units, err := pricing.UnitsForTokens(m.Exascale.Price, total)
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	requestID := "infreq_" + uuid.NewString()
+	id := "chatcmpl_" + uuid.NewString()
+
+	if req.Stream {
+		s.streamChat(w, id, req.Model, res)
+	} else {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"id": id, "object": "chat.completion", "created": time.Now().Unix(), "model": req.Model,
+			"choices": []map[string]any{{
+				"index":         0,
+				"message":       map[string]any{"role": "assistant", "content": res.Content},
+				"finish_reason": res.FinishReason,
+			}},
+			"usage": map[string]any{
+				"prompt_tokens": res.PromptTokens, "completion_tokens": res.CompletionTokens, "total_tokens": total,
+			},
+		})
+	}
+	// Emit AFTER the response completes (exactly once). request_id is the ledger's debit idempotency key.
+	s.meter(p, m, req.Model, res, units, latency, requestID)
+}
+
+// meter emits exactly one inference.usage.v1 event for a served request. Best-effort: a publish
+// failure is logged, never fails the customer (the response was already produced).
+func (s *Server) meter(p auth.Principal, m catalog.Model, modelID string, res model.ChatResult, units string, latencyMS int, requestID string) {
+	in, out, lat := res.PromptTokens, res.CompletionTokens, latencyMS
+	e := events.UsageEvent{
+		RequestID: requestID, TenantID: p.TenantID, Model: modelID,
+		Modality: m.Exascale.Modality, CreditType: m.Exascale.CreditType,
+		InputTokens: &in, OutputTokens: &out, Units: units, LatencyMS: &lat,
+		IsPaper: p.IsPaper, TS: time.Now().UTC().Format(time.RFC3339),
+	}
+	if p.SubAccountID != "" {
+		e.SubAccountID = &p.SubAccountID
+	}
+	if err := s.usage.PublishUsage(e); err != nil {
+		slog.Error("publish inference.usage.v1 failed", "request_id", requestID, "err", err)
+	}
+}
+
+// streamChat sends the completion as an SSE stream of OpenAI chat.completion.chunk objects: a role
+// delta, then content deltas, then a finish chunk, then `data: [DONE]`.
+func (s *Server) streamChat(w http.ResponseWriter, id, modelID string, res model.ChatResult) {
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		serverError(w, fmt.Errorf("streaming unsupported"))
+		return
+	}
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	send := func(delta map[string]any, finish any) {
+		chunk := map[string]any{
+			"id": id, "object": "chat.completion.chunk", "created": time.Now().Unix(), "model": modelID,
+			"choices": []map[string]any{{"index": 0, "delta": delta, "finish_reason": finish}},
+		}
+		b, _ := json.Marshal(chunk)
+		fmt.Fprintf(w, "data: %s\n\n", b)
+		flusher.Flush()
+	}
+	send(map[string]any{"role": "assistant"}, nil)
+	for _, word := range strings.Fields(res.Content) {
+		send(map[string]any{"content": word + " "}, nil)
+	}
+	send(map[string]any{}, res.FinishReason)
+	fmt.Fprint(w, "data: [DONE]\n\n")
+	flusher.Flush()
 }
 
 // writeJSON writes a JSON response.
