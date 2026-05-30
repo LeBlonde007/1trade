@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
-  title: Exascale Platform-Core API (auth, accounts, RBAC, keys)
-  version: 1.2.0
+  title: Exascale Platform-Core API (auth, accounts, RBAC, keys, billing)
+  version: 1.3.0
   description: >
     Identity for the whole platform. Owned by `platform-core`. Every other service authenticates
     inbound requests by verifying the JWT this service issues (see JwtClaims) — that's how each
@@ -16,6 +16,7 @@ servers:
 tags:
   - { name: auth, description: "Login, OAuth, session, API keys." }
   - { name: accounts, description: "Tenants, orgs, users, roles." }
+  - { name: billing, description: "Credit purchase — Stripe checkout, webhook, purchase history." }
 
 paths:
   /v1/auth/signup:
@@ -224,6 +225,77 @@ paths:
                   users: { type: array, items: { $ref: '#/components/schemas/User' } }
                   next_cursor: { type: string, nullable: true }
 
+  /v1/billing/checkout:
+    post:
+      tags: [billing]
+      summary: >
+        Start a credit purchase. Validates the order, records a pending purchase, and returns a
+        Stripe Checkout URL. Credits are only minted after payment settles (the webhook books them).
+      operationId: createCheckout
+      security: [{ tenantJwt: [] }]
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount, credit_type, currency]
+              properties:
+                amount:      { type: string, description: "credits to buy, fixed-point decimal string" }
+                credit_type: { type: string, description: "e.g. text, ai_index, gpu_h100 (see credit-types.md)" }
+                currency:    { type: string, enum: [usd, jpy], description: "settlement currency" }
+      responses:
+        '200':
+          description: Checkout created.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  purchase_id:  { type: string, format: uuid }
+                  checkout_url: { type: string, description: "redirect the customer here to pay" }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { description: Invalid order., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+
+  /v1/billing/webhook/stripe:
+    post:
+      tags: [billing]
+      summary: >
+        Stripe webhook receiver. NOT bearer-authenticated — authenticity is the Stripe-Signature
+        header (HMAC). On checkout.session.completed it books the credits to the ledger, idempotent
+        on the Stripe event id (replays are safe).
+      operationId: stripeWebhook
+      parameters:
+        - { name: Stripe-Signature, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, description: "raw Stripe Event payload (verified by signature)" }
+      responses:
+        '200': { description: Received (and booked if applicable). }
+        '400': { description: Bad/again-replayable payload., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+        '401': { description: Signature verification failed., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+
+  /v1/billing/purchases:
+    get:
+      tags: [billing]
+      summary: The tenant's purchase history.
+      operationId: listPurchases
+      security: [{ tenantJwt: [] }]
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        '200':
+          description: Purchases.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  purchases: { type: array, items: { $ref: '#/components/schemas/Purchase' } }
+
 components:
   securitySchemes:
     tenantJwt:
@@ -308,6 +380,17 @@ components:
         sub_account_id: { type: string, format: uuid, nullable: true }
         scopes:         { type: array, items: { type: string } }
         is_paper:       { type: boolean, description: "from the key's tenant; the gateway propagates it into usage events" }
+    Purchase:
+      type: object
+      description: A credit purchase order and its settlement state.
+      properties:
+        id:          { type: string, format: uuid }
+        amount:      { type: string, description: "credits purchased, fixed-point decimal string" }
+        credit_type: { type: string }
+        currency:    { type: string, enum: [usd, jpy] }
+        status:      { type: string, enum: [pending, paid, failed] }
+        created_at:  { type: string, format: date-time }
+        paid_at:     { type: string, format: date-time, nullable: true }
     ApiError:
       type: object
       required: [code, message]
