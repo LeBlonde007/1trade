@@ -10,6 +10,7 @@ import (
 
 	"github.com/exascale/credit-ledger/internal/api"
 	"github.com/exascale/credit-ledger/internal/config"
+	"github.com/exascale/credit-ledger/internal/consumer"
 	"github.com/exascale/credit-ledger/internal/events"
 	"github.com/exascale/credit-ledger/internal/store"
 )
@@ -44,6 +45,12 @@ func main() {
 			defer np.Close()
 			pub = np
 			slog.Info("publishing credit.tx.v1 to NATS", "url", cfg.NATSURL)
+		}
+		// Consume inference.usage.v1 → idempotent debit (the inference billing loop, F08↔F05).
+		if uc, err := consumer.Start(cfg.NATSURL, st, pub); err != nil {
+			slog.Error("usage consumer not started — inference debits will not flow", "err", err)
+		} else {
+			defer uc.Close()
 		}
 	}
 

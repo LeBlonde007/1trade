@@ -5,6 +5,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -21,18 +22,28 @@ import (
 	"github.com/google/uuid"
 )
 
-// Server wires config + the auth resolver + the model backend + the usage publisher into a handler.
+// buyCreditsURL is returned in a 402 so the customer knows where to top up.
+const buyCreditsURL = "https://app.exascale.io/billing/buy"
+
+// CreditChecker is the pre-flight balance guard (implemented by internal/ledger). A nil checker
+// disables the pre-flight (e.g. in unit tests, or when no JWT secret is configured).
+type CreditChecker interface {
+	Sufficient(ctx context.Context, tenantID string, isPaper bool, creditType string) (ok bool, balance string, err error)
+}
+
+// Server wires config + auth + the model backend + the usage publisher + the credit pre-flight.
 type Server struct {
 	cfg     config.Config
 	auth    *auth.Resolver
 	backend model.Backend
 	usage   events.Publisher
+	credit  CreditChecker
 	mux     *http.ServeMux
 }
 
-// New builds the routed handler.
-func New(cfg config.Config, backend model.Backend, usage events.Publisher) *Server {
-	s := &Server{cfg: cfg, auth: auth.NewResolver(cfg), backend: backend, usage: usage, mux: http.NewServeMux()}
+// New builds the routed handler. credit may be nil to disable the pre-flight balance check.
+func New(cfg config.Config, backend model.Backend, usage events.Publisher, credit CreditChecker) *Server {
+	s := &Server{cfg: cfg, auth: auth.NewResolver(cfg), backend: backend, usage: usage, credit: credit, mux: http.NewServeMux()}
 	s.routes()
 	return s
 }
@@ -105,7 +116,24 @@ func (s *Server) chatCompletions(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "model_not_found", "unknown model: "+req.Model)
 		return
 	}
-	// TODO(#23): pre-flight credit balance check → 402 Payment Required before serving.
+	// Pre-flight: reject before consuming a GPU when the tenant has no credit. Fail-open on a ledger
+	// error (a balance-service blip shouldn't block inference; the event-driven debit still records it).
+	if s.credit != nil {
+		ok, bal, err := s.credit.Sufficient(r.Context(), p.TenantID, p.IsPaper, m.Exascale.CreditType)
+		if err != nil {
+			slog.Warn("pre-flight balance check failed; serving anyway", "tenant_id", p.TenantID, "err", err)
+		} else if !ok {
+			writeJSON(w, http.StatusPaymentRequired, map[string]any{
+				"code":    "INSUFFICIENT_CREDIT",
+				"message": "Not enough " + m.Exascale.CreditType + " credits to serve this request.",
+				"details": map[string]any{
+					"credit_type": m.Exascale.CreditType, "balance": bal,
+					"required": m.Exascale.Price, "buy_credits_url": buyCreditsURL,
+				},
+			})
+			return
+		}
+	}
 
 	msgs := make([]model.Message, len(req.Messages))
 	for i, mm := range req.Messages {

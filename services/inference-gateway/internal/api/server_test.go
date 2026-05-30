@@ -2,6 +2,7 @@ package api_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -67,11 +68,22 @@ func signJWT(t *testing.T, tenant string) string {
 	return tok
 }
 
-// newServer builds a gateway with the mock backend + a capturing publisher.
+// newServer builds a gateway with the mock backend + a capturing publisher (pre-flight disabled).
 func newServer() (*httptest.Server, *capturePub) {
 	pub := &capturePub{}
 	cfg := config.Config{Env: "dev", JWTSecret: testSecret, HTTPTimeout: time.Second}
-	return httptest.NewServer(api.New(cfg, model.MockBackend{}, pub)), pub
+	return httptest.NewServer(api.New(cfg, model.MockBackend{}, pub, nil)), pub
+}
+
+// stubChecker is a CreditChecker that always reports the configured sufficiency.
+type stubChecker struct {
+	ok  bool
+	bal string
+}
+
+// Sufficient returns the stubbed result.
+func (s stubChecker) Sufficient(_ context.Context, _ string, _ bool, _ string) (bool, string, error) {
+	return s.ok, s.bal, nil
 }
 
 // TestChatCompletion drives a full chat request and asserts the OpenAI-shaped response plus the
@@ -136,6 +148,38 @@ func TestChatAuthAndModel(t *testing.T) {
 	resp2, _ := http.DefaultClient.Do(req)
 	if resp2.StatusCode != 404 {
 		t.Fatalf("unknown-model = %d, want 404", resp2.StatusCode)
+	}
+}
+
+// TestChatInsufficientCredit asserts the pre-flight returns 402 INSUFFICIENT_CREDIT (and does not
+// serve / meter) when the tenant has no credit.
+func TestChatInsufficientCredit(t *testing.T) {
+	pub := &capturePub{}
+	cfg := config.Config{Env: "dev", JWTSecret: testSecret, HTTPTimeout: time.Second}
+	srv := httptest.NewServer(api.New(cfg, model.MockBackend{}, pub, stubChecker{ok: false, bal: "0.000000"}))
+	defer srv.Close()
+
+	req, _ := http.NewRequest("POST", srv.URL+"/v1/chat/completions",
+		strings.NewReader(`{"model":"llama-3.1-8b","messages":[{"role":"user","content":"x"}]}`))
+	req.Header.Set("Authorization", "Bearer "+signJWT(t, "t1"))
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusPaymentRequired {
+		t.Fatalf("status %d, want 402", resp.StatusCode)
+	}
+	var body map[string]any
+	_ = json.NewDecoder(resp.Body).Decode(&body)
+	if body["code"] != "INSUFFICIENT_CREDIT" {
+		t.Fatalf("code = %v, want INSUFFICIENT_CREDIT", body["code"])
+	}
+	pub.mu.Lock()
+	n := len(pub.events)
+	pub.mu.Unlock()
+	if n != 0 {
+		t.Fatalf("metered a rejected request: %d events", n)
 	}
 }
 

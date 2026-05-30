@@ -10,6 +10,7 @@ import (
 	"github.com/exascale/inference-gateway/internal/api"
 	"github.com/exascale/inference-gateway/internal/config"
 	"github.com/exascale/inference-gateway/internal/events"
+	"github.com/exascale/inference-gateway/internal/ledger"
 	"github.com/exascale/inference-gateway/internal/model"
 )
 
@@ -34,9 +35,18 @@ func main() {
 	// Mock backend for now; real vLLM (F09) implements the same interface and swaps in here.
 	backend := model.MockBackend{}
 
+	// Pre-flight credit guard — only when a JWT secret is configured (it mints the tenant token the
+	// ledger verifies). A nil checker disables the pre-flight.
+	var credit api.CreditChecker
+	if cfg.JWTSecret != "" {
+		credit = ledger.NewClient(cfg)
+	} else {
+		slog.Warn("PLATFORM_JWT_SECRET unset; credit pre-flight disabled")
+	}
+
 	srv := &http.Server{
 		Addr:              cfg.Addr,
-		Handler:           api.New(cfg, backend, usage),
+		Handler:           api.New(cfg, backend, usage, credit),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	slog.Info("inference-gateway listening", "addr", cfg.Addr, "env", cfg.Env, "version", Version)
