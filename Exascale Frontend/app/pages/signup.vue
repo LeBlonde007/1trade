@@ -33,8 +33,10 @@ const acctTypes: { key: AccountKey; icon: any; nm: string; l1: string; l2: strin
 ]
 
 // ─── Email + password ──────────────────────────────────────
-const email = ref('you@firm.com')
-const password = ref('••••••••••••')
+const email = ref('')
+const password = ref('')
+const submitting = ref(false)
+const signupError = ref('')
 const passwordShown = ref(false)
 const pwInputType = computed(() => passwordShown.value ? 'text' : 'password')
 
@@ -165,9 +167,21 @@ const togglePw = () => { passwordShown.value = !passwordShown.value }
  *   ai     → /onboarding/verify → /trade (placeholder)
  */
 const onSubmit = async () => {
-  if (!agreed.value) return
-  const e = encodeURIComponent(email.value || 'jane.doe@walmart.com')
-  await navigateTo('/onboarding/verify?email=' + e)
+  if (!agreed.value || !email.value || !password.value) return
+  signupError.value = ''
+  submitting.value = true
+  try {
+    // Create the real account (tenant + admin user) via the BFF, then continue onboarding.
+    await useAuth().signup(email.value, password.value)
+    await navigateTo('/onboarding/verify?email=' + encodeURIComponent(email.value))
+  } catch (err: unknown) {
+    const ex = err as { statusCode?: number; data?: { message?: string } }
+    signupError.value = ex?.statusCode === 409
+      ? 'That email is already registered'
+      : (ex?.data?.message || 'Could not create the account')
+  } finally {
+    submitting.value = false
+  }
 }
 </script>
 

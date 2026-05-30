@@ -67,7 +67,22 @@ export default defineNuxtConfig({
     '/compute':       { ssr: false },
     '/compute/**':    { ssr: false },
     '/inference':     { ssr: false },
+    '/console':       { ssr: false },
     '/states':        { ssr: false },
+  },
+
+  // Mock→live seam (F20). The Nitro BFF (server/api/**) reads EXASCALE_API_MODE: 'mock' serves
+  // realistic canned data; 'local' proxies to the real platform services. Screens never change —
+  // they only ever call /api/**. Upstream URLs are server-only (private); the public block exposes
+  // just the mode so the UI can show a demo banner.
+  runtimeConfig: {
+    apiMode: process.env.EXASCALE_API_MODE || 'mock',
+    platformCoreUrl: process.env.PLATFORM_CORE_URL || 'http://localhost:8001',
+    gatewayUrl: process.env.INFERENCE_GATEWAY_URL || 'http://localhost:8085',
+    ledgerUrl: process.env.CREDIT_LEDGER_URL || 'http://localhost:8002',
+    public: {
+      apiMode: process.env.EXASCALE_API_MODE || 'mock',
+    },
   },
 
   // No Tailwind for v1 — keeps tokens.css the sole styling language.
