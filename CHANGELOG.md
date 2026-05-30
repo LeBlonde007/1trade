@@ -4,6 +4,32 @@ All notable changes to Exascale. Format: [Keep a Changelog](https://keepachangel
 SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not dates — see
 `docs/plans/MANAGEMENT_PLAN.md`).
 
+## [v0.2.0] — Milestone 2: first inference dollar (sandbox) — inference gateway (F08)
+
+### Added
+- **Inference gateway (F08):** the Exascale OpenAI-compatible inference API. `GET /v1/models`
+  (curated catalog: Llama-70B/8B + Whisper, with fixed-point pricing); `POST /v1/chat/completions`
+  on a swappable `model.Backend` (mock now, vLLM in F09) with JSON + **SSE** streaming. Customer
+  auth by **API key** (resolved via platform-core introspection, 30s cache) or first-party JWT.
+  Distroless/non-root deploy + Tilt.
+- **The billing loop (F08 ↔ F05), proven live in k3d:** a request emits exactly one
+  `inference.usage.v1` (fixed-point `units`, `request_id` = idempotency key); credit-ledger consumes
+  it over a **durable JetStream** consumer and debits via `ApplyMovement` (atomic, hash-chained,
+  idempotent — redelivery never double-bills). End-to-end: signup → API key →
+  `curl /v1/chat/completions` → `text` balance `100.000000 → 99.865000`.
+- **Pre-flight 402:** a zero-credit tenant is rejected with `INSUFFICIENT_CREDIT`
+  (+ balance/required/buy-credits link) before any GPU is touched.
+- Contract: `openapi/inference.yaml` v1.0.0 (new); `openapi/platform-core.yaml` v1.2.0 (internal
+  API-key introspection endpoint + `serviceToken` scheme).
+
+### Security
+- F08 review gate: JWT verification is HMAC-only (alg-confusion rejected); API keys resolve via a
+  service-token-guarded introspection endpoint (404 on unknown/revoked — no enumeration); the
+  `SERVICE_TOKEN` is generated, never committed; `is_paper` threads tenant → usage event → debit;
+  units are exact fixed-point (`math/big.Rat`), never float. Known follow-ups (non-blocking for the
+  sandbox): asymmetric JWT so services can't mint, and a balance hold to close the pre-flight
+  fail-open window.
+
 ## [v0.1.1] — Milestone 1: auth & SSO (F02)
 
 ### Added

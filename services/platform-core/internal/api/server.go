@@ -44,6 +44,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /v1/auth/keys", s.listKeys)
 	s.mux.HandleFunc("POST /v1/auth/keys", s.createKey)
 	s.mux.HandleFunc("DELETE /v1/auth/keys/{id}", s.revokeKey)
+	s.mux.HandleFunc("POST /v1/auth/keys/introspect", s.introspectKey) // internal (service token)
 	// OAuth is scaffolded; real provider wiring (client secrets via Vault) is a follow-up.
 	s.mux.HandleFunc("GET /v1/auth/oauth/{provider}", notConfigured)
 	s.mux.HandleFunc("GET /v1/auth/oauth/{provider}/callback", notConfigured)
@@ -225,6 +226,35 @@ func (s *Server) revokeKey(w http.ResponseWriter, r *http.Request) {
 	}
 	slog.Info("audit: api key revoked", "tenant_id", p.TenantID, "key_id", id)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// introspectKey is the internal endpoint the inference gateway calls to resolve a customer's raw
+// API key to its tenant/scopes/is_paper. Guarded by the service-to-service token (never exposed to
+// end users). Returns 404 for an unknown/revoked key (no distinction, to avoid an enumeration oracle).
+func (s *Server) introspectKey(w http.ResponseWriter, r *http.Request) {
+	if !serviceAuthorized(s.cfg, r) {
+		writeErr(w, http.StatusUnauthorized, "unauthorized", "service authorization required")
+		return
+	}
+	var b struct {
+		APIKey string `json:"api_key"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&b); err != nil || b.APIKey == "" {
+		writeErr(w, http.StatusBadRequest, "bad_request", "api_key is required")
+		return
+	}
+	tenantID, scopes, isPaper, ok, err := s.st.LookupAPIKey(r.Context(), domain.HashAPIKey(b.APIKey))
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	if !ok {
+		writeErr(w, http.StatusNotFound, "not_found", "unknown or revoked key")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"tenant_id": tenantID, "sub_account_id": nil, "scopes": scopes, "is_paper": isPaper,
+	})
 }
 
 // notConfigured is the OAuth scaffold response until provider secrets are wired.

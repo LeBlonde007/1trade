@@ -154,7 +154,7 @@ Status legend: ⬜ Not started · 🔵 In progress · ✅ Done · ⚠️ At risk
 | F05 | Prepaid credit ledger (balances, append-only tx, hash chain) | Ledger | M1→M4 | ✅ | ~95% | **Phase-1 complete & deployed in k3d** — domain + store + API + NATS events + self-migrating k8s deploy, all verified (pod 1/1 Ready, live purchase→chain ok). Now verifies real platform-core JWTs (F02 integration live). Later: prod overlays/HPA, scheduled reconciliation. See STATUS.md. |
 | F06 | Credit purchase / billing (Stripe → ACH/wire → multi-currency) | Platform + Ledger | M2 / M3 | ⬜ | 0% | The revenue rails. |
 | F07 | Credit conversion (AI ↔ sub-credits, GPU tiers) | Ledger | M2 / M3 | ⬜ | 0% | |
-| F08 | Inference gateway (OpenAI-compatible, auth, debit) | Inference | M2 | ⬜ | 0% | Fastest revenue path. |
+| F08 | Inference gateway (OpenAI-compatible, auth, debit) | Inference | M2 | ✅ | ~85% | **Core complete & deployed in k3d (v0.2.0).** OpenAI-compatible `/v1/chat/completions` (mock backend + SSE) + `/v1/models`; API-key auth via platform-core introspection; **pre-flight 402**; usage → `inference.usage.v1` → ledger **idempotent debit**. **Proven live: API key → infer → wallet debit `100→99.865`.** Remaining: real vLLM (F09) behind the backend interface, the other modality endpoints. |
 | F09 | vLLM deployment — first 3 models | Inference | M2 | ⬜ | 0% | Llama-70B/8B, Whisper. |
 | F10 | Curated SoTA catalog (full) | Inference | M3 / M5 | ⬜ | 0% | The differentiation. |
 | F11 | Multi-model-per-GPU packing | Inference | M3 | ⬜ | 0% | Unit economics. |

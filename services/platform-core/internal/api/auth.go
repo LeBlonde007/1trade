@@ -1,6 +1,7 @@
 package api
 
 import (
+	"crypto/subtle"
 	"fmt"
 	"net/http"
 	"strings"
@@ -42,6 +43,14 @@ func (s *Server) authed(w http.ResponseWriter, r *http.Request) (principal, bool
 		return principal{}, false
 	}
 	return p, true
+}
+
+// serviceAuthorized reports whether the request carries the valid service-to-service token. The
+// comparison is constant-time so a wrong token can't be discovered byte-by-byte via timing. A
+// service token that is unset always denies (fail closed).
+func serviceAuthorized(cfg config.Config, r *http.Request) bool {
+	tok := bearer(r)
+	return cfg.ServiceToken != "" && subtle.ConstantTimeCompare([]byte(tok), []byte(cfg.ServiceToken)) == 1
 }
 
 // bearer extracts the token from an Authorization: Bearer <token> header.

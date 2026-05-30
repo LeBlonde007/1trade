@@ -17,6 +17,7 @@ import (
 )
 
 const jwtSecret = "platform-core-test-secret-32+chars-xxxxx"
+const svcToken = "platform-core-service-token-for-tests"
 
 // TestAPIIntegration drives the real HTTP handlers against real Postgres via httptest: signup →
 // token, /me, login, API-key create/list/revoke, and the auth failure paths. It also asserts the
@@ -33,7 +34,7 @@ func TestAPIIntegration(t *testing.T) {
 	}
 	defer st.Close()
 
-	cfg := config.Config{Env: "dev", JWTSecret: jwtSecret, TokenTTL: 3600_000_000_000} // 1h
+	cfg := config.Config{Env: "dev", JWTSecret: jwtSecret, ServiceToken: svcToken, TokenTTL: 3600_000_000_000} // 1h
 	srv := httptest.NewServer(api.New(cfg, st))
 	defer srv.Close()
 
@@ -113,7 +114,27 @@ func TestAPIIntegration(t *testing.T) {
 	if len(list.Keys) != 1 {
 		t.Fatalf("expected 1 key, got %d", len(list.Keys))
 	}
+
+	// introspect (service-to-service): the raw key resolves to its tenant + is_paper. This is the
+	// path the inference gateway uses to authenticate a customer API key.
+	secret := created["secret"].(string)
+	var princ map[string]any
+	if code := do("POST", "/v1/auth/keys/introspect", svcToken, map[string]any{"api_key": secret}, &princ); code != 200 {
+		t.Fatalf("introspect status %d (%v)", code, princ)
+	}
+	if princ["tenant_id"] == nil || princ["is_paper"] != true {
+		t.Fatalf("introspect principal wrong: %v", princ)
+	}
+	// wrong service token → 401 (fail closed)
+	if code := do("POST", "/v1/auth/keys/introspect", "wrong-service-token", map[string]any{"api_key": secret}, nil); code != 401 {
+		t.Fatalf("introspect with wrong service token = %d, want 401", code)
+	}
+
 	if code := do("DELETE", "/v1/auth/keys/"+created["id"].(string), token, nil, nil); code != 204 {
 		t.Fatalf("revoke key = %d, want 204", code)
+	}
+	// a revoked key no longer introspects → 404
+	if code := do("POST", "/v1/auth/keys/introspect", svcToken, map[string]any{"api_key": secret}, nil); code != 404 {
+		t.Fatalf("introspect revoked key = %d, want 404", code)
 	}
 }

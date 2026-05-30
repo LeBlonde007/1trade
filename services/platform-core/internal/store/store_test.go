@@ -65,14 +65,14 @@ func TestStoreIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create key: %v", err)
 	}
-	tid, scopes, ok, err := s.LookupAPIKey(ctx, k.Hash)
-	if err != nil || !ok || tid != u.TenantID || len(scopes) != 1 {
-		t.Fatalf("lookup key: ok=%v tid=%v scopes=%v err=%v", ok, tid, scopes, err)
+	tid, scopes, isPaper, ok, err := s.LookupAPIKey(ctx, k.Hash)
+	if err != nil || !ok || tid != u.TenantID || len(scopes) != 1 || !isPaper {
+		t.Fatalf("lookup key: ok=%v tid=%v scopes=%v isPaper=%v err=%v", ok, tid, scopes, isPaper, err)
 	}
 	if err := s.RevokeAPIKey(ctx, u.TenantID, id); err != nil {
 		t.Fatalf("revoke: %v", err)
 	}
-	if _, _, ok, _ := s.LookupAPIKey(ctx, k.Hash); ok {
+	if _, _, _, ok, _ := s.LookupAPIKey(ctx, k.Hash); ok {
 		t.Fatal("revoked key still resolves")
 	}
 }

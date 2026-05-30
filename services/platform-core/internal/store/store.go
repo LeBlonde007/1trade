@@ -191,19 +191,24 @@ func (s *Store) RevokeAPIKey(ctx context.Context, tenantID, id string) error {
 	return err
 }
 
-// LookupAPIKey resolves a presented key hash to its tenant + scopes (only if not revoked) and
-// stamps last_used_at. ok=false if unknown/revoked.
-func (s *Store) LookupAPIKey(ctx context.Context, hash string) (tenantID string, scopes []string, ok bool, err error) {
+// LookupAPIKey resolves a presented key hash to its tenant + scopes + is_paper (only if not revoked)
+// and stamps last_used_at, in one round trip. is_paper comes from the key's tenant so the inference
+// gateway can propagate paper/real into usage events. ok=false if unknown/revoked.
+func (s *Store) LookupAPIKey(ctx context.Context, hash string) (tenantID string, scopes []string, isPaper bool, ok bool, err error) {
 	err = s.pool.QueryRow(ctx,
-		`UPDATE api_keys SET last_used_at=now() WHERE hash=$1 AND revoked_at IS NULL
-		 RETURNING tenant_id, scopes`, hash).Scan(&tenantID, &scopes)
+		`WITH k AS (
+		     UPDATE api_keys SET last_used_at=now() WHERE hash=$1 AND revoked_at IS NULL
+		     RETURNING tenant_id, scopes
+		 )
+		 SELECT k.tenant_id, k.scopes, t.is_paper
+		 FROM k JOIN tenants t ON t.id = k.tenant_id`, hash).Scan(&tenantID, &scopes, &isPaper)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return "", nil, false, nil
+		return "", nil, false, false, nil
 	}
 	if err != nil {
-		return "", nil, false, err
+		return "", nil, false, false, err
 	}
-	return tenantID, scopes, true, nil
+	return tenantID, scopes, isPaper, true, nil
 }
 
 // toRoles converts stored role strings to domain.Role.
