@@ -95,6 +95,20 @@ SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not da
   sandbox): asymmetric JWT so services can't mint, and a balance hold to close the pre-flight
   fail-open window.
 
+## [v0.1.3] — Milestone 1: platform gap-closers (email verify, budgets, linked endpoints)
+
+### Added
+- **Email verification:** signup issues a one-time token (only its hash is stored; the raw token is
+  emailed in prod / logged in dev). `POST /v1/auth/verify` (the token is the credential — no bearer,
+  single-use, audited), `POST /v1/auth/verify/resend`. The existing `onboarding/verify` page now
+  consumes the magic-link `?token`.
+- **Monthly budgets:** `GET`/`PUT /v1/billing/budget` (billing/admin, audited) — the basis for
+  50/80/100% consumption alerts (auto-stop is M3).
+- **Linked the orphan endpoints:** BFF routes for verify, budget, purchase history, and the audit
+  log, so they're reachable from the UI (no more backend-only endpoints).
+- Contract `platform-core.yaml` v1.5.0. Proven live: resend → verify (single-use) → reuse 400;
+  budget set/get; audit captures `user.email.verify` + `budget.set`.
+
 ## [v0.1.2] — Milestone 1: accounts, orgs & RBAC (F03)
 
 ### Added
