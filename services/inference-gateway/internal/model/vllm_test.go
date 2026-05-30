@@ -25,7 +25,7 @@ func TestVLLMBackendChat(t *testing.T) {
 		gotModel = body.Model
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"choices": []map[string]any{{
-				"message": map[string]string{"role": "assistant", "content": "hello from llama"},
+				"message":       map[string]string{"role": "assistant", "content": "hello from llama"},
 				"finish_reason": "stop",
 			}},
 			"usage": map[string]int{"prompt_tokens": 11, "completion_tokens": 7},

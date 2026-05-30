@@ -4,6 +4,27 @@ All notable changes to Exascale. Format: [Keep a Changelog](https://keepachangel
 SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not dates — see
 `docs/plans/MANAGEMENT_PLAN.md`).
 
+## [v0.2.2] — Milestone 2: vLLM runtime integration (F09)
+
+### Added
+- **inference-runtime (F09):** `services/inference-runtime/server.py` — a production vLLM worker
+  (FastAPI + `AsyncLLMEngine`, OpenAI-compatible `/v1/chat/completions` + `/healthz` `/readyz`
+  `/metrics`; weights mount from a PVC, not baked into the image; exact token usage). `Dockerfile.vllm`
+  (CUDA, pinned vLLM) + a GPU `Deployment` (`nvidia.com/gpu`, nodeSelector/tolerations, readiness-gated
+  weight load, accurate requests/limits). The internal gateway↔runtime contract is documented in the
+  runtime README.
+- **The mock→real swap:** the gateway's `model.VLLMBackend` calls the runtime over HTTP and bills
+  from the runtime's real token usage; `INFERENCE_BACKEND=vllm` selects it with **no customer-API
+  change**. Unit-tested (success, usage-omitted fallback, runtime error).
+- **CPU stub runtime** (`stub/`, zero deps) so the whole path runs in k3d without a GPU. **Proven
+  live:** gateway `backend: vllm` → `/v1/chat/completions` served by the runtime → tokens from the
+  runtime usage → `text` balance `100 → 99.900000` (`5 × 20/1000`).
+
+### Notes
+- GPU-bound acceptance (3 models load/serve, P50/P95 latency, OOM-safe under load, crash re-route)
+  needs **F12 (GPU Operator) + a 40 GB+ GPU node** — the artifacts are ready; verification is deferred
+  to a staging GPU node. Per-model routing (model→pod registration/heartbeat) lands with F11.
+
 ## [v0.2.1] — Milestone 2: credit purchase / billing (F06)
 
 ### Added
