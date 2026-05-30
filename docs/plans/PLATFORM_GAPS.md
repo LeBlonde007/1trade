@@ -62,7 +62,11 @@ Stripe purchase, credit balance/ledger, PCI‑by‑Stripe.
 **⚠️ Backend done — UI not wired (= the F20 console job):** login/signup, model picker, API‑key
 screen, text playground, buy‑credits, cost/balance view, latency view.
 
-**❌ Not built — close the loop (small, near‑term):** email verification, usage budgets/alerts,
+**✅ Closed (v0.1.3):** email verification (token + verify/resend, single-use, audited); monthly
+budgets (set/get, audited); the previously-unlinked endpoints (verify, budget, purchases, audit) now
+have BFF routes.
+
+**❌ Not built — close the loop (small, near‑term):** budget alert UI + auto-stop (M3),
 speech/image/video inference, AutoPay auto‑recharge.
 
 **❌ Not built — net‑new scope (large, needs a decision):** Data, Training/MLops, Fine‑tune, RAG,

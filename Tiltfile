@@ -40,10 +40,12 @@ local_resource(
         '--from-file=0001_init.sql=services/platform-core/migrations/0001_init.sql '
         '--from-file=0002_billing.sql=services/platform-core/migrations/0002_billing.sql '
         '--from-file=0003_accounts.sql=services/platform-core/migrations/0003_accounts.sql '
+        '--from-file=0004_gaps.sql=services/platform-core/migrations/0004_gaps.sql '
         '--dry-run=client -o yaml | kubectl apply -f -',
     deps=['services/platform-core/migrations/0001_init.sql',
           'services/platform-core/migrations/0002_billing.sql',
-          'services/platform-core/migrations/0003_accounts.sql'],
+          'services/platform-core/migrations/0003_accounts.sql',
+          'services/platform-core/migrations/0004_gaps.sql'],
 )
 docker_build('exascale/platform-core:dev', 'services/platform-core',
              dockerfile='services/platform-core/Dockerfile')

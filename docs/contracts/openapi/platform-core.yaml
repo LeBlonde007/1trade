@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Exascale Platform-Core API (auth, accounts, RBAC, keys, billing)
-  version: 1.4.0
+  version: 1.5.0
   description: >
     Identity for the whole platform. Owned by `platform-core`. Every other service authenticates
     inbound requests by verifying the JWT this service issues (see JwtClaims) — that's how each
@@ -224,6 +224,48 @@ paths:
                 properties:
                   users: { type: array, items: { $ref: '#/components/schemas/User' } }
                   next_cursor: { type: string, nullable: true }
+
+  /v1/auth/verify:
+    post:
+      tags: [auth]
+      summary: Verify an email address with the one-time token (the token is the credential; no bearer).
+      operationId: verifyEmail
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [token], properties: { token: { type: string } } } } }
+      responses:
+        '200': { description: Verified., content: { application/json: { schema: { type: object, properties: { verified: { type: boolean } } } } } }
+        '400': { description: Invalid or used token., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+
+  /v1/auth/verify/resend:
+    post:
+      tags: [auth]
+      summary: Issue a fresh verification token for the caller (emailed in prod; returned in dev).
+      operationId: resendVerify
+      security: [{ tenantJwt: [] }]
+      responses:
+        '200': { description: Sent. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/billing/budget:
+    get:
+      tags: [billing]
+      summary: The tenant's monthly credit budget (null if none set).
+      operationId: getBudget
+      security: [{ tenantJwt: [] }]
+      responses:
+        '200': { description: Budget. }
+    put:
+      tags: [billing]
+      summary: Set the tenant's monthly budget (billing/admin). Drives 50/80/100% alerts. Audited.
+      operationId: setBudget
+      security: [{ tenantJwt: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [credit_type, monthly_limit], properties: { credit_type: { type: string }, monthly_limit: { type: string, description: "fixed-point decimal string" } } } } }
+      responses:
+        '200': { description: Updated. }
+        '403': { description: Insufficient role., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
 
   /v1/account/orgs:
     post:

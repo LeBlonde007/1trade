@@ -70,6 +70,10 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /v1/account/orgs/{id}/users", s.listOrgUsers)
 	s.mux.HandleFunc("PUT /v1/account/users/{id}/roles", s.assignRoles)
 	s.mux.HandleFunc("GET /v1/account/tenants/{id}", s.getTenant)
+	s.mux.HandleFunc("POST /v1/auth/verify", s.verifyEmail)          // token is the credential (no bearer)
+	s.mux.HandleFunc("POST /v1/auth/verify/resend", s.resendVerify)  // authed; dev returns the token
+	s.mux.HandleFunc("GET /v1/billing/budget", s.getBudget)
+	s.mux.HandleFunc("PUT /v1/billing/budget", s.setBudget)
 	// OAuth is scaffolded; real provider wiring (client secrets via Vault) is a follow-up.
 	s.mux.HandleFunc("GET /v1/auth/oauth/{provider}", notConfigured)
 	s.mux.HandleFunc("GET /v1/auth/oauth/{provider}/callback", notConfigured)
@@ -121,6 +125,9 @@ func (s *Server) signup(w http.ResponseWriter, r *http.Request) {
 		TenantID: u.TenantID, ActorID: u.ID, Action: "tenant.signup",
 		TargetType: "tenant", TargetID: u.TenantID, After: map[string]any{"email": b.Email}, IsPaper: u.IsPaper,
 	})
+	if raw := s.issueVerifyToken(r, u.ID); raw != "" && s.cfg.IsDev() {
+		slog.Info("dev: email verification token (would be emailed)", "user_id", u.ID, "token", raw)
+	}
 	s.issue(w, http.StatusCreated, u.ID, domain.Claims{TenantID: u.TenantID, Roles: u.Roles, IsPaper: u.IsPaper})
 }
 

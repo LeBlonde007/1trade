@@ -25,10 +25,29 @@ function startCooldown(secs: number) {
   }, 1000)
 }
 
-function onResend() {
+const verified = ref(false)
+const verifyError = ref('')
+
+async function onResend() {
   if (remaining.value > 0) return
   startCooldown(COOLDOWN_SECS)
+  try {
+    await $fetch('/api/auth/verify/resend', { method: 'POST' })
+  } catch { /* cooldown still applies; surfaced on next attempt */ }
 }
+
+// A magic-link lands here with ?token=…; consume it, then continue onboarding.
+onMounted(async () => {
+  const token = typeof route.query.token === 'string' ? route.query.token : ''
+  if (!token) return
+  try {
+    await $fetch('/api/auth/verify', { method: 'POST', body: { token } })
+    verified.value = true
+    setTimeout(() => navigateTo('/console'), 800)
+  } catch {
+    verifyError.value = 'This verification link is invalid or has already been used.'
+  }
+})
 
 const cooldownLabel = computed(() => {
   const m = Math.floor(remaining.value / 60)
