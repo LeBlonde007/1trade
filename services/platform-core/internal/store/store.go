@@ -225,3 +225,73 @@ func isUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
+
+// Purchase is a credit purchase order (F06). Amount is a fixed-point decimal string.
+type Purchase struct {
+	ID         string
+	TenantID   string
+	Amount     string
+	CreditType string
+	Currency   string
+	Status     string
+	IsPaper    bool
+	CreatedAt  time.Time
+	PaidAt     *time.Time
+}
+
+// CreatePurchase inserts a pending purchase linked to its Stripe checkout session.
+func (s *Store) CreatePurchase(ctx context.Context, p Purchase, sessionID string) error {
+	_, err := s.pool.Exec(ctx,
+		`INSERT INTO purchases (id, tenant_id, amount, credit_type, currency, status, stripe_session_id, is_paper)
+		 VALUES ($1,$2,$3::numeric,$4,$5,'pending',$6,$7)`,
+		p.ID, p.TenantID, p.Amount, p.CreditType, p.Currency, sessionID, p.IsPaper)
+	if err != nil {
+		return fmt.Errorf("insert purchase: %w", err)
+	}
+	return nil
+}
+
+// GetPurchaseBySession loads the purchase for a Stripe checkout session. ok=false if unknown.
+func (s *Store) GetPurchaseBySession(ctx context.Context, sessionID string) (Purchase, bool, error) {
+	var p Purchase
+	err := s.pool.QueryRow(ctx,
+		`SELECT id, tenant_id, amount::text, credit_type, currency, status, is_paper, created_at, paid_at
+		 FROM purchases WHERE stripe_session_id=$1`, sessionID).
+		Scan(&p.ID, &p.TenantID, &p.Amount, &p.CreditType, &p.Currency, &p.Status, &p.IsPaper, &p.CreatedAt, &p.PaidAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Purchase{}, false, nil
+	}
+	if err != nil {
+		return Purchase{}, false, err
+	}
+	return p, true, nil
+}
+
+// MarkPurchasePaid settles a pending purchase: status→paid, stamps the Stripe event id + paid_at.
+// Idempotent — a replay (already paid) updates no rows and is not an error.
+func (s *Store) MarkPurchasePaid(ctx context.Context, sessionID, eventID string) error {
+	_, err := s.pool.Exec(ctx,
+		`UPDATE purchases SET status='paid', stripe_event_id=$2, paid_at=now()
+		 WHERE stripe_session_id=$1 AND status='pending'`, sessionID, eventID)
+	return err
+}
+
+// ListPurchases returns a tenant's purchase history, newest first.
+func (s *Store) ListPurchases(ctx context.Context, tenantID string, limit int) ([]Purchase, error) {
+	rows, err := s.pool.Query(ctx,
+		`SELECT id, tenant_id, amount::text, credit_type, currency, status, is_paper, created_at, paid_at
+		 FROM purchases WHERE tenant_id=$1 ORDER BY created_at DESC LIMIT $2`, tenantID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Purchase
+	for rows.Next() {
+		var p Purchase
+		if err := rows.Scan(&p.ID, &p.TenantID, &p.Amount, &p.CreditType, &p.Currency, &p.Status, &p.IsPaper, &p.CreatedAt, &p.PaidAt); err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
