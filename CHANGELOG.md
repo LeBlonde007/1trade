@@ -4,6 +4,27 @@ All notable changes to Exascale. Format: [Keep a Changelog](https://keepachangel
 SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not dates — see
 `docs/plans/MANAGEMENT_PLAN.md`).
 
+## [v0.2.3] — Milestone 2: platform console — live data layer + console (F20)
+
+### Added
+- **Mock→live seam (F20):** a Nitro BFF (`server/api/**`) so every screen calls same-origin `/api/**`
+  with the JWT in an httpOnly cookie; `EXASCALE_API_MODE=mock|local` flips canned↔live with zero UI
+  change. BFF routes for auth, catalog, wallet (balances/transactions), inference, billing checkout,
+  and API keys — each mock|live. Composables: `useAuth/useCatalog/useWallet/useInference/useBilling/
+  useKeys`. `login` + `signup` wired to real auth; route guard.
+- **Live `/console`:** a dense, dark, institutional dashboard (design-system tokens only, mono +
+  tabular numbers, semantic ▲/▼, sharp radius) wired to all six composables — identity, balances,
+  model picker, inference playground (run → token usage + est. cost; 402 → buy-credits), buy-credits
+  (Stripe checkout), API keys (generate → secret-shown-once → revoke), recent transactions.
+- **Proven live** against the running platform: signup→identity, httpOnly session, catalog→real 3
+  models, wallet→ledger, key create (secret once), checkout→Stripe URL, inference 402 surfaced; and
+  the console run path: seed 200 text → Run → 200 (tokens 7/13/20) → wallet 199.900000.
+
+### Notes
+- The large existing mock screens (`inference.vue`, `wallet/index.vue`, …) remain as the polished
+  showcase; the live data layer + `/console` deliver the M2 "catalog + wallet wired" goal. Wiring
+  those individual screens to the composables is incremental UI work (browser-iterated).
+
 ## [v0.2.2] — Milestone 2: vLLM runtime integration (F09)
 
 ### Added
