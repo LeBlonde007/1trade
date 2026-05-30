@@ -1,0 +1,376 @@
+openapi: 3.0.3
+info:
+  title: Exascale Inference API (chat, completions, embeddings, audio, images)
+  version: 1.0.0
+  description: >
+    **The Exascale inference API.** Owned by `inference-ml` (the inference-gateway). It is
+    wire-compatible with the OpenAI request/response format so a customer migrates by changing one
+    base URL — a convenience, not a dependency. Lead with "the Exascale API."
+
+    Auth is a **bearer API key** (`Authorization: Bearer exk_...`) minted in platform-core; a
+    first-party tenant JWT is also accepted. The gateway resolves the key → tenant_id /
+    sub_account_id / scopes / **is_paper**, checks the relevant sub-credit balance (402 if short),
+    serves the request, and on completion emits exactly one `inference.usage.v1` event — which
+    credit-ledger consumes to debit the credit (idempotent on the request id). `is_paper` is derived
+    from the authenticated tenant, never from the request body. See
+    docs/plans/features/F08-inference-gateway.md, events/inference.usage.v1.yaml, and
+    credit-types.md §2 (modality → credit_type).
+
+servers:
+  - { url: "https://api.exascale.io", description: prod }
+  - { url: "http://localhost:8080", description: "local (k3d ingress)" }
+
+tags:
+  - { name: inference, description: "Chat, completions, embeddings, audio, images." }
+  - { name: models, description: "The curated model catalog." }
+
+paths:
+  /v1/chat/completions:
+    post:
+      tags: [inference]
+      summary: "Chat completion (OpenAI-compatible). Set stream=true for SSE token streaming."
+      operationId: createChatCompletion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChatCompletionRequest' }
+      responses:
+        '200':
+          description: >
+            Completion. With `stream:false` a single JSON `ChatCompletion`. With `stream:true` an
+            `text/event-stream` of `ChatCompletionChunk` objects terminated by `data: [DONE]`.
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/ChatCompletion' } }
+            text/event-stream: { schema: { type: string } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '402': { $ref: '#/components/responses/InsufficientCredit' }
+        '404': { $ref: '#/components/responses/ModelNotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /v1/completions:
+    post:
+      tags: [inference]
+      summary: Text completion (legacy OpenAI-compatible).
+      operationId: createCompletion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CompletionRequest' }
+      responses:
+        '200':
+          description: Completion.
+          content: { application/json: { schema: { $ref: '#/components/schemas/Completion' } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '402': { $ref: '#/components/responses/InsufficientCredit' }
+        '404': { $ref: '#/components/responses/ModelNotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /v1/embeddings:
+    post:
+      tags: [inference]
+      summary: Create embeddings (OpenAI-compatible). Debits the `embeddings` credit.
+      operationId: createEmbeddings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EmbeddingsRequest' }
+      responses:
+        '200':
+          description: Embeddings.
+          content: { application/json: { schema: { $ref: '#/components/schemas/EmbeddingsResponse' } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '402': { $ref: '#/components/responses/InsufficientCredit' }
+        '404': { $ref: '#/components/responses/ModelNotFound' }
+
+  /v1/audio/transcriptions:
+    post:
+      tags: [inference]
+      summary: Speech-to-text (OpenAI-compatible). Debits the `speech` credit.
+      operationId: createTranscription
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: '#/components/schemas/TranscriptionRequest' }
+      responses:
+        '200':
+          description: Transcript.
+          content: { application/json: { schema: { $ref: '#/components/schemas/Transcription' } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '402': { $ref: '#/components/responses/InsufficientCredit' }
+
+  /v1/audio/translations:
+    post:
+      tags: [inference]
+      summary: Speech translation to English (OpenAI-compatible). Debits the `speech` credit.
+      operationId: createTranslation
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: '#/components/schemas/TranscriptionRequest' }
+      responses:
+        '200':
+          description: Translation.
+          content: { application/json: { schema: { $ref: '#/components/schemas/Transcription' } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '402': { $ref: '#/components/responses/InsufficientCredit' }
+
+  /v1/audio/speech:
+    post:
+      tags: [inference]
+      summary: Text-to-speech (OpenAI-compatible). Returns audio bytes. Debits the `speech` credit.
+      operationId: createSpeech
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SpeechRequest' }
+      responses:
+        '200':
+          description: Audio stream.
+          content:
+            audio/mpeg: { schema: { type: string, format: binary } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '402': { $ref: '#/components/responses/InsufficientCredit' }
+
+  /v1/images/generations:
+    post:
+      tags: [inference]
+      summary: Image generation (OpenAI-compatible). Debits the `image` credit.
+      operationId: createImage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ImageRequest' }
+      responses:
+        '200':
+          description: Generated image(s).
+          content: { application/json: { schema: { $ref: '#/components/schemas/ImageResponse' } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '402': { $ref: '#/components/responses/InsufficientCredit' }
+
+  /v1/models:
+    get:
+      tags: [models]
+      summary: List the curated catalog (OpenAI-compatible shape + Exascale pricing extension).
+      operationId: listModels
+      responses:
+        '200':
+          description: The catalog.
+          content: { application/json: { schema: { $ref: '#/components/schemas/ModelList' } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+components:
+  securitySchemes:
+    apiKey:
+      type: http
+      scheme: bearer
+      description: "Customer API key minted in platform-core (`exk_...`). The OpenAI-SDK bearer."
+    tenantJwt:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "First-party tenant JWT from platform-core (alternative to an API key)."
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid API key / token.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+    InsufficientCredit:
+      description: >
+        Not enough of the required sub-credit. `code` = `INSUFFICIENT_CREDIT`; `details` carries the
+        credit_type, current balance, required amount, and a link to buy more.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+          example:
+            code: INSUFFICIENT_CREDIT
+            message: "Not enough text credits to serve this request."
+            details:
+              credit_type: text
+              balance: "0.000000"
+              required: "12.500000"
+              buy_credits_url: "https://app.exascale.io/billing/buy"
+    ModelNotFound:
+      description: Unknown or unavailable model id.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+    RateLimited:
+      description: Per-tenant rate/quota exceeded (fair-scheduling guard).
+      content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+
+  schemas:
+    ApiError:
+      type: object
+      required: [code, message]
+      properties:
+        code:    { type: string, example: INSUFFICIENT_CREDIT }
+        message: { type: string }
+        details: { type: object, additionalProperties: true }
+
+    ChatMessage:
+      type: object
+      required: [role, content]
+      properties:
+        role:    { type: string, enum: [system, user, assistant, tool] }
+        content: { type: string }
+
+    ChatCompletionRequest:
+      type: object
+      required: [model, messages]
+      properties:
+        model:       { type: string, description: "catalog model id, e.g. llama-3.1-70b" }
+        messages:    { type: array, items: { $ref: '#/components/schemas/ChatMessage' } }
+        max_tokens:  { type: integer, minimum: 1, nullable: true }
+        temperature: { type: number, minimum: 0, maximum: 2, default: 1 }
+        stream:      { type: boolean, default: false, description: "true → SSE token stream" }
+
+    Usage:
+      type: object
+      description: Token accounting; the basis for the billed `units` in inference.usage.v1.
+      properties:
+        prompt_tokens:     { type: integer, minimum: 0 }
+        completion_tokens: { type: integer, minimum: 0 }
+        total_tokens:      { type: integer, minimum: 0 }
+
+    ChatCompletionChoice:
+      type: object
+      properties:
+        index:         { type: integer }
+        message:       { $ref: '#/components/schemas/ChatMessage' }
+        finish_reason: { type: string, enum: [stop, length, content_filter], nullable: true }
+
+    ChatCompletion:
+      type: object
+      properties:
+        id:      { type: string, example: "chatcmpl_01Hf…" }
+        object:  { type: string, example: chat.completion }
+        created: { type: integer, description: "unix seconds" }
+        model:   { type: string }
+        choices: { type: array, items: { $ref: '#/components/schemas/ChatCompletionChoice' } }
+        usage:   { $ref: '#/components/schemas/Usage' }
+
+    CompletionRequest:
+      type: object
+      required: [model, prompt]
+      properties:
+        model:      { type: string }
+        prompt:     { type: string }
+        max_tokens: { type: integer, minimum: 1, nullable: true }
+        stream:     { type: boolean, default: false }
+
+    Completion:
+      type: object
+      properties:
+        id:      { type: string }
+        object:  { type: string, example: text_completion }
+        created: { type: integer }
+        model:   { type: string }
+        choices:
+          type: array
+          items:
+            type: object
+            properties:
+              index:         { type: integer }
+              text:          { type: string }
+              finish_reason: { type: string, nullable: true }
+        usage: { $ref: '#/components/schemas/Usage' }
+
+    EmbeddingsRequest:
+      type: object
+      required: [model, input]
+      properties:
+        model: { type: string }
+        input:
+          oneOf:
+            - { type: string }
+            - { type: array, items: { type: string } }
+          description: "one string or a batch of strings"
+
+    EmbeddingsResponse:
+      type: object
+      properties:
+        object: { type: string, example: list }
+        model:  { type: string }
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              object:    { type: string, example: embedding }
+              index:     { type: integer }
+              embedding: { type: array, items: { type: number } }
+        usage: { $ref: '#/components/schemas/Usage' }
+
+    TranscriptionRequest:
+      type: object
+      required: [model, file]
+      properties:
+        model: { type: string, example: whisper-large-v3 }
+        file:  { type: string, format: binary }
+
+    Transcription:
+      type: object
+      properties:
+        text: { type: string }
+
+    SpeechRequest:
+      type: object
+      required: [model, input, voice]
+      properties:
+        model: { type: string }
+        input: { type: string }
+        voice: { type: string }
+
+    ImageRequest:
+      type: object
+      required: [model, prompt]
+      properties:
+        model:  { type: string }
+        prompt: { type: string }
+        n:      { type: integer, minimum: 1, maximum: 10, default: 1 }
+        size:   { type: string, example: "1024x1024" }
+
+    ImageResponse:
+      type: object
+      properties:
+        created: { type: integer }
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              url:      { type: string, nullable: true }
+              b64_json: { type: string, nullable: true }
+
+    Model:
+      type: object
+      description: A catalog entry. OpenAI fields + an Exascale pricing extension (`exascale`).
+      properties:
+        id:       { type: string, example: llama-3.1-70b }
+        object:   { type: string, example: model }
+        created:  { type: integer }
+        owned_by: { type: string, example: exascale }
+        exascale:
+          type: object
+          description: Exascale pricing/metadata extension.
+          properties:
+            modality:    { type: string, enum: [text, speech, image, video, embeddings] }
+            credit_type: { type: string, enum: [text, speech, image, video, embeddings] }
+            unit:        { type: string, description: "billable unit, e.g. '1K tokens'" }
+            price:       { type: string, description: "credits per unit, fixed-point decimal string" }
+
+    ModelList:
+      type: object
+      properties:
+        object: { type: string, example: list }
+        data:   { type: array, items: { $ref: '#/components/schemas/Model' } }
+
+# API key OR first-party JWT; the gateway resolves either to tenant_id + is_paper.
+security:
+  - apiKey: []
+  - tenantJwt: []
