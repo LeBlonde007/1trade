@@ -1,0 +1,53 @@
+package api
+
+import (
+	"fmt"
+	"net/http"
+	"strings"
+
+	"github.com/exascale/platform-core/internal/config"
+	"github.com/exascale/platform-core/internal/domain"
+)
+
+// principal is the authenticated caller resolved from a platform JWT.
+type principal struct {
+	UserID   string
+	TenantID string
+	OrgID    string
+	Roles    []domain.Role
+	IsPaper  bool
+}
+
+// authPrincipal verifies the bearer JWT (the one platform-core itself issued) and returns the caller.
+func authPrincipal(cfg config.Config, r *http.Request) (principal, error) {
+	tok := bearer(r)
+	if tok == "" {
+		return principal{}, fmt.Errorf("missing bearer token")
+	}
+	c, err := domain.VerifyToken(cfg.JWTSecret, tok)
+	if err != nil {
+		return principal{}, err
+	}
+	return principal{
+		UserID: c.Subject, TenantID: c.TenantID, OrgID: c.OrgID, Roles: c.Roles, IsPaper: c.IsPaper,
+	}, nil
+}
+
+// authed resolves the caller from the bearer JWT; on failure it writes a generic 401 and returns
+// ok=false, so handlers can guard with `p, ok := s.authed(w, r); if !ok { return }`.
+func (s *Server) authed(w http.ResponseWriter, r *http.Request) (principal, bool) {
+	p, err := authPrincipal(s.cfg, r)
+	if err != nil {
+		writeErr(w, http.StatusUnauthorized, "unauthorized", "authentication required")
+		return principal{}, false
+	}
+	return p, true
+}
+
+// bearer extracts the token from an Authorization: Bearer <token> header.
+func bearer(r *http.Request) string {
+	if after, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok {
+		return strings.TrimSpace(after)
+	}
+	return ""
+}

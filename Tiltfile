@@ -4,6 +4,16 @@
 
 allow_k8s_contexts('k3d-exascale')  # guard: never act on a non-local cluster
 
+# --- shared auth secret (F02) — the HS256 JWT signing key both platform-core (issuer) and
+# credit-ledger (verifier) read as PLATFORM_JWT_SECRET. Generated locally on first run and kept in
+# the cluster; never committed. Prod sources it from SOPS/Vault.
+local_resource(
+    'platform-auth',
+    cmd='kubectl get secret platform-auth >/dev/null 2>&1 || '
+        'kubectl create secret generic platform-auth '
+        '--from-literal=PLATFORM_JWT_SECRET=$(openssl rand -base64 48)',
+)
+
 # --- credit-ledger (F05) — deployed to `default`; talks to the data plane in `data` via FQDN ---
 # Migrations ConfigMap (shared types.sql + the service migration) — created out-of-band because it
 # sources files from two repo locations; the Deployment's initContainer applies them.
@@ -19,6 +29,20 @@ docker_build('exascale/credit-ledger:dev', 'services/credit-ledger',
              dockerfile='services/credit-ledger/Dockerfile')
 k8s_yaml(kustomize('deploy/k8s/credit-ledger/base'))
 k8s_resource('credit-ledger', port_forwards='8002:8002',
-             resource_deps=['credit-ledger-migrations'])
+             resource_deps=['credit-ledger-migrations', 'platform-auth'])
+
+# --- platform-core (F02) — identity for the fleet; issues the JWT credit-ledger verifies ---
+local_resource(
+    'platform-core-migrations',
+    cmd='kubectl create configmap platform-core-migrations '
+        '--from-file=0001_init.sql=services/platform-core/migrations/0001_init.sql '
+        '--dry-run=client -o yaml | kubectl apply -f -',
+    deps=['services/platform-core/migrations/0001_init.sql'],
+)
+docker_build('exascale/platform-core:dev', 'services/platform-core',
+             dockerfile='services/platform-core/Dockerfile')
+k8s_yaml(kustomize('deploy/k8s/platform-core/base'))
+k8s_resource('platform-core', port_forwards='8001:8001',
+             resource_deps=['platform-core-migrations', 'platform-auth'])
 
 # Future services register their own docker_build + k8s_yaml + k8s_resource blocks here.

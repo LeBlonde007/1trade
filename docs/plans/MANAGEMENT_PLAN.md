@@ -148,10 +148,10 @@ Status legend: ⬜ Not started · 🔵 In progress · ✅ Done · ⚠️ At risk
 | ID | Feature | Owner team | Target | Status | % | Notes |
 |---|---|---|---|---|---|---|
 | F01 | Foundation infra (K8s, data plane, CI/CD, observability, secrets) | Infra/SRE | M1 | 🔵 | ~50% | Scaffold + **core data plane (Postgres/TimescaleDB/Redis/NATS) verified on k3d** (all 1/1 Ready). Pending: FULL=1 scheduling+observability, real envs (staging/prod), SOPS secrets, CI-green, backup/restore + e2e skeleton. |
-| F02 | Auth — email/OAuth (M1); SAML/SCIM/2FA (M4) | Platform | M1 / M4 | ⬜ | 0% | Contract authored (openapi/platform-core.yaml + JWT claims); implementation not started. |
+| F02 | Auth — email/OAuth (M1); SAML/SCIM/2FA (M4) | Platform | M1 / M4 | ✅ | ~90% | **M1 core complete & deployed in k3d (v0.1.1)** — signup/login→JWT/me/logout/API-keys, bcrypt + HS256, case-insensitive identity, anti-enumeration. **Cross-service auth proven live: one platform-core login → credit-ledger verifies the JWT** (shared `platform-auth` secret). Review gate green. Later (M4): OAuth providers, SAML/SCIM, 2FA, full accounts/org surface (F03). |
 | F03 | Accounts, orgs, sub-accounts, RBAC, audit log | Platform | M1 / M4 | ⬜ | 0% | Sub-accounts M4. |
 | F04 | `exascale` CLI (login → infer → gpu → billing) | Platform | M1→M6 | ⬜ | 0% | Primary engineer interface. |
-| F05 | Prepaid credit ledger (balances, append-only tx, hash chain) | Ledger | M1→M4 | ✅ | ~95% | **Phase-1 complete & deployed in k3d** — domain + store + API + NATS events + self-migrating k8s deploy, all verified (pod 1/1 Ready, live purchase→chain ok). Later: prod overlays/HPA, scheduled reconciliation, real JWT after F02. See STATUS.md. |
+| F05 | Prepaid credit ledger (balances, append-only tx, hash chain) | Ledger | M1→M4 | ✅ | ~95% | **Phase-1 complete & deployed in k3d** — domain + store + API + NATS events + self-migrating k8s deploy, all verified (pod 1/1 Ready, live purchase→chain ok). Now verifies real platform-core JWTs (F02 integration live). Later: prod overlays/HPA, scheduled reconciliation. See STATUS.md. |
 | F06 | Credit purchase / billing (Stripe → ACH/wire → multi-currency) | Platform + Ledger | M2 / M3 | ⬜ | 0% | The revenue rails. |
 | F07 | Credit conversion (AI ↔ sub-credits, GPU tiers) | Ledger | M2 / M3 | ⬜ | 0% | |
 | F08 | Inference gateway (OpenAI-compatible, auth, debit) | Inference | M2 | ⬜ | 0% | Fastest revenue path. |

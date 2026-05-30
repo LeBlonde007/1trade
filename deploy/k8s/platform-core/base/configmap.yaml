@@ -1,0 +1,11 @@
+# platform-core non-secret config. PLATFORM_JWT_SECRET is NOT here — it's the shared `platform-auth`
+# Secret (created out-of-band: SOPS/Vault in prod, `kubectl create secret` / Tilt locally), read by
+# both platform-core (issuer) and credit-ledger (verifier).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: platform-core-env
+data:
+  EXASCALE_ENV: "dev"
+  PLATFORM_ADDR: ":8001"
+  DATABASE_URL: "postgres://exascale:exascale@postgres.data.svc.cluster.local:5432/exascale"

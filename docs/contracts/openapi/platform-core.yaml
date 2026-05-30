@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Exascale Platform-Core API (auth, accounts, RBAC, keys)
-  version: 1.0.0
+  version: 1.1.0
   description: >
     Identity for the whole platform. Owned by `platform-core`. Every other service authenticates
     inbound requests by verifying the JWT this service issues (see JwtClaims) — that's how each
@@ -18,6 +18,34 @@ tags:
   - { name: accounts, description: "Tenants, orgs, users, roles." }
 
 paths:
+  /v1/auth/signup:
+    post:
+      tags: [auth]
+      summary: Self-serve signup — creates an individual tenant + admin user, returns a JWT (auto-login).
+      operationId: signup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, format: password }
+                tenant_name: { type: string }
+      responses:
+        '201':
+          description: Created + authenticated.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string }
+                  expires_at: { type: string, format: date-time }
+        '409': { description: Email already registered., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+
   /v1/auth/login:
     post:
       tags: [auth]
@@ -225,7 +253,7 @@ components:
         name:      { type: string }
         kind:      { type: string, enum: [individual, org] }
         is_paper:  { type: boolean }
-        created_at:{ type: string, format: date-time }
+        created_at: { type: string, format: date-time }
     User:
       type: object
       properties:
