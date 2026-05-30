@@ -23,7 +23,7 @@ spec:
           args:
             - |
               set -e
-              for f in /migrations/0001_init.sql /migrations/0002_billing.sql; do
+              for f in /migrations/0001_init.sql /migrations/0002_billing.sql /migrations/0003_accounts.sql; do
                 echo "applying $f"; psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"
               done
           env:

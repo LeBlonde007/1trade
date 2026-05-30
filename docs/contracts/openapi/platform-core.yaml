@@ -225,6 +225,44 @@ paths:
                   users: { type: array, items: { $ref: '#/components/schemas/User' } }
                   next_cursor: { type: string, nullable: true }
 
+  /v1/account/orgs:
+    post:
+      tags: [accounts]
+      summary: Create an org under the tenant (admin-only). Audited.
+      operationId: createOrg
+      security: [{ tenantJwt: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [name], properties: { name: { type: string } } } } }
+      responses:
+        '201': { description: Created., content: { application/json: { schema: { $ref: '#/components/schemas/Org' } } } }
+        '403': { description: Insufficient role., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+    get:
+      tags: [accounts]
+      summary: List the tenant's orgs.
+      operationId: listOrgs
+      security: [{ tenantJwt: [] }]
+      responses:
+        '200':
+          description: Orgs.
+          content: { application/json: { schema: { type: object, properties: { orgs: { type: array, items: { $ref: '#/components/schemas/Org' } } } } } }
+
+  /v1/account/users/{id}/roles:
+    put:
+      tags: [accounts]
+      summary: Assign a user's roles within the tenant (admin-only). Audited (before/after).
+      operationId: assignRoles
+      security: [{ tenantJwt: [] }]
+      parameters: [ { name: id, in: path, required: true, schema: { type: string, format: uuid } } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [roles], properties: { roles: { type: array, items: { $ref: '#/components/schemas/Role' } } } } } }
+      responses:
+        '200': { description: Updated. }
+        '403': { description: Insufficient role., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { description: Unknown role., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+
   /v1/account/audit:
     get:
       tags: [accounts]
@@ -388,6 +426,12 @@ components:
         name:      { type: string }
         kind:      { type: string, enum: [individual, org] }
         is_paper:  { type: boolean }
+        created_at: { type: string, format: date-time }
+    Org:
+      type: object
+      properties:
+        id:         { type: string, format: uuid }
+        name:       { type: string }
         created_at: { type: string, format: date-time }
     User:
       type: object

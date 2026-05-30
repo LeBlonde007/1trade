@@ -65,6 +65,11 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /v1/billing/webhook/stripe", s.stripeWebhook) // auth = Stripe signature
 	s.mux.HandleFunc("GET /v1/billing/purchases", s.listPurchases)
 	s.mux.HandleFunc("GET /v1/account/audit", s.listAudit) // F03 — queryable audit trail (admin)
+	s.mux.HandleFunc("POST /v1/account/orgs", s.createOrg)
+	s.mux.HandleFunc("GET /v1/account/orgs", s.listOrgs)
+	s.mux.HandleFunc("GET /v1/account/orgs/{id}/users", s.listOrgUsers)
+	s.mux.HandleFunc("PUT /v1/account/users/{id}/roles", s.assignRoles)
+	s.mux.HandleFunc("GET /v1/account/tenants/{id}", s.getTenant)
 	// OAuth is scaffolded; real provider wiring (client secrets via Vault) is a follow-up.
 	s.mux.HandleFunc("GET /v1/auth/oauth/{provider}", notConfigured)
 	s.mux.HandleFunc("GET /v1/auth/oauth/{provider}/callback", notConfigured)
