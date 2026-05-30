@@ -7,7 +7,9 @@ ARG VLLM_VERSION=0.6.3.post1
 WORKDIR /app
 RUN pip install --no-cache-dir vllm==${VLLM_VERSION} \
     prometheus-client fastapi "uvicorn[standard]"
-COPY services/inference-runtime/python /app
-EXPOSE 8000 8001
+COPY services/inference-runtime/server.py /app/server.py
+EXPOSE 8000
 ENV PYTHONUNBUFFERED=1
-ENTRYPOINT ["python", "-m", "exascale_runtime"]
+# Weights mount from a PVC at MODEL_PATH; MODEL_ID is the catalog id. Serves the gateway↔runtime
+# contract in services/inference-runtime/README.md.
+ENTRYPOINT ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -32,8 +32,14 @@ func main() {
 		usage = np
 	}
 
-	// Mock backend for now; real vLLM (F09) implements the same interface and swaps in here.
-	backend := model.MockBackend{}
+	// Backend selection (F09): the real vLLM runtime or the GPU-free mock, behind one interface.
+	var backend model.Backend = model.MockBackend{}
+	if cfg.InferenceBackend == "vllm" {
+		backend = model.NewVLLMBackend(cfg.VLLMBaseURL, cfg.InferenceTimeout)
+		slog.Info("inference backend: vllm", "runtime", cfg.VLLMBaseURL)
+	} else {
+		slog.Info("inference backend: mock")
+	}
 
 	// Pre-flight credit guard — only when a JWT secret is configured (it mints the tenant token the
 	// ledger verifies). A nil checker disables the pre-flight.
