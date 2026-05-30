@@ -69,8 +69,46 @@ function isDebit(amount: string): boolean {
 }
 const textBalance = computed(() => balances.value.find((b) => b.credit_type === 'text')?.balance ?? '0')
 
+// ── Budget + activity panels ────────────────────────────────
+interface Budget { credit_type: string; monthly_limit: string }
+interface Purchase { id: string; amount: string; credit_type: string; currency: string; status: string; created_at: string }
+interface AuditEntry { id: string; action: string; target_type?: string; created_at: string }
+const budget = useState<Budget | null>('console:budget', () => null)
+const budgetInput = ref('')
+const purchases = useState<Purchase[]>('console:purchases', () => [])
+const auditEntries = useState<AuditEntry[]>('console:audit', () => [])
+
+async function loadBudget() {
+  budget.value = (await $fetch<{ budget: Budget | null }>('/api/billing/budget')).budget
+  if (budget.value) budgetInput.value = String(Number(budget.value.monthly_limit))
+}
+async function saveBudget() {
+  if (!budgetInput.value) return
+  await $fetch('/api/billing/budget', { method: 'PUT', body: { credit_type: 'text', monthly_limit: Number(budgetInput.value).toFixed(6) } })
+  await loadBudget()
+}
+async function loadActivity() {
+  purchases.value = (await $fetch<{ purchases: Purchase[] }>('/api/billing/purchases')).purchases || []
+  auditEntries.value = (await $fetch<{ entries: AuditEntry[] }>('/api/account/audit')).entries || []
+}
+
+// Month-to-date consumption for the budget's credit type, from the transaction feed.
+const usedThisMonth = computed(() => {
+  const ct = budget.value?.credit_type ?? 'text'
+  const m = new Date().getMonth()
+  return transactions.value
+    .filter((t) => t.credit_type === ct && t.operation === 'consumption' && new Date(t.created_at).getMonth() === m)
+    .reduce((s, t) => s + Math.abs(Number(t.amount)), 0)
+})
+const budgetPct = computed(() => {
+  const lim = Number(budget.value?.monthly_limit ?? 0)
+  return lim > 0 ? Math.min(100, (usedThisMonth.value / lim) * 100) : 0
+})
+// 50/80/100% alert bands → semantic color.
+const budgetLevel = computed(() => (budgetPct.value >= 100 ? 'over' : budgetPct.value >= 80 ? 'warn' : budgetPct.value >= 50 ? 'mid' : 'ok'))
+
 onMounted(async () => {
-  await Promise.allSettled([loadCatalog(), loadBalances(), loadTransactions(), loadKeys()])
+  await Promise.allSettled([loadCatalog(), loadBalances(), loadTransactions(), loadKeys(), loadBudget(), loadActivity()])
 })
 </script>
 
@@ -147,6 +185,24 @@ onMounted(async () => {
           <p class="hint">Opens Stripe checkout. On settlement the wallet credits automatically.</p>
         </section>
 
+        <!-- Monthly budget -->
+        <section class="card">
+          <div class="card-h"><h2>Monthly budget</h2></div>
+          <div class="buy-row">
+            <input v-model="budgetInput" class="input mono amt" inputmode="numeric" placeholder="limit" />
+            <span class="unit">text credits / mo</span>
+            <button class="primary" @click="saveBudget">Save</button>
+          </div>
+          <div v-if="budget" class="budget-meter">
+            <div class="bar"><div class="fill" :class="'lvl-' + budgetLevel" :style="{ width: budgetPct + '%' }"></div></div>
+            <div class="budget-row mono">
+              <span :class="'lvl-text-' + budgetLevel">{{ fmt(String(usedThisMonth)) }} used</span>
+              <span class="muted">/ {{ fmt(budget.monthly_limit) }} · {{ budgetPct.toFixed(0) }}%</span>
+            </div>
+          </div>
+          <p v-else class="hint">No budget set. Alerts fire at 50 / 80 / 100% of usage.</p>
+        </section>
+
         <!-- API keys -->
         <section class="card">
           <div class="card-h"><h2>API keys</h2></div>
@@ -197,6 +253,40 @@ onMounted(async () => {
         </tbody>
       </table>
     </section>
+
+    <!-- Activity: purchases + audit -->
+    <div class="grid">
+      <section class="card">
+        <div class="card-h"><h2>Purchases</h2></div>
+        <table class="tbl">
+          <thead><tr><th>Date</th><th class="r">Amount</th><th>Credit</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr v-for="p in purchases" :key="p.id">
+              <td class="mono muted">{{ new Date(p.created_at).toLocaleDateString() }}</td>
+              <td class="r mono">{{ fmt(p.amount) }}</td>
+              <td>{{ p.credit_type }}</td>
+              <td><span :class="p.status === 'paid' ? 'pos' : 'muted'">{{ p.status }}</span></td>
+            </tr>
+            <tr v-if="!purchases.length"><td colspan="4" class="muted">No purchases yet.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="card">
+        <div class="card-h"><h2>Audit log</h2></div>
+        <table class="tbl">
+          <thead><tr><th>Time</th><th>Action</th><th>Target</th></tr></thead>
+          <tbody>
+            <tr v-for="a in auditEntries" :key="a.id">
+              <td class="mono muted">{{ new Date(a.created_at).toLocaleTimeString() }}</td>
+              <td class="mono">{{ a.action }}</td>
+              <td class="muted">{{ a.target_type }}</td>
+            </tr>
+            <tr v-if="!auditEntries.length"><td colspan="3" class="muted">No activity yet.</td></tr>
+          </tbody>
+        </table>
+      </section>
+    </div>
   </div>
 </template>
 
@@ -287,6 +377,21 @@ onMounted(async () => {
 .tbl .acts { text-align: right; }
 .pos { color: var(--pos); }
 .neg { color: var(--neg); }
+
+/* Budget meter */
+.buy-row .unit { font-size: var(--fs-xs); color: var(--text-3); align-self: center; }
+.budget-meter { margin-top: var(--sp-3); }
+.bar { height: 6px; background: var(--overlay); border-radius: var(--radius-full); overflow: hidden; }
+.fill { height: 100%; transition: width var(--dur) var(--ease); }
+.fill.lvl-ok { background: var(--pos); }
+.fill.lvl-mid { background: var(--brand); }
+.fill.lvl-warn { background: var(--warn); }
+.fill.lvl-over { background: var(--neg); }
+.budget-row { display: flex; justify-content: space-between; font-size: var(--fs-xs); margin-top: var(--sp-2); }
+.lvl-text-ok { color: var(--pos); }
+.lvl-text-mid { color: var(--text); }
+.lvl-text-warn { color: var(--warn); }
+.lvl-text-over { color: var(--neg); }
 
 @media (max-width: 1100px) { .grid { grid-template-columns: 1fr; } }
 </style>
