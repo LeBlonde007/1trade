@@ -86,6 +86,26 @@ function fmtUsd(n: number, dp = 2) {
 // =====================================================
 const totalUsd = computed(() => assets.reduce((s, a) => s + a.qty * a.usdPrice, 0))
 
+// F20: in live mode (EXASCALE_API_MODE=local), overlay real credit balances from the ledger onto the
+// matching assets. Mock mode keeps the showcase numbers untouched; assets with no live balance are
+// left as-is (non-destructive).
+const walletApiMode = useRuntimeConfig().public.apiMode
+onMounted(async () => {
+  if (walletApiMode !== 'local') return
+  const creditKeyFor: Record<string, string> = {
+    ai: 'ai_index', text: 'text', speech: 'speech', image: 'image', video: 'video', h100: 'gpu_h100', h200: 'gpu_h200',
+  }
+  try {
+    const live = await useWallet().loadBalances()
+    for (const a of assets) {
+      const ct = creditKeyFor[a.key]
+      if (!ct) continue
+      const b = live.find((x) => x.credit_type === ct)
+      if (b) { a.qty = Number(b.balance); a.locked = Number(b.locked_amount); a.empty = Number(b.balance) === 0 }
+    }
+  } catch { /* leave the showcase values on error */ }
+})
+
 interface AllocGroup { key: string; name: string; color: string; usd: number }
 const allocationGroups = computed<AllocGroup[]>(() => {
   const get = (k: string) => assets.find(a => a.key === k)!
