@@ -8,12 +8,15 @@ import (
 
 // Config holds runtime configuration.
 type Config struct {
-	Env          string        // dev | staging | prod
-	Addr         string        // listen address, e.g. ":8001"
-	DatabaseURL  string        // Postgres DSN
-	JWTSecret    string        // HS256 signing secret — SHARED with every service that verifies tokens
-	ServiceToken string        // service-to-service token guarding internal endpoints (e.g. key introspect)
-	TokenTTL     time.Duration // issued-token lifetime
+	Env                 string        // dev | staging | prod
+	Addr                string        // listen address, e.g. ":8001"
+	DatabaseURL         string        // Postgres DSN
+	JWTSecret           string        // HS256 signing secret — SHARED with every service that verifies tokens
+	ServiceToken        string        // service-to-service token (guards internal endpoints; auths calls to the ledger)
+	CreditLedgerURL     string        // base URL for booking settled purchases (F06)
+	StripeWebhookSecret string        // Stripe webhook signing secret (verifies inbound webhooks)
+	StripeSecretKey     string        // Stripe API key (real checkout sessions; empty → mock Stripe)
+	TokenTTL            time.Duration // issued-token lifetime
 }
 
 // Load reads configuration from the environment with sensible dev defaults.
@@ -25,12 +28,15 @@ func Load() Config {
 		}
 	}
 	return Config{
-		Env:          envOr("EXASCALE_ENV", "dev"),
-		Addr:         envOr("PLATFORM_ADDR", ":8001"),
-		DatabaseURL:  os.Getenv("DATABASE_URL"),
-		JWTSecret:    os.Getenv("PLATFORM_JWT_SECRET"),
-		ServiceToken: os.Getenv("SERVICE_TOKEN"),
-		TokenTTL:     ttl,
+		Env:                 envOr("EXASCALE_ENV", "dev"),
+		Addr:                envOr("PLATFORM_ADDR", ":8001"),
+		DatabaseURL:         os.Getenv("DATABASE_URL"),
+		JWTSecret:           os.Getenv("PLATFORM_JWT_SECRET"),
+		ServiceToken:        os.Getenv("SERVICE_TOKEN"),
+		CreditLedgerURL:     envOr("CREDIT_LEDGER_URL", "http://credit-ledger:8002"),
+		StripeWebhookSecret: os.Getenv("STRIPE_WEBHOOK_SECRET"),
+		StripeSecretKey:     os.Getenv("STRIPE_SECRET_KEY"),
+		TokenTTL:            ttl,
 	}
 }
 

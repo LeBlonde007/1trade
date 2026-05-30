@@ -1,0 +1,155 @@
+package api
+
+import (
+	"encoding/json"
+	"io"
+	"log/slog"
+	"math/big"
+	"net/http"
+	"strconv"
+	"time"
+
+	"github.com/exascale/platform-core/internal/billing"
+	"github.com/exascale/platform-core/internal/domain"
+	"github.com/exascale/platform-core/internal/store"
+	"github.com/google/uuid"
+)
+
+// checkoutBody is the POST /v1/billing/checkout request.
+type checkoutBody struct {
+	Amount     string `json:"amount"`
+	CreditType string `json:"credit_type"`
+	Currency   string `json:"currency"`
+}
+
+// createCheckout validates an order, records a pending purchase, creates a Stripe checkout session,
+// and returns its URL. Credits are minted only after settlement (the webhook books them).
+func (s *Server) createCheckout(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.authed(w, r)
+	if !ok {
+		return
+	}
+	var b checkoutBody
+	if err := json.NewDecoder(r.Body).Decode(&b); err != nil {
+		writeErr(w, http.StatusBadRequest, "bad_request", "invalid body")
+		return
+	}
+	amt, ok := new(big.Rat).SetString(b.Amount)
+	if !ok || amt.Sign() <= 0 {
+		writeErr(w, http.StatusUnprocessableEntity, "bad_amount", "amount must be a positive decimal")
+		return
+	}
+	if b.CreditType == "" || (b.Currency != "usd" && b.Currency != "jpy") {
+		writeErr(w, http.StatusUnprocessableEntity, "bad_request", "credit_type and a supported currency (usd|jpy) are required")
+		return
+	}
+
+	purchaseID := uuid.NewString()
+	session, err := s.stripe.CreateCheckoutSession(r.Context(), billing.CheckoutParams{
+		PurchaseID: purchaseID, TenantID: p.TenantID, Amount: b.Amount, CreditType: b.CreditType, Currency: b.Currency,
+	})
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	if err := s.st.CreatePurchase(r.Context(), store.Purchase{
+		ID: purchaseID, TenantID: p.TenantID, Amount: b.Amount, CreditType: b.CreditType, Currency: b.Currency, IsPaper: p.IsPaper,
+	}, session.ID); err != nil {
+		serverError(w, err)
+		return
+	}
+	slog.Info("audit: checkout created", "tenant_id", p.TenantID, "purchase_id", purchaseID, "amount", b.Amount, "credit_type", b.CreditType)
+	writeJSON(w, http.StatusOK, map[string]any{"purchase_id": purchaseID, "checkout_url": session.URL})
+}
+
+// stripeEvent is the slice of a Stripe Event payload we act on.
+type stripeEvent struct {
+	ID   string `json:"id"`
+	Type string `json:"type"`
+	Data struct {
+		Object struct {
+			ID string `json:"id"`
+		} `json:"object"`
+	} `json:"data"`
+}
+
+// stripeWebhook receives Stripe events. Authenticity is the Stripe-Signature header (HMAC), never a
+// bearer token. On checkout.session.completed it marks the purchase paid and books the credits to
+// the ledger, idempotent on the Stripe event id (a replay never double-mints).
+func (s *Server) stripeWebhook(w http.ResponseWriter, r *http.Request) {
+	payload, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "bad_request", "could not read body")
+		return
+	}
+	if err := domain.VerifyStripeSignature(payload, r.Header.Get("Stripe-Signature"),
+		s.cfg.StripeWebhookSecret, domain.StripeSignatureTolerance, time.Now()); err != nil {
+		slog.Warn("stripe webhook signature rejected", "err", err)
+		writeErr(w, http.StatusUnauthorized, "invalid_signature", "signature verification failed")
+		return
+	}
+	var ev stripeEvent
+	if err := json.Unmarshal(payload, &ev); err != nil || ev.ID == "" {
+		writeErr(w, http.StatusBadRequest, "bad_request", "invalid event payload")
+		return
+	}
+	if ev.Type != "checkout.session.completed" {
+		w.WriteHeader(http.StatusOK) // not a settlement event — ack and ignore
+		return
+	}
+	pur, found, err := s.st.GetPurchaseBySession(r.Context(), ev.Data.Object.ID)
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	if !found {
+		w.WriteHeader(http.StatusOK) // unknown session — ack so Stripe stops retrying
+		return
+	}
+	if err := s.st.MarkPurchasePaid(r.Context(), ev.Data.Object.ID, ev.ID); err != nil {
+		serverError(w, err)
+		return
+	}
+	// Book the credits. Idempotent on the event id, so a retry (e.g. after a transient failure here)
+	// recovers without double-minting. A failure returns 500 → Stripe retries.
+	if err := s.booker.BookPurchase(r.Context(), billing.PurchaseBooking{
+		TenantID: pur.TenantID, Amount: pur.Amount, CreditType: pur.CreditType, IsPaper: pur.IsPaper,
+		ReferenceID: pur.ID, IdempotencyKey: ev.ID,
+	}); err != nil {
+		serverError(w, err)
+		return
+	}
+	slog.Info("audit: purchase booked", "tenant_id", pur.TenantID, "purchase_id", pur.ID, "event_id", ev.ID, "amount", pur.Amount)
+	w.WriteHeader(http.StatusOK)
+}
+
+// listPurchases returns the tenant's purchase history.
+func (s *Server) listPurchases(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.authed(w, r)
+	if !ok {
+		return
+	}
+	limit := 50
+	if v := r.URL.Query().Get("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 1 && n <= 200 {
+			limit = n
+		}
+	}
+	purs, err := s.st.ListPurchases(r.Context(), p.TenantID, limit)
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	out := make([]map[string]any, 0, len(purs))
+	for _, pu := range purs {
+		row := map[string]any{
+			"id": pu.ID, "amount": pu.Amount, "credit_type": pu.CreditType,
+			"currency": pu.Currency, "status": pu.Status, "created_at": pu.CreatedAt.UTC().Format(time.RFC3339),
+		}
+		if pu.PaidAt != nil {
+			row["paid_at"] = pu.PaidAt.UTC().Format(time.RFC3339)
+		}
+		out = append(out, row)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"purchases": out})
+}

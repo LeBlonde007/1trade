@@ -10,24 +10,40 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/exascale/platform-core/internal/billing"
 	"github.com/exascale/platform-core/internal/config"
 	"github.com/exascale/platform-core/internal/domain"
 	"github.com/exascale/platform-core/internal/store"
 	"github.com/google/uuid"
 )
 
-// Server wires config + store into an http.Handler.
+// Server wires config + store + the billing collaborators into an http.Handler.
 type Server struct {
-	cfg config.Config
-	st  *store.Store
-	mux *http.ServeMux
+	cfg    config.Config
+	st     *store.Store
+	stripe billing.StripeClient
+	booker billing.PurchaseBooker
+	mux    *http.ServeMux
 }
 
-// New builds the routed handler.
+// New builds the routed handler with the default billing collaborators (mock Stripe until a key is
+// configured; the real credit-ledger booker).
 func New(cfg config.Config, st *store.Store) *Server {
-	s := &Server{cfg: cfg, st: st, mux: http.NewServeMux()}
+	return NewWithBilling(cfg, st, defaultStripe(cfg), billing.NewLedgerClient(cfg))
+}
+
+// NewWithBilling builds the handler with explicit billing collaborators (tests inject fakes).
+func NewWithBilling(cfg config.Config, st *store.Store, stripe billing.StripeClient, booker billing.PurchaseBooker) *Server {
+	s := &Server{cfg: cfg, st: st, stripe: stripe, booker: booker, mux: http.NewServeMux()}
 	s.routes()
 	return s
+}
+
+// defaultStripe returns the real Stripe client when a secret key is configured, else the mock (local
+// dev / CI). The real-Stripe checkout-session client is an M3 follow-up; the mock exercises the full
+// booking loop today.
+func defaultStripe(_ config.Config) billing.StripeClient {
+	return billing.MockStripe{}
 }
 
 // ServeHTTP implements http.Handler.
@@ -45,6 +61,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /v1/auth/keys", s.createKey)
 	s.mux.HandleFunc("DELETE /v1/auth/keys/{id}", s.revokeKey)
 	s.mux.HandleFunc("POST /v1/auth/keys/introspect", s.introspectKey) // internal (service token)
+	s.mux.HandleFunc("POST /v1/billing/checkout", s.createCheckout)
+	s.mux.HandleFunc("POST /v1/billing/webhook/stripe", s.stripeWebhook) // auth = Stripe signature
+	s.mux.HandleFunc("GET /v1/billing/purchases", s.listPurchases)
 	// OAuth is scaffolded; real provider wiring (client secrets via Vault) is a follow-up.
 	s.mux.HandleFunc("GET /v1/auth/oauth/{provider}", notConfigured)
 	s.mux.HandleFunc("GET /v1/auth/oauth/{provider}/callback", notConfigured)
