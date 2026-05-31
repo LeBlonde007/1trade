@@ -34,16 +34,21 @@ type usageEvent struct {
 	IsPaper      bool    `json:"is_paper"`
 }
 
-// UsageConsumer holds the durable JetStream subscription that debits the ledger on inference usage.
+// UsageConsumer holds the durable JetStream pull subscription that debits the ledger on inference
+// usage, plus the fetch loop's stop signal.
 type UsageConsumer struct {
-	nc  *nats.Conn
-	sub *nats.Subscription
-	st  *store.Store
-	pub events.Publisher
+	nc   *nats.Conn
+	sub  *nats.Subscription
+	st   *store.Store
+	pub  events.Publisher
+	stop chan struct{}
 }
 
 // Start connects to NATS/JetStream, ensures the stream capturing inference.usage.v1 exists, and
-// begins consuming with a durable, manually-acked subscription. Close to stop.
+// begins consuming with a durable PULL subscription (a fetch loop). Pull is deliberate: a push
+// durable is exclusive — one active subscription at a time — so a pod restart races the server's
+// still-"bound" old deliver subject and fails with "consumer is already bound to a subscription",
+// silently stopping all debits. A pull consumer rebinds cleanly across restarts. Close to stop.
 func Start(url string, st *store.Store, pub events.Publisher) (*UsageConsumer, error) {
 	nc, err := nats.Connect(url, nats.Name("credit-ledger-consumer"), nats.Timeout(5*time.Second))
 	if err != nil {
@@ -65,16 +70,47 @@ func Start(url string, st *store.Store, pub events.Publisher) (*UsageConsumer, e
 			return nil, fmt.Errorf("add stream: %w", err)
 		}
 	}
-	c := &UsageConsumer{nc: nc, st: st, pub: pub}
-	sub, err := js.Subscribe(subject, c.handle,
-		nats.Durable(durable), nats.ManualAck(), nats.AckExplicit(), nats.MaxDeliver(5))
+	// Migrate a legacy push-based durable (from the old js.Subscribe path) to pull: a pull
+	// subscription cannot bind to a consumer that has a DeliverSubject, so delete it and let
+	// PullSubscribe recreate it. The old consumer never acked (it failed to bind), so no progress is
+	// lost; the debit is idempotent on request_id regardless.
+	if info, err := js.ConsumerInfo(streamName, durable); err == nil && info.Config.DeliverSubject != "" {
+		_ = js.DeleteConsumer(streamName, durable)
+	}
+	c := &UsageConsumer{nc: nc, st: st, pub: pub, stop: make(chan struct{})}
+	sub, err := js.PullSubscribe(subject, durable, nats.AckExplicit(), nats.MaxDeliver(5))
 	if err != nil {
 		nc.Close()
-		return nil, fmt.Errorf("subscribe: %w", err)
+		return nil, fmt.Errorf("pull subscribe: %w", err)
 	}
 	c.sub = sub
-	slog.Info("consuming inference.usage.v1 → ledger debit", "stream", streamName, "durable", durable)
+	go c.loop()
+	slog.Info("consuming inference.usage.v1 → ledger debit (pull)", "stream", streamName, "durable", durable)
 	return c, nil
+}
+
+// loop fetches batches of usage events and debits each, until Close. A fetch timeout (no messages in
+// the window) is normal and just polls again; other fetch errors back off briefly then retry.
+func (c *UsageConsumer) loop() {
+	for {
+		select {
+		case <-c.stop:
+			return
+		default:
+		}
+		msgs, err := c.sub.Fetch(10, nats.MaxWait(2*time.Second))
+		if err != nil {
+			if errors.Is(err, nats.ErrTimeout) {
+				continue // no messages this window — poll again
+			}
+			slog.Error("usage fetch failed — retrying", "err", err)
+			time.Sleep(500 * time.Millisecond)
+			continue
+		}
+		for _, m := range msgs {
+			c.handle(m)
+		}
+	}
 }
 
 // handle debits the ledger for one usage event. Idempotent on request_id, so a redelivery is a
@@ -124,8 +160,11 @@ func (c *UsageConsumer) handle(msg *nats.Msg) {
 	_ = msg.Ack()
 }
 
-// Close drains the subscription and connection.
+// Close stops the fetch loop, then drains the subscription and connection.
 func (c *UsageConsumer) Close() {
+	if c.stop != nil {
+		close(c.stop)
+	}
 	if c.sub != nil {
 		_ = c.sub.Drain()
 	}
