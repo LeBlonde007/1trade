@@ -4,6 +4,21 @@ All notable changes to Exascale. Format: [Keep a Changelog](https://keepachangel
 SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not dates — see
 `docs/plans/MANAGEMENT_PLAN.md`).
 
+## [v0.2.6] — Milestone 2: wallet "recent movements" — live (F20 × F05)
+
+### Added
+- **The wallet "Recent movements" table now renders real ledger transactions** in `local` mode
+  (`useWallet.loadTransactions` → `/api/wallet/transactions`). Each ledger row maps to a movement:
+  operation → coloured pill (`conversion`/`purchase`/`mint`/`consumption`/`burn`), credit type →
+  asset name, signed amount (▲/▼ via `+`/`−`), and balance-after — mono + `tabular-nums`. A just-made
+  conversion appears immediately (balances + movements both refresh on submit). `mock` mode keeps the
+  canned showcase rows.
+
+### Proven live (through the running frontend BFF)
+- signup → purchase 300 ai_index → convert 120 → `GET /api/wallet/transactions` returns, newest-first:
+  `Conversion text +98.672785` (bal 98.672785) · `Conversion ai_index −120` (bal 180) · `Purchase
+  ai_index +300` (bal 300) — exactly the rows the table maps.
+
 ## [v0.2.5] — Milestone 2: wallet convert UI — live (F20 × F07)
 
 ### Added
