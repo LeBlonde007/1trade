@@ -90,13 +90,17 @@ func cmdLogin(cfg config.Config, args []string) error {
 func cmdSignup(cfg config.Config, args []string) error {
 	fs := flag.NewFlagSet("signup", flag.ExitOnError)
 	email := fs.String("email", "", "account email")
+	password := fs.String("password", "", "account password (prefer the prompt or EXASCALE_PASSWORD)")
 	name := fs.String("name", "", "tenant name")
 	_ = fs.Parse(args)
 	e := firstNonEmpty(*email)
 	if e == "" {
 		e = readLine("Email: ")
 	}
-	p := readPassword("Password: ")
+	p := firstNonEmpty(*password, os.Getenv("EXASCALE_PASSWORD"))
+	if p == "" {
+		p = readPassword("Password: ")
+	}
 	var out struct {
 		Token string `json:"token"`
 	}

@@ -201,6 +201,15 @@ SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not da
   sandbox): asymmetric JWT so services can't mint, and a balance hold to close the pre-flight
   fail-open window.
 
+## [v0.1.5] — Milestone 1: CLI signup `--password` flag (F04 fix)
+
+### Fixed
+- **`exascale signup` now accepts `--password`** (and `EXASCALE_PASSWORD`), matching `login` — it
+  previously only took `--email`/`--name` and always prompted, so the documented non-interactive
+  signup (`signup --email … --password …`) failed with "flag provided but not defined: -password".
+  The hidden prompt remains the default when neither is given. Proven live: `signup --email …
+  --password … --name …` → account created + identity printed.
+
 ## [v0.1.4] — Milestone 1: exascale CLI v0 (F04)
 
 ### Added
