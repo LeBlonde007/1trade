@@ -4,6 +4,26 @@ All notable changes to Exascale. Format: [Keep a Changelog](https://keepachangel
 SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not dates — see
 `docs/plans/MANAGEMENT_PLAN.md`).
 
+## [v0.2.8] — Milestone 2: settings · API keys — live (F20 × F02)
+
+### Added
+- **The settings → API Keys screen now manages real platform-core keys** in `local` mode
+  (`Exascale Frontend`). Create mints a key through platform-core and reveals the **real one-time
+  secret**; the list and revoke run against the live API; the count, created date, and status
+  (active/revoked) reflect real data. `mock` mode keeps the showcase keys + client-side generation.
+  Scope rendering tolerates arbitrary live scope strings (falls back gracefully for scopes not in the
+  showcase taxonomy); an empty state and inline create/revoke errors were added. Design-token clean
+  (mono prefixes, semantic status tags, sentence case).
+- Wired via the existing `useKeys` composable + `/api/keys` BFF (no contract change).
+
+### Verification
+- Typecheck clean. **Live re-verify deferred:** the local k3d cluster stopped between sessions and
+  can't restart on this host right now (its `:8080` LB port is held by an unrelated local project),
+  so platform-core isn't reachable to run the create→reveal→revoke e2e. The wired path
+  (`useKeys → /api/keys → proxyJson → platform-core /v1/auth/keys`) is the same one verified live in
+  F20-6 (v0.2.3); this change only routes the settings screen's create/list/revoke through it in
+  local mode. Re-run the live e2e once the cluster is back.
+
 ## [v0.2.7] — Milestone 2: inference playground credit meter + debit-flow fix (F20 × F08, F08↔F05)
 
 ### Added
