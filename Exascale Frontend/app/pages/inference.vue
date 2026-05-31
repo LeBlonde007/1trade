@@ -100,6 +100,9 @@ interface Turn {
   tokens?: { in?: number; out?: number }
   latencyMs?: number
   costUsd?: number
+  /** Real credit cost (live mode): tokens × catalog price, in `creditType` credits. */
+  creditCost?: number
+  creditType?: string
   reqId?: string
   backend?: string
 }
@@ -172,6 +175,49 @@ let streamTimer: ReturnType<typeof setInterval> | null = null
 // it keeps the rich streaming showcase below. The live path routes to a model the gateway serves.
 const apiMode = useRuntimeConfig().public.apiMode
 
+// F20×F08 — live credit economics. In local mode we load the real model catalog (credit price per
+// unit) + the tenant's text-credit balance, so each run shows its true credit cost and the session
+// meter reflects real spend (the gateway debits the same tokens×price async via the ledger).
+const catalog = useCatalog()
+const wallet = useWallet()
+const catalogPrice = ref<Record<string, { price: number; creditType: string; unit: string }>>({})
+const textBalance = ref<number | null>(null)
+
+/** refreshBalance pulls the tenant's live `text` credit balance (local mode only). */
+async function refreshBalance() {
+  if (apiMode !== 'local') return
+  try {
+    const bals = await wallet.loadBalances()
+    textBalance.value = Number(bals.find((b) => b.credit_type === 'text')?.balance ?? 0)
+  } catch { /* keep the prior value */ }
+}
+
+/** liveCreditCost computes a token-priced model's real credit cost from the catalog (null if unknown). */
+function liveCreditCost(modelId: string, totalTokens: number): { cost: number; creditType: string } | null {
+  const p = catalogPrice.value[modelId]
+  if (!p || !p.unit.includes('1K')) return null
+  return { cost: (totalTokens / 1000) * p.price, creditType: p.creditType }
+}
+
+onMounted(async () => {
+  if (apiMode !== 'local') return
+  try {
+    const models = await catalog.load()
+    const map: Record<string, { price: number; creditType: string; unit: string }> = {}
+    for (const m of models) map[m.id] = { price: Number(m.exascale.price), creditType: m.exascale.credit_type, unit: m.exascale.unit }
+    catalogPrice.value = map
+  } catch { /* meter falls back to estimates only */ }
+  await refreshBalance()
+})
+
+// The gateway serves the 8B/70B Llamas; any other showcase pick routes to 8B for the live call.
+const liveServedId = computed(() => (['llama-3.1-8b', 'llama-3.1-70b'].includes(selectedId.value) ? selectedId.value : 'llama-3.1-8b'))
+
+// Session meter — only live turns (those carrying a real creditCost) count toward credit spend.
+const liveTurns = computed(() => turns.filter((t) => t.creditCost !== undefined))
+const sessionCredits = computed(() => liveTurns.value.reduce((s, t) => s + (t.creditCost ?? 0), 0))
+const hasLiveUsage = computed(() => apiMode === 'local' && liveTurns.value.length > 0)
+
 // Rough tokens estimate (~4 chars/token)
 const draftTokens = computed(() => Math.max(0, Math.ceil(draft.value.length / 4)))
 
@@ -192,6 +238,13 @@ const estimateCost = computed(() => {
   return inputUsd + outUsd
 })
 
+// Live credit estimate for the served model (input context + the max-out budget) × catalog price.
+const estimateCredits = computed(() => {
+  const p = catalogPrice.value[liveServedId.value]
+  if (!p || !p.unit.includes('1K')) return 0
+  return ((estimateInputTokens.value + params.maxTokens) / 1000) * p.price
+})
+
 function stripHtml(html: string) {
   return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
 }
@@ -199,6 +252,10 @@ function fmtCost(n: number) {
   if (n < 0.01) return '$' + n.toFixed(5)
   if (n < 1) return '$' + n.toFixed(4)
   return '$' + n.toFixed(2)
+}
+/** fmtCredits renders a credit amount, trimmed to ≤6dp (tabular-friendly). */
+function fmtCredits(n: number) {
+  return (Math.round(n * 1e6) / 1e6).toLocaleString('en-US', { maximumFractionDigits: 6 })
 }
 function fmtNum(n: number) {
   return n.toLocaleString('en-US')
@@ -271,9 +328,10 @@ function send() {
 // 402 surfaces as a buy-credits hint.
 async function sendLive(text: string) {
   const startedAt = Date.now()
-  const liveModel = ['llama-3.1-8b', 'llama-3.1-70b'].includes(selectedId.value) ? selectedId.value : 'llama-3.1-8b'
+  const liveModel = liveServedId.value
   try {
     const res = await useInference().run(liveModel, text, params.maxTokens)
+    const cc = liveCreditCost(liveModel, res.usage.total_tokens)
     turns.push({
       id: nextId(), role: 'assistant',
       text: res.content,
@@ -281,9 +339,12 @@ async function sendLive(text: string) {
       tokens: { in: res.usage.prompt_tokens, out: res.usage.completion_tokens },
       latencyMs: Date.now() - startedAt,
       costUsd: mockCost(res.usage.prompt_tokens, res.usage.completion_tokens),
+      creditCost: cc?.cost,
+      creditType: cc?.creditType,
       reqId: 'req_' + Math.random().toString(36).slice(2, 12),
       backend: liveModel,
     })
+    void refreshBalance() // the debit settles async via the ledger; pull the new balance shortly after
   } catch (e: unknown) {
     const ex = e as { data?: { code?: string; message?: string } }
     const msg = ex?.data?.code === 'INSUFFICIENT_CREDIT'
@@ -716,7 +777,9 @@ onBeforeUnmount(() => {
                       {{ t.role === 'user' ? 'Marcus Chen' : selected.name }}
                     </span>
                     <span v-if="t.role === 'assistant' && t.latencyMs" class="turn-meta mono">
-                      {{ t.latencyMs }}ms · {{ t.tokens?.out ?? 0 }} tok out · {{ fmtCost(t.costUsd ?? 0) }}
+                      {{ t.latencyMs }}ms · {{ t.tokens?.out ?? 0 }} tok out ·
+                      <template v-if="t.creditCost !== undefined">{{ fmtCredits(t.creditCost) }} {{ t.creditType }} credits</template>
+                      <template v-else>{{ fmtCost(t.costUsd ?? 0) }}</template>
                     </span>
                     <span v-else-if="t.role === 'assistant'" class="turn-meta mono pulse-meta">
                       <span class="pulse" /> Streaming…
@@ -754,7 +817,8 @@ onBeforeUnmount(() => {
                     <div class="composer-actions">
                       <span class="cost-preview mono">
                         Estimated cost:
-                        <strong>{{ fmtCost(estimateCost) }}</strong>
+                        <strong v-if="apiMode === 'local'">{{ fmtCredits(estimateCredits) }} text credits</strong>
+                        <strong v-else>{{ fmtCost(estimateCost) }}</strong>
                         <span class="dim">
                           ({{ fmtNum(estimateInputTokens) }} in · {{ fmtNum(params.maxTokens) }} max out)
                         </span>
@@ -850,7 +914,10 @@ onBeforeUnmount(() => {
               <dd class="mono small">{{ lastAssistant?.backend ?? '—' }}</dd>
 
               <dt>Cost</dt>
-              <dd class="mono pos">{{ fmtCost(lastAssistant?.costUsd ?? 0) }}</dd>
+              <dd v-if="lastAssistant?.creditCost !== undefined" class="mono pos">
+                {{ fmtCredits(lastAssistant.creditCost) }} {{ lastAssistant.creditType }} credits
+              </dd>
+              <dd v-else class="mono pos">{{ fmtCost(lastAssistant?.costUsd ?? 0) }}</dd>
 
               <dt>Request ID</dt>
               <dd class="mono small flex">
@@ -893,6 +960,17 @@ onBeforeUnmount(() => {
                   {{ fmtCost(turns.reduce((s, t) => s + (t.costUsd ?? 0), 0)) }}
                 </span>
               </div>
+              <!-- Live credit meter (local mode, once a real run has happened) -->
+              <template v-if="hasLiveUsage">
+                <div class="totals-row">
+                  <span class="t-k mono">Credits spent · session</span>
+                  <span class="t-v mono pos">{{ fmtCredits(sessionCredits) }}</span>
+                </div>
+                <div class="totals-row">
+                  <span class="t-k mono">Text balance · live</span>
+                  <span class="t-v mono">{{ textBalance === null ? '—' : fmtCredits(textBalance) }}</span>
+                </div>
+              </template>
             </div>
 
             <div class="meta-section">
