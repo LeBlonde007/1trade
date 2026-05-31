@@ -4,6 +4,31 @@ All notable changes to Exascale. Format: [Keep a Changelog](https://keepachangel
 SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not dates — see
 `docs/plans/MANAGEMENT_PLAN.md`).
 
+## [v0.2.7] — Milestone 2: inference playground credit meter + debit-flow fix (F20 × F08, F08↔F05)
+
+### Added
+- **Real-time credit visibility in the inference playground** (`Exascale Frontend`). In `local` mode
+  each run shows its **real credit cost** — `total_tokens / 1000 × catalog price`, in the model's
+  credit type — on the turn, in the response sidebar, and as a pre-send estimate. A live **session
+  meter** sums credits spent and shows the tenant's live `text` balance (pulled after each run).
+  `mock` mode keeps the USD showcase. Cost is derived from the live catalog (`useCatalog`) + ledger
+  balances (`useWallet`); the gateway debits the same `tokens × price` server-side.
+
+### Fixed
+- **Inference debits weren't flowing** (`credit-ledger` consumer). The `inference.usage.v1` consumer
+  used a **push-based durable** subscription, which is exclusive — after a pod restart the server
+  still held the old deliver subject "bound", so the new subscription failed with *"consumer is
+  already bound to a subscription"* and the consumer **silently never started**. Usage events piled
+  up unbilled, breaking the M2 inference-dollar loop (and commitment #4, visible settlement).
+  Switched to a **durable pull consumer** (fetch loop) which rebinds cleanly across restarts; a
+  legacy push consumer is auto-migrated (deleted → recreated as pull). Idempotency on `request_id`
+  is unchanged, so the catch-up replay can't double-bill.
+
+### Proven live (k3d)
+- catalog `llama-3.1-8b` = 5.000000 / 1K tokens · text. Run via the BFF → 18 total tokens → the UI
+  shows **0.090000 text credits**, and the ledger balance debits **50 → 49.91 within ~1s** through
+  the fixed pull consumer. Consumer boots `…ledger debit (pull)` with no bind error.
+
 ## [v0.2.6] — Milestone 2: wallet "recent movements" — live (F20 × F05)
 
 ### Added
