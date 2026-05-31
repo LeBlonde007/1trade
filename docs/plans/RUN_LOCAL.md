@@ -4,7 +4,8 @@
 live services). `LOCAL_DEV.md` describes the *intended* end-state (ingress `:8080`, Grafana, `make
 seed`, `exascale login --dev`); several of those aren't wired yet. When in doubt, follow this file.
 
-Last verified: 2026-05-31 (tags up to `v0.2.7`).
+Last verified: 2026-05-31 (tags up to `v0.2.8`). To **verify the shipped features** once it's up, see
+**[TESTING.md](./TESTING.md)** (automated tests + curl + CLI + web, per feature).
 
 ---
 
