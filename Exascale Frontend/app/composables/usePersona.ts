@@ -5,7 +5,7 @@
  * to filter the trading-app sidebar, hint marketing nav, and pre-select
  * the tour engine. Persists to localStorage so it survives reloads.
  *
- * Default = 'trader' so first-time visitors see the most common surface.
+ * Default = 'enterprise' (AI company) — the platform-first audience post-GTM-pivot.
  *
  *   const p = usePersona()
  *   p.persona.value          → 'trader' | 'enterprise' | 'partner'
@@ -31,7 +31,9 @@ export const PERSONA_META: Record<ActivePersona, PersonaMeta> = {
 }
 
 export function usePersona() {
-  const persona = useState<ActivePersona>('active-persona', () => 'trader')
+  // Default = 'enterprise' (AI company) — the platform-first audience post-GTM-pivot. Traders +
+  // datacenter partners switch via the sidebar persona pill; the choice persists to localStorage.
+  const persona = useState<ActivePersona>('active-persona', () => 'enterprise')
 
   // Hydrate from localStorage once on the client.
   if (import.meta.client) {

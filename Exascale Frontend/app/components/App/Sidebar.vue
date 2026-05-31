@@ -3,7 +3,7 @@
  * AppSidebar — icon-only nav for the trading app (64px wide).
  *
  * Items are tagged with the personas they belong to. The active persona
- * (from usePersona()) filters the visible list. Default persona = 'trader'.
+ * (from usePersona()) filters the visible list. Default persona = 'enterprise' (AI company).
  * Users switch personas via the persona-pill at the bottom or via
  * /onboarding/tour.
  */
@@ -38,24 +38,27 @@ interface NavItem {
 }
 
 const items: NavItem[] = [
-  // Core trading surfaces — visible to traders + enterprise (AI co also trades)
-  { icon: CandlestickChart, label: 'Trade',     to: '/trade',                          personas: ['trader', 'enterprise'] },
-  { icon: List,             label: 'Markets',   to: '/markets/eai-idx', match: '/markets', personas: ['trader', 'enterprise'] },
-  { icon: TrendingUp,       label: 'Index',     to: '/benchmark',                      personas: ['trader', 'enterprise'] },
-  { icon: Briefcase,        label: 'Portfolio', to: '/portfolio',                      personas: ['trader', 'enterprise'] },
-  { icon: Clock,            label: 'History',   to: '/history',                        personas: ['trader', 'enterprise'] },
-  { icon: Wallet,           label: 'Wallet',    to: '/wallet',                         personas: ['trader', 'enterprise'] },
+  // Exchange / trading surfaces — TRADER only. (The exchange is paused per the GTM pivot; the
+  // AI company consumes inference/compute, it does not trade — so these are not on `enterprise`.)
+  { icon: CandlestickChart, label: 'Trade',     to: '/trade',                          personas: ['trader'] },
+  { icon: List,             label: 'Markets',   to: '/markets/eai-idx', match: '/markets', personas: ['trader'] },
+  { icon: TrendingUp,       label: 'Index',     to: '/benchmark',                      personas: ['trader'] },
+  { icon: Briefcase,        label: 'Portfolio', to: '/portfolio',                      personas: ['trader'] },
+  { icon: Clock,            label: 'History',   to: '/history',                        personas: ['trader'] },
 
-  // Compute / inference — enterprise (AI co) primary user
+  // Wallet — everyone holds credits.
+  { icon: Wallet,           label: 'Wallet',    to: '/wallet',                         personas: 'all' },
+
+  // Compute / inference — the AI company (enterprise).
   { icon: Server,           label: 'Compute',   to: '/compute',                        personas: ['enterprise'] },
   { icon: MessageSquare,    label: 'Inference', to: '/inference',                      personas: ['enterprise'] },
 
-  // Enterprise admin
+  // AI-company admin.
   { icon: Building2,        label: 'Onboarding', to: '/enterprise/onboarding',         personas: ['enterprise'], group: 'enterprise' },
   { icon: ShieldCheck,      label: 'Audit log',  to: '/enterprise/audit',              personas: ['enterprise'], group: 'enterprise' },
   { icon: Banknote,         label: 'Billing',    to: '/enterprise/billing',            personas: ['enterprise'], group: 'enterprise' },
 
-  // Datacenter partner
+  // Datacenter partner — supply side.
   { icon: Database,         label: 'DC dashboard', to: '/datacenter', match: '/datacenter', personas: ['partner'], group: 'partner' },
 ]
 
