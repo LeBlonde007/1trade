@@ -33,9 +33,9 @@ look-and-feel); in **local** the wired screens hit the real platform.
 ### The three personas
 
 You pick a persona during onboarding (**`/onboarding/welcome` → `/onboarding/tour`**); it persists in
-`localStorage` and tailors the sidebar/nav. (Note: the **account-type cards on `/signup`** — Trader /
-AI Company / Enterprise — are a *separate, cosmetic* chooser; they don't set this runtime persona or
-reach the backend.)
+`localStorage` and tailors the sidebar/nav. The **account-type card on `/signup`** sets this persona
+for you on submit (Trader → `trader`; AI Company / Enterprise → `enterprise`); you can still switch it
+via the sidebar persona pill.
 
 | Persona | Who | Surface | Live in local mode? |
 |---|---|---|---|
@@ -57,10 +57,11 @@ reach the backend.)
 > that actually moves real credits.
 
 **Step 1 — Create an account / sign in.** Go to `/signup`.
-- The page shows a **3-way account-type selector** (Trader · AI Company · Enterprise), Work email,
-  Password, and OAuth buttons. **The account-type cards and the OAuth buttons are UI placeholders** —
-  they are *not* sent to the backend and don't set your runtime persona. Pick any, enter email +
-  password, accept terms → **Open Account**.
+- The page shows a **3-way account-type selector** (Trader · AI Company · Enterprise) + Work email +
+  Password + OAuth buttons. The **account-type sets your runtime persona + onboarding path** on submit
+  (Trader → Light KYC; AI Company / Enterprise → straight to the console). It isn't stored on the
+  backend; the **OAuth buttons are placeholders**. Pick **AI Company**, enter email + password, accept
+  terms → **Open Account**.
 - In **local mode** this creates a **real account** (BFF `/api/auth/signup` → platform-core; httpOnly
   session cookie set) and **emails a verification link to Mailpit**, then routes to
   **`/onboarding/verify`**. Open **Mailpit → http://localhost:8025**, open the *"Verify your Exascale
@@ -70,10 +71,11 @@ reach the backend.)
 - **Easiest for testing:** once the account exists, use **`/login`** — it signs in and lands you
   straight on **`/console`**. Logout clears the session and bounces you back to `/login`.
 
-**Step 2 — (optional) Set the runtime persona.** The sidebar/nav tailoring is a **separate** setting
-from the signup cards — choose it on **`/onboarding/tour`** (pick *AI Company*); it persists in
-`localStorage`. You don't need it to exercise the live surface — just use the AI-Company screens below
-(`/inference`, `/wallet`, `/settings`, `/console`).
+**Step 2 — Persona.** Your signup account-type already set the runtime persona (so picking *AI Company*
+gives you the inference/wallet/keys sidebar and skips trader KYC). To change it later, use the
+**sidebar persona pill** or re-run **`/onboarding/tour`**. The onboarding is persona-aware: **Trader**
+gets the 4-step Light-KYC identity flow; **AI Company** is verified → straight to the console;
+**Datacenter** is pointed at capacity registration (KYC doesn't apply).
 
 **Step 3 — Browse the model catalog.** Open `/inference`. The model picker lists the **live catalog**.
 - Expect: `llama-3.1-70b`, `llama-3.1-8b`, `whisper-large-v3` with per-unit **credit prices**.

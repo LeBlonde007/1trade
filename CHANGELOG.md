@@ -4,6 +4,19 @@ All notable changes to Exascale. Format: [Keep a Changelog](https://keepachangel
 SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not dates — see
 `docs/plans/MANAGEMENT_PLAN.md`).
 
+## [v0.2.10] — Milestone 2: persona-aware onboarding (F20)
+
+### Fixed
+- **`/onboarding/kyc` was the Trader Light-KYC flow for every persona.** KYC (identity verification)
+  is a *trading* requirement, so it now shows only for the **trader** persona. **AI Company**
+  (`enterprise`) — verified, no trading — sees a short "you're ready, go to your console" panel;
+  **Datacenter** (`partner`) is pointed at capacity registration (`/datacenter/register`). No personal
+  KYC is forced on non-traders.
+- **The signup account-type now actually drives the experience.** Picking Trader / AI Company /
+  Enterprise on `/signup` sets the runtime persona on submit (Trader → `trader`; AI Company /
+  Enterprise → `enterprise`) — so the sidebar surface *and* the onboarding path match the choice
+  (previously the cards were cosmetic and everyone defaulted to one flow).
+
 ## [v0.2.9] — Milestone 2: local email (Mailpit) + persona-scoped nav (F02, F20)
 
 ### Added

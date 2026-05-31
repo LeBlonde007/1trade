@@ -173,6 +173,9 @@ const onSubmit = async () => {
   try {
     // Create the real account (tenant + admin user) via the BFF, then continue onboarding.
     await useAuth().signup(email.value, password.value)
+    // The account-type choice drives the runtime persona — the sidebar surface and the
+    // persona-aware onboarding path (trader → Light KYC; AI company → console).
+    usePersona().set(acctType.value === 'trader' ? 'trader' : 'enterprise')
     await navigateTo('/onboarding/verify?email=' + encodeURIComponent(email.value))
   } catch (err: unknown) {
     const ex = err as { statusCode?: number; data?: { message?: string } }
