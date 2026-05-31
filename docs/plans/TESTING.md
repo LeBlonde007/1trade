@@ -33,7 +33,9 @@ look-and-feel); in **local** the wired screens hit the real platform.
 ### The three personas
 
 You pick a persona during onboarding (**`/onboarding/welcome` → `/onboarding/tour`**); it persists in
-`localStorage` and tailors the sidebar/nav.
+`localStorage` and tailors the sidebar/nav. (Note: the **account-type cards on `/signup`** — Trader /
+AI Company / Enterprise — are a *separate, cosmetic* chooser; they don't set this runtime persona or
+reach the backend.)
 
 | Persona | Who | Surface | Live in local mode? |
 |---|---|---|---|
@@ -54,13 +56,24 @@ You pick a persona during onboarding (**`/onboarding/welcome` → `/onboarding/t
 > Run in **local mode** (`EXASCALE_API_MODE=local npm run dev`) with the stack up. This is the path
 > that actually moves real credits.
 
-**Step 1 — Sign up.** Go to `/signup`. Enter email + password (+ org name) → submit.
-- Expect: account created, you land in the app (httpOnly session cookie set).
-- Under the hood: BFF `/api/auth/signup` → platform-core. (`/login` works the same for an existing account; logging out clears the session and bounces you to `/login`.)
+**Step 1 — Create an account / sign in.** Go to `/signup`.
+- The page shows a **3-way account-type selector** (Trader · AI Company · Enterprise), Work email,
+  Password, and OAuth buttons. **The account-type cards and the OAuth buttons are UI placeholders** —
+  they are *not* sent to the backend and don't set your runtime persona. Pick any, enter email +
+  password, accept terms → **Open Account**.
+- In **local mode** this creates a **real account** (BFF `/api/auth/signup` → platform-core; httpOnly
+  session cookie set), then routes to **`/onboarding/verify`** — an email-verification waiting screen.
+  There's **no email provider in dev**, so it's a dead-end as shown; you're already authenticated, so
+  either click **"I've verified my email →"** to continue the onboarding, or just open an app page
+  directly (`/console`, `/inference`).
+- In **mock mode** (plain `npm run dev`) signup only sets a demo session — **no backend call**.
+- **Easiest for testing:** once the account exists, use **`/login`** — it signs in and lands you
+  straight on **`/console`**. Logout clears the session and bounces you back to `/login`.
 
-**Step 2 — Choose the persona.** Visit `/onboarding/welcome` → `/onboarding/tour`, pick **AI Company**.
-- Expect: the nav tailors to inference/wallet/keys; the choice survives a reload.
-- `/onboarding/verify` (email verification) is a dev no-op — there's no email provider locally.
+**Step 2 — (optional) Set the runtime persona.** The sidebar/nav tailoring is a **separate** setting
+from the signup cards — choose it on **`/onboarding/tour`** (pick *AI Company*); it persists in
+`localStorage`. You don't need it to exercise the live surface — just use the AI-Company screens below
+(`/inference`, `/wallet`, `/settings`, `/console`).
 
 **Step 3 — Browse the model catalog.** Open `/inference`. The model picker lists the **live catalog**.
 - Expect: `llama-3.1-70b`, `llama-3.1-8b`, `whisper-large-v3` with per-unit **credit prices**.
