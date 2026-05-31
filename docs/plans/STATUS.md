@@ -2,10 +2,10 @@
 
 **Living status.** ✅ done · 🟩 partly done / in progress · ⬜ not started · ⏸ paused (by design).
 Updated as work lands. Pair with `SEQUENCING.md` (plan), `MANAGEMENT_PLAN.md` (tracker), `CHANGELOG.md` (releases).
-Last updated: 2026-05-30.
+Last updated: 2026-05-31.
 
 > Legend: ✅ **green = done** · 🟩 in progress · ⬜ **white = not done** · ⏸ paused.
-> Tags shipped: `v0.1.0 v0.1.1 v0.1.2 v0.1.3` (M1) · `v0.2.0 v0.2.1 v0.2.2 v0.2.3` (M2). All on `main` (origin).
+> Tags shipped: `v0.1.0 v0.1.1 v0.1.2 v0.1.3 v0.1.4` (M1) · `v0.2.0 v0.2.1 v0.2.2 v0.2.3 v0.2.4` (M2). All on `main` (origin).
 
 ```
 Exascale
@@ -25,14 +25,15 @@ Exascale
 │   ├── ⬜ FULL=1 stack (Kueue + Volcano + Prometheus/Loki/Tempo)   ⬜ SOPS secrets
 │   └── ⬜ Real envs (staging/prod) · ⬜ CI green on GitHub · backup/restore drill · make test-e2e
 │
-├── ✅ M1 — Foundation (shipped, except F04)
+├── ✅ M1 — Foundation (shipped; F04 CLI v0 done)
 │   ├── ✅ F05 credit-ledger     financial heart — append-only hash chain, fixed-point, atomic,
 │   │                            per-tenant idempotency; consumes inference.usage.v1 → debit. DEPLOYED.
 │   ├── ✅ F02 auth & SSO        signup/login→JWT/me/keys, bcrypt, case-insensitive, anti-enumeration,
 │   │                            key introspection; email verification (v0.1.3). OAuth/SAML/2FA = M4.
 │   ├── ✅ F03 accounts/orgs/RBAC  audit log (admin.action.v1 + queryable trail), requireRole→403,
 │   │                            org CRUD + role assignment, tenant-scoped. Sub-accounts = M4.
-│   ├── ⬜ F04 exascale CLI      ← M1 GAP, not started (login/whoami/credits balance/infer)
+│   ├── 🟩 F04 exascale CLI v0   login/whoami/credits balance+convert/catalog/infer/keys/config —
+│   │                            Go client over the live APIs (v0.1.4). M3+: gpu/cluster/train; dist M6.
 │   └── ✅ F20 console shell     Nuxt app + design system + mock-data mode.
 │
 ├── ✅ M2 — First inference dollar / sandbox (shipped, except F07 + F12)
@@ -63,8 +64,8 @@ Exascale
 
 ## Where we are vs. the sequencing (SEQUENCING.md)
 
-- **M1 (Foundation):** ✅ essentially complete. Shipped F01(core)+F02+F03+F05+F20-shell. **Gaps vs plan:
-  F04 (CLI v0) not started; F01 remainder (observability/SOPS/real-envs/CI-green) pending.**
+- **M1 (Foundation):** ✅ essentially complete. Shipped F01(core)+F02+F03+F04(CLI v0)+F05+F20-shell.
+  **Gaps vs plan: F01 remainder (observability/SOPS/real-envs/CI-green) pending.**
 - **M2 (First inference dollar, sandbox):** ✅ the loop works end-to-end live — signup → buy credits
   (Stripe) → run inference (gateway→runtime) → idempotent ledger debit → console shows it; **F07
   conversion** (AI-index↔text) live (v0.2.4). **Gaps vs plan: F12 (compute control plane) not started
@@ -73,22 +74,19 @@ Exascale
   (M3-ish) shipped as gap-closers (v0.1.3).
 - **M3–M6:** ⬜ not started.
 
-Repo: trunk = `main` (8 features merged), pushed to `origin` (ex-main). Tags v0.1.0→v0.1.3, v0.2.0→v0.2.3.
+Repo: trunk = `main` (10 features merged), pushed to `origin` (ex-main). Tags v0.1.0→v0.1.4, v0.2.0→v0.2.4.
 
 ---
 
 ## TO DO — next up (ordered, to converge on the sequencing)
 
-1. **F04 — exascale CLI v0** (M1 gap; fully buildable here). `login`, `whoami`, `credits balance`,
-   `infer chat`, `credits convert` against the live platform — the "primary engineer interface" +
-   the sub-5-min commitment. `/ex-start F04`.
-2. **F12 — compute control plane** (M2 gap). Needs a GPU node + GPU Operator to be meaningful; pairs
+1. **F12 — compute control plane** (M2 gap). Needs a GPU node + GPU Operator to be meaningful; pairs
    with provisioning. Unblocks real F09 serving + F13 GPU lifecycle.
-3. **Wallet "convert" UI** (F20/F07 M3 sync) — small BFF route + console panel over the now-live
+2. **Wallet "convert" UI** (F20/F07 M3 sync) — small BFF route + console panel over the now-live
    /v1/credits/convert.
-4. **F01 remainder** — observability (Prometheus /metrics + Grafana/Loki/Tempo; tasks #3/#13), SOPS
+3. **F01 remainder** — observability (Prometheus /metrics + Grafana/Loki/Tempo; tasks #3/#13), SOPS
    secrets, real-env clusters, CI green. Prod-hardening before paying customers (M3).
-5. **M3 provisioning (your side)** — Stripe + domain/Cloudflare + registry + GPU node + HF token +
+4. **M3 provisioning (your side)** — Stripe + domain/Cloudflare + registry + GPU node + HF token +
    email provider. See `PROVISIONING.md`.
 
 ### Decisions still open

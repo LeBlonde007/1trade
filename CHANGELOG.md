@@ -114,6 +114,22 @@ SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not da
   sandbox): asymmetric JWT so services can't mint, and a balance hold to close the pre-flight
   fail-open window.
 
+## [v0.1.4] — Milestone 1: exascale CLI v0 (F04)
+
+### Added
+- **`exascale` CLI (F04):** the primary engineer interface — a thin Go client over the live platform
+  (`apps/cli`). Commands: `login`/`signup` (hidden password)/`whoami`/`logout`; `credits
+  balance`/`transactions`/`convert`; `catalog`; `infer chat -m MODEL "prompt"`; `keys
+  create`/`list`/`revoke`; `config get`/`set`. Token in `~/.exascale/config.json` (0600); per-service
+  URLs with env overrides + dev defaults. Client unit-tested.
+- **Proven live:** `login → whoami → catalog → credits balance → convert (ai_index→text) → infer
+  chat`. M1 v0 acceptance (login/whoami/credits balance) met, plus the live M2/M3 commands whose
+  backends already exist.
+
+### Notes
+- `gpu`/`cluster`/`train`/`billing` commands wire in as F12/F13 land; distribution
+  (brew/apt/pip/install.sh) is M6.
+
 ## [v0.1.3] — Milestone 1: platform gap-closers (email verify, budgets, linked endpoints)
 
 ### Added
