@@ -5,7 +5,7 @@ Updated as work lands. Pair with `SEQUENCING.md` (plan), `MANAGEMENT_PLAN.md` (t
 Last updated: 2026-05-31.
 
 > Legend: ✅ **green = done** · 🟩 in progress · ⬜ **white = not done** · ⏸ paused.
-> Tags shipped: `v0.1.0 v0.1.1 v0.1.2 v0.1.3 v0.1.4` (M1) · `v0.2.0 v0.2.1 v0.2.2 v0.2.3 v0.2.4` (M2). All on `main` (origin).
+> Tags shipped: `v0.1.0 v0.1.1 v0.1.2 v0.1.3 v0.1.4` (M1) · `v0.2.0 v0.2.1 v0.2.2 v0.2.3 v0.2.4 v0.2.5` (M2). All on `main` (origin).
 
 ```
 Exascale
@@ -49,7 +49,8 @@ Exascale
 │   ├── ⬜ F12 compute control plane ← M2 GAP (Kueue+Volcano+GPU Operator; GPU-gated)
 │   └── ✅ F20 console wired      BFF (EXASCALE_API_MODE mock|local) + live /console (auth, catalog,
 │                                inference, wallet, buy, keys, budget alerts, purchases, audit).
-│                                inference.vue + wallet showcase screens wired (local mode).
+│                                inference.vue wired; wallet convert drawer executes live F07
+│                                conversions (rate/spread + atomic burn+mint, v0.2.5).
 │
 ├── ⬜ M3+ — F10 catalog · F11 packing · F13 GPU lifecycle · F14 reserved · F15 clusters
 │        · F16 supply abstraction · F17 DC onboarding · F18 payouts · F19 attestation
@@ -82,12 +83,13 @@ Repo: trunk = `main` (10 features merged), pushed to `origin` (ex-main). Tags v0
 
 1. **F12 — compute control plane** (M2 gap). Needs a GPU node + GPU Operator to be meaningful; pairs
    with provisioning. Unblocks real F09 serving + F13 GPU lifecycle.
-2. **Wallet "convert" UI** (F20/F07 M3 sync) — small BFF route + console panel over the now-live
-   /v1/credits/convert.
-3. **F01 remainder** — observability (Prometheus /metrics + Grafana/Loki/Tempo; tasks #3/#13), SOPS
+2. **F01 remainder** — observability (Prometheus /metrics + Grafana/Loki/Tempo; tasks #3/#13), SOPS
    secrets, real-env clusters, CI green. Prod-hardening before paying customers (M3).
-4. **M3 provisioning (your side)** — Stripe + domain/Cloudflare + registry + GPU node + HF token +
+3. **M3 provisioning (your side)** — Stripe + domain/Cloudflare + registry + GPU node + HF token +
    email provider. See `PROVISIONING.md`.
+
+_Done since last update:_ wallet "convert" UI — the drawer now executes live F07 conversions
+(rate/spread + atomic burn+mint, v0.2.5).
 
 ### Decisions still open
 - **ADR-0002** (AI↔sub-credit conversion direction) — provisional (bidirectional, 1% spread); counsel

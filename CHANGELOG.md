@@ -4,6 +4,33 @@ All notable changes to Exascale. Format: [Keep a Changelog](https://keepachangel
 SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not dates — see
 `docs/plans/MANAGEMENT_PLAN.md`).
 
+## [v0.2.5] — Milestone 2: wallet convert UI — live (F20 × F07)
+
+### Added
+- **The wallet convert drawer now executes real conversions** (`Exascale Frontend`). In `local` mode
+  the showcase drawer is driven by live data: published rate + house spread for the selected pair,
+  and the submit button calls the ledger to atomically burn `from` / mint `to`, then refreshes
+  balances and toasts the result. `mock` mode is untouched — same drawer, canned cross-rate.
+- **BFF routes:** `GET /api/wallet/conversion-rates` and `POST /api/wallet/convert` (Nitro), proxying
+  credit-ledger `/v1/credits/{conversion-rates,convert}`. `is_paper` is derived from the session JWT
+  (never the client); the client-supplied `rate` is advisory/mock-only and **cannot** influence a
+  real conversion (the ledger looks the rate up server-side). The idempotency key is minted in
+  `useWallet.convert` so a retried submit de-dupes instead of double-converting.
+- **`useWallet`** gains `loadConversionRates()`, `rateFor(from,to)`, `convert(from,to,amount)`, and a
+  `converting` flag.
+
+### Proven live (through the running frontend BFF)
+- signup → mint `ai_index` → `GET /api/wallet/conversion-rates` → `POST /api/wallet/convert` 100
+  ai_index → **82.227321 text** (−1% spread), balances 900 / 82.227321.
+- **Idempotent replay** through the BFF leaves balances unchanged (one conversion only).
+- **Error propagation:** an unseeded pair returns **HTTP 422 `no_rate`** with `data.message`, which
+  the drawer surfaces as a toast; `402 INSUFFICIENT_CREDIT` propagates the same way.
+
+### Notes
+- Live conversion is gated to seeded pairs (`ai_index ↔ text` today); other pairs show an indicative
+  rate and a "no live rate" note until M3 adds GPU-tier / other-modality rates. Copy stays
+  "convert" (prepaid framing), never "trade"/"exchange".
+
 ## [v0.2.4] — Milestone 2: credit conversion (F07)
 
 ### Added

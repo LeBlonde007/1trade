@@ -86,24 +86,39 @@ function fmtUsd(n: number, dp = 2) {
 // =====================================================
 const totalUsd = computed(() => assets.reduce((s, a) => s + a.qty * a.usdPrice, 0))
 
-// F20: in live mode (EXASCALE_API_MODE=local), overlay real credit balances from the ledger onto the
-// matching assets. Mock mode keeps the showcase numbers untouched; assets with no live balance are
-// left as-is (non-destructive).
+// F20×F07: in live mode (EXASCALE_API_MODE=local), overlay real credit balances + published
+// conversion rates from the ledger; the convert drawer then executes real conversions. Mock mode
+// keeps the showcase numbers + cross-rate untouched (non-destructive).
 const walletApiMode = useRuntimeConfig().public.apiMode
-onMounted(async () => {
+const wallet = useWallet()
+const converting = wallet.converting   // top-level ref → auto-unwraps in template
+const toasts = useToasts()
+
+// asset key → ledger credit_type. Drives both the balance overlay and the live convert lookup.
+const creditTypeFor: Record<string, string> = {
+  ai: 'ai_index', text: 'text', speech: 'speech', image: 'image', video: 'video', h100: 'gpu_h100', h200: 'gpu_h200',
+}
+
+/** refreshLiveBalances overlays the tenant's real ledger balances onto the showcase assets. */
+async function refreshLiveBalances() {
   if (walletApiMode !== 'local') return
-  const creditKeyFor: Record<string, string> = {
-    ai: 'ai_index', text: 'text', speech: 'speech', image: 'image', video: 'video', h100: 'gpu_h100', h200: 'gpu_h200',
-  }
   try {
-    const live = await useWallet().loadBalances()
+    const live = await wallet.loadBalances()
     for (const a of assets) {
-      const ct = creditKeyFor[a.key]
+      const ct = creditTypeFor[a.key]
       if (!ct) continue
       const b = live.find((x) => x.credit_type === ct)
       if (b) { a.qty = Number(b.balance); a.locked = Number(b.locked_amount); a.empty = Number(b.balance) === 0 }
     }
   } catch { /* leave the showcase values on error */ }
+}
+
+onMounted(async () => {
+  if (walletApiMode !== 'local') return
+  await Promise.all([
+    refreshLiveBalances(),
+    wallet.loadConversionRates().catch(() => { /* drawer falls back to the cross-rate */ }),
+  ])
 })
 
 interface AllocGroup { key: string; name: string; color: string; usd: number }
@@ -203,8 +218,66 @@ const convRate = computed(() => {
   return convFromAsset.value.usdPrice / convToAsset.value.usdPrice
 })
 const SPREAD = 0.005
-const convEffRate = computed(() => convRate.value * (1 - SPREAD))
-const convOut = computed(() => convAmount.value * convEffRate.value)
+
+// F20×F07 — live rate overlay. In local mode, prefer the published rate + house spread for the
+// selected (from,to) credit-type pair; mock mode (or any pair without a seeded rate, i.e. anything
+// other than ai_index↔text today) transparently falls back to the showcase cross-rate above.
+const fromCT = computed(() => creditTypeFor[convFromKey.value] || '')
+const toCT = computed(() => creditTypeFor[convToKey.value] || '')
+const liveRateStr = computed(() => (walletApiMode === 'local' ? wallet.rateFor(fromCT.value, toCT.value) : null))
+const isLivePair = computed(() => liveRateStr.value !== null)
+const dispRate = computed(() => (isLivePair.value ? Number(liveRateStr.value) : convRate.value))
+const dispSpread = computed(() => (isLivePair.value ? Number(wallet.spread.value) || 0.01 : SPREAD))
+const dispEffRate = computed(() => dispRate.value * (1 - dispSpread.value))
+const dispOut = computed(() => convAmount.value * dispEffRate.value)
+
+/** fmtOut renders a converted amount: full 6dp for real (often fractional) conversions, integer for the showcase. */
+function fmtOut(n: number) {
+  return isLivePair.value ? fmt(n, 6) : fmtInt(n)
+}
+
+/**
+ * submitConvert executes the conversion. In mock/showcase mode it just explains the seam; in local
+ * mode it calls the live ledger for a seeded pair, then refreshes balances. The button stays guarded
+ * (positive amount, ≤ balance) and surfaces 402/422 from the ledger as a toast.
+ */
+async function submitConvert() {
+  if (walletApiMode !== 'local') {
+    toasts.push({ tone: 'info', title: 'Showcase mode', body: 'Connect live data to execute conversions.' })
+    return
+  }
+  if (!isLivePair.value) {
+    toasts.push({ tone: 'warn', title: 'No live rate', body: 'Only AI Credits ↔ Text are convertible right now.' })
+    return
+  }
+  if (convAmount.value <= 0) {
+    toasts.push({ tone: 'warn', title: 'Enter an amount', body: 'Amount must be greater than zero.' })
+    return
+  }
+  if (convAmount.value > convFromAsset.value.qty) {
+    toasts.push({ tone: 'warn', title: 'Insufficient balance', body: `You hold ${fmtInt(convFromAsset.value.qty)} ${convFromAsset.value.sym}.` })
+    return
+  }
+  try {
+    const res = await wallet.convert(fromCT.value, toCT.value, String(convAmount.value))
+    const got = Math.abs(Number(res.credit.amount))
+    toasts.push({
+      tone: 'pos', title: 'Converted',
+      body: `${fmtInt(convAmount.value)} ${convFromAsset.value.sym} → ${fmt(got, 6)} ${convToAsset.value.sym}`,
+    })
+    await refreshLiveBalances()
+  } catch (e: unknown) {
+    const err = e as { data?: { message?: string }; statusMessage?: string }
+    toasts.push({ tone: 'neg', title: 'Conversion failed', body: err?.data?.message || err?.statusMessage || 'Conversion failed' })
+  }
+}
+
+/** submitNote is the small caption under the convert button — it names the active seam honestly. */
+const submitNote = computed(() => {
+  if (walletApiMode !== 'local') return 'Showcase rate · connect live data to execute'
+  if (!isLivePair.value) return 'Live conversion available for AI Credits ↔ Text'
+  return 'Atomic burn + mint · settles instantly'
+})
 
 function setAmountPct(pct: number) {
   const v = Math.round(convFromAsset.value.qty * pct)
@@ -519,20 +592,20 @@ const todayPct = computed(() => startTotal.value === 0 ? 0 : todayPnl.value / st
           <div class="pv-out">
             <span>{{ fmtInt(convAmount) }}</span> {{ convFromAsset.sym }}
             <span class="arr">→</span>
-            <span>{{ fmtInt(convOut) }}</span> {{ convToAsset.sym }}
+            <span>{{ fmtOut(dispOut) }}</span> {{ convToAsset.sym }}
           </div>
           <div class="pv-rows">
-            <div class="pv-row live">
-              <span class="k">RATE · LIVE</span>
-              <span class="v">1 {{ convFromAsset.sym }} = {{ convRate.toFixed(3) }} {{ convToAsset.sym }}</span>
+            <div class="pv-row" :class="{ live: isLivePair }">
+              <span class="k">{{ isLivePair ? 'RATE · LIVE' : 'RATE · INDICATIVE' }}</span>
+              <span class="v">1 {{ convFromAsset.sym }} = {{ dispRate.toFixed(4) }} {{ convToAsset.sym }}</span>
             </div>
             <div class="pv-row">
               <span class="k">HOUSE SPREAD</span>
-              <span class="v">0.50%</span>
+              <span class="v">{{ (dispSpread * 100).toFixed(2) }}%</span>
             </div>
             <div class="pv-row">
               <span class="k">EFFECTIVE RATE</span>
-              <span class="v">{{ convEffRate.toFixed(3) }}</span>
+              <span class="v">{{ dispEffRate.toFixed(4) }}</span>
             </div>
             <div class="pv-row">
               <span class="k">EST. SETTLEMENT</span>
@@ -542,11 +615,12 @@ const todayPct = computed(() => startTotal.value === 0 ? 0 : todayPnl.value / st
         </div>
 
         <div class="drawer-submit">
-          <button type="button">
-            Convert {{ fmtInt(convAmount) }} {{ convFromAsset.sym }} → {{ fmtInt(convOut) }} {{ convToAsset.sym }}
+          <button type="button" :disabled="converting" @click="submitConvert">
+            <template v-if="converting">Converting…</template>
+            <template v-else>Convert {{ fmtInt(convAmount) }} {{ convFromAsset.sym }} → {{ fmtOut(dispOut) }} {{ convToAsset.sym }}</template>
             <svg viewBox="0 0 16 16"><path d="M3 8h10M9 4l4 4-4 4" /></svg>
           </button>
-          <div class="submit-note">Rate locked for 8 seconds at submit</div>
+          <div class="submit-note">{{ submitNote }}</div>
         </div>
       </aside>
     </main>
@@ -1138,6 +1212,7 @@ const todayPct = computed(() => startTotal.value === 0 ? 0 : todayPnl.value / st
   transition: background 120ms;
 }
 .drawer-submit button:hover { background: var(--brand-hov); }
+.drawer-submit button:disabled { opacity: 0.5; cursor: progress; }
 .drawer-submit button svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.6; }
 .drawer-submit .submit-note {
   margin-top: 10px;
