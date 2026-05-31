@@ -118,6 +118,7 @@ onMounted(async () => {
   await Promise.all([
     refreshLiveBalances(),
     wallet.loadConversionRates().catch(() => { /* drawer falls back to the cross-rate */ }),
+    wallet.loadTransactions().catch(() => { /* movements stay on the showcase */ }),
   ])
 })
 
@@ -196,6 +197,63 @@ function fmtMovementBalance(m: Movement) {
   return (m.asset === 'USD' ? '$' : '') + fmtInt(m.balance)
 }
 
+// --- Live movements (local mode) — map real ledger transactions onto the movements table ----------
+/** ctLabel maps a ledger credit_type to its display name (falls back to the raw type). */
+function ctLabel(ct: string): string {
+  const a = assets.find((x) => creditTypeFor[x.key] === ct)
+  return a ? a.name : ct
+}
+/** opMeta maps a ledger operation (+ direction) to a table pill: a label and a colour key. */
+function opMeta(op: string, neg: boolean): { label: string; key: 'buy' | 'sell' | 'conv' | 'dep' } {
+  switch (op) {
+    case 'conversion':  return { label: 'Conversion', key: 'conv' }
+    case 'purchase':    return { label: 'Purchase', key: 'dep' }
+    case 'mint':        return { label: 'Mint', key: 'dep' }
+    case 'consumption': return { label: 'Usage', key: 'sell' }
+    case 'burn':        return { label: 'Burn', key: 'sell' }
+    default:            return { label: op.charAt(0).toUpperCase() + op.slice(1), key: neg ? 'sell' : 'buy' }
+  }
+}
+/** txTime renders an ISO timestamp as HH:MM:SS in UTC. */
+function txTime(iso: string): string {
+  return new Date(iso).toISOString().slice(11, 19)
+}
+/** trimDec drops trailing fixed-point zeros so amounts read cleanly while staying tabular. */
+function trimDec(s: string): string {
+  return s.includes('.') ? s.replace(/\.?0+$/, '') : s
+}
+
+interface LiveMovement {
+  tx_id: string
+  time: string
+  label: string
+  key: string
+  asset: string
+  amountText: string
+  pos: boolean
+  balanceText: string
+}
+
+/** liveMovements maps the most recent ledger transactions to movements-table rows. */
+const liveMovements = computed<LiveMovement[]>(() =>
+  wallet.transactions.value.slice(0, 8).map((t) => {
+    const neg = t.amount.trim().startsWith('-')
+    const meta = opMeta(t.operation, neg)
+    return {
+      tx_id: t.tx_id,
+      time: txTime(t.created_at),
+      label: meta.label,
+      key: meta.key,
+      asset: ctLabel(t.credit_type),
+      amountText: (neg ? '−' : '+') + trimDec(t.amount.replace('-', '')),
+      pos: !neg,
+      balanceText: trimDec(t.balance_after),
+    }
+  }),
+)
+/** useLiveMovements is true once real transactions have loaded in local mode (else keep the showcase). */
+const useLiveMovements = computed(() => walletApiMode === 'local' && wallet.transactions.value.length > 0)
+
 // =====================================================
 // Conversion drawer state (open by default per design)
 // =====================================================
@@ -265,7 +323,7 @@ async function submitConvert() {
       tone: 'pos', title: 'Converted',
       body: `${fmtInt(convAmount.value)} ${convFromAsset.value.sym} → ${fmt(got, 6)} ${convToAsset.value.sym}`,
     })
-    await refreshLiveBalances()
+    await Promise.all([refreshLiveBalances(), wallet.loadTransactions().catch(() => {})])
   } catch (e: unknown) {
     const err = e as { data?: { message?: string }; statusMessage?: string }
     toasts.push({ tone: 'neg', title: 'Conversion failed', body: err?.data?.message || err?.statusMessage || 'Conversion failed' })
@@ -511,7 +569,19 @@ const todayPct = computed(() => startTotal.value === 0 ? 0 : todayPnl.value / st
               <th>Balance after</th>
             </tr>
           </thead>
-          <tbody>
+          <!-- Live: real ledger transactions (local mode, once loaded) -->
+          <tbody v-if="useLiveMovements">
+            <tr v-for="m in liveMovements" :key="m.tx_id">
+              <td>{{ m.time }} UTC</td>
+              <td><span class="type-pill" :class="`type-${m.key}`">{{ m.label }}</span></td>
+              <td>{{ m.asset }}</td>
+              <td class="amt" :class="m.pos ? 'pos' : 'neg'">{{ m.amountText }}</td>
+              <td>—</td>
+              <td class="balance">{{ m.balanceText }}</td>
+            </tr>
+          </tbody>
+          <!-- Showcase: canned movements (mock mode / before live data loads) -->
+          <tbody v-else>
             <tr v-for="(m, i) in MOVEMENTS" :key="i">
               <td>{{ m.time }} UTC</td>
               <td><span class="type-pill" :class="`type-${m.typeKey}`">{{ m.type }}</span></td>
