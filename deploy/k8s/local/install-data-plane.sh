@@ -8,10 +8,10 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 GPU="${GPU:-0}"; FULL="${FULL:-0}"
 
-echo "==> core data plane (Postgres · TimescaleDB · Redis · NATS)"
+echo "==> core data plane (Postgres · TimescaleDB · Redis · NATS · Mailpit)"
 kubectl apply -f "$HERE/data-plane.yaml"
 echo "   waiting for rollouts..."
-for d in postgres timescaledb redis nats; do
+for d in postgres timescaledb redis nats mailpit; do
   kubectl -n data rollout status "deploy/$d" --timeout=180s
 done
 echo "   core ready."
