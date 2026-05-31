@@ -13,6 +13,7 @@ import (
 	"github.com/exascale/platform-core/internal/billing"
 	"github.com/exascale/platform-core/internal/config"
 	"github.com/exascale/platform-core/internal/domain"
+	"github.com/exascale/platform-core/internal/email"
 	"github.com/exascale/platform-core/internal/store"
 	"github.com/google/uuid"
 )
@@ -23,6 +24,7 @@ type Server struct {
 	st     *store.Store
 	stripe billing.StripeClient
 	booker billing.PurchaseBooker
+	mailer email.Sender
 	mux    *http.ServeMux
 }
 
@@ -32,9 +34,10 @@ func New(cfg config.Config, st *store.Store) *Server {
 	return NewWithBilling(cfg, st, defaultStripe(cfg), billing.NewLedgerClient(cfg))
 }
 
-// NewWithBilling builds the handler with explicit billing collaborators (tests inject fakes).
+// NewWithBilling builds the handler with explicit billing collaborators (tests inject fakes). The
+// mailer comes from config (Mailpit locally; a no-op when no SMTP server is set).
 func NewWithBilling(cfg config.Config, st *store.Store, stripe billing.StripeClient, booker billing.PurchaseBooker) *Server {
-	s := &Server{cfg: cfg, st: st, stripe: stripe, booker: booker, mux: http.NewServeMux()}
+	s := &Server{cfg: cfg, st: st, stripe: stripe, booker: booker, mailer: email.New(cfg.SMTPAddr, cfg.EmailFrom), mux: http.NewServeMux()}
 	s.routes()
 	return s
 }
@@ -125,8 +128,15 @@ func (s *Server) signup(w http.ResponseWriter, r *http.Request) {
 		TenantID: u.TenantID, ActorID: u.ID, Action: "tenant.signup",
 		TargetType: "tenant", TargetID: u.TenantID, After: map[string]any{"email": b.Email}, IsPaper: u.IsPaper,
 	})
-	if raw := s.issueVerifyToken(r, u.ID); raw != "" && s.cfg.IsDev() {
-		slog.Info("dev: email verification token (would be emailed)", "user_id", u.ID, "token", raw)
+	if raw := s.issueVerifyToken(r, u.ID); raw != "" {
+		link := email.VerifyURL(s.cfg.AppBaseURL, raw)
+		if err := s.mailer.SendVerification(b.Email, link); err != nil {
+			slog.Error("send verification email", "err", err, "user_id", u.ID)
+		}
+		if s.cfg.IsDev() && !s.mailer.Enabled() {
+			// No SMTP server configured — surface the token so the flow stays testable locally.
+			slog.Info("dev: email verification token (no SMTP configured)", "user_id", u.ID, "token", raw)
+		}
 	}
 	s.issue(w, http.StatusCreated, u.ID, domain.Claims{TenantID: u.TenantID, Roles: u.Roles, IsPaper: u.IsPaper})
 }

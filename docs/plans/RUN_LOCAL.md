@@ -162,6 +162,7 @@ meter) → wallet balances + recent-movements update live.**
 | `:8002` | credit-ledger (credits/convert/debits) |
 | `:8085` | inference-gateway (OpenAI API) |
 | `:8000` | inference-runtime (CPU stub) |
+| `:8025` | Mailpit web UI — captured emails (`kubectl port-forward -n data deploy/mailpit 8025:8025`) |
 
 ---
 

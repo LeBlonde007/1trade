@@ -62,11 +62,11 @@ reach the backend.)
   they are *not* sent to the backend and don't set your runtime persona. Pick any, enter email +
   password, accept terms → **Open Account**.
 - In **local mode** this creates a **real account** (BFF `/api/auth/signup` → platform-core; httpOnly
-  session cookie set), then routes to **`/onboarding/verify`** — an email-verification waiting screen.
-  There's **no email provider in dev**, so it's a dead-end as shown; you're already authenticated, so
-  either click **"I've verified my email →"** to continue the onboarding, or just open an app page
-  directly (`/console`, `/inference`).
-- In **mock mode** (plain `npm run dev`) signup only sets a demo session — **no backend call**.
+  session cookie set) and **emails a verification link to Mailpit**, then routes to
+  **`/onboarding/verify`**. Open **Mailpit → http://localhost:8025**, open the *"Verify your Exascale
+  email"* message, and click its link — it consumes the token and lands you on **`/console`**. (You're
+  already authenticated from signup, so you can also just open `/console` directly.)
+- In **mock mode** (plain `npm run dev`) signup only sets a demo session — **no backend call, no email**.
 - **Easiest for testing:** once the account exists, use **`/login`** — it signs in and lands you
   straight on **`/console`**. Logout clears the session and bounces you back to `/login`.
 

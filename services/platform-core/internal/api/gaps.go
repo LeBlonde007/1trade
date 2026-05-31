@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/exascale/platform-core/internal/domain"
+	"github.com/exascale/platform-core/internal/email"
 	"github.com/exascale/platform-core/internal/store"
 )
 
@@ -57,9 +58,16 @@ func (s *Server) resendVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	raw := s.issueVerifyToken(r, p.UserID)
+	if raw != "" {
+		if idn, found, err := s.st.GetUserByID(r.Context(), p.UserID); err == nil && found {
+			if err := s.mailer.SendVerification(idn.Email, email.VerifyURL(s.cfg.AppBaseURL, raw)); err != nil {
+				slog.Error("resend verification email", "err", err, "user_id", p.UserID)
+			}
+		}
+	}
 	out := map[string]any{"sent": true}
-	if s.cfg.IsDev() && raw != "" {
-		out["dev_token"] = raw
+	if s.cfg.IsDev() && raw != "" && !s.mailer.Enabled() {
+		out["dev_token"] = raw // no SMTP configured — keep the flow testable
 	}
 	writeJSON(w, http.StatusOK, out)
 }

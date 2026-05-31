@@ -5,7 +5,7 @@ Updated as work lands. Pair with `SEQUENCING.md` (plan), `MANAGEMENT_PLAN.md` (t
 Last updated: 2026-05-31.
 
 > Legend: ✅ **green = done** · 🟩 in progress · ⬜ **white = not done** · ⏸ paused.
-> Tags shipped: `v0.1.0 v0.1.1 v0.1.2 v0.1.3 v0.1.4` (M1) · `v0.2.0 … v0.2.8` (M2). All on `main` (origin).
+> Tags shipped: `v0.1.0 … v0.1.5` (M1) · `v0.2.0 … v0.2.9` (M2). All on `main` (origin).
 
 ```
 Exascale
@@ -29,7 +29,8 @@ Exascale
 │   ├── ✅ F05 credit-ledger     financial heart — append-only hash chain, fixed-point, atomic,
 │   │                            per-tenant idempotency; consumes inference.usage.v1 → debit. DEPLOYED.
 │   ├── ✅ F02 auth & SSO        signup/login→JWT/me/keys, bcrypt, case-insensitive, anti-enumeration,
-│   │                            key introspection; email verification (v0.1.3). OAuth/SAML/2FA = M4.
+│   │                            key introspection; email verification — real SMTP send via Mailpit
+│   │                            in local mode (v0.2.9). OAuth/SAML/2FA = M4.
 │   ├── ✅ F03 accounts/orgs/RBAC  audit log (admin.action.v1 + queryable trail), requireRole→403,
 │   │                            org CRUD + role assignment, tenant-scoped. Sub-accounts = M4.
 │   ├── 🟩 F04 exascale CLI v0   login/whoami/credits balance+convert/catalog/infer/keys/config —
@@ -53,7 +54,8 @@ Exascale
 │                                wallet drawer executes live F07 conversions (v0.2.5) +
 │                                recent-movements renders live ledger txs (v0.2.6); inference
 │                                playground shows real credit cost + session meter (v0.2.7);
-│                                settings · API keys manage live platform-core keys (v0.2.8).
+│                                settings · API keys manage live platform-core keys (v0.2.8);
+│                                persona-scoped nav — each persona shows only its screens (v0.2.9).
 │
 ├── ⬜ M3+ — F10 catalog · F11 packing · F13 GPU lifecycle · F14 reserved · F15 clusters
 │        · F16 supply abstraction · F17 DC onboarding · F18 payouts · F19 attestation
@@ -95,7 +97,8 @@ _Done since last update:_ wallet screen fully live — convert drawer executes F
 (v0.2.5) + recent-movements renders live ledger txs (v0.2.6); inference playground shows real
 credit cost + a live session meter (v0.2.7); **fixed a silent bug where inference debits never
 flowed** — the usage consumer was a push durable that failed to rebind after restarts; now a pull
-consumer (v0.2.7), debit proven to land ~1s after a run.
+consumer (v0.2.7), debit proven to land ~1s after a run. Settings API keys live (v0.2.8). Local email
+via Mailpit + persona-scoped nav (v0.2.9).
 
 ### Decisions still open
 - **ADR-0002** (AI↔sub-credit conversion direction) — provisional (bidirectional, 1% spread); counsel

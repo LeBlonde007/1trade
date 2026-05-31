@@ -4,6 +4,26 @@ All notable changes to Exascale. Format: [Keep a Changelog](https://keepachangel
 SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not dates — see
 `docs/plans/MANAGEMENT_PLAN.md`).
 
+## [v0.2.9] — Milestone 2: local email (Mailpit) + persona-scoped nav (F02, F20)
+
+### Added
+- **Transactional email — works in local mode (F02).** platform-core now actually **sends** the
+  email-verification link over SMTP (`internal/email`), wired to **Mailpit** in the local data plane
+  (`axllent/mailpit` — SMTP `:1025`, web UI `:8025`). Sign up → the *"Verify your Exascale email"*
+  message appears in Mailpit → click the link → `/onboarding/verify` consumes the token → you land on
+  `/console`. The signup email-verify dead-end is gone. `SMTP_ADDR`/`EMAIL_FROM`/`APP_BASE_URL` config;
+  a blank `SMTP_ADDR` makes sending a safe no-op (CI), which still surfaces the dev token.
+- **Persona-scoped navigation (F20).** Each app persona now shows **only its screens**: the AI company
+  (`enterprise`) gets Inference / Compute / Wallet / Onboarding / Audit / Billing — **not** the
+  exchange screens (Trade/Markets/Index/Portfolio/History are trader-only; the stale "AI co also
+  trades" tagging predated the GTM pivot). Datacenter (`partner`) = DC dashboard + Wallet; Wallet is
+  shared. Default persona flipped to `enterprise` (the platform-first audience).
+
+### Proven live (k3d)
+- signup → **Mailpit inbox shows the verification email** → token extracted from the link →
+  `POST /v1/auth/verify` → `{verified:true}`; replay of the used token → `400` (single-use). Mailpit
+  reachable at `http://localhost:8025`. Unit tests: `VerifyURL` + disabled-sender no-op.
+
 ## [v0.2.8] — Milestone 2: settings · API keys — live (F20 × F02)
 
 ### Added
