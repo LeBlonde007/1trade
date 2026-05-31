@@ -166,7 +166,7 @@ Status legend: ⬜ Not started · 🔵 In progress · ✅ Done · ⚠️ At risk
 | F17 | DC partner onboarding (manual v1) | Settlement | M4 / M5 | ⬜ | 0% | |
 | F18 | Partner payouts (escrow + streamed; proof-of-reserves) | Settlement + Ledger | M4 / M5 | ⬜ | 0% | |
 | F19 | GPU attestation (KYB + NVIDIA + challenge-response + DCGM + bond) | Settlement | M4 | ⬜ | 0% | Makes credits credible. |
-| F20 | Platform console UI (catalog, wallet, compute, billing) | Frontend | M1→M6 | 🔵 | ~45% | **M2 mock→live seam done (v0.2.3).** Nitro BFF + `EXASCALE_API_MODE` flip; composables for auth/catalog/wallet/inference/billing/keys (all proven live). **Live `/console`** (design-system tokens) ties the loop: run inference → wallet debits; buy credits; manage keys. login/signup wired. Remaining: wire the individual large mock screens (browser-iterated), compute/billing pages (M3+). |
+| F20 | Platform console UI (catalog, wallet, compute, billing) | Frontend | M1→M6 | 🔵 | ~50% | **M2 mock→live seam done (v0.2.3).** Nitro BFF + `EXASCALE_API_MODE` flip; composables for auth/catalog/wallet/inference/billing/keys (all proven live). **Live `/console`** (design-system tokens) ties the loop: run inference → wallet debits; buy credits; manage keys. login/signup wired. **Wallet convert drawer executes live F07 conversions** (rate/spread + atomic burn+mint, idempotent; v0.2.5). Remaining: wire the individual large mock screens (browser-iterated), compute/billing pages (M3+). |
 | F21 | SOC 2 Type I (Vanta, controls, evidence) | Security + Infra | M4 / M6 | ⬜ | 0% | |
 | F22 | Licensing track (jurisdiction, counsel, prepaid framing) | Security | parallel | 🔵 | ~10% | Counsel engagement starting; keeps Phase 2 unblockable. |
 
