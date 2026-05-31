@@ -5,7 +5,7 @@ Updated as work lands. Pair with `SEQUENCING.md` (plan), `MANAGEMENT_PLAN.md` (t
 Last updated: 2026-05-31.
 
 > Legend: ✅ **green = done** · 🟩 in progress · ⬜ **white = not done** · ⏸ paused.
-> Tags shipped: `v0.1.0 v0.1.1 v0.1.2 v0.1.3 v0.1.4` (M1) · `v0.2.0 … v0.2.7` (M2). All on `main` (origin).
+> Tags shipped: `v0.1.0 v0.1.1 v0.1.2 v0.1.3 v0.1.4` (M1) · `v0.2.0 … v0.2.8` (M2). All on `main` (origin).
 
 ```
 Exascale
@@ -52,7 +52,8 @@ Exascale
 │                                inference, wallet, buy, keys, budget alerts, purchases, audit).
 │                                wallet drawer executes live F07 conversions (v0.2.5) +
 │                                recent-movements renders live ledger txs (v0.2.6); inference
-│                                playground shows real credit cost + session meter (v0.2.7).
+│                                playground shows real credit cost + session meter (v0.2.7);
+│                                settings · API keys manage live platform-core keys (v0.2.8).
 │
 ├── ⬜ M3+ — F10 catalog · F11 packing · F13 GPU lifecycle · F14 reserved · F15 clusters
 │        · F16 supply abstraction · F17 DC onboarding · F18 payouts · F19 attestation

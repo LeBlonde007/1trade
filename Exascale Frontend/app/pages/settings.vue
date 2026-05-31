@@ -181,6 +181,37 @@ const apiKeys = ref<ApiKey[]>([
   },
 ])
 
+// F20×F02 — live API keys. In local mode the list + create + revoke run against platform-core (real
+// one-time secret); mock mode keeps the showcase above. Real keys carry arbitrary scope strings, so
+// rendering tolerates scopes not in SCOPE_META.
+const apiMode = useRuntimeConfig().public.apiMode
+const liveKeys = useKeys()
+const keyError = ref('')
+
+/** scopeClass returns a pill class for a scope, falling back to a neutral style for live scopes. */
+function scopeClass(s: string): string {
+  return SCOPE_META[s as Scope]?.cls ?? 'sc-read'
+}
+/** scopeLabel returns a scope's display label (the raw string for live scopes not in SCOPE_META). */
+function scopeLabel(s: string): string {
+  return SCOPE_META[s as Scope]?.label ?? s
+}
+
+/** displayKeys is the rendered key list — live platform keys in local mode, else the showcase. */
+const displayKeys = computed<ApiKey[]>(() => {
+  if (apiMode !== 'local') return apiKeys.value
+  return liveKeys.keys.value.map((k) => ({
+    id: k.id,
+    name: k.name,
+    prefix: k.prefix,
+    scopes: (k.scopes ?? []) as Scope[],
+    created: k.created_at ? k.created_at.slice(0, 10) : '—',
+    lastUsed: '—',
+    createdBy: profile.email,
+    status: k.revoked ? 'revoked' : 'active',
+  }))
+})
+
 type Expiration = 'never' | '30d' | '90d' | '1y' | 'custom'
 const EXP_OPTIONS: Array<{ value: Expiration; label: string; sub: string }> = [
   { value: '30d',    label: '30 days',  sub: 'Recommended for short-lived bots' },
@@ -217,6 +248,8 @@ function openCreateKeyModal() {
 }
 function closeApiModal() {
   showApiModal.value = false
+  keyError.value = ''
+  if (apiMode === 'local') liveKeys.dismissSecret() // clear the one-time secret from memory
 }
 
 function selectedScopes(): Scope[] {
@@ -232,9 +265,24 @@ function randomSuffix(len: number) {
   return s
 }
 
-function generateKey() {
+async function generateKey() {
   if (!canGenerate.value) return
   const scopes = selectedScopes()
+  keyError.value = ''
+  // Live mode → mint through platform-core; the real one-time secret comes back in the response.
+  if (apiMode === 'local') {
+    try {
+      const r = await liveKeys.create(newKeyName.value.trim(), scopes)
+      generatedKeyFull.value = r.secret
+      generatedKeyId.value = r.id
+      apiModalStep.value = 'generated'
+    } catch (e: unknown) {
+      const ex = e as { data?: { message?: string }; statusMessage?: string }
+      keyError.value = ex?.data?.message || ex?.statusMessage || 'Could not create key.'
+    }
+    return
+  }
+  // Showcase (mock mode) — fabricate a plausible key client-side.
   const tier = scopes.includes('admin')
     ? 'admin'
     : scopes.includes('trade')
@@ -275,7 +323,11 @@ async function copyGeneratedKey() {
 
 const expLabel = computed(() => EXP_OPTIONS.find(o => o.value === newKeyExp.value)?.label ?? 'Never')
 
-function revokeKey(id: string) {
+async function revokeKey(id: string) {
+  if (apiMode === 'local') {
+    try { await liveKeys.revoke(id) } catch { keyError.value = 'Could not revoke key.' }
+    return
+  }
   apiKeys.value = apiKeys.value.filter(k => k.id !== id)
 }
 
@@ -294,6 +346,7 @@ function goTo(k: SectionKey) {
 onMounted(() => {
   const h = route.hash?.replace('#', '') as SectionKey
   if (h && SECTIONS.find(s => s.key === h)) active.value = h
+  if (apiMode === 'local') liveKeys.load().catch(() => { keyError.value = 'Could not load keys.' })
 })
 </script>
 
@@ -605,7 +658,7 @@ onMounted(() => {
             <div class="card-head">
               <span class="eyebrow"><span class="dot" /> Active keys</span>
               <span class="card-meta">
-                {{ apiKeys.length }} active · <NuxtLink to="/enterprise/audit">Audit log →</NuxtLink>
+                {{ displayKeys.length }} {{ displayKeys.length === 1 ? 'key' : 'keys' }} · <NuxtLink to="/enterprise/audit">Audit log →</NuxtLink>
               </span>
             </div>
             <div class="api-table-wrap">
@@ -623,7 +676,10 @@ onMounted(() => {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="k in apiKeys" :key="k.id">
+                  <tr v-if="displayKeys.length === 0">
+                    <td class="left dim" colspan="8">No API keys yet — create one to call the inference API.</td>
+                  </tr>
+                  <tr v-for="k in displayKeys" :key="k.id">
                     <td class="left name-cell">
                       <span class="key-name">{{ k.name }}</span>
                     </td>
@@ -636,15 +692,19 @@ onMounted(() => {
                           v-for="sc in k.scopes"
                           :key="sc"
                           class="scope-badge"
-                          :class="SCOPE_META[sc].cls"
-                        >{{ SCOPE_META[sc].label }}</span>
+                          :class="scopeClass(sc)"
+                        >{{ scopeLabel(sc) }}</span>
                       </span>
                     </td>
                     <td class="left mono dim">{{ k.created }}</td>
                     <td class="left mono">{{ k.lastUsed }}</td>
                     <td class="left mono dim">{{ k.createdBy }}</td>
                     <td class="left">
-                      <span class="status-tag verified">
+                      <span v-if="k.status === 'revoked'" class="status-tag revoked">
+                        <span class="dot" />
+                        Revoked
+                      </span>
+                      <span v-else class="status-tag verified">
                         <span class="dot" />
                         Active
                       </span>
@@ -652,7 +712,7 @@ onMounted(() => {
                     <td class="right-td">
                       <div class="row-actions-inline">
                         <button type="button" class="btn-mini ghost">Edit</button>
-                        <button type="button" class="btn-mini" @click="revokeKey(k.id)">Revoke</button>
+                        <button v-if="k.status !== 'revoked'" type="button" class="btn-mini" @click="revokeKey(k.id)">Revoke</button>
                       </div>
                     </td>
                   </tr>
@@ -840,7 +900,8 @@ onMounted(() => {
           </div>
 
           <footer class="modal-foot">
-            <span class="foot-hint">
+            <span v-if="keyError" class="foot-hint err">{{ keyError }}</span>
+            <span v-else class="foot-hint">
               <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
                 <rect x="3.5" y="7" width="9" height="6.5" />
                 <path d="M5.5 7V5a2.5 2.5 0 015 0v2" />
@@ -1337,6 +1398,11 @@ onMounted(() => {
   background: var(--pos-soft);
   color: var(--pos);
   border: 1px solid rgba(25, 195, 125, 0.25);
+}
+.status-tag.revoked {
+  background: var(--hover);
+  color: var(--text-3);
+  border: 1px solid var(--border);
 }
 .status-tag.pending {
   background: rgba(245, 158, 11, 0.10);
@@ -1990,6 +2056,7 @@ onMounted(() => {
   stroke-width: 1.5;
 }
 .foot-hint.check { color: var(--pos); }
+.foot-hint.err { color: var(--neg); }
 .foot-hint.check strong { color: var(--text); font-family: var(--font-sans); font-weight: 500; }
 .foot-actions { display: flex; gap: 8px; }
 .modal-foot .btn { height: 36px; }
