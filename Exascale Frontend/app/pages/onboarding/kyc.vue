@@ -11,6 +11,13 @@
 definePageMeta({ layout: false })
 useHead({ title: 'Identity Verification — Exascale', htmlAttrs: { 'data-theme': 'light' } })
 
+// Persona-aware. KYC (identity verification) is a *trading* requirement — only the trader persona
+// goes through the Light-KYC flow below. AI companies don't trade (verified → straight to the
+// console); datacenter partners onboard capacity instead. See the persona branch in the template.
+const personaCx = usePersona()
+const isTrader = computed(() => personaCx.persona.value === 'trader')
+const personaName = computed(() => personaCx.meta.value.short)
+
 type StepKey = 'personal' | 'background' | 'intentions' | 'confirm'
 
 interface StepDef {
@@ -333,7 +340,41 @@ const intentionTitles = computed(() =>
       </div>
     </div>
 
-    <!-- ============ Interactive flow ============ -->
+    <!-- ============ Non-trader personas: KYC doesn't apply ============ -->
+    <div v-else-if="!isTrader" class="page">
+      <div class="page-header">
+        <div class="eyebrow"><span class="dot" /> {{ personaName }} onboarding</div>
+        <template v-if="personaCx.persona.value === 'enterprise'">
+          <h1 class="page-title">You're verified — welcome to Exascale.</h1>
+          <p class="page-subtitle">
+            Identity verification (KYC) is only required for real-money <em>trading</em>. As an AI
+            company you run inference &amp; compute on prepaid credits — no KYC needed. You're ready to go.
+          </p>
+        </template>
+        <template v-else>
+          <h1 class="page-title">Let's onboard your datacenter.</h1>
+          <p class="page-subtitle">
+            Register your capacity to start supplying GPUs to the Exascale market. Next we'll collect
+            your cluster details, location, and payout account — not personal identity.
+          </p>
+        </template>
+      </div>
+      <div class="success-actions">
+        <NuxtLink v-if="personaCx.persona.value === 'enterprise'" to="/console" class="btn primary accent lg">
+          Go to your console
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square"
+               style="width:14px;height:14px"><path d="M3 8h10M9 4l4 4-4 4" /></svg>
+        </NuxtLink>
+        <NuxtLink v-else to="/datacenter/register" class="btn primary accent lg">
+          Register a datacenter
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square"
+               style="width:14px;height:14px"><path d="M3 8h10M9 4l4 4-4 4" /></svg>
+        </NuxtLink>
+        <NuxtLink to="/onboarding/welcome" class="btn ghost">Take the product tour first</NuxtLink>
+      </div>
+    </div>
+
+    <!-- ============ Interactive flow (trader) ============ -->
     <div v-else class="page">
       <div class="page-header">
         <div class="eyebrow"><span class="dot" /> Trader onboarding · Light KYC</div>

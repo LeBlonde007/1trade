@@ -5,7 +5,7 @@ Updated as work lands. Pair with `SEQUENCING.md` (plan), `MANAGEMENT_PLAN.md` (t
 Last updated: 2026-05-31.
 
 > Legend: ✅ **green = done** · 🟩 in progress · ⬜ **white = not done** · ⏸ paused.
-> Tags shipped: `v0.1.0 … v0.1.5` (M1) · `v0.2.0 … v0.2.9` (M2). All on `main` (origin).
+> Tags shipped: `v0.1.0 … v0.1.5` (M1) · `v0.2.0 … v0.2.10` (M2). All on `main` (origin).
 
 ```
 Exascale
