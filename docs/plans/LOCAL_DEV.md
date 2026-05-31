@@ -1,5 +1,9 @@
 # Local Development
 
+> **This file is the intended end-state design.** Some of it isn't wired yet (the `:8080` ingress,
+> Grafana, `make seed`, `exascale login --dev`). For the **accurate, current-state runbook of what's
+> actually built and runnable today**, see **[RUN_LOCAL.md](./RUN_LOCAL.md)**.
+
 Goal: a developer clones the repo, runs **one command**, and within ~15 minutes has the whole
 platform running locally with mock data. Every agent's service must support this same flow.
 
