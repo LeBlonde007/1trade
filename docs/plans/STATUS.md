@@ -5,7 +5,7 @@ Updated as work lands. Pair with `SEQUENCING.md` (plan), `MANAGEMENT_PLAN.md` (t
 Last updated: 2026-05-31.
 
 > Legend: ✅ **green = done** · 🟩 in progress · ⬜ **white = not done** · ⏸ paused.
-> Tags shipped: `v0.1.0 v0.1.1 v0.1.2 v0.1.3 v0.1.4` (M1) · `v0.2.0 v0.2.1 v0.2.2 v0.2.3 v0.2.4 v0.2.5` (M2). All on `main` (origin).
+> Tags shipped: `v0.1.0 v0.1.1 v0.1.2 v0.1.3 v0.1.4` (M1) · `v0.2.0 v0.2.1 v0.2.2 v0.2.3 v0.2.4 v0.2.5 v0.2.6` (M2). All on `main` (origin).
 
 ```
 Exascale
@@ -49,8 +49,8 @@ Exascale
 │   ├── ⬜ F12 compute control plane ← M2 GAP (Kueue+Volcano+GPU Operator; GPU-gated)
 │   └── ✅ F20 console wired      BFF (EXASCALE_API_MODE mock|local) + live /console (auth, catalog,
 │                                inference, wallet, buy, keys, budget alerts, purchases, audit).
-│                                inference.vue wired; wallet convert drawer executes live F07
-│                                conversions (rate/spread + atomic burn+mint, v0.2.5).
+│                                inference.vue wired; wallet drawer executes live F07 conversions
+│                                (v0.2.5) + recent-movements renders live ledger txs (v0.2.6).
 │
 ├── ⬜ M3+ — F10 catalog · F11 packing · F13 GPU lifecycle · F14 reserved · F15 clusters
 │        · F16 supply abstraction · F17 DC onboarding · F18 payouts · F19 attestation
@@ -88,8 +88,9 @@ Repo: trunk = `main` (10 features merged), pushed to `origin` (ex-main). Tags v0
 3. **M3 provisioning (your side)** — Stripe + domain/Cloudflare + registry + GPU node + HF token +
    email provider. See `PROVISIONING.md`.
 
-_Done since last update:_ wallet "convert" UI — the drawer now executes live F07 conversions
-(rate/spread + atomic burn+mint, v0.2.5).
+_Done since last update:_ wallet screen fully live — the convert drawer executes F07 conversions
+(rate/spread + atomic burn+mint, v0.2.5) and the recent-movements table renders live ledger
+transactions (v0.2.6).
 
 ### Decisions still open
 - **ADR-0002** (AI↔sub-credit conversion direction) — provisional (bidirectional, 1% spread); counsel
