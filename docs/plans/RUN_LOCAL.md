@@ -174,3 +174,5 @@ meter) → wallet balances + recent-movements update live.**
 | Inference returns 402 | tenant has no `text` credits | mint via §4, or `credits convert` into `text` |
 | Balance didn't change after `infer` | debit is async (~1s) | re-check `credits balance` a moment later |
 | `curl :8001/healthz` fails | services not up / no forward | `kubectl get pods -A`; `tilt up` |
+| `make up` → `connection refused` on `…:43407` | cluster is **stopped** (was: Makefile skipped starting it — fixed) | `make up` now starts it; or `k3d cluster start exascale` |
+| `k3d cluster start` → serverlb `Bind for 0.0.0.0:8080 failed: port is already allocated` | another local project holds `:8080` (k3d's LB also fronts the kube API) | free `:8080` (`docker ps`, stop the holder) **then** start; if the LB got wedged from a failed start, `k3d cluster delete exascale && make up` (dev data is disposable; images are cached so it's quick) |

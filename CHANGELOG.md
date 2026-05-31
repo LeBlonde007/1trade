@@ -17,12 +17,12 @@ SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not da
 - Wired via the existing `useKeys` composable + `/api/keys` BFF (no contract change).
 
 ### Verification
-- Typecheck clean. **Live re-verify deferred:** the local k3d cluster stopped between sessions and
-  can't restart on this host right now (its `:8080` LB port is held by an unrelated local project),
-  so platform-core isn't reachable to run the create→reveal→revoke e2e. The wired path
-  (`useKeys → /api/keys → proxyJson → platform-core /v1/auth/keys`) is the same one verified live in
-  F20-6 (v0.2.3); this change only routes the settings screen's create/list/revoke through it in
-  local mode. Re-run the live e2e once the cluster is back.
+- Typecheck clean. **Live e2e passed** (through the running BFF): fresh tenant → `GET /api/keys` empty
+  → `POST /api/keys` returns the **one-time secret** + prefix + scopes → `GET /api/keys` lists
+  metadata only → `DELETE /api/keys/{id}` → 200 → list shows `active:0, total:1` (revoked). Confirms
+  the screen's create-reveal-list-revoke + active/revoked mapping against live platform-core.
+  _(Verification was briefly deferred when the local k3d cluster needed recreating; it has since been
+  rebuilt and the e2e run.)_
 
 ## [v0.2.7] — Milestone 2: inference playground credit meter + debit-flow fix (F20 × F08, F08↔F05)
 

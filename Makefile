@@ -16,11 +16,14 @@ help:
 .PHONY: up
 up: cluster data-plane tilt
 
-## cluster: create the local k3d cluster (idempotent)
+## cluster: create the local k3d cluster, or start it if it already exists but is stopped (idempotent)
 .PHONY: cluster
 cluster:
-	@k3d cluster list 2>/dev/null | awk '{print $$1}' | grep -qx "$(CLUSTER)" \
-		|| k3d cluster create --config deploy/k8s/local/k3d.yaml
+	@if k3d cluster list 2>/dev/null | awk '{print $$1}' | grep -qx "$(CLUSTER)"; then \
+		echo "==> starting existing k3d cluster '$(CLUSTER)'"; k3d cluster start "$(CLUSTER)"; \
+	else \
+		echo "==> creating k3d cluster '$(CLUSTER)'"; k3d cluster create --config deploy/k8s/local/k3d.yaml; \
+	fi
 	@kubectl config use-context k3d-$(CLUSTER) >/dev/null
 
 ## data-plane: install Postgres/TimescaleDB/Redis/NATS + observability via Helm
