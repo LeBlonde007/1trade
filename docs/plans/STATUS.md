@@ -5,7 +5,8 @@ Updated as work lands. Pair with `SEQUENCING.md` (plan), `MANAGEMENT_PLAN.md` (t
 Last updated: 2026-06-02.
 
 > Legend: ✅ **green = done** · 🟩 in progress · ⬜ **white = not done** · ⏸ paused.
-> Tags shipped: `v0.1.0 … v0.1.5` (M1) · `v0.2.0 … v0.2.12` (M2). All on `main` (origin).
+> Tags shipped: `v0.1.0 … v0.1.5` (M1) · `v0.2.0 … v0.2.12` (M2) · `v0.2.13 … v0.2.16` (F01 hardening:
+> test-e2e, scheduling, CI build/test, golangci-lint v2). All on `main` (origin).
 
 ```
 Exascale
@@ -26,9 +27,9 @@ Exascale
 │   ├── ✅ SCHED=1 — Kueue + Volcano + mock-GPU queues (cq-inference/-training-{small,large}); live:
 │   │      Kueue admits a job + Volcano gang-schedules minAvailable:2 on the mock node (v0.2.14)
 │   ├── ⬜ OBS=1 stack (Prometheus/Loki/Tempo)   ⬜ SOPS secrets
-│   ├── 🟩 CI: go job now really builds + race-tests all 5 modules (Go 1.25, scripts/go-all.sh,
-│   │      GOWORK=off) + contracts YAML multi-doc fix (v0.2.15). Lint advisory pending golangci-lint v2
-│   │      (tooling task); hygiene/pre-commit full-green gated on the same.
+│   ├── 🟩 CI: go job builds + race-tests all 5 modules (Go 1.25, scripts/go-all.sh) + golangci-lint
+│   │      v2.12.2 hard gate, all modules lint-clean (scripts/lint.sh) + contracts YAML multi-doc fix
+│   │      (v0.2.15–v0.2.16). go + contracts jobs green; hygiene red only on non-Go pre-commit hooks.
 │   └── ⬜ Real envs (staging/prod) · backup/restore drill
 │
 ├── ✅ M1 — Foundation (shipped; F04 CLI v0 done)

@@ -4,6 +4,34 @@ All notable changes to Exascale. Format: [Keep a Changelog](https://keepachangel
 SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not dates — see
 `docs/plans/MANAGEMENT_PLAN.md`).
 
+## [v0.2.16] — golangci-lint v2 (Go 1.25) — lint is a hard CI gate again (F01 tooling)
+
+### Changed
+- **Bumped golangci-lint v1.59.1 → v2.12.2** (Go-1.25 compatible) and migrated `.golangci.yml` to the
+  v2 schema. Lint runs across every module via a new `scripts/lint.sh` (golangci-lint at the repo
+  root reaches nothing in a multi-module repo) and is now a **hard gate** in CI (was advisory in
+  v0.2.15) — all 5 modules are lint-clean. Version bumped everywhere: CI, the pre-commit hook (now a
+  local hook → `scripts/lint.sh`, multi-module aware), and `install-toolchain.sh`. `make lint` →
+  `scripts/lint.sh` (`make lint FIX=1` to auto-fix).
+- **Config tuning** for context-appropriate cases: the CLI is exempt from the `fmt.Print*` ban (it
+  writes to stdout); tests are exempt from `noctx`/`errorlint`/`bodyclose` (httptest + sentinel `==`);
+  `main.go` from `gocritic` exitAfterDefer (idiomatic startup); gosec `G101` excluded (false positives
+  on credit-type code constants + public URLs — real secrets are caught by gitleaks + env/Secrets).
+  **`wrapcheck` is deferred** (documented): a blanket enable is ~85 mechanical `%w` wraps; errcheck +
+  errorlint already cover the correctness core. Re-enable after a dedicated wrapping sweep (tech-lead).
+
+### Fixed
+- Genuine lint findings: `compute-control` `writeSchedErr` now uses `errors.Is` (wrapped-sentinel
+  safe) + preallocates the catalog slice; removed an unused `notImplemented` helper in `credit-ledger`;
+  the CLI HTTP client uses `http.NewRequestWithContext`; a platform-core hash-determinism test no
+  longer trips `SA4000` (identical-expression compare).
+
+### Verified
+- `scripts/lint.sh` green across all 5 modules on v2.12.2; `go-all.sh build` + `test -race` still
+  green; `.golangci.yml`, `.pre-commit-config.yaml`, and `ci.yml` parse. With this, the CI `go` job
+  (build + race-test + lint) is fully green; the remaining red on the `hygiene` job is its *other*
+  pre-commit hooks (eslint/ruff/formatting), outside the golangci-lint bump.
+
 ## [v0.2.15] — CI actually builds + tests the Go services (F01)
 
 ### Fixed

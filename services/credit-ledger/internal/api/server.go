@@ -224,13 +224,6 @@ func toTxDTOs(ts []domain.Transaction) []txDTO {
 	return out
 }
 
-// notImplemented returns a 501 handler (used for F07 conversion endpoints).
-func notImplemented(msg string) http.HandlerFunc {
-	return func(w http.ResponseWriter, _ *http.Request) {
-		writeErr(w, http.StatusNotImplemented, "not_implemented", msg)
-	}
-}
-
 // writeJSON writes a JSON response with the given status.
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")

@@ -17,7 +17,7 @@
 set -euo pipefail
 
 # ---- config (override via env) -------------------------------------------------------------
-GOLANGCI_VERSION="${GOLANGCI_VERSION:-v1.59.1}"   # keep in sync with .pre-commit-config.yaml
+GOLANGCI_VERSION="${GOLANGCI_VERSION:-v2.12.2}"   # v2.x — Go 1.25 compatible. .golangci.yml is v2 format.
 GITLEAKS_VERSION="${GITLEAKS_VERSION:-8.18.4}"    # keep in sync with .pre-commit-config.yaml
 SOPS_VERSION="${SOPS_VERSION:-3.9.0}"
 WANT_GPU=false

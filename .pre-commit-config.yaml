@@ -30,13 +30,18 @@ repos:
     hooks:
       - id: gitleaks
 
-  # --- Go: format + the full lint set (per-function doc comments, security, errors) ---
-  - repo: https://github.com/golangci/golangci-lint
-    rev: v1.59.1
+  # --- Go: the full lint set (per-function doc comments, security, errors). Local hook because each
+  # services/* and apps/cli is its own module — golangci-lint at the repo root reaches nothing, so we
+  # loop the modules via scripts/lint.sh. Config is .golangci.yml (v2). golangci-lint v2.x must be on
+  # PATH (scripts/install-toolchain.sh). ---
+  - repo: local
     hooks:
       - id: golangci-lint
-        # config is .golangci.yml at repo root
-        entry: golangci-lint run --fix
+        name: golangci-lint (all Go modules)
+        entry: scripts/lint.sh
+        language: script
+        types: [go]
+        pass_filenames: false
 
   # --- Python (inference runtime): ruff format + lint ---
   - repo: https://github.com/astral-sh/ruff-pre-commit

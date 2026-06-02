@@ -4,6 +4,7 @@ package client
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -41,7 +42,9 @@ func Do(method, baseURL, path, token string, headers map[string]string, body, ou
 		}
 		r = bytes.NewReader(b)
 	}
-	req, err := http.NewRequest(method, strings.TrimRight(baseURL, "/")+path, r)
+	// The CLI has no ambient request context; a background context satisfies the no-context-less-request
+	// rule while the client's own 120s timeout bounds the call.
+	req, err := http.NewRequestWithContext(context.Background(), method, strings.TrimRight(baseURL, "/")+path, r)
 	if err != nil {
 		return err
 	}
