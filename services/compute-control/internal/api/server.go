@@ -6,6 +6,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -52,8 +53,9 @@ func (s *Server) routes() {
 // tenant data and the catalog drives the marketing/console pricing view.
 func (s *Server) listTypes(w http.ResponseWriter, _ *http.Request) {
 	h100, h200 := s.sched.Capacity()
-	types := make([]map[string]any, 0)
-	for _, t := range domain.Catalog(h100, h200) {
+	catalog := domain.Catalog(h100, h200)
+	types := make([]map[string]any, 0, len(catalog))
+	for _, t := range catalog {
 		types = append(types, map[string]any{
 			"id": t.ID, "name": t.Name, "gpu": t.GPU,
 			"credit_type": t.CreditType, "price_per_hour": t.PricePerHour, "available": t.Available,
@@ -248,16 +250,17 @@ func bearer(r *http.Request) string {
 	return ""
 }
 
-// writeSchedErr maps a scheduler error to the right HTTP status + ApiError code.
+// writeSchedErr maps a scheduler error to the right HTTP status + ApiError code. Uses errors.Is so a
+// wrapped sentinel still maps correctly.
 func writeSchedErr(w http.ResponseWriter, err error) {
-	switch err {
-	case scheduler.ErrNotFound, scheduler.ErrForbidden:
+	switch {
+	case errors.Is(err, scheduler.ErrNotFound), errors.Is(err, scheduler.ErrForbidden):
 		writeErr(w, http.StatusNotFound, "not_found", "job not found")
-	case scheduler.ErrCapacity:
+	case errors.Is(err, scheduler.ErrCapacity):
 		writeErr(w, http.StatusPaymentRequired, "quota_exhausted", "insufficient GPU capacity for this tier")
-	case scheduler.ErrUnknownGPU, scheduler.ErrUnknownClass, scheduler.ErrBadRequest:
+	case errors.Is(err, scheduler.ErrUnknownGPU), errors.Is(err, scheduler.ErrUnknownClass), errors.Is(err, scheduler.ErrBadRequest):
 		writeErr(w, http.StatusUnprocessableEntity, "invalid_request", err.Error())
-	case scheduler.ErrNotCancelable:
+	case errors.Is(err, scheduler.ErrNotCancelable):
 		writeErr(w, http.StatusConflict, "conflict", "job is not in a cancelable state")
 	default:
 		slog.Error("scheduler error", "err", err)

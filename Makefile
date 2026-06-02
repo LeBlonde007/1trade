@@ -81,11 +81,10 @@ test:
 test-e2e:
 	@bash scripts/e2e.sh
 
-## lint: run linters (golangci-lint + pre-commit hooks)
+## lint: golangci-lint across every Go module (scripts/lint.sh); add --fix to auto-fix
 .PHONY: lint
 lint:
-	@command -v golangci-lint >/dev/null && (test -f go.work && golangci-lint run ./... || echo "no Go yet") || echo "golangci-lint not installed"
-	@command -v pre-commit >/dev/null && pre-commit run --all-files || echo "pre-commit not installed"
+	@bash scripts/lint.sh $(if $(FIX),--fix,)
 
 ## fmt: format Go + run gofmt/goimports
 .PHONY: fmt

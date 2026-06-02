@@ -71,10 +71,12 @@ jobs:
         run: bash scripts/go-all.sh build
       - name: race-test all modules
         run: bash scripts/go-all.sh test -race
-      # golangci-lint stays advisory until the v1→v2 / Go-1.25 bump (MANAGEMENT_PLAN tooling task):
-      # the v1.59.1 pin can't parse Go 1.25 and .golangci.yml is still v1 format.
-      - name: golangci-lint (advisory until the v2 bump)
+      # golangci-lint v2 (Go-1.25 compatible), per-module via scripts/lint.sh — a HARD gate. The
+      # golangci-lint-action runs at one working dir; our modules are separate, so we install + loop.
+      - name: golangci-lint (all modules)
         if: hashFiles('**/*.go') != ''
-        continue-on-error: true
-        uses: golangci/golangci-lint-action@v6
-        with: { version: v1.59.1 }
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh \
+            | sh -s -- -b "$(go env GOPATH)/bin" v2.12.2
+          export PATH="$(go env GOPATH)/bin:$PATH"
+          bash scripts/lint.sh

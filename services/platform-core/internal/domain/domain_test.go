@@ -98,7 +98,10 @@ func TestAPIKey(t *testing.T) {
 	if VerifyAPIKey(k.Hash, "exk_wrong") {
 		t.Fatal("wrong key accepted")
 	}
-	if HashAPIKey("exk_x") != HashAPIKey("exk_x") {
+	// HashAPIKey must be deterministic: the same key hashes the same way (separate vars so the
+	// determinism check isn't constant-folded into an identical-expression warning).
+	h1, h2 := HashAPIKey("exk_x"), HashAPIKey("exk_x")
+	if h1 != h2 {
 		t.Fatal("hash not deterministic")
 	}
 }
