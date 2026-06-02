@@ -14,6 +14,13 @@ ports:
   - port: 8443:443
     nodeFilters:
       - loadbalancer
+# k3d-managed local registry. Creating it here publishes the `local-registry-hosting` ConfigMap
+# into kube-public, which Tilt auto-detects so `docker_build` pushes here (and the cluster pulls
+# from here) instead of falling back to docker.io. No `default_registry` needed in the Tiltfile.
+registries:
+  create:
+    name: registry.localhost
+    hostPort: "5111"
 options:
   k3d:
     wait: true

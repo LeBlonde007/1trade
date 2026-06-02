@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: compute-control
+  labels: { app: compute-control }
+spec:
+  replicas: 1                       # local; HPA + N replicas in prod overlay (DEPLOYMENT.md §7)
+  selector:
+    matchLabels: { app: compute-control }
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+  template:
+    metadata:
+      labels: { app: compute-control }
+    spec:
+      containers:
+        - name: compute-control
+          image: exascale/compute-control:dev
+          ports: [{ containerPort: 8086 }]
+          envFrom:
+            - configMapRef: { name: compute-control-env }
+            - secretRef: { name: platform-auth }   # PLATFORM_JWT_SECRET (verify tenant JWTs) + SERVICE_TOKEN (internal scheduling)
+          livenessProbe:
+            httpGet: { path: /healthz, port: 8086 }
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: { path: /readyz, port: 8086 }
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: "1", memory: 256Mi }
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532          # distroless 'nonroot' UID — numeric so kubelet can verify non-root
+            runAsGroup: 65532
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }

@@ -10,9 +10,9 @@ allow_k8s_contexts('k3d-exascale')  # guard: never act on a non-local cluster
 # sources them from SOPS/Vault.
 local_resource(
     'platform-auth',
-    cmd='kubectl get secret platform-auth >/dev/null 2>&1 || '
-        'kubectl create secret generic platform-auth '
-        '--from-literal=PLATFORM_JWT_SECRET=$(openssl rand -base64 48) '
+    cmd='kubectl get secret platform-auth >/dev/null 2>&1 || ' +
+        'kubectl create secret generic platform-auth ' +
+        '--from-literal=PLATFORM_JWT_SECRET=$(openssl rand -base64 48) ' +
         '--from-literal=SERVICE_TOKEN=$(openssl rand -base64 32)',
 )
 
@@ -21,10 +21,10 @@ local_resource(
 # sources files from two repo locations; the Deployment's initContainer applies them.
 local_resource(
     'credit-ledger-migrations',
-    cmd='kubectl create configmap credit-ledger-migrations '
-        '--from-file=types.sql=docs/contracts/schemas/types.sql '
-        '--from-file=0001_init.sql=services/credit-ledger/migrations/0001_init.sql '
-        '--from-file=0002_conversion.sql=services/credit-ledger/migrations/0002_conversion.sql '
+    cmd='kubectl create configmap credit-ledger-migrations ' +
+        '--from-file=types.sql=docs/contracts/schemas/types.sql ' +
+        '--from-file=0001_init.sql=services/credit-ledger/migrations/0001_init.sql ' +
+        '--from-file=0002_conversion.sql=services/credit-ledger/migrations/0002_conversion.sql ' +
         '--dry-run=client -o yaml | kubectl apply -f -',
     deps=['docs/contracts/schemas/types.sql', 'services/credit-ledger/migrations/0001_init.sql',
           'services/credit-ledger/migrations/0002_conversion.sql'],
@@ -38,11 +38,11 @@ k8s_resource('credit-ledger', port_forwards='8002:8002',
 # --- platform-core (F02) — identity for the fleet; issues the JWT credit-ledger verifies ---
 local_resource(
     'platform-core-migrations',
-    cmd='kubectl create configmap platform-core-migrations '
-        '--from-file=0001_init.sql=services/platform-core/migrations/0001_init.sql '
-        '--from-file=0002_billing.sql=services/platform-core/migrations/0002_billing.sql '
-        '--from-file=0003_accounts.sql=services/platform-core/migrations/0003_accounts.sql '
-        '--from-file=0004_gaps.sql=services/platform-core/migrations/0004_gaps.sql '
+    cmd='kubectl create configmap platform-core-migrations ' +
+        '--from-file=0001_init.sql=services/platform-core/migrations/0001_init.sql ' +
+        '--from-file=0002_billing.sql=services/platform-core/migrations/0002_billing.sql ' +
+        '--from-file=0003_accounts.sql=services/platform-core/migrations/0003_accounts.sql ' +
+        '--from-file=0004_gaps.sql=services/platform-core/migrations/0004_gaps.sql ' +
         '--dry-run=client -o yaml | kubectl apply -f -',
     deps=['services/platform-core/migrations/0001_init.sql',
           'services/platform-core/migrations/0002_billing.sql',
@@ -67,5 +67,22 @@ docker_build('exascale/inference-gateway:dev', 'services/inference-gateway',
 k8s_yaml(kustomize('deploy/k8s/inference-gateway/base'))
 k8s_resource('inference-gateway', port_forwards='8085:8085',
              resource_deps=['platform-auth', 'inference-runtime'])  # gateway's vllm backend needs the runtime
+
+# --- compute-control (F12) — GPU control plane: catalog + quota + the internal scheduling surface.
+# M2 runs the in-memory mock-GPU scheduler; it emits compute.usage.v1 → credit-ledger debits gpu_*. ---
+docker_build('exascale/compute-control:dev', 'services/compute-control',
+             dockerfile='services/compute-control/Dockerfile')
+k8s_yaml(kustomize('deploy/k8s/compute-control/base'))
+k8s_resource('compute-control', port_forwards='8086:8086',
+             resource_deps=['platform-auth'])
+
+# --- data-plane UIs — deployed by `make data-plane` (not Tilt), so Tilt can't port-forward them
+# itself. These long-running local_resources hold the forwards open for the life of `tilt up` and
+# surface clickable links in the Tilt UI. --address 0.0.0.0 so a Windows browser reaches WSL2. ---
+local_resource(
+    'mailpit-ui',  # captured outbound email (F02 verification) — SMTP :1025, web UI :8025
+    serve_cmd='kubectl port-forward -n data --address 0.0.0.0 svc/mailpit 8025:8025',
+    links=['http://localhost:8025'],
+)
 
 # Future services register their own docker_build + k8s_yaml + k8s_resource blocks here.

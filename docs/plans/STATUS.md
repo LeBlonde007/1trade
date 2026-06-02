@@ -2,10 +2,10 @@
 
 **Living status.** ✅ done · 🟩 partly done / in progress · ⬜ not started · ⏸ paused (by design).
 Updated as work lands. Pair with `SEQUENCING.md` (plan), `MANAGEMENT_PLAN.md` (tracker), `CHANGELOG.md` (releases).
-Last updated: 2026-05-31.
+Last updated: 2026-06-02.
 
 > Legend: ✅ **green = done** · 🟩 in progress · ⬜ **white = not done** · ⏸ paused.
-> Tags shipped: `v0.1.0 … v0.1.5` (M1) · `v0.2.0 … v0.2.11` (M2). All on `main` (origin).
+> Tags shipped: `v0.1.0 … v0.1.5` (M1) · `v0.2.0 … v0.2.12` (M2). All on `main` (origin).
 
 ```
 Exascale
@@ -37,7 +37,7 @@ Exascale
 │   │                            Go client over the live APIs (v0.1.4). M3+: gpu/cluster/train; dist M6.
 │   └── ✅ F20 console shell     Nuxt app + design system (live-only; no mock mode, v0.2.11).
 │
-├── ✅ M2 — First inference dollar / sandbox (shipped, except F07 + F12)
+├── ✅ M2 — First inference dollar / sandbox (shipped, complete)
 │   ├── ✅ F06 billing           Stripe checkout → webhook (sig-verified) → idempotent ledger mint;
 │   │                            monthly budgets (v0.1.3). ACH/wire/JPY = M3.
 │   ├── ✅ F07 credit conversion  AI-index↔text, atomic two-leg (burn+mint, chained), rate table,
@@ -48,7 +48,13 @@ Exascale
 │   ├── 🟩 F09 vLLM runtime      gateway↔runtime contract + VLLMBackend (mock→vLLM config flip) +
 │   │                            production server.py/Dockerfile.vllm/GPU manifest + CPU stub.
 │   │                            Proven live on the stub; real GPU serving needs F12 + a GPU node.
-│   ├── ⬜ F12 compute control plane ← M2 GAP (Kueue+Volcano+GPU Operator; GPU-gated)
+│   ├── ✅ F12 compute control plane  v0 live in k3d (v0.2.12). compute-control service behind the
+│   │                            scheduler.Scheduler seam: catalog + quota + internal scheduling
+│   │                            (/v1/compute/jobs|types|quota|instances), mock-GPU backend (gang
+│   │                            capacity, idempotent submit, supply attribution). Emits
+│   │                            compute.usage.v1 → ledger debits gpu_* (live: gang→cancel→debit
+│   │                            1000→999.976667). M3: real Kueue+Volcano backend (same interface),
+│   │                            F13 instance lifecycle, 32+ GPU correctness — GPU-node-gated.
 │   └── ✅ F20 console wired      live-only BFF (proxies the platform; no mock mode, v0.2.11) + live
 │                                /console (auth, catalog, inference, wallet, buy, keys, budget,
 │                                purchases, audit). wallet convert (v0.2.5) + live movements (v0.2.6);
@@ -75,33 +81,38 @@ Exascale
 
 - **M1 (Foundation):** ✅ essentially complete. Shipped F01(core)+F02+F03+F04(CLI v0)+F05+F20-shell.
   **Gaps vs plan: F01 remainder (observability/SOPS/real-envs/CI-green) pending.**
-- **M2 (First inference dollar, sandbox):** ✅ the loop works end-to-end live — signup → buy credits
-  (Stripe) → run inference (gateway→runtime) → idempotent ledger debit → console shows it; **F07
-  conversion** (AI-index↔text) live (v0.2.4). **Gaps vs plan: F12 (compute control plane) not started
-  (GPU-gated); F09 real GPU serving deferred to a GPU node.**
+- **M2 (First inference dollar, sandbox):** ✅ **complete.** The loop works end-to-end live — signup →
+  buy credits (Stripe) → run inference (gateway→runtime) → idempotent ledger debit → console shows it;
+  **F07 conversion** (AI-index↔text) live (v0.2.4); **F12 compute control plane v0** live (v0.2.12) —
+  mock-GPU gang scheduling → `compute.usage.v1` → ledger `gpu_*` debit, proven in k3d. **Deferred to
+  M3 (GPU-node-gated): F12's real Kueue+Volcano backend + F09 real GPU serving.**
 - **Pulled forward:** F03 audit-log + RBAC (sequenced M4) built in M1; email-verify + budgets
   (M3-ish) shipped as gap-closers (v0.1.3).
 - **M3–M6:** ⬜ not started.
 
-Repo: trunk = `main` (10 features merged), pushed to `origin` (ex-main). Tags v0.1.0→v0.1.4, v0.2.0→v0.2.4.
+Repo: trunk = `main`, pushed to `origin` (ex-main). Tags v0.1.0→v0.1.5 (M1), v0.2.0→v0.2.12 (M2).
 
 ---
 
 ## TO DO — next up (ordered, to converge on the sequencing)
 
-1. **F12 — compute control plane** (M2 gap). Needs a GPU node + GPU Operator to be meaningful; pairs
-   with provisioning. Unblocks real F09 serving + F13 GPU lifecycle.
-2. **F01 remainder** — observability (Prometheus /metrics + Grafana/Loki/Tempo; tasks #3/#13), SOPS
-   secrets, real-env clusters, CI green. Prod-hardening before paying customers (M3).
+1. **F01 remainder → Decision Gate 2** — `make test-e2e` (timing the sub-5-min time-to-first-action,
+   the formal M2 gate), the **FULL=1 Kueue+Volcano stack** (prereq for F12's real k8s scheduler
+   backend), observability (Prometheus /metrics + Grafana/Loki/Tempo; tasks #3/#13), SOPS secrets,
+   real-env clusters, CI green. Prod-hardening before paying customers (M3).
+2. **M3 begins — F13 GPU instance lifecycle** (<90s start, CLI `gpu create/list/stop`), the direct
+   continuation of F12 on the `scheduler.Scheduler` seam; then F11 packing, F10 full catalog, F14
+   reserved, F16 supply abstraction.
 3. **M3 provisioning (your side)** — Stripe + domain/Cloudflare + registry + GPU node + HF token +
    email provider. See `PROVISIONING.md`.
 
-_Done since last update:_ wallet screen fully live — convert drawer executes F07 conversions
-(v0.2.5) + recent-movements renders live ledger txs (v0.2.6); inference playground shows real
-credit cost + a live session meter (v0.2.7); **fixed a silent bug where inference debits never
-flowed** — the usage consumer was a push durable that failed to rebind after restarts; now a pull
-consumer (v0.2.7), debit proven to land ~1s after a run. Settings API keys live (v0.2.8). Local email
-via Mailpit + persona-scoped nav (v0.2.9).
+_Done since last update:_ **F12 compute control plane v0 — M2 now complete** (v0.2.12): the
+`compute-control` service (mock-GPU gang scheduling, idempotent submit, supply attribution) emits
+`compute.usage.v1` → credit-ledger debits `gpu_*`, proven live in k3d (gang → cancel → debit
+`1000→999.976667`). Earlier: wallet screen fully live — convert drawer (v0.2.5) + live movements
+(v0.2.6); inference real credit cost + session meter, and the push→pull consumer fix so debits land
+~1s after a run (v0.2.7); settings API keys live (v0.2.8); Mailpit email + persona-scoped nav
+(v0.2.9); persona-aware onboarding (v0.2.10); live-only frontend, mock mode removed (v0.2.11).
 
 ### Decisions still open
 - **ADR-0002** (AI↔sub-credit conversion direction) — provisional (bidirectional, 1% spread); counsel

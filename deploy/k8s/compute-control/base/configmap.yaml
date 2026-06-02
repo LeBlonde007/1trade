@@ -1,0 +1,15 @@
+# compute-control non-secret config. PLATFORM_JWT_SECRET + SERVICE_TOKEN come from the shared
+# `platform-auth` Secret (envFrom in the Deployment) — never here.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: compute-control-env
+data:
+  EXASCALE_ENV: "dev"
+  COMPUTE_ADDR: ":8086"
+  NATS_URL: "nats://nats.data.svc.cluster.local:4222"
+  COMPUTE_SCHEDULER: "mock"                 # M2: in-memory mock-GPU scheduler (real Kueue+Volcano in M3)
+  SUPPLY_SOURCE_ID: "dc-owned-1"            # owned-DC attribution for placements this milestone
+  EXASCALE_PAPER: "true"                    # sandbox credits locally
+  COMPUTE_H100_COUNT: "8"                   # mock-GPU pool sizes (real counts via the GPU Operator)
+  COMPUTE_H200_COUNT: "0"

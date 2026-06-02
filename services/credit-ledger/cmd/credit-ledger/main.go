@@ -47,10 +47,16 @@ func main() {
 			slog.Info("publishing credit.tx.v1 to NATS", "url", cfg.NATSURL)
 		}
 		// Consume inference.usage.v1 → idempotent debit (the inference billing loop, F08↔F05).
-		if uc, err := consumer.Start(cfg.NATSURL, st, pub); err != nil {
-			slog.Error("usage consumer not started — inference debits will not flow", "err", err)
+		if uc, err := consumer.Start(cfg.NATSURL, consumer.Inference, st, pub); err != nil {
+			slog.Error("inference usage consumer not started — inference debits will not flow", "err", err)
 		} else {
 			defer uc.Close()
+		}
+		// Consume compute.usage.v1 → idempotent gpu_* debit (the GPU billing loop, F12↔F05).
+		if cc, err := consumer.Start(cfg.NATSURL, consumer.Compute, st, pub); err != nil {
+			slog.Error("compute usage consumer not started — gpu debits will not flow", "err", err)
+		} else {
+			defer cc.Close()
 		}
 	}
 

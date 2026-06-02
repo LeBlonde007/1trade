@@ -1,0 +1,212 @@
+openapi: 3.0.3
+info:
+  title: Exascale Compute API (GPU types, quota, scheduled jobs, instances)
+  version: 1.0.0
+  description: >
+    **The Exascale compute control-plane API.** Owned by `compute-platform` (the `compute-control`
+    service). It wraps the Kubernetes scheduling stack (Kueue queues per workload class + Volcano gang
+    scheduling + the NVIDIA GPU Operator) behind a stable API.
+
+    **Provisional (M2).** This milestone ships the *internal* scheduling + quota surface that
+    `inference-gateway`/`inference-runtime` use to place pods, plus a read-only GPU-type catalog. The
+    customer-facing GPU instance lifecycle (`/v1/compute/instances` create/stop, sub-90s start) and
+    clusters land in M3/M5; their shapes here are minimal and may change (final in `compute.yaml`
+    v1.1.0).
+
+    Auth: a first-party tenant **JWT** for customer reads (quota, types, instances); the internal
+    **service token** for scheduling (`POST /v1/compute/jobs`, called by the gateway/runtime).
+    `is_paper` is derived from the authenticated principal, never the request body. Metered GPU usage
+    is emitted as `events/compute.usage.v1` → credit-ledger debits the `gpu_*` credit (idempotent on
+    `usage_id`). See docs/plans/features/F12-compute-control-plane.md and credit-types.md §1 (GPU tiers).
+
+servers:
+  - { url: "https://api.exascale.io", description: prod }
+  - { url: "http://localhost:8086", description: "local (compute-control)" }
+
+tags:
+  - { name: catalog, description: "GPU types + availability (read-only)." }
+  - { name: quota, description: "Per-tenant / per-sub-account GPU quota." }
+  - { name: scheduling, description: "Internal: place workloads via Kueue + Volcano." }
+  - { name: instances, description: "Customer GPU instances (M3; minimal in M2)." }
+
+paths:
+  /healthz:
+    get: { tags: [catalog], summary: Liveness., operationId: healthz, responses: { '200': { description: ok } } }
+  /readyz:
+    get: { tags: [catalog], summary: Readiness (K8s API reachable)., operationId: readyz, responses: { '200': { description: ready }, '503': { description: not ready } } }
+
+  /v1/compute/types:
+    get:
+      tags: [catalog]
+      summary: List GPU types + per-hour price + current availability.
+      operationId: listComputeTypes
+      responses:
+        '200':
+          description: GPU types.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  types: { type: array, items: { $ref: '#/components/schemas/ComputeType' } }
+
+  /v1/compute/quota:
+    get:
+      tags: [quota]
+      summary: The authenticated tenant's GPU quota + usage (per tier).
+      operationId: getQuota
+      responses:
+        '200':
+          description: Quotas.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  quotas: { type: array, items: { $ref: '#/components/schemas/Quota' } }
+        '401': { $ref: '#/components/responses/Error' }
+
+  /v1/compute/jobs:
+    get:
+      tags: [scheduling]
+      summary: List the tenant's scheduled jobs (newest first).
+      operationId: listJobs
+      responses:
+        '200':
+          description: Jobs.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobs: { type: array, items: { $ref: '#/components/schemas/Job' } }
+    post:
+      tags: [scheduling]
+      summary: >
+        Submit a workload to the scheduler (internal — service token). Creates a Kueue Workload in the
+        class's queue; multi-pod jobs gang-schedule via Volcano. Idempotent on the Idempotency-Key.
+      operationId: submitJob
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/JobRequest' } } }
+      responses:
+        '202': { description: Accepted + queued., content: { application/json: { schema: { $ref: '#/components/schemas/Job' } } } }
+        '402': { $ref: '#/components/responses/Error' }   # quota exhausted
+        '409': { $ref: '#/components/responses/Error' }   # idempotency conflict
+        '422': { $ref: '#/components/responses/Error' }
+
+  /v1/compute/jobs/{id}:
+    parameters: [ { name: id, in: path, required: true, schema: { type: string } } ]
+    get:
+      tags: [scheduling]
+      summary: Get a job (status + placement).
+      operationId: getJob
+      responses:
+        '200': { description: Job., content: { application/json: { schema: { $ref: '#/components/schemas/Job' } } } }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [scheduling]
+      summary: Cancel / tear down a job.
+      operationId: cancelJob
+      responses:
+        '200': { description: Cancelled. }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /v1/compute/instances:
+    get:
+      tags: [instances]
+      summary: List the tenant's GPU instances (M3 customer-facing; minimal in M2).
+      operationId: listInstances
+      responses:
+        '200':
+          description: Instances.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  instances: { type: array, items: { $ref: '#/components/schemas/Instance' } }
+
+components:
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string }
+      description: Dedupe key — a retried submit returns the same job, never a second placement.
+
+  responses:
+    Error:
+      description: Error.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+
+  schemas:
+    Decimal:
+      type: string
+      description: Fixed-point decimal as a string (NUMERIC(20,6)) — never a float.
+      example: "2.990000"
+
+    ComputeType:
+      type: object
+      properties:
+        id:             { type: string, enum: [gpu_h100, gpu_h200], description: "GPU tier == credit_type" }
+        name:           { type: string, example: "H100 80GB" }
+        gpu:            { type: string, example: "NVIDIA H100 80GB" }
+        credit_type:    { type: string, enum: [gpu_h100, gpu_h200] }
+        price_per_hour: { $ref: '#/components/schemas/Decimal' }
+        available:      { type: integer, description: "schedulable GPUs of this tier right now (mock-GPU count locally)" }
+
+    Quota:
+      type: object
+      properties:
+        credit_type:    { type: string, enum: [gpu_h100, gpu_h200] }
+        limit_hours:    { $ref: '#/components/schemas/Decimal' }
+        used_hours:     { $ref: '#/components/schemas/Decimal' }
+        reserved_hours: { $ref: '#/components/schemas/Decimal' }
+        remaining_hours: { $ref: '#/components/schemas/Decimal' }
+        is_paper:       { type: boolean }
+
+    JobRequest:
+      type: object
+      required: [workload_class, gpu_type, gpus]
+      properties:
+        workload_class: { type: string, enum: [inference, training-small, training-large], description: "selects the Kueue queue" }
+        gpu_type:       { type: string, enum: [gpu_h100, gpu_h200] }
+        gpus:           { type: integer, minimum: 1, description: "GPUs per pod" }
+        pods:           { type: integer, minimum: 1, default: 1, description: ">1 → Volcano gang (all-or-nothing) scheduling" }
+        reserved:       { type: boolean, default: false, description: "use the tenant's reserved capacity (pre-empts on-demand)" }
+        sub_account_id: { type: [string, "null"], format: uuid }
+        reference_id:   { type: string, description: "caller's correlation id (e.g. the inference model/instance)" }
+
+    Job:
+      type: object
+      properties:
+        id:              { type: string, example: "cjob_01Hf…" }
+        status:          { type: string, enum: [pending, queued, scheduled, running, succeeded, failed, cancelled] }
+        workload_class:  { type: string }
+        gpu_type:        { type: string, enum: [gpu_h100, gpu_h200] }
+        gpus:            { type: integer }
+        pods:            { type: integer }
+        reserved:        { type: boolean }
+        supply_source_id: { type: string, description: "owned DC or partner that provided the GPUs (drives payout)" }
+        placement:       { type: [string, "null"], description: "node/zone once scheduled" }
+        is_paper:        { type: boolean }
+        created_at:      { type: string, format: date-time }
+
+    Instance:
+      type: object
+      description: "Customer GPU instance (M3; minimal here)."
+      properties:
+        id:         { type: string }
+        gpu_type:   { type: string, enum: [gpu_h100, gpu_h200] }
+        status:     { type: string, enum: [provisioning, running, stopped, terminated] }
+        created_at: { type: string, format: date-time }
+
+    ApiError:
+      type: object
+      required: [code, message]
+      properties:
+        code:    { type: string, example: quota_exhausted }
+        message: { type: string }
