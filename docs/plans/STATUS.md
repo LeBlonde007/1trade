@@ -35,7 +35,7 @@ Exascale
 │   │                            org CRUD + role assignment, tenant-scoped. Sub-accounts = M4.
 │   ├── 🟩 F04 exascale CLI v0   login/whoami/credits balance+convert/catalog/infer/keys/config —
 │   │                            Go client over the live APIs (v0.1.4). M3+: gpu/cluster/train; dist M6.
-│   └── ✅ F20 console shell     Nuxt app + design system + mock-data mode.
+│   └── ✅ F20 console shell     Nuxt app + design system (live-only; no mock mode, v0.2.11).
 │
 ├── ✅ M2 — First inference dollar / sandbox (shipped, except F07 + F12)
 │   ├── ✅ F06 billing           Stripe checkout → webhook (sig-verified) → idempotent ledger mint;
@@ -49,13 +49,11 @@ Exascale
 │   │                            production server.py/Dockerfile.vllm/GPU manifest + CPU stub.
 │   │                            Proven live on the stub; real GPU serving needs F12 + a GPU node.
 │   ├── ⬜ F12 compute control plane ← M2 GAP (Kueue+Volcano+GPU Operator; GPU-gated)
-│   └── ✅ F20 console wired      BFF (EXASCALE_API_MODE mock|local) + live /console (auth, catalog,
-│                                inference, wallet, buy, keys, budget alerts, purchases, audit).
-│                                wallet drawer executes live F07 conversions (v0.2.5) +
-│                                recent-movements renders live ledger txs (v0.2.6); inference
-│                                playground shows real credit cost + session meter (v0.2.7);
-│                                settings · API keys manage live platform-core keys (v0.2.8);
-│                                persona-scoped nav — each persona shows only its screens (v0.2.9).
+│   └── ✅ F20 console wired      live-only BFF (proxies the platform; no mock mode, v0.2.11) + live
+│                                /console (auth, catalog, inference, wallet, buy, keys, budget,
+│                                purchases, audit). wallet convert (v0.2.5) + live movements (v0.2.6);
+│                                inference real credit cost + session meter (v0.2.7); settings · API
+│                                keys live (v0.2.8); persona-scoped nav + onboarding (v0.2.9–v0.2.10).
 │
 ├── ⬜ M3+ — F10 catalog · F11 packing · F13 GPU lifecycle · F14 reserved · F15 clusters
 │        · F16 supply abstraction · F17 DC onboarding · F18 payouts · F19 attestation
