@@ -58,6 +58,11 @@ Exascale
 ├── ⬜ M3+ — F10 catalog · F11 packing · F13 GPU lifecycle · F14 reserved · F15 clusters
 │        · F16 supply abstraction · F17 DC onboarding · F18 payouts · F19 attestation
 │
+├── 🟩 F23 Console v1.5 screens (~15%) — the v1.5 screen catalog itemized screen-by-screen
+│        (Tiers E–N) vs the backend each needs. Built: detail drawers, toasts, status, markets
+│        index, tour, footer. Active: money/compute/enterprise/datacenter/marketing/help/polish;
+│        exchange tiers ⏸ Phase 2. See features/F23-console-v15-screens.md.
+│
 ├── 🟩 Compliance & trust  — ⬜ F21 SOC 2 (M4→M6) · 🟩 F22 licensing track (parallel)
 │
 └── ⏸ Phase 2 — Exchange (paused, license-gated, kept warm)
