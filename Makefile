@@ -65,16 +65,15 @@ cli:
 	@test -d apps/cli && (cd apps/cli && go build -o ../../bin/exascale ./cmd/exascale) \
 		|| echo "apps/cli not scaffolded yet (F04)"
 
-## build: build all Go services
+## build: build every Go module (services + CLI)
 .PHONY: build
 build:
-	@test -n "$$(ls -d services/*/ 2>/dev/null)" \
-		&& go build ./... || echo "no Go services scaffolded yet"
+	@bash scripts/go-all.sh build
 
-## test: run unit tests across the repo
+## test: race-test every Go module (+ Nuxt typecheck if installed)
 .PHONY: test
 test:
-	@test -f go.work && go test ./... || echo "no Go modules yet"
+	@bash scripts/go-all.sh test -race
 	@test -d "Exascale Frontend/node_modules" && (cd "Exascale Frontend" && npm run typecheck 2>/dev/null || true) || true
 
 ## test-e2e: timed sub-5-min time-to-first-action loop (signup→top-up→infer→GPU debit). Needs `make up`.

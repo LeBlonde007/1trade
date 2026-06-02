@@ -26,7 +26,10 @@ Exascale
 │   ├── ✅ SCHED=1 — Kueue + Volcano + mock-GPU queues (cq-inference/-training-{small,large}); live:
 │   │      Kueue admits a job + Volcano gang-schedules minAvailable:2 on the mock node (v0.2.14)
 │   ├── ⬜ OBS=1 stack (Prometheus/Loki/Tempo)   ⬜ SOPS secrets
-│   └── ⬜ Real envs (staging/prod) · ⬜ CI green on GitHub · backup/restore drill
+│   ├── 🟩 CI: go job now really builds + race-tests all 5 modules (Go 1.25, scripts/go-all.sh,
+│   │      GOWORK=off) + contracts YAML multi-doc fix (v0.2.15). Lint advisory pending golangci-lint v2
+│   │      (tooling task); hygiene/pre-commit full-green gated on the same.
+│   └── ⬜ Real envs (staging/prod) · backup/restore drill
 │
 ├── ✅ M1 — Foundation (shipped; F04 CLI v0 done)
 │   ├── ✅ F05 credit-ledger     financial heart — append-only hash chain, fixed-point, atomic,
