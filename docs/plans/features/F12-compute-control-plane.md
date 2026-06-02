@@ -88,3 +88,11 @@ emits `compute.usage.v1` → credit-ledger debits **gpu_h100 1000 → 999.976667
 topology/locality, customer instance lifecycle (<90s start), reserved-capacity pre-emption, and the
 32+ GPU correctness run. The `k8s` scheduler backend is the only new code those need behind the
 existing interface.
+
+**Cluster-side scheduling stack now live (v0.2.14, F01 `SCHED=1`).** Kueue + Volcano are installed in
+k3d with a **mock GPU** resource (`exascale.io/gpu=8`) and the project Kueue config —
+`ResourceFlavor`s + a `ClusterQueue` per workload class (`cq-inference`/`-training-small`/
+`-training-large`, cohort `exascale`) + `LocalQueue`s. Verified: a Kueue-admitted Job places on the
+mock-GPU node and a Volcano `minAvailable:2` gang schedules all-or-nothing. So the M3 `k8s` backend
+only has to translate `scheduler.JobSpec` → a Kueue Workload + Volcano PodGroup in these queues; the
+queues, flavors, and gang mechanics are proven. See `deploy/k8s/scheduling/`.

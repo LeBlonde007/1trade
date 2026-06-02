@@ -8,9 +8,21 @@
 > root `README.md` + `.env.example`, `services/` + `apps/` layout markers, plus
 > `deploy/k8s/local/data-plane.yaml` (core data plane). **Verified:** k3d cluster boots (2 nodes
 > Ready); core data plane (Postgres 16, TimescaleDB, Redis, NATS+JetStream) deploys **1/1 Ready**
-> with live connectivity checks (psql / redis PONG / nats `/healthz`). **Pending:** `FULL=1`
-> scheduling (Kueue/Volcano) + observability (Prometheus/Loki/Tempo), staging/prod-paper/prod-real
-> clusters, SOPS-sealed secrets, CI-green, backup/restore drill, `make test-e2e` skeleton.
+> with live connectivity checks (psql / redis PONG / nats `/healthz`).
+>
+> **Scheduling stack live (v0.2.14):** `SCHED=1`/`FULL=1` installs **Kueue + Volcano** (ordered:
+> Kueue's cluster-wide webhook must be Ready before Volcano applies, or Volcano's own Deployments are
+> blocked), then advertises a **mock GPU** extended resource (`exascale.io/gpu=8`) on the
+> `exascale.io/gpu=mock` node and applies the project Kueue config — `ResourceFlavor`s + a
+> `ClusterQueue` per F12 workload class (`cq-inference`/`-training-small`/`-training-large`, cohort
+> `exascale`) + `LocalQueue`s (`kueue.x-k8s.io/v1beta2`). Verified live in k3d: a Kueue-admitted Job
+> places on the mock-GPU node, and a Volcano `minAvailable:2` gang schedules all-or-nothing. This
+> unblocks F12's M3 `k8s` scheduler backend (it targets these queues). See `deploy/k8s/scheduling/`.
+>
+> **`make test-e2e` live (v0.2.13):** timed sub-5-min time-to-first-action loop.
+>
+> **Pending:** observability (Prometheus/Loki/Tempo — the `OBS=1` tier), staging/prod-paper/prod-real
+> clusters, SOPS-sealed secrets, CI-green, backup/restore drill.
 
 ## Spec
 

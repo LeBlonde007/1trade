@@ -1,0 +1,113 @@
+# Exascale — Kueue admission config for the local mock-GPU cluster (F01 FULL/SCHED + F12).
+#
+# Models the F12 control plane's scheduling shape: one Kueue queue per workload class
+# (inference, training-small, training-large), all drawing GPUs from a shared cohort sized to the
+# mock-GPU pool (8). GPUs are a countable extended resource `exascale.io/gpu` advertised on the node
+# labeled `exascale.io/gpu=mock` (see mock-gpu-resource.sh) — no real GPU needed. In M3 the GPU
+# Operator advertises `nvidia.com/gpu` and the flavor splits per tier (h100/h200); this file is the
+# mock stand-in with the same queue topology.
+#
+# Apply: kubectl apply -f kueue-config.yaml   (Kueue controller + webhooks must be Ready first).
+
+# --- flavors -------------------------------------------------------------------------------------
+# default-flavor backs cpu/memory (any node); mock-gpu pins GPU asks to the mock-GPU node.
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ResourceFlavor
+metadata:
+  name: default-flavor
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ResourceFlavor
+metadata:
+  name: mock-gpu
+spec:
+  nodeLabels:
+    exascale.io/gpu: mock
+---
+# --- cluster queues (one per workload class, shared cohort "exascale") ----------------------------
+# nominalQuota for exascale.io/gpu sums to 8 across the cohort (inference 4 + training-small 2 +
+# training-large 2); borrowing within the cohort lets a class burst into idle GPUs.
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ClusterQueue
+metadata:
+  name: cq-inference
+spec:
+  namespaceSelector: {}
+  cohortName: exascale
+  resourceGroups:
+    - coveredResources: ["cpu", "memory"]
+      flavors:
+        - name: default-flavor
+          resources:
+            - { name: cpu, nominalQuota: "8" }
+            - { name: memory, nominalQuota: 16Gi }
+    - coveredResources: ["exascale.io/gpu"]
+      flavors:
+        - name: mock-gpu
+          resources:
+            - { name: exascale.io/gpu, nominalQuota: "4" }
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ClusterQueue
+metadata:
+  name: cq-training-small
+spec:
+  namespaceSelector: {}
+  cohortName: exascale
+  resourceGroups:
+    - coveredResources: ["cpu", "memory"]
+      flavors:
+        - name: default-flavor
+          resources:
+            - { name: cpu, nominalQuota: "8" }
+            - { name: memory, nominalQuota: 16Gi }
+    - coveredResources: ["exascale.io/gpu"]
+      flavors:
+        - name: mock-gpu
+          resources:
+            - { name: exascale.io/gpu, nominalQuota: "2" }
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ClusterQueue
+metadata:
+  name: cq-training-large
+spec:
+  namespaceSelector: {}
+  cohortName: exascale
+  resourceGroups:
+    - coveredResources: ["cpu", "memory"]
+      flavors:
+        - name: default-flavor
+          resources:
+            - { name: cpu, nominalQuota: "8" }
+            - { name: memory, nominalQuota: 16Gi }
+    - coveredResources: ["exascale.io/gpu"]
+      flavors:
+        - name: mock-gpu
+          resources:
+            - { name: exascale.io/gpu, nominalQuota: "2" }
+---
+# --- local queues (default namespace) — the names jobs reference via kueue.x-k8s.io/queue-name -----
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: LocalQueue
+metadata:
+  name: inference
+  namespace: default
+spec:
+  clusterQueue: cq-inference
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: LocalQueue
+metadata:
+  name: training-small
+  namespace: default
+spec:
+  clusterQueue: cq-training-small
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: LocalQueue
+metadata:
+  name: training-large
+  namespace: default
+spec:
+  clusterQueue: cq-training-large
