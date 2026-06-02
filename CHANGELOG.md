@@ -4,6 +4,39 @@ All notable changes to Exascale. Format: [Keep a Changelog](https://keepachangel
 SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not dates — see
 `docs/plans/MANAGEMENT_PLAN.md`).
 
+## [v0.2.12] — Milestone 2: compute control plane v0 (F12) — closes M2
+
+### Added
+- **`compute-control` service (F12) — the GPU control plane.** New Go service (`:8086`) behind the
+  `scheduler.Scheduler` interface: a GPU-type catalog + per-tenant quota for customers, and the
+  internal scheduling surface (`POST/GET/DELETE /v1/compute/jobs`, `/types`, `/quota`, `/instances`)
+  the inference gateway+runtime use to place gang-scheduled pods. Honors
+  `docs/contracts/openapi/compute.yaml`. M2 ships the in-memory **mock-GPU** backend
+  (`COMPUTE_SCHEDULER=mock`) — all-or-nothing gang capacity, idempotent submit on `Idempotency-Key`,
+  supply-source attribution, tenant scoping; the real Kueue+Volcano+GPU-Operator backend implements
+  the same interface in M3.
+- **GPU usage → credit debit.** The service emits `compute.usage.v1` (exact fixed-point
+  GPU-seconds → GPU-hours, no floats); **credit-ledger** now drains **both** `inference.usage.v1`
+  and `compute.usage.v1` through one generalized consumer → idempotent `gpu_*` debit (idempotent on
+  `usage_id`, hash-chained).
+- **Auth model:** tenant JWT for customer reads (local HS256 verify, alg-pinned); service token for
+  internal scheduling; `is_paper` is taken from the principal, never the request body.
+- **Deploy:** distroless non-root Dockerfile, `deploy/k8s/compute-control/base` (kustomize), Tilt
+  wiring, and the k3d local registry + real `seed.sh` (tenants + paper credits incl. `gpu_*`).
+
+### Verified
+- Unit tests green (scheduler: gang capacity, idempotency, tenant scoping, cancel→meter, validation,
+  quota; API: public catalog, JWT-gated quota, service-token submit→get→cancel lifecycle, 402 on
+  capacity). `go build`/`go vet` clean on both services.
+- **Live in k3d:** `GET /v1/compute/types` (8×H100) → submit a 2-pod×2-GPU H100 gang → 202 running,
+  `placement dc-owned-1/mock`, availability 8→4, quota `used 4 / remaining 4`, idempotent re-submit
+  returns the same job → cancel frees capacity (→8) and emits `compute.usage.v1` → credit-ledger
+  debits **gpu_h100 1000 → 999.976667** (hash-chained `consumption` txn keyed on `usage_id`,
+  `is_paper=true`).
+- `/security-review` clean (alg-pinned JWT, constant-time service-token compare, tenant-scoped
+  404-not-403, negative-units guard, idempotent debit). Real Kueue+Volcano gang scheduling at GPU
+  scale is GPU-node-gated → M3.
+
 ## [v0.2.11] — Milestone 2: live-only frontend — mock mode removed (F20)
 
 ### Changed
