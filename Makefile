@@ -69,6 +69,11 @@ test:
 	@test -f go.work && go test ./... || echo "no Go modules yet"
 	@test -d "Exascale Frontend/node_modules" && (cd "Exascale Frontend" && npm run typecheck 2>/dev/null || true) || true
 
+## test-e2e: timed sub-5-min time-to-first-action loop (signup→top-up→infer→GPU debit). Needs `make up`.
+.PHONY: test-e2e
+test-e2e:
+	@bash scripts/e2e.sh
+
 ## lint: run linters (golangci-lint + pre-commit hooks)
 .PHONY: lint
 lint:
