@@ -4,6 +4,29 @@ All notable changes to Exascale. Format: [Keep a Changelog](https://keepachangel
 SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not dates — see
 `docs/plans/MANAGEMENT_PLAN.md`).
 
+## [v0.2.11] — Milestone 2: live-only frontend — mock mode removed (F20)
+
+### Changed
+- **Removed frontend "mock mode" entirely — the web app is always live.** Every BFF route
+  (`server/api/**`, 19 routes) now just proxies to the real platform service — no `isMock` branch;
+  `isMock`/`mockIdentity` dropped from `server/utils/api.ts`; `EXASCALE_API_MODE`/`apiMode` removed
+  from `nuxt.config`. `npm run dev` now needs the platform stack up.
+- **Wired screens render only real data** with loading/empty states — the seeded showcase/mock that
+  used to render on linked screens is gone: the inference playground starts with an **empty
+  conversation** (no fake turns) and shows credits-only economics; the wallet **recent-movements**
+  shows real ledger transactions (empty state when none, no canned rows); **settings → API keys** and
+  **console** are live-only. Dead mock helpers/arrays removed (`mockReplyFor`, `mockCost`, mock
+  `apiKeys`, `MOVEMENTS`, USD cost fallbacks).
+- **Convention updated:** CLAUDE.md's "mock-data mode" is retired in favour of live-only; new features
+  ship wired. Screens with **no backend yet** (the paused exchange, datacenter/compute supply) keep
+  placeholder data until their service exists. Docs (RUN_LOCAL, TESTING) updated.
+
+### Verified
+- Typecheck clean on the changed files (only the pre-existing `console.vue` router-typing warning
+  remains). Dev server boots and serves (`/`, `/login` → 200); BFF routes compile and proxy (a 500 on
+  `/api/catalog` with the cluster down is the correct upstream-unreachable path, not a build error).
+  Full live click-through pending a cluster restart.
+
 ## [v0.2.10] — Milestone 2: persona-aware onboarding (F20)
 
 ### Fixed

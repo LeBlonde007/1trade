@@ -1,8 +1,5 @@
-/** POST /api/auth/verify/resend — issue a fresh verification token for the caller. */
+/** POST /api/auth/verify/resend — issue a fresh verification token for the caller. Proxies platform-core. */
 import { defineEventHandler } from 'h3'
-import { isMock, proxyJson } from '../../../utils/api'
+import { proxyJson } from '../../../utils/api'
 
-export default defineEventHandler((event) => {
-  if (isMock(event)) return { sent: true }
-  return proxyJson(event, 'platform', '/v1/auth/verify/resend', { method: 'POST' })
-})
+export default defineEventHandler((event) => proxyJson(event, 'platform', '/v1/auth/verify/resend', { method: 'POST' }))

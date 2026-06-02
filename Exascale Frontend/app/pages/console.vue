@@ -2,8 +2,8 @@
 /**
  * /console — the live platform console (F20). One dense, dark, institutional surface wired to the
  * real platform via the BFF composables: identity, model catalog, inference playground, wallet
- * (balances + transactions), buy-credits, and API keys. `EXASCALE_API_MODE=local` makes every panel
- * live; mock mode shows realistic canned data. Tokens only — no raw values here.
+ * (balances + transactions), buy-credits, and API keys. Always live (no mock mode). Tokens only —
+ * no raw values here.
  */
 definePageMeta({ layout: false, middleware: 'auth' })
 useHead({ title: 'Console — Exascale', htmlAttrs: { 'data-theme': 'dark' } })
@@ -14,8 +14,6 @@ const { balances, transactions, loadBalances, loadTransactions } = useWallet()
 const { running, error: infError, insufficientCredit, result, run } = useInference()
 const { checkout, loading: buying } = useBilling()
 const { keys, newSecret, load: loadKeys, create: createKey, revoke: revokeKey, dismissSecret } = useKeys()
-
-const apiMode = useRuntimeConfig().public.apiMode
 
 // ── Inference playground state ──────────────────────────────
 const selectedModel = ref('llama-3.1-8b')
@@ -119,9 +117,7 @@ onMounted(async () => {
       <div class="brand">
         <span class="mark">EXASCALE</span>
         <span class="sub">Console</span>
-        <span class="mode" :class="apiMode === 'local' ? 'mode-live' : 'mode-mock'">
-          {{ apiMode === 'local' ? 'live' : 'demo data' }}
-        </span>
+        <span class="mode mode-live">live</span>
       </div>
       <div class="who">
         <span class="bal mono">{{ fmt(textBalance) }} <span class="unit">text</span></span>

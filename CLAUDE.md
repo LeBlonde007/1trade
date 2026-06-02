@@ -87,7 +87,7 @@ through written contracts in `docs/contracts/`:
 - **Credit types** come from `docs/contracts/credit-types.md` — never hardcode a new credit type.
 - **All money/credit math uses fixed-point** (`NUMERIC(20,6)` in SQL, decimal libs in Go) — never floats.
 - **Frontend numbers** use mono font + `tabular-nums`. Sentence case everywhere. Institutional aesthetic (Bloomberg/Polymarket), never crypto-flashy.
-- **Mock-data mode** (months 1–2): trading UI runs on realistic simulated data (Brownian motion w/ mean reversion, power-law book depth, log-normal trade sizes). Backend swaps in behind the same API with zero UI change.
+- **Live-only frontend (no mock mode).** The web app is always wired to the real backend: every BFF route (`server/api/**`) proxies to a platform service, and screens render real data with loading/empty states — no `isMock` fallbacks, no in-component mock arrays. When wiring a new feature, ship it live (this supersedes the earlier "mock-data mode" convention). Screens with **no backend yet** (e.g. the paused exchange) may keep placeholder data until their service exists.
 - **Tests + migrations ship with the code**, not after. No PR without tests for new logic.
 - **Audit everything** that touches credits, orders, or admin actions.
 - **Every function gets a doc comment** on the lines directly above it (what + why). Clean code,

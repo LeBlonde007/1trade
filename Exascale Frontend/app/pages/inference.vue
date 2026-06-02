@@ -99,62 +99,15 @@ interface Turn {
   html?: string
   tokens?: { in?: number; out?: number }
   latencyMs?: number
-  costUsd?: number
-  /** Real credit cost (live mode): tokens × catalog price, in `creditType` credits. */
+  /** Real credit cost: tokens × catalog price, in `creditType` credits. */
   creditCost?: number
   creditType?: string
   reqId?: string
   backend?: string
 }
 
-const turns = reactive<Turn[]>([
-  {
-    id: 1,
-    role: 'user',
-    text: "Explain the difference between paper trading and real-money trading in Exascale's v1 architecture.",
-  },
-  {
-    id: 2,
-    role: 'assistant',
-    text: '',
-    html: `
-      <p>Two distinct settlement paths, sharing the same matching engine and order book:</p>
-      <ul>
-        <li><strong>Paper trading</strong> — simulated capital. Orders touch the live book for routing/match, but fills settle against a per-account paper-credit balance. <span class="acc">No real funds change hands.</span> Available to every Light-KYC account at signup (default $10,000 paper balance).</li>
-        <li><strong>Real-money trading</strong> — real settlement in USD or JPY against an audited bank wire. Requires <strong>Full KYC</strong> (document upload, source-of-funds, sanctions screen). Subject to the same surveillance rules — wash, marking-the-close, layering.</li>
-      </ul>
-      <p>Under the hood, both paths share <code>OrderBook::route()</code> and the <code>AI-INDEX</code> reference print. The only divergence is in <code>Settlement::apply()</code>, which checks the account's <code>kycLevel</code> flag and either debits the paper ledger or the bank-funded ledger.</p>
-      <p>The same applies to physical delivery (GPU-credit redemption): paper accounts can simulate redemption but the GPU is not actually provisioned.</p>
-    `,
-    tokens: { in: 8_234, out: 1_206 },
-    latencyMs: 423,
-    costUsd: 0.00547,
-    reqId: 'req_3a91c8d2_5f0e',
-    backend: 'vllm-pool-llama-70b-us-east',
-  },
-  {
-    id: 3,
-    role: 'user',
-    text: 'What KYC level is required for each?',
-  },
-  {
-    id: 4,
-    role: 'assistant',
-    text: '',
-    html: `
-      <ul>
-        <li><strong>Paper trading</strong> — <strong>Light KYC</strong>. Legal name, DOB, country/sub-region, and trading-experience disclosure. Takes ~3 min, no documents.</li>
-        <li><strong>Real-money trading</strong> — <strong>Full KYC</strong>. Government-issued ID, proof of address, source-of-funds attestation, sanctions and PEP screening (manual review if flagged). Initiated from <code>Settings → KYC status → Upgrade</code>. Typically 1–2 business days.</li>
-      </ul>
-      <p>Members of regulated trading firms also have a firm-level compliance handshake before real-money is enabled — Exascale ops coordinates with the firm's CCO via the standard partner-attestation flow.</p>
-    `,
-    tokens: { in: 412, out: 188 },
-    latencyMs: 318,
-    costUsd: 0.000376,
-    reqId: 'req_d10fb841_e80a',
-    backend: 'vllm-pool-llama-70b-us-east',
-  },
-])
+// Live-only: the conversation starts empty — real turns are appended as the user runs inference.
+const turns = reactive<Turn[]>([])
 
 // Most recent assistant for the metadata sidebar
 const lastAssistant = computed(() => {
@@ -169,23 +122,18 @@ const lastAssistant = computed(() => {
 // =====================================================
 const draft = ref('')
 const sending = ref(false)
-let streamTimer: ReturnType<typeof setInterval> | null = null
 
-// F20: in live mode (EXASCALE_API_MODE=local) send() calls the real inference gateway; in mock mode
-// it keeps the rich streaming showcase below. The live path routes to a model the gateway serves.
-const apiMode = useRuntimeConfig().public.apiMode
-
-// F20×F08 — live credit economics. In local mode we load the real model catalog (credit price per
-// unit) + the tenant's text-credit balance, so each run shows its true credit cost and the session
-// meter reflects real spend (the gateway debits the same tokens×price async via the ledger).
+// send() calls the real inference gateway; the live path routes to a model the gateway serves.
+// F20×F08 — live credit economics: load the real model catalog (credit price per unit) + the tenant's
+// text-credit balance, so each run shows its true credit cost and the session meter reflects real
+// spend (the gateway debits the same tokens×price async via the ledger).
 const catalog = useCatalog()
 const wallet = useWallet()
 const catalogPrice = ref<Record<string, { price: number; creditType: string; unit: string }>>({})
 const textBalance = ref<number | null>(null)
 
-/** refreshBalance pulls the tenant's live `text` credit balance (local mode only). */
+/** refreshBalance pulls the tenant's live `text` credit balance. */
 async function refreshBalance() {
-  if (apiMode !== 'local') return
   try {
     const bals = await wallet.loadBalances()
     textBalance.value = Number(bals.find((b) => b.credit_type === 'text')?.balance ?? 0)
@@ -200,7 +148,6 @@ function liveCreditCost(modelId: string, totalTokens: number): { cost: number; c
 }
 
 onMounted(async () => {
-  if (apiMode !== 'local') return
   try {
     const models = await catalog.load()
     const map: Record<string, { price: number; creditType: string; unit: string }> = {}
@@ -216,7 +163,7 @@ const liveServedId = computed(() => (['llama-3.1-8b', 'llama-3.1-70b'].includes(
 // Session meter — only live turns (those carrying a real creditCost) count toward credit spend.
 const liveTurns = computed(() => turns.filter((t) => t.creditCost !== undefined))
 const sessionCredits = computed(() => liveTurns.value.reduce((s, t) => s + (t.creditCost ?? 0), 0))
-const hasLiveUsage = computed(() => apiMode === 'local' && liveTurns.value.length > 0)
+const hasLiveUsage = computed(() => liveTurns.value.length > 0)
 
 // Rough tokens estimate (~4 chars/token)
 const draftTokens = computed(() => Math.max(0, Math.ceil(draft.value.length / 4)))
@@ -229,15 +176,6 @@ const baseContextTokens = computed(() => {
 })
 const estimateInputTokens = computed(() => baseContextTokens.value + draftTokens.value)
 
-const estimateCost = computed(() => {
-  const m = selected.value
-  if (m.priceIn === undefined || m.priceOut === undefined) return 0
-  const inputUsd = (estimateInputTokens.value / 1_000_000) * m.priceIn
-  // Assume completion = max_tokens budget for cost estimate
-  const outUsd = (params.maxTokens / 1_000_000) * m.priceOut
-  return inputUsd + outUsd
-})
-
 // Live credit estimate for the served model (input context + the max-out budget) × catalog price.
 const estimateCredits = computed(() => {
   const p = catalogPrice.value[liveServedId.value]
@@ -247,11 +185,6 @@ const estimateCredits = computed(() => {
 
 function stripHtml(html: string) {
   return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-}
-function fmtCost(n: number) {
-  if (n < 0.01) return '$' + n.toFixed(5)
-  if (n < 1) return '$' + n.toFixed(4)
-  return '$' + n.toFixed(2)
 }
 /** fmtCredits renders a credit amount, trimmed to ≤6dp (tabular-friendly). */
 function fmtCredits(n: number) {
@@ -270,63 +203,15 @@ function fmtPrice(m: ModelDef) {
 
 function nextId() { return Math.max(0, ...turns.map(t => t.id)) + 1 }
 
-function send() {
+// send runs the prompt through the real inference gateway (BFF) and appends the completion with its
+// true token usage + credit cost. The selected model is routed to one the gateway serves; a 402
+// surfaces as a buy-credits hint.
+async function send() {
   const text = draft.value.trim()
   if (!text || sending.value) return
-
-  // 1. Push user turn
   turns.push({ id: nextId(), role: 'user', text })
-  const userInputTokens = estimateInputTokens.value
   draft.value = ''
   sending.value = true
-
-  // Live mode → real inference; mock mode keeps the streaming showcase below.
-  if (apiMode === 'local') { void sendLive(text); return }
-
-  // 2. Prepare a streaming assistant turn
-  const assistantId = nextId()
-  const fullReply = mockReplyFor(text)
-  const placeholder: Turn = {
-    id: assistantId,
-    role: 'assistant',
-    text: '',
-    html: '<p class="streaming-cursor"><span class="cursor" /></p>',
-    tokens: { in: userInputTokens, out: 0 },
-    latencyMs: undefined,
-    costUsd: 0,
-    reqId: 'req_' + Math.random().toString(36).slice(2, 10) + '_' + Math.random().toString(36).slice(2, 6),
-    backend: selectedBackend(selected.value),
-  }
-  turns.push(placeholder)
-
-  // 3. Stream chars
-  let charIdx = 0
-  const startedAt = Date.now()
-  if (streamTimer) clearInterval(streamTimer)
-  streamTimer = setInterval(() => {
-    charIdx += 8 + Math.floor(Math.random() * 12)
-    const slice = fullReply.slice(0, charIdx)
-    placeholder.html = renderMarkdownLite(slice) + '<span class="cursor"></span>'
-    const outT = Math.ceil(slice.length / 4)
-    placeholder.tokens = { in: userInputTokens, out: outT }
-    placeholder.costUsd = mockCost(userInputTokens, outT)
-
-    if (charIdx >= fullReply.length) {
-      if (streamTimer) clearInterval(streamTimer)
-      streamTimer = null
-      placeholder.html = renderMarkdownLite(fullReply)
-      placeholder.text = fullReply
-      placeholder.latencyMs = Date.now() - startedAt
-      placeholder.costUsd = mockCost(userInputTokens, Math.ceil(fullReply.length / 4))
-      sending.value = false
-    }
-  }, 60)
-}
-
-// sendLive runs the prompt through the real inference gateway (BFF) and appends the completion with
-// its true token usage. The selected showcase model is routed to one the gateway actually serves; a
-// 402 surfaces as a buy-credits hint.
-async function sendLive(text: string) {
   const startedAt = Date.now()
   const liveModel = liveServedId.value
   try {
@@ -338,7 +223,6 @@ async function sendLive(text: string) {
       html: renderMarkdownLite(res.content),
       tokens: { in: res.usage.prompt_tokens, out: res.usage.completion_tokens },
       latencyMs: Date.now() - startedAt,
-      costUsd: mockCost(res.usage.prompt_tokens, res.usage.completion_tokens),
       creditCost: cc?.cost,
       creditType: cc?.creditType,
       reqId: 'req_' + Math.random().toString(36).slice(2, 12),
@@ -354,29 +238,6 @@ async function sendLive(text: string) {
   } finally {
     sending.value = false
   }
-}
-
-function mockReplyFor(prompt: string): string {
-  const p = prompt.toLowerCase()
-  if (p.includes('kyc') || p.includes('verify')) {
-    return `KYC has two tiers:
-
-- **Light** unlocks paper trading. Three minutes, no documents.
-- **Full** is required for real-money settlement. Document upload + source-of-funds + sanctions screen, 1–2 business days.
-
-Both are managed under Settings → KYC status. The transition is forward-only — Light cannot be re-applied once Full is approved.`
-  }
-  if (p.includes('rate limit') || p.includes('throttle')) {
-    return `Per-key rate limits are set by **scope** and **tier**. Defaults for the \`trade\` scope: 60 orders/sec/account, 600 RPS for market data. Burst budget is 5× sustained for 10 seconds. Exceeding the cap returns \`429\` with a \`Retry-After\` header in milliseconds.`
-  }
-  // Generic fallback
-  return `Here's the short version:
-
-- The system is **deterministic at the matching layer** — every event has a sequence number and a cryptographic chain root.
-- Reads are **eventually consistent** under the index print, with a window <60 s under normal operation.
-- API surface is the **same in paper and real-money modes**; only the \`Settlement\` middleware diverges, branching on the account's \`kycLevel\`.
-
-If you want a deeper dive, check the methodology document (\`/benchmark\`) and the public schema under \`data.exascale.com/index/v1\`.`
 }
 
 function renderMarkdownLite(src: string): string {
@@ -395,11 +256,6 @@ function inlineMd(s: string) {
     .replace(/`([^`]+)`/g, '<code>$1</code>')
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
     .replace(/\n/g, '<br />')
-}
-function mockCost(inT: number, outT: number) {
-  const m = selected.value
-  if (m.priceIn === undefined || m.priceOut === undefined) return 0
-  return (inT / 1_000_000) * m.priceIn + (outT / 1_000_000) * m.priceOut
 }
 function selectedBackend(m: ModelDef) {
   if (m.category === 'speech') return 'whisper-pool-eu-west'
@@ -505,9 +361,6 @@ async function copyText(text: string, label: string) {
 // =====================================================
 // cleanup
 // =====================================================
-onBeforeUnmount(() => {
-  if (streamTimer) clearInterval(streamTimer)
-})
 </script>
 
 <template>
@@ -777,9 +630,7 @@ onBeforeUnmount(() => {
                       {{ t.role === 'user' ? 'Marcus Chen' : selected.name }}
                     </span>
                     <span v-if="t.role === 'assistant' && t.latencyMs" class="turn-meta mono">
-                      {{ t.latencyMs }}ms · {{ t.tokens?.out ?? 0 }} tok out ·
-                      <template v-if="t.creditCost !== undefined">{{ fmtCredits(t.creditCost) }} {{ t.creditType }} credits</template>
-                      <template v-else>{{ fmtCost(t.costUsd ?? 0) }}</template>
+                      {{ t.latencyMs }}ms · {{ t.tokens?.out ?? 0 }} tok out<template v-if="t.creditCost !== undefined"> · {{ fmtCredits(t.creditCost) }} {{ t.creditType }} credits</template>
                     </span>
                     <span v-else-if="t.role === 'assistant'" class="turn-meta mono pulse-meta">
                       <span class="pulse" /> Streaming…
@@ -817,8 +668,7 @@ onBeforeUnmount(() => {
                     <div class="composer-actions">
                       <span class="cost-preview mono">
                         Estimated cost:
-                        <strong v-if="apiMode === 'local'">{{ fmtCredits(estimateCredits) }} text credits</strong>
-                        <strong v-else>{{ fmtCost(estimateCost) }}</strong>
+                        <strong>{{ fmtCredits(estimateCredits) }} text credits</strong>
                         <span class="dim">
                           ({{ fmtNum(estimateInputTokens) }} in · {{ fmtNum(params.maxTokens) }} max out)
                         </span>
@@ -917,7 +767,7 @@ onBeforeUnmount(() => {
               <dd v-if="lastAssistant?.creditCost !== undefined" class="mono pos">
                 {{ fmtCredits(lastAssistant.creditCost) }} {{ lastAssistant.creditType }} credits
               </dd>
-              <dd v-else class="mono pos">{{ fmtCost(lastAssistant?.costUsd ?? 0) }}</dd>
+              <dd v-else class="mono dim">—</dd>
 
               <dt>Request ID</dt>
               <dd class="mono small flex">
@@ -955,12 +805,10 @@ onBeforeUnmount(() => {
                 </span>
               </div>
               <div class="totals-row">
-                <span class="t-k mono">Total cost</span>
-                <span class="t-v mono pos">
-                  {{ fmtCost(turns.reduce((s, t) => s + (t.costUsd ?? 0), 0)) }}
-                </span>
+                <span class="t-k mono">Credits spent</span>
+                <span class="t-v mono pos">{{ fmtCredits(sessionCredits) }}</span>
               </div>
-              <!-- Live credit meter (local mode, once a real run has happened) -->
+              <!-- Live credit meter (once a real run has happened) -->
               <template v-if="hasLiveUsage">
                 <div class="totals-row">
                   <span class="t-k mono">Credits spent · session</span>
