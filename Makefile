@@ -4,6 +4,9 @@
 
 CLUSTER ?= exascale
 GPU     ?= 0          # set GPU=1 to schedule the host GPU (needs NVIDIA Container Toolkit)
+FULL    ?= 0          # set FULL=1 to also install scheduling + observability
+SCHED   ?= 0          # set SCHED=1 to also install Kueue + Volcano + mock-GPU queues
+OBS     ?= 0          # set OBS=1 to also install Prometheus/Loki/Tempo/Grafana
 
 .DEFAULT_GOAL := help
 
@@ -26,10 +29,15 @@ cluster:
 	fi
 	@kubectl config use-context k3d-$(CLUSTER) >/dev/null
 
-## data-plane: install Postgres/TimescaleDB/Redis/NATS + observability via Helm
+## data-plane: install the data plane (core; FULL=1/SCHED=1/OBS=1/GPU=1 add tiers)
 .PHONY: data-plane
 data-plane:
-	@GPU=$(GPU) bash deploy/k8s/local/install-data-plane.sh
+	@GPU=$(GPU) FULL=$(FULL) SCHED=$(SCHED) OBS=$(OBS) bash deploy/k8s/local/install-data-plane.sh
+
+## sched: install Kueue + Volcano + mock-GPU queues (the F12 scheduling stack) into the cluster
+.PHONY: sched
+sched:
+	@SCHED=1 bash deploy/k8s/local/install-data-plane.sh
 
 ## tilt: start Tilt (builds + deploys services into the cluster, live-reload on save)
 .PHONY: tilt

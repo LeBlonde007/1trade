@@ -4,6 +4,37 @@ All notable changes to Exascale. Format: [Keep a Changelog](https://keepachangel
 SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not dates — see
 `docs/plans/MANAGEMENT_PLAN.md`).
 
+## [v0.2.14] — Scheduling stack: Kueue + Volcano + mock-GPU queues (F01 SCHED, unblocks F12 M3)
+
+### Added
+- **`make sched` / `SCHED=1` — the cluster-side scheduling layer** the F12 control plane targets,
+  running on k3d with no real GPU. Installs **Kueue** (per-workload-class quota admission) + **Volcano**
+  (gang scheduling), advertises a **mock GPU** extended resource (`exascale.io/gpu=8`) on the
+  `exascale.io/gpu=mock` node, and applies the project Kueue config under `deploy/k8s/scheduling/`:
+  `ResourceFlavor`s (`default-flavor`, `mock-gpu`) + a `ClusterQueue` per workload class
+  (`cq-inference` 4 GPU / `cq-training-small` 2 / `cq-training-large` 2, shared cohort `exascale`) +
+  a `LocalQueue` per class (`kueue.x-k8s.io/v1beta2`).
+- `deploy/k8s/scheduling/` — `kueue-config.yaml`, `mock-gpu-resource.sh` (node-status PATCH; re-run
+  after a cluster restart), `examples/{kueue-inference-job,volcano-gang-job}.yaml`, and a README.
+- The data-plane installer is now tiered: `SCHED=1` (scheduling) and `OBS=1` (observability) compose
+  independently; `FULL=1` = both. New `make sched` target; `make data-plane` passes the tier flags.
+
+### Fixed
+- **Install ordering:** Kueue registers a `Fail`-policy mutating webhook on *all* Deployments/Jobs
+  cluster-wide, so applying Volcano before Kueue's webhook had endpoints made Volcano's own
+  Deployments fail to create. The installer now waits for the Kueue controller + webhook endpoints
+  before applying Volcano. The Kueue config is server-side-applied (avoids the v1beta1→v1beta2
+  last-applied annotation clash; `cohort` was renamed to `cohortName` in v1beta2).
+
+### Verified
+- Live in k3d: install completes clean; all 3 `ClusterQueue`s report `Active=True`. A Kueue-admitted
+  Job (`inference` queue, `exascale.io/gpu` request) → `Admitted=True`, both pods Running on the
+  mock-GPU node. A Volcano `minAvailable:2` gang → `PodGroup` `Running` (`MINMEMBER=2 RUNNINGS=2`),
+  both pods bound together by the `volcano` scheduler. App stack unaffected by the new operators.
+- This is the F12 mock-GPU gang-scheduling acceptance at cluster level; it unblocks F12's M3 `k8s`
+  scheduler backend (same `scheduler.Scheduler` interface, targets these queues). The 32+ GPU
+  correctness run remains real-GPU-gated.
+
 ## [v0.2.13] — Milestone 2: `make test-e2e` — sub-5-min time-to-first-action gate (F01)
 
 ### Added

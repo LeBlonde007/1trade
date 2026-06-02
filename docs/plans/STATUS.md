@@ -20,10 +20,12 @@ Exascale
 │   └── ⬜ openapi/{compute,supply,index}.yaml · events/partner.capacity.v1
 │       └── ⏸ Phase 2: trading.yaml · events/{trades.executed,orders.state,surveillance.alert}.v1
 │
-├── 🟩 F01 Foundation infra  (~60%) — owner infra-sre
+├── 🟩 F01 Foundation infra  (~68%) — owner infra-sre
 │   ├── ✅ Repo scaffold · ✅ Core data plane (Postgres/TimescaleDB/Redis/NATS+JetStream) on k3d
 │   ├── ✅ make test-e2e — timed TTFA loop (signup→top-up→infer→GPU debit) <300s, ~6s live (v0.2.13)
-│   ├── ⬜ FULL=1 stack (Kueue + Volcano + Prometheus/Loki/Tempo)   ⬜ SOPS secrets
+│   ├── ✅ SCHED=1 — Kueue + Volcano + mock-GPU queues (cq-inference/-training-{small,large}); live:
+│   │      Kueue admits a job + Volcano gang-schedules minAvailable:2 on the mock node (v0.2.14)
+│   ├── ⬜ OBS=1 stack (Prometheus/Loki/Tempo)   ⬜ SOPS secrets
 │   └── ⬜ Real envs (staging/prod) · ⬜ CI green on GitHub · backup/restore drill
 │
 ├── ✅ M1 — Foundation (shipped; F04 CLI v0 done)
@@ -97,11 +99,11 @@ Repo: trunk = `main`, pushed to `origin` (ex-main). Tags v0.1.0→v0.1.5 (M1), v
 
 ## TO DO — next up (ordered, to converge on the sequencing)
 
-1. **F01 remainder → Decision Gate 2** — ✅ `make test-e2e` lands the sub-5-min time-to-first-action
-   as a timed test (signup→top-up→infer→GPU debit, ~6s live, v0.2.13). Remaining: the **FULL=1
-   Kueue+Volcano stack** (prereq for F12's real k8s scheduler backend), observability (Prometheus
-   /metrics + Grafana/Loki/Tempo; tasks #3/#13), SOPS secrets, real-env clusters, CI green
-   (wire `make test-e2e` into the CI pre-staging gate). Prod-hardening before paying customers (M3).
+1. **F01 remainder → Decision Gate 2** — ✅ `make test-e2e` (sub-5-min TTFA, ~6s live, v0.2.13);
+   ✅ `SCHED=1` Kueue+Volcano+mock-GPU queues (F12's real-backend prereq, gang scheduling verified,
+   v0.2.14). Remaining: observability (`OBS=1` Prometheus/Loki/Tempo + per-service `/metrics`; tasks
+   #3/#13), SOPS secrets, real-env clusters, CI green (wire `make test-e2e` into the pre-staging gate).
+   Prod-hardening before paying customers (M3).
 2. **M3 begins — F13 GPU instance lifecycle** (<90s start, CLI `gpu create/list/stop`), the direct
    continuation of F12 on the `scheduler.Scheduler` seam; then F11 packing, F10 full catalog, F14
    reserved, F16 supply abstraction.

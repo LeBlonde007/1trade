@@ -1,0 +1,35 @@
+# Example: a Volcano GANG job — all-or-nothing scheduling of a 2-pod group, each requesting the mock
+# GPU resource. minAvailable=2 means Volcano admits the group only when both pods can be placed at
+# once (the F12 multi-pod gang). Proves the gang-scheduling path.
+#   kubectl apply -f examples/volcano-gang-job.yaml
+#   kubectl get podgroups -n default          # gang group, phase Running once both pods bind
+#   kubectl get pods -n default -l volcano.sh/job-name=mock-gang-h100 -o wide
+apiVersion: batch.volcano.sh/v1alpha1
+kind: Job
+metadata:
+  name: mock-gang-h100
+  namespace: default
+spec:
+  minAvailable: 2                 # gang: schedule all 2, or none
+  schedulerName: volcano
+  queue: default
+  tasks:
+    - name: worker
+      replicas: 2
+      template:
+        spec:
+          schedulerName: volcano
+          nodeSelector:
+            exascale.io/gpu: mock
+          containers:
+            - name: worker
+              image: busybox:1.36
+              command: ["sh", "-c", "echo gang-member-up; sleep 120"]
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 32Mi
+                  exascale.io/gpu: "1"
+                limits:
+                  exascale.io/gpu: "1"
+          restartPolicy: Never
