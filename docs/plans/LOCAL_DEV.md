@@ -167,12 +167,16 @@ Each agent ships their service ready for `make up` to bring it online. Definitio
 ```
 make test         # unit tests across all Go services + Nuxt unit
 make test-integ   # spins up compose, runs integration tests, tears down
-make test-e2e     # spins up everything + seeds + runs Playwright across signup → first infer
+make test-e2e     # timed time-to-first-action loop against the live stack (scripts/e2e.sh)
 ```
 
 `make test-e2e` is the **sub-5-minute time-to-first-action** contract translated to a test:
-signup → CLI login → buy credits → first inference call → wallet shows debit. All in <5 min
-on CI hardware.
+**signup → top up credits → first inference (text debit) → first GPU job (gpu_\* debit)**, asserted
+to complete within a 300s budget. It's an **API-level** harness (`scripts/e2e.sh`) — it drives the
+real services over HTTP, opening its own `kubectl` port-forwards for anything not already reachable,
+so it runs against a `make up` stack with no extra setup. Each run uses a fresh tenant and is
+idempotent. Locally the loop completes in **~6s**. (A browser-level Playwright variant over the Nuxt
+console can layer on top later — ENGINEERING_STANDARDS §E2E.)
 
 ---
 

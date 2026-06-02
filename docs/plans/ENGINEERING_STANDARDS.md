@@ -182,7 +182,7 @@ see §9.
 | Property | Ledger + matching invariants (no double-spend, balance == replay) | service test dirs | `make test` |
 | Integration | Service against real Postgres/Redis/NATS | `make test-integ` (compose) | CI on PR |
 | Contract | Service responses conform to its OpenAPI | per service | CI on PR |
-| E2E | Signup → buy credits → first inference → debit (the 5-min flow) | `make test-e2e` (Playwright) | CI pre-staging |
+| E2E | Signup → top up → first inference → debit → GPU job → debit (the 5-min flow) | `make test-e2e` (API harness, `scripts/e2e.sh`; Playwright variant TBD) | CI pre-staging |
 | Load | Perf targets (match P99, instance start, ledger throughput) | `make test-load` | pre-prod, scheduled |
 
 - **Coverage isn't a vanity metric** — but ledger, matching, conversion, and auth paths target

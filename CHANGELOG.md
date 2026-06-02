@@ -4,6 +4,25 @@ All notable changes to Exascale. Format: [Keep a Changelog](https://keepachangel
 SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not dates — see
 `docs/plans/MANAGEMENT_PLAN.md`).
 
+## [v0.2.13] — Milestone 2: `make test-e2e` — sub-5-min time-to-first-action gate (F01)
+
+### Added
+- **`make test-e2e` (`scripts/e2e.sh`) — the time-to-first-action acceptance test** (Decision Gate 2
+  + immutable commitment #3). An API-level harness that drives the **real** services over HTTP and
+  asserts the whole first-value loop completes within a 300s budget:
+  **signup → top up credits → first inference (text debit) → first GPU job (gpu_\* debit)** — the
+  inference *and* compute (F12) billing loops, end to end. It opens its own `kubectl` port-forwards
+  for anything not already reachable (so it runs against a `make up` stack with no extra setup), uses
+  a fresh tenant per run, and is idempotent (per-tenant idempotency keys). Prefers `jq`, falls back to
+  `python3`. Exits non-zero on any failed step or a blown budget.
+
+### Verified
+- Green twice against the live k3d stack: full loop in **~6s** (budget 300s) — signup → JWT →
+  top up (`text 100000`, `gpu_h100 1000`) → inference (`llama-3.1-8b`) 200 → text debit
+  `100000 → 99999.9` → GPU gang submit→cancel → `gpu_h100 1000 → 999.999444`. The sub-5-minute
+  contract holds with ~50× margin locally. (Next: wire it into the CI pre-staging gate; a
+  browser-level Playwright variant over the Nuxt console can layer on later.)
+
 ## [v0.2.12] — Milestone 2: compute control plane v0 (F12) — closes M2
 
 ### Added
