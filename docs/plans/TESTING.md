@@ -14,21 +14,16 @@ Covers tags **v0.1.0 → v0.1.5** (M1) and **v0.2.0 → v0.2.8** (M2). Pair with
 
 ## 0. Run the frontend in dev mode
 
-Two modes, **same screens, zero code difference** — the only switch is `EXASCALE_API_MODE`:
+The web app is **always live** — there is no mock mode. Bring the stack up first (per RUN_LOCAL.md so
+`:8001/:8002/:8085` answer), then:
 
 ```bash
 cd "Exascale Frontend"
-
-# MOCK mode — no backend needed. Realistic canned data. For UI/UX + design review.
-npm run dev                              # → http://localhost:3000
-
-# LOCAL mode — wired to the live services. For real end-to-end testing.
-#   (first bring the stack up per RUN_LOCAL.md so :8001/:8002/:8085 answer)
-EXASCALE_API_MODE=local npm run dev      # → http://localhost:3000
+npm run dev                              # → http://localhost:3000 (needs the stack up)
 ```
 
-A small **demo banner** shows which mode you're in. In **mock** every screen renders fully (good for
-look-and-feel); in **local** the wired screens hit the real platform.
+Wired screens render real platform data (with loading/empty states). Screens whose backend isn't built
+yet (the paused exchange, datacenter/compute supply) still show placeholder data — flagged below.
 
 ### The three personas
 
@@ -53,8 +48,7 @@ via the sidebar persona pill.
 
 ## 1A. AI Company — Maya Chen  ✅ the live end-to-end journey
 
-> Run in **local mode** (`EXASCALE_API_MODE=local npm run dev`) with the stack up. This is the path
-> that actually moves real credits.
+> Run with the stack up (`npm run dev` — always live). This is the path that actually moves real credits.
 
 **Step 1 — Create an account / sign in.** Go to `/signup`.
 - The page shows a **3-way account-type selector** (Trader · AI Company · Enterprise) + Work email +
@@ -62,12 +56,11 @@ via the sidebar persona pill.
   (Trader → Light KYC; AI Company / Enterprise → straight to the console). It isn't stored on the
   backend; the **OAuth buttons are placeholders**. Pick **AI Company**, enter email + password, accept
   terms → **Open Account**.
-- In **local mode** this creates a **real account** (BFF `/api/auth/signup` → platform-core; httpOnly
-  session cookie set) and **emails a verification link to Mailpit**, then routes to
-  **`/onboarding/verify`**. Open **Mailpit → http://localhost:8025**, open the *"Verify your Exascale
-  email"* message, and click its link — it consumes the token and lands you on **`/console`**. (You're
-  already authenticated from signup, so you can also just open `/console` directly.)
-- In **mock mode** (plain `npm run dev`) signup only sets a demo session — **no backend call, no email**.
+- This creates a **real account** (BFF `/api/auth/signup` → platform-core; httpOnly session cookie set)
+  and **emails a verification link to Mailpit**, then routes to **`/onboarding/verify`**. Open
+  **Mailpit → http://localhost:8025**, open the *"Verify your Exascale email"* message, and click its
+  link — it consumes the token and lands you on **`/console`**. (You're already authenticated from
+  signup, so you can also just open `/console` directly.)
 - **Easiest for testing:** once the account exists, use **`/login`** — it signs in and lands you
   straight on **`/console`**. Logout clears the session and bounces you back to `/login`.
 
@@ -79,11 +72,11 @@ gets the 4-step Light-KYC identity flow; **AI Company** is verified → straight
 
 **Step 3 — Browse the model catalog.** Open `/inference`. The model picker lists the **live catalog**.
 - Expect: `llama-3.1-70b`, `llama-3.1-8b`, `whisper-large-v3` with per-unit **credit prices**.
-- Live check: prices come from the gateway `/v1/models` via `/api/catalog`. _(mock: a canned list.)_
+- Live check: prices come from the gateway `/v1/models` via `/api/catalog`.
 
 **Step 4 — Get credits.** A fresh tenant starts at zero.
 - **In dev, the reliable way is the service-token mint** (Part 2 §2.3) — run it once for your tenant.
-- Or via UI: `/wallet/buy` → pick an amount → checkout. In dev this returns a **mock** Stripe URL and
+- Or via UI: `/wallet/buy` → pick an amount → checkout. In dev this returns a dev (Stripe-test) URL and
   the mint only completes on the (absent) webhook, so prefer the mint.
 - After crediting, `/wallet` shows the real balance.
 
@@ -91,7 +84,7 @@ gets the 4-step Light-KYC identity flow; **AI Company** is verified → straight
 - Expect: a completion (CPU-stub reply) + token usage. The turn shows the **real credit cost**
   (`tokens / 1000 × catalog price`); the **session meter** sums credits spent and shows your live
   `text` balance. _(v0.2.7)_
-- ~1s later, the wallet balance drops by that cost (debit is async via NATS). _(mock: instant canned cost in USD.)_
+- ~1s later, the wallet balance drops by that cost (debit is async via NATS).
 
 **Step 6 — Wallet: convert + movements.** `/wallet`.
 - Open the **Convert** drawer → from **AI Credits** → to **Text**, amount `100` → **Convert**.

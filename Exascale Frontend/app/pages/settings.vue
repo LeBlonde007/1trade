@@ -128,63 +128,8 @@ const SCOPE_META: Record<Scope, { label: string; cls: string; help: string }> = 
 }
 const ALL_SCOPES: Scope[] = ['trade', 'read', 'market-data', 'billing', 'admin']
 
-const apiKeys = ref<ApiKey[]>([
-  {
-    id: 'k1',
-    name: 'Production trading bot',
-    prefix: 'esx_prod_a47b9c',
-    scopes: ['trade', 'read', 'market-data'],
-    created: '2026-04-10',
-    lastUsed: '12 minutes ago',
-    createdBy: 'jane.doe@walmart.com',
-    status: 'active',
-  },
-  {
-    id: 'k2',
-    name: 'Market-data dashboard',
-    prefix: 'esx_live_7c12ef',
-    scopes: ['read', 'market-data'],
-    created: '2026-03-22',
-    lastUsed: '2 hours ago',
-    createdBy: 'marcus.chen@frontier.lab',
-    status: 'active',
-  },
-  {
-    id: 'k3',
-    name: 'Backfill ingest',
-    prefix: 'esx_data_3f8e21',
-    scopes: ['market-data'],
-    created: '2025-11-04',
-    lastUsed: '4 days ago',
-    createdBy: 'ops@walmart.com',
-    status: 'active',
-  },
-  {
-    id: 'k4',
-    name: 'CI/CD deploys',
-    prefix: 'esx_admin_b91c08',
-    scopes: ['admin', 'billing'],
-    created: '2026-02-01',
-    lastUsed: '1 month ago',
-    createdBy: 'devops@walmart.com',
-    status: 'active',
-  },
-  {
-    id: 'k5',
-    name: 'Paper trading scratch',
-    prefix: 'esx_test_d51fa4',
-    scopes: ['trade', 'read'],
-    created: '2026-05-12',
-    lastUsed: 'Never used',
-    createdBy: 'marcus.chen@frontier.lab',
-    status: 'active',
-  },
-])
-
-// F20×F02 — live API keys. In local mode the list + create + revoke run against platform-core (real
-// one-time secret); mock mode keeps the showcase above. Real keys carry arbitrary scope strings, so
-// rendering tolerates scopes not in SCOPE_META.
-const apiMode = useRuntimeConfig().public.apiMode
+// F20×F02 — live API keys: list + create + revoke run against platform-core (real one-time secret).
+// Real keys carry arbitrary scope strings, so rendering tolerates scopes not in SCOPE_META.
 const liveKeys = useKeys()
 const keyError = ref('')
 
@@ -197,9 +142,8 @@ function scopeLabel(s: string): string {
   return SCOPE_META[s as Scope]?.label ?? s
 }
 
-/** displayKeys is the rendered key list — live platform keys in local mode, else the showcase. */
+/** displayKeys is the rendered key list — the tenant's live platform keys. */
 const displayKeys = computed<ApiKey[]>(() => {
-  if (apiMode !== 'local') return apiKeys.value
   return liveKeys.keys.value.map((k) => ({
     id: k.id,
     name: k.name,
@@ -249,7 +193,7 @@ function openCreateKeyModal() {
 function closeApiModal() {
   showApiModal.value = false
   keyError.value = ''
-  if (apiMode === 'local') liveKeys.dismissSecret() // clear the one-time secret from memory
+  liveKeys.dismissSecret() // clear the one-time secret from memory
 }
 
 function selectedScopes(): Scope[] {
@@ -258,57 +202,20 @@ function selectedScopes(): Scope[] {
 
 const canGenerate = computed(() => newKeyName.value.trim().length > 0 && selectedScopes().length > 0)
 
-function randomSuffix(len: number) {
-  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
-  let s = ''
-  for (let i = 0; i < len; i++) s += chars.charAt(Math.floor(Math.random() * chars.length))
-  return s
-}
-
 async function generateKey() {
   if (!canGenerate.value) return
   const scopes = selectedScopes()
   keyError.value = ''
-  // Live mode → mint through platform-core; the real one-time secret comes back in the response.
-  if (apiMode === 'local') {
-    try {
-      const r = await liveKeys.create(newKeyName.value.trim(), scopes)
-      generatedKeyFull.value = r.secret
-      generatedKeyId.value = r.id
-      apiModalStep.value = 'generated'
-    } catch (e: unknown) {
-      const ex = e as { data?: { message?: string }; statusMessage?: string }
-      keyError.value = ex?.data?.message || ex?.statusMessage || 'Could not create key.'
-    }
-    return
+  // Mint through platform-core; the real one-time secret comes back in the response.
+  try {
+    const r = await liveKeys.create(newKeyName.value.trim(), scopes)
+    generatedKeyFull.value = r.secret
+    generatedKeyId.value = r.id
+    apiModalStep.value = 'generated'
+  } catch (e: unknown) {
+    const ex = e as { data?: { message?: string }; statusMessage?: string }
+    keyError.value = ex?.data?.message || ex?.statusMessage || 'Could not create key.'
   }
-  // Showcase (mock mode) — fabricate a plausible key client-side.
-  const tier = scopes.includes('admin')
-    ? 'admin'
-    : scopes.includes('trade')
-      ? 'prod'
-      : scopes.includes('billing')
-        ? 'bill'
-        : 'live'
-  const prefix = `esx_${tier}_${randomSuffix(6)}`
-  const full = `${prefix}_${randomSuffix(8)}_${randomSuffix(16)}`
-  generatedKeyFull.value = full
-  generatedKeyId.value = 'k' + (apiKeys.value.length + 1)
-  // Optimistically add the new key (without revealing full key)
-  apiKeys.value = [
-    {
-      id: generatedKeyId.value,
-      name: newKeyName.value.trim(),
-      prefix,
-      scopes,
-      created: new Date().toISOString().slice(0, 10),
-      lastUsed: 'Never used',
-      createdBy: profile.email,
-      status: 'active',
-    },
-    ...apiKeys.value,
-  ]
-  apiModalStep.value = 'generated'
 }
 
 async function copyGeneratedKey() {
@@ -324,11 +231,7 @@ async function copyGeneratedKey() {
 const expLabel = computed(() => EXP_OPTIONS.find(o => o.value === newKeyExp.value)?.label ?? 'Never')
 
 async function revokeKey(id: string) {
-  if (apiMode === 'local') {
-    try { await liveKeys.revoke(id) } catch { keyError.value = 'Could not revoke key.' }
-    return
-  }
-  apiKeys.value = apiKeys.value.filter(k => k.id !== id)
+  try { await liveKeys.revoke(id) } catch { keyError.value = 'Could not revoke key.' }
 }
 
 // =====================================================
@@ -346,7 +249,7 @@ function goTo(k: SectionKey) {
 onMounted(() => {
   const h = route.hash?.replace('#', '') as SectionKey
   if (h && SECTIONS.find(s => s.key === h)) active.value = h
-  if (apiMode === 'local') liveKeys.load().catch(() => { keyError.value = 'Could not load keys.' })
+  liveKeys.load().catch(() => { keyError.value = 'Could not load keys.' })
 })
 </script>
 

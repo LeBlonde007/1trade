@@ -67,21 +67,19 @@ then `curl -s localhost:8001/healthz` etc. should return `200`.
 
 ---
 
-## 2. Run the web console — wired to live services
+## 2. Run the web console
 
-`make web` runs Nuxt in **mock** mode (canned data). For the live platform, flip the seam:
+The web app is **always live** (there is no mock mode) — it needs the stack up + the forwards from §1.
 
 ```bash
 cd "Exascale Frontend"
-EXASCALE_API_MODE=local npm run dev        # → http://localhost:3000
+npm run dev        # → http://localhost:3000
 ```
 
-That single var is all you need — the BFF's upstream URLs already default to `localhost:8001/8085/8002`
-(the Tilt forwards). `mock` ↔ `local` is **zero UI change**. Override the URLs only if you forwarded to
-different ports:
+No env needed — the BFF's upstream URLs default to `localhost:8001/8085/8002` (the Tilt forwards).
+Override only if you forwarded to different ports:
 
 ```bash
-EXASCALE_API_MODE=local \
 PLATFORM_CORE_URL=http://localhost:8001 \
 CREDIT_LEDGER_URL=http://localhost:8002 \
 INFERENCE_GATEWAY_URL=http://localhost:8085 \
@@ -170,7 +168,7 @@ meter) → wallet balances + recent-movements update live.**
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| Web shows mock data | `EXASCALE_API_MODE` not set | run with `EXASCALE_API_MODE=local` (§2) |
+| Web shows empty data | the stack/forwards aren't up | start the stack + forwards (§1); the app is live-only |
 | Web "upstream error" / 502 | a forward is down | `tilt up`, or re-run the `kubectl port-forward`s (§1) |
 | `port-forward` "address already in use" | already forwarded | leave it — that port is up |
 | Inference returns 402 | tenant has no `text` credits | mint via §4, or `credits convert` into `text` |

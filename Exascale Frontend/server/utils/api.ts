@@ -1,7 +1,8 @@
 /**
  * BFF helpers (F20). Every screen calls the Nitro BFF (`/api/**`), never a platform service
  * directly — that keeps requests same-origin (no CORS), hides internal URLs, and lets the session
- * JWT live in an httpOnly cookie the browser can't read. `EXASCALE_API_MODE` selects mock vs live.
+ * JWT live in an httpOnly cookie the browser can't read. The BFF is always live: every route proxies
+ * to the real platform service (no mock mode — see docs).
  */
 import { getCookie, setCookie, deleteCookie, createError, type H3Event } from 'h3'
 
@@ -9,16 +10,6 @@ import { getCookie, setCookie, deleteCookie, createError, type H3Event } from 'h
 export const SESSION_COOKIE = 'ex_session'
 
 type Service = 'platform' | 'gateway' | 'ledger'
-
-/** isMock reports whether the BFF should serve canned data instead of proxying to live services. */
-export function isMock(event: H3Event): boolean {
-  return useRuntimeConfig(event).apiMode !== 'local'
-}
-
-/** mockIdentity is the canned `/v1/auth/me` identity returned in mock mode. */
-export function mockIdentity(email = 'founder@acme.ai') {
-  return { user_id: 'mock-user', email, tenant_id: 'mock-tenant', org_id: '', roles: ['admin'], is_paper: true }
-}
 
 /** upstreamBase returns the base URL for a platform service from runtime config. */
 function upstreamBase(event: H3Event, svc: Service): string {
@@ -37,7 +28,7 @@ export function setSession(event: H3Event, token: string): void {
     httpOnly: true,
     sameSite: 'lax',
     path: '/',
-    secure: process.env.NODE_ENV === 'production',
+    secure: !import.meta.dev,
     maxAge: 60 * 60 * 24, // 24h, matches the platform token TTL
   })
 }

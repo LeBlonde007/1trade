@@ -86,10 +86,8 @@ function fmtUsd(n: number, dp = 2) {
 // =====================================================
 const totalUsd = computed(() => assets.reduce((s, a) => s + a.qty * a.usdPrice, 0))
 
-// F20×F07: in live mode (EXASCALE_API_MODE=local), overlay real credit balances + published
-// conversion rates from the ledger; the convert drawer then executes real conversions. Mock mode
-// keeps the showcase numbers + cross-rate untouched (non-destructive).
-const walletApiMode = useRuntimeConfig().public.apiMode
+// F20×F07: overlay the tenant's real credit balances + published conversion rates from the ledger;
+// the convert drawer then executes real conversions. (Live-only — there is no mock mode.)
 const wallet = useWallet()
 const converting = wallet.converting   // top-level ref → auto-unwraps in template
 const toasts = useToasts()
@@ -99,9 +97,8 @@ const creditTypeFor: Record<string, string> = {
   ai: 'ai_index', text: 'text', speech: 'speech', image: 'image', video: 'video', h100: 'gpu_h100', h200: 'gpu_h200',
 }
 
-/** refreshLiveBalances overlays the tenant's real ledger balances onto the showcase assets. */
+/** refreshLiveBalances overlays the tenant's real ledger balances onto the asset cards. */
 async function refreshLiveBalances() {
-  if (walletApiMode !== 'local') return
   try {
     const live = await wallet.loadBalances()
     for (const a of assets) {
@@ -110,15 +107,14 @@ async function refreshLiveBalances() {
       const b = live.find((x) => x.credit_type === ct)
       if (b) { a.qty = Number(b.balance); a.locked = Number(b.locked_amount); a.empty = Number(b.balance) === 0 }
     }
-  } catch { /* leave the showcase values on error */ }
+  } catch { /* leave the card values on error */ }
 }
 
 onMounted(async () => {
-  if (walletApiMode !== 'local') return
   await Promise.all([
     refreshLiveBalances(),
     wallet.loadConversionRates().catch(() => { /* drawer falls back to the cross-rate */ }),
-    wallet.loadTransactions().catch(() => { /* movements stay on the showcase */ }),
+    wallet.loadTransactions().catch(() => { /* movements show empty */ }),
   ])
 })
 
@@ -162,42 +158,7 @@ function sparkPaths(pts: number[], w = 240, h = 36) {
 // =====================================================
 // Recent movements
 // =====================================================
-interface Movement {
-  time: string
-  type: string
-  typeKey: 'buy' | 'sell' | 'conv' | 'dep'
-  asset: string
-  amount: number
-  price: number | string
-  balance: number
-}
-const MOVEMENTS: Movement[] = [
-  { time: '14:23:47', type: 'Trade buy',  typeKey: 'buy',  asset: 'AI Credits',    amount:  5000,    price: 0.000998, balance: 2425000 },
-  { time: '14:18:23', type: 'Trade sell', typeKey: 'sell', asset: 'Text Credits',  amount: -250,     price: 0.001212, balance: 1200000 },
-  { time: '13:55:12', type: 'Conversion', typeKey: 'conv', asset: 'AI → Speech',   amount: -1500,    price: '1.193',  balance: 2420000 },
-  { time: '13:41:08', type: 'Trade buy',  typeKey: 'buy',  asset: 'H100 GPU',      amount:  2,       price: 2.948,    balance: 245 },
-  { time: '12:18:55', type: 'Deposit',    typeKey: 'dep',  asset: 'USD',           amount:  500.00,  price: 1,        balance: 3891.42 },
-  { time: '11:02:14', type: 'Trade sell', typeKey: 'sell', asset: 'Image Credits', amount: -1200,    price: 0.007981, balance: 152000 },
-  { time: '10:47:31', type: 'Conversion', typeKey: 'conv', asset: 'AI → Image',    amount: -8500,    price: '0.126',  balance: 2421500 },
-  { time: '09:38:22', type: 'Trade buy',  typeKey: 'buy',  asset: 'AI Credits',    amount:  20000,   price: 0.000994, balance: 2430000 },
-]
-
-function fmtMovementAmount(m: Movement) {
-  const sign = m.amount >= 0 ? '+' : '−'
-  const abs = Math.abs(m.amount)
-  if (m.asset === 'USD') return sign + '$' + fmt(abs)
-  return sign + fmtInt(abs)
-}
-function fmtMovementPrice(m: Movement) {
-  if (typeof m.price === 'string') return m.price
-  if (m.price >= 1) return '$' + fmt(m.price)
-  return '$' + fmt(m.price, 6)
-}
-function fmtMovementBalance(m: Movement) {
-  return (m.asset === 'USD' ? '$' : '') + fmtInt(m.balance)
-}
-
-// --- Live movements (local mode) — map real ledger transactions onto the movements table ----------
+// --- Live movements — map real ledger transactions onto the movements table -----------------------
 /** ctLabel maps a ledger credit_type to its display name (falls back to the raw type). */
 function ctLabel(ct: string): string {
   const a = assets.find((x) => creditTypeFor[x.key] === ct)
@@ -251,8 +212,8 @@ const liveMovements = computed<LiveMovement[]>(() =>
     }
   }),
 )
-/** useLiveMovements is true once real transactions have loaded in local mode (else keep the showcase). */
-const useLiveMovements = computed(() => walletApiMode === 'local' && wallet.transactions.value.length > 0)
+/** hasMovements is true once the tenant has at least one real ledger transaction (else: empty state). */
+const hasMovements = computed(() => wallet.transactions.value.length > 0)
 
 // =====================================================
 // Conversion drawer state (open by default per design)
@@ -277,12 +238,12 @@ const convRate = computed(() => {
 })
 const SPREAD = 0.005
 
-// F20×F07 — live rate overlay. In local mode, prefer the published rate + house spread for the
-// selected (from,to) credit-type pair; mock mode (or any pair without a seeded rate, i.e. anything
-// other than ai_index↔text today) transparently falls back to the showcase cross-rate above.
+// F20×F07 — live rate overlay. Prefer the published rate + house spread for the selected (from,to)
+// credit-type pair; a pair without a seeded rate (anything other than ai_index↔text today) falls back
+// to the cross-rate above.
 const fromCT = computed(() => creditTypeFor[convFromKey.value] || '')
 const toCT = computed(() => creditTypeFor[convToKey.value] || '')
-const liveRateStr = computed(() => (walletApiMode === 'local' ? wallet.rateFor(fromCT.value, toCT.value) : null))
+const liveRateStr = computed(() => wallet.rateFor(fromCT.value, toCT.value))
 const isLivePair = computed(() => liveRateStr.value !== null)
 const dispRate = computed(() => (isLivePair.value ? Number(liveRateStr.value) : convRate.value))
 const dispSpread = computed(() => (isLivePair.value ? Number(wallet.spread.value) || 0.01 : SPREAD))
@@ -295,15 +256,10 @@ function fmtOut(n: number) {
 }
 
 /**
- * submitConvert executes the conversion. In mock/showcase mode it just explains the seam; in local
- * mode it calls the live ledger for a seeded pair, then refreshes balances. The button stays guarded
- * (positive amount, ≤ balance) and surfaces 402/422 from the ledger as a toast.
+ * submitConvert executes the conversion against the live ledger for a seeded pair, then refreshes
+ * balances. The button stays guarded (positive amount, ≤ balance) and surfaces 402/422 as a toast.
  */
 async function submitConvert() {
-  if (walletApiMode !== 'local') {
-    toasts.push({ tone: 'info', title: 'Showcase mode', body: 'Connect live data to execute conversions.' })
-    return
-  }
   if (!isLivePair.value) {
     toasts.push({ tone: 'warn', title: 'No live rate', body: 'Only AI Credits ↔ Text are convertible right now.' })
     return
@@ -330,9 +286,8 @@ async function submitConvert() {
   }
 }
 
-/** submitNote is the small caption under the convert button — it names the active seam honestly. */
+/** submitNote is the small caption under the convert button. */
 const submitNote = computed(() => {
-  if (walletApiMode !== 'local') return 'Showcase rate · connect live data to execute'
   if (!isLivePair.value) return 'Live conversion available for AI Credits ↔ Text'
   return 'Atomic burn + mint · settles instantly'
 })
@@ -569,8 +524,8 @@ const todayPct = computed(() => startTotal.value === 0 ? 0 : todayPnl.value / st
               <th>Balance after</th>
             </tr>
           </thead>
-          <!-- Live: real ledger transactions (local mode, once loaded) -->
-          <tbody v-if="useLiveMovements">
+          <!-- Real ledger transactions, newest first. -->
+          <tbody v-if="hasMovements">
             <tr v-for="m in liveMovements" :key="m.tx_id">
               <td>{{ m.time }} UTC</td>
               <td><span class="type-pill" :class="`type-${m.key}`">{{ m.label }}</span></td>
@@ -580,16 +535,8 @@ const todayPct = computed(() => startTotal.value === 0 ? 0 : todayPnl.value / st
               <td class="balance">{{ m.balanceText }}</td>
             </tr>
           </tbody>
-          <!-- Showcase: canned movements (mock mode / before live data loads) -->
           <tbody v-else>
-            <tr v-for="(m, i) in MOVEMENTS" :key="i">
-              <td>{{ m.time }} UTC</td>
-              <td><span class="type-pill" :class="`type-${m.typeKey}`">{{ m.type }}</span></td>
-              <td>{{ m.asset }}</td>
-              <td class="amt" :class="m.amount >= 0 ? 'pos' : 'neg'">{{ fmtMovementAmount(m) }}</td>
-              <td>{{ fmtMovementPrice(m) }}</td>
-              <td class="balance">{{ fmtMovementBalance(m) }}</td>
-            </tr>
+            <tr><td colspan="6" class="dim" style="text-align:center; padding:24px 0;">No movements yet — buy or convert credits to get started.</td></tr>
           </tbody>
         </table>
         <a href="#" class="full-link">
