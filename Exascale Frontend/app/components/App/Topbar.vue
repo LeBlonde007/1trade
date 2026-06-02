@@ -14,8 +14,6 @@ import {
   HelpCircle,
   Activity,
   LogOut,
-  Check,
-  Plus,
   Building2,
   ExternalLink,
 } from 'lucide-vue-next'
@@ -29,7 +27,7 @@ const indexPrice = ref(0.001005)
 const indexChange = ref(0.0018)
 let tickerInterval: ReturnType<typeof setInterval> | null = null
 
-// ─── User / org session (mock — replaced by real auth later) ─
+// ─── User / org session (real identity from useAuth) ─
 interface Org {
   id: string
   name: string
@@ -38,20 +36,35 @@ interface Org {
   current: boolean
 }
 
-const user = reactive({
-  name: 'Jordan Park',
-  email: 'jordan.park@frontier.lab',
-  initial: 'J',
-  mode: 'paper' as 'paper' | 'capital',
+const auth = useAuth()
+
+/** Display identity from the session: name from the email local-part, mode from is_paper. */
+const user = computed(() => {
+  const u = auth.user.value
+  const email = u?.email ?? ''
+  const local = email.split('@')[0] || 'account'
+  const name = local.split(/[._-]/).filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || 'Account'
+  return {
+    name,
+    email,
+    initial: (name.charAt(0) || 'A').toUpperCase(),
+    mode: (u?.is_paper ? 'paper' : 'capital') as 'paper' | 'capital',
+  }
 })
 
-const orgs = reactive<Org[]>([
-  { id: 'personal',     name: 'Personal',       role: 'Owner',      type: 'personal',   current: true  },
-  { id: 'frontier-lab', name: 'Frontier Lab',   role: 'Trader',     type: 'lab',        current: false },
-  { id: 'walmart',      name: 'Walmart Inc.',   role: 'Consultant', type: 'enterprise', current: false },
-])
-
-const currentOrg = computed(() => orgs.find((o) => o.current) ?? orgs[0])
+/** Current org context from the session (/me has no org display name → 'Personal' vs 'Organization'). */
+const currentOrg = computed<Org>(() => {
+  const u = auth.user.value
+  const role = u?.roles?.[0] ?? 'member'
+  return {
+    id: u?.org_id || 'personal',
+    name: u?.org_id ? 'Organization' : 'Personal',
+    role: role.charAt(0).toUpperCase() + role.slice(1),
+    type: u?.org_id ? 'enterprise' : 'personal',
+    current: true,
+  }
+})
 
 // ─── Menu open state ────────────────────────────────────────
 const menuOpen = ref(false)
@@ -61,13 +74,9 @@ const avatarRef = ref<HTMLElement | null>(null)
 function toggleMenu() { menuOpen.value = !menuOpen.value }
 function closeMenu()  { menuOpen.value = false }
 
-function switchOrg(orgId: string) {
-  orgs.forEach((o) => { o.current = o.id === orgId })
-  closeMenu()
-}
-
 async function signOut() {
   closeMenu()
+  try { await auth.logout() } catch { /* clear session locally regardless */ }
   await navigateTo('/login')
 }
 
@@ -183,30 +192,6 @@ function orgTypeLabel(t: 'personal' | 'lab' | 'enterprise'): string {
               </div>
             </div>
 
-            <!-- Switch organization -->
-            <div class="um-section">
-              <div class="um-eyebrow">Switch organization</div>
-              <button
-                v-for="org in orgs"
-                :key="org.id"
-                type="button"
-                class="um-row um-org"
-                :class="{ current: org.current }"
-                role="menuitemradio"
-                :aria-checked="org.current"
-                @click="switchOrg(org.id)"
-              >
-                <span class="check">
-                  <Check v-if="org.current" :size="12" />
-                </span>
-                <span class="row-name">{{ org.name }}</span>
-                <span class="row-meta mono">{{ org.role }}</span>
-              </button>
-              <button type="button" class="um-row um-org add" role="menuitem">
-                <span class="check"><Plus :size="12" /></span>
-                <span class="row-name">Add organization…</span>
-              </button>
-            </div>
 
             <!-- Account shortcuts -->
             <div class="um-section">
