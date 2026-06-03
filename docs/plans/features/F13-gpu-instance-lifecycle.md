@@ -66,6 +66,10 @@ Target: <90s P95 time-to-running.
 live web `/compute` list + provision (BFF + `useCompute`). Mock-GPU backend; real K8s provisioner +
 <90s-P95 timing land on a GPU node.
 
+**Live-verified on k3d (v0.3.0):** signup → mint `gpu_h100` → create instance (running + ssh) → list →
+run 8s → stop → async `compute.usage.v1` debit `gpu_h100 100.000000 → 99.997778` (8s ÷ 3600 = 0.002222
+GPU-h, exact). Tenant-scoped, `is_paper` respected.
+
 ## Milestone
 
 - M3 (Gate 3): on-demand GPU rental live.

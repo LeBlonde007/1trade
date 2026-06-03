@@ -64,7 +64,8 @@ Exascale
 │   │                            capacity, idempotent submit, supply attribution). Emits
 │   │                            compute.usage.v1 → ledger debits gpu_* (live: gang→cancel→debit
 │   │                            1000→999.976667). M3: real Kueue+Volcano backend (same interface),
-│   │                            ✅ F13 instance lifecycle (v0.3.0), 32+ GPU correctness — GPU-node-gated.
+│   │                            ✅ F13 instance lifecycle (v0.3.0; live e2e: create→stop→debit
+│   │                            gpu_h100 100→99.997778), 32+ GPU correctness — GPU-node-gated.
 │   └── ✅ F20 console wired      live-only BFF (proxies the platform; no mock mode, v0.2.11) + live
 │                                /console (auth, catalog, inference, wallet, buy, keys, budget,
 │                                purchases, audit). wallet convert (v0.2.5) + live movements (v0.2.6);
