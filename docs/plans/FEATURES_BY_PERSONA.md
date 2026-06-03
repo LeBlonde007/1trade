@@ -22,30 +22,43 @@ each step marked done / showcase / paused. Pair with [STATUS.md](STATUS.md) (tre
 
 ## ✅ enterprise — AI Company (Maya Chen)
 
-**The headline journey: signup → buy credits → run inference / rent a GPU → see the debit. Fully live.**
+**Registering an AI Company lands you in the console.** Then the live journey runs from there:
+`signup → verify → welcome → ` **`/console`** ` → buy credits → run inference / rent a GPU → see the debit.`
+
+### Phase 1 — Onboarding → console
 
 | # | Step | Screen / surface | Status | Tag |
 |---|---|---|---|---|
 | 1 | Sign up (pick **AI Company** account type) | `/signup` | ✅ | F02 (v0.1.1) |
 | 2 | Verify email (real SMTP → Mailpit locally) | `/onboarding/verify` | ✅ | F02 (v0.2.9) |
-| 3 | Onboarding — persona welcome + product tour | `/onboarding/welcome` · `/tour` | ✅ | F20 (v0.2.10) |
-| 4 | KYC gate (real identity check before real money) | `/onboarding/kyc` | ⬜ shell | F22 (M3) |
-| 5 | Browse the **live model catalog** | `/inference` | ✅ | F08 (v0.2.0) |
-| 6 | **Buy credits** — Stripe checkout → webhook → ledger mint | `/wallet/buy` | ✅ (mock Stripe in dev) | F06 (v0.2.1) |
-| 7 | **Run inference** (chat) → **real per-token debit** + session meter | `/inference` | ✅ | F08/F09 (v0.2.7) |
-| 8 | Convert credits (AI-index ↔ text), 1% spread | `/wallet` convert | ✅ | F07 (v0.2.5) |
-| 9 | **Rent a GPU instance** — provision → running + connect info | `/compute/new` → `/compute` | ✅ | **F13 (v0.3.0)** |
-| 10 | Manage instances — list / stop / start / delete (GPU debit while running) | `/compute` | ✅ | **F13 (v0.3.0)** |
-| 11 | Wallet — live balances + transaction movements | `/wallet` | ✅ | F05 (v0.2.6) |
-| 12 | Mint an **API key** (shown once) | `/settings` | ✅ | F02 (v0.2.8) |
-| 13 | Drive it all from the **CLI** — `login / infer / gpu / credits / keys` | `exascale …` | ✅ | F04 + F13 (v0.1.4, v0.3.0) |
-| 14 | One-screen **console** ops | `/console` | ✅ | F20 (v0.2.3) |
-| 15 | Budgets + purchase history | billing surfaces | ✅ | F06 (v0.1.3) |
-| 16 | Audit log + RBAC (admin actions → queryable trail) | F03 backend | ✅ backend · ⬜ rich screen | F03 (v0.1.2) |
-| 17 | Enterprise team management + SAML SSO + sub-accounts | `/enterprise/teams` · `/sso` | ⬜ | F02/F03 (M4) |
+| 3 | Welcome + product tour (inference/compute quick-start) | `/onboarding/welcome` · `/onboarding/tour` | ✅ | F20 (v0.2.10) |
+| → | **Lands in the console (home)** | **`/console`** | ✅ | F20 (v0.2.3) |
 
-**Live today:** steps 1–3, 5–16 (backend). **Not yet:** 4 real KYC (M3), 16 rich audit screen (F23),
-17 enterprise SSO/teams (M4).
+> **KYC is not in this flow.** It's a gate at the **first real-money purchase** (`/wallet/buy`):
+> the client gate is **built** — a real-money order (`is_paper=false`, unverified) is blocked behind
+> an identity-verification panel that routes to the `/onboarding/kyc` form, while **sandbox + all
+> credit usage need none** (preview the gate with `?kyc=1`). Server-side KYC/AML enforcement +
+> submission lands with **F22 (M3)**. Persona-aware routing (`usePersona().postOnboard`) means a
+> verified AI company never lands on the paused exchange or a needless KYC wall.
+
+### Phase 2 — In the product (from the console)
+
+| Step | Screen / surface | Status | Tag |
+|---|---|---|---|
+| Browse the **live model catalog** | `/inference` | ✅ | F08 (v0.2.0) |
+| **Buy credits** — Stripe checkout → webhook → ledger mint | `/wallet/buy` | ✅ (mock Stripe in dev) | F06 (v0.2.1) |
+| **Run inference** (chat) → **real per-token debit** + session meter | `/inference` | ✅ | F08/F09 (v0.2.7) |
+| Convert credits (AI-index ↔ text), 1% spread | `/wallet` convert | ✅ | F07 (v0.2.5) |
+| **Rent + manage GPU instances** — provision / stop / start / delete | `/compute` · `/compute/new` | ✅ | **F13 (v0.3.0)** |
+| Wallet — live balances + transaction movements | `/wallet` | ✅ | F05 (v0.2.6) |
+| Mint an **API key** (shown once) | `/settings` | ✅ | F02 (v0.2.8) |
+| Drive it all from the **CLI** — `login / infer / gpu / credits / keys` | `exascale …` | ✅ | F04 + F13 |
+| Console ops · budgets · purchase history | `/console` · billing | ✅ | F20 · F06 |
+| Audit log + RBAC (admin actions → queryable trail) | F03 backend | ✅ backend · ⬜ rich screen | F03 (v0.1.2) |
+| Enterprise team management + SAML SSO + sub-accounts | `/enterprise/teams` · `/sso` | ⬜ | F02/F03 (M4) |
+
+**Live today:** all of Phase 1 (→ console) + Phase 2, except real-money KYC (M3), the rich audit
+*screen* (F23), and enterprise SSO/teams (M4).
 
 ---
 

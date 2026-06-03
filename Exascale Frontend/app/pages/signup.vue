@@ -24,13 +24,17 @@ definePageMeta({ layout: false })
 useHead({ title: 'Open an account — Exascale', htmlAttrs: { 'data-theme': 'light' } })
 
 // ─── Account type ───────────────────────────────────────────
+// Trader is disabled until the exchange/trading layer ships (license-gated, paused per the GTM
+// pivot) — default is AI Company, the live platform-first product.
 type AccountKey = 'trader' | 'ai' | 'ent'
-const acctType = ref<AccountKey>('trader')
-const acctTypes: { key: AccountKey; icon: any; nm: string; l1: string; l2: string }[] = [
-  { key: 'trader', icon: CandlestickChart, nm: 'Trader',     l1: 'Trade credits',  l2: 'Paper or real money' },
+const acctType = ref<AccountKey>('ai')
+const acctTypes: { key: AccountKey; icon: any; nm: string; l1: string; l2: string; soon?: boolean }[] = [
+  { key: 'trader', icon: CandlestickChart, nm: 'Trader',     l1: 'Trade credits',  l2: 'Paper or real money', soon: true },
   { key: 'ai',     icon: Terminal,         nm: 'AI Company', l1: 'Use credits',     l2: 'Inference & compute' },
   { key: 'ent',    icon: Building2,        nm: 'Enterprise', l1: 'Multi-user SSO', l2: 'Procurement-friendly' },
 ]
+/** selectAcct picks an account type, ignoring disabled (coming-soon) ones. */
+const selectAcct = (a: { key: AccountKey; soon?: boolean }) => { if (!a.soon) acctType.value = a.key }
 
 // ─── Email + password ──────────────────────────────────────
 const email = ref('')
@@ -51,7 +55,7 @@ const scorePw = (v: string): number => {
 }
 const STR_LABELS = ['', 'Weak', 'Fair', 'Strong', 'Excellent']
 const strength = computed(() => scorePw(password.value))
-const strengthLabel = computed(() => strength.value ? STR_LABELS[strength.value].toUpperCase() : '')
+const strengthLabel = computed(() => strength.value ? (STR_LABELS[strength.value] ?? '').toUpperCase() : '')
 
 // ─── Terms ─────────────────────────────────────────────────
 const agreed = ref(true)
@@ -64,6 +68,7 @@ const valueProps = [
 ]
 const vpIdx = ref(0)
 const vpIn = ref(true)
+const currentVp = computed(() => valueProps[vpIdx.value] ?? valueProps[0]!)
 let vpInterval: ReturnType<typeof setInterval> | null = null
 
 const rotateProp = () => {
@@ -159,12 +164,11 @@ onUnmounted(() => {
 const togglePw = () => { passwordShown.value = !passwordShown.value }
 
 /**
- * Submit handler — route based on the selected account type.
- * All flows pass through email verification first (D2), then their
- * type-specific onboarding.
- *   trader → /onboarding/verify → /onboarding/kyc → /onboarding/welcome → /trade
- *   ent    → /onboarding/verify → /onboarding/kyc → ...
- *   ai     → /onboarding/verify → /trade (placeholder)
+ * Submit handler — create the account (the BFF sets the httpOnly session), set the runtime persona
+ * from the chosen account type, then start onboarding. Every flow is: verify → welcome → (tour) →
+ * home, where home is persona-aware (usePersona.postOnboard): AI Company / Enterprise → /console;
+ * Trader → /onboarding/kyc (Light-KYC) → /trade. The Trader card is disabled (soon) under the GTM
+ * pivot, so in practice signups are AI Company / Enterprise → enterprise persona → land in /console.
  */
 const onSubmit = async () => {
   if (!agreed.value || !email.value || !password.value) return
@@ -182,6 +186,8 @@ const onSubmit = async () => {
     signupError.value = ex?.statusCode === 409
       ? 'That email is already registered'
       : (ex?.data?.message || 'Could not create the account')
+    // Toast too — visible even if the user has scrolled past the button.
+    useToasts().push({ tone: 'neg', title: 'Could not create the account', body: signupError.value })
   } finally {
     submitting.value = false
   }
@@ -214,20 +220,23 @@ const onSubmit = async () => {
             :key="a.key"
             type="button"
             class="acct"
-            :class="{ active: acctType === a.key }"
-            @click="acctType = a.key"
+            :class="{ active: acctType === a.key, soon: a.soon }"
+            :disabled="a.soon"
+            :title="a.soon ? 'Trading is coming soon' : undefined"
+            @click="selectAcct(a)"
           >
-            <span class="check" />
+            <span v-if="a.soon" class="acct-soon">Soon</span>
+            <span v-else class="check" />
             <span class="ic-wrap"><component :is="a.icon" :size="16" :stroke-width="1.6" /></span>
             <span class="nm">{{ a.nm }}</span>
             <span class="l1">{{ a.l1 }}</span>
-            <span class="l2">{{ a.l2 }}</span>
+            <span class="l2">{{ a.soon ? 'Coming soon' : a.l2 }}</span>
           </button>
         </div>
 
         <div class="field">
           <div class="row"><span class="lbl">— Work email</span></div>
-          <input v-model="email" type="email" />
+          <input v-model="email" type="email" autocomplete="email" @keyup.enter="onSubmit" />
         </div>
 
         <div class="field">
@@ -236,7 +245,7 @@ const onSubmit = async () => {
             <span v-if="strengthLabel" class="hint" :class="`hint-s${strength}`">{{ strengthLabel }}</span>
           </div>
           <div class="input-with-toggle">
-            <input v-model="password" :type="pwInputType" />
+            <input v-model="password" :type="pwInputType" autocomplete="new-password" @keyup.enter="onSubmit" />
             <button
               type="button"
               class="toggle"
@@ -251,12 +260,13 @@ const onSubmit = async () => {
           </div>
         </div>
 
-        <div class="or">Or continue with</div>
+        <div class="or">Or continue with <span class="soon-tag">soon</span></div>
 
         <div class="oauth-stack">
           <!-- OAuth brand SVGs use the providers' literal brand colors (Google/GitHub/Microsoft).
-               Those are external brand identities, not design-system tokens — left as-is intentionally. -->
-          <button type="button" class="oauth">
+               Those are external brand identities, not design-system tokens — left as-is intentionally.
+               Social sign-in is disabled until F02 OAuth ships (M4) — honest, not a dead control. -->
+          <button type="button" class="oauth" disabled title="Social sign-in is coming soon">
             <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
               <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.79 2.71v2.26h2.9c1.7-1.56 2.69-3.87 2.69-6.61z" />
               <path fill="#34A853" d="M9 18c2.43 0 4.47-.81 5.96-2.19l-2.9-2.26c-.81.54-1.84.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.96v2.33A8.999 8.999 0 0 0 9 18z" />
@@ -265,13 +275,13 @@ const onSubmit = async () => {
             </svg>
             Continue with Google
           </button>
-          <button type="button" class="oauth">
+          <button type="button" class="oauth" disabled title="Social sign-in is coming soon">
             <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
               <path fill="currentColor" d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1.1-.8.1-.8.1-.8 1.2.1 1.9 1.3 1.9 1.3 1.1 1.9 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-6 0-1.3.5-2.4 1.3-3.2-.1-.3-.6-1.6.1-3.2 0 0 1-.3 3.3 1.2a11.4 11.4 0 0 1 6 0c2.3-1.6 3.3-1.2 3.3-1.2.7 1.6.2 2.9.1 3.2.8.8 1.3 1.9 1.3 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3" />
             </svg>
             Continue with GitHub
           </button>
-          <button type="button" class="oauth">
+          <button type="button" class="oauth" disabled title="Social sign-in is coming soon">
             <svg width="18" height="18" viewBox="0 0 21 21" aria-hidden="true">
               <rect x="1" y="1" width="9" height="9" fill="#F25022" />
               <rect x="11" y="1" width="9" height="9" fill="#7FBA00" />
@@ -291,10 +301,18 @@ const onSubmit = async () => {
           </span>
         </label>
 
-        <button type="button" class="submit" :disabled="!agreed" @click="onSubmit">
-          Open Account
-          <ArrowRight :size="16" />
+        <button type="button" class="submit" :disabled="!agreed || submitting" @click="onSubmit">
+          <template v-if="submitting">
+            <span class="spinner" aria-hidden="true" />
+            Opening account…
+          </template>
+          <template v-else>
+            Open Account
+            <ArrowRight :size="16" />
+          </template>
         </button>
+
+        <p v-if="signupError" class="form-error" role="alert">{{ signupError }}</p>
 
         <p class="signin-link">
           Already have an account?
@@ -313,9 +331,7 @@ const onSubmit = async () => {
 
       <div class="value-prop-wrap">
         <div class="value-prop" :class="{ in: vpIn }">
-          <template v-for="(seg, i) in [valueProps[vpIdx]]" :key="i">
-            <span>{{ seg.plain }}</span><em>{{ seg.em }}</em><span>{{ seg.tail }}</span>
-          </template>
+          <span>{{ currentVp.plain }}</span><em>{{ currentVp.em }}</em><span>{{ currentVp.tail }}</span>
         </div>
       </div>
 
@@ -491,7 +507,27 @@ const onSubmit = async () => {
   color: var(--text);
 }
 
-.acct:hover { border-color: var(--border-strong); }
+.acct:hover:not(:disabled) { border-color: var(--border-strong); }
+
+/* Coming-soon account type (Trader — exchange paused): visible but not selectable */
+.acct.soon {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.acct-soon {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 1px 5px;
+}
 
 .acct .ic-wrap {
   width: 28px;
@@ -685,12 +721,30 @@ const onSubmit = async () => {
   transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
 }
 
-.oauth:hover {
+.oauth:hover:not(:disabled) {
   background: var(--sunken);
   border-color: var(--border-strong);
 }
 
+.oauth:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .oauth svg { display: block; }
+
+/* "soon" pill on the OAuth divider — honest that social sign-in isn't wired yet */
+.soon-tag {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 1px 5px;
+  margin-left: 2px;
+}
 
 /* ─── Terms ─── */
 .terms {
@@ -771,6 +825,31 @@ const onSubmit = async () => {
 .submit:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+/* Loading spinner inside the submit button */
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid color-mix(in srgb, var(--text) 30%, transparent);
+  border-top-color: var(--text);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Inline form error (paired with a toast) — negative semantic, sharp, mono */
+.form-error {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--neg);
+  background: var(--neg-soft);
+  border: 1px solid color-mix(in srgb, var(--neg) 40%, transparent);
+  border-radius: var(--radius-sm);
 }
 
 .signin-link {

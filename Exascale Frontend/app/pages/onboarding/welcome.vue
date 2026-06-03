@@ -13,6 +13,24 @@ useHead({ title: 'Welcome to Exascale — Exascale', htmlAttrs: { 'data-theme': 
 const route = useRoute()
 const firstName = ref<string>(typeof route.query.name === 'string' ? route.query.name : 'Jane')
 
+// Persona-aware primary CTA — AI company → console, datacenter → dashboard, trader → KYC gate (the
+// paused exchange). Never hardcode /trade: a verified AI company must not land on the exchange.
+const personaCx = usePersona()
+const isTrader = computed(() => personaCx.persona.value === 'trader')
+const ctaTo = computed(() => personaCx.postOnboard.value)
+const ctaLabel = computed(() => ({
+  trader: 'Continue', enterprise: 'Go to your console', partner: 'Go to your dashboard',
+}[personaCx.persona.value]))
+
+// AI-company quick-start (the live product) — three first actions, numbers-first per the design
+// system. Real values: H100 $2.99/hr, H200 $3.49/hr (credit-types.md §1); text ≈ $0.00121 / 1K.
+interface QuickStart { cap: string; big: string; sub: string; to: string; go: string }
+const quickStart: QuickStart[] = [
+  { cap: 'Inference', big: '$0.00121', sub: 'per 1K text credits · OpenAI-compatible API · curated SoTA models', to: '/inference', go: 'Open the playground →' },
+  { cap: 'GPU compute', big: '$2.99 / hr', sub: 'H100 on-demand · per-second billing · <90s start · H200 $3.49/hr', to: '/compute/new', go: 'Launch an instance →' },
+  { cap: 'Credits', big: '$0 egress', sub: 'prepaid credits · live balance + full audit trail · top up with a card', to: '/wallet/buy', go: 'Buy credits →' },
+]
+
 // Live AI Index (mean reversion to 1.0024)
 const indexValue = ref<number>(1.0024)
 const indexPct   = ref<number>(0.18)
@@ -41,7 +59,8 @@ function tickIndex() {
   })
 }
 
-onMounted(() => { tickInterval = setInterval(tickIndex, 2400) })
+// The live index ticker is trading-only — don't run it on the AI-company welcome.
+onMounted(() => { if (isTrader.value) tickInterval = setInterval(tickIndex, 2400) })
 onBeforeUnmount(() => { if (tickInterval) clearInterval(tickInterval) })
 
 const indexDisplay = computed(() => (indexValue.value * 1000).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }))
@@ -70,9 +89,20 @@ function fmtDelta(pct: number): string {
     <div class="center">
       <div class="hero">
         <h1>Welcome to Exascale, {{ firstName }}.</h1>
-        <p class="sub">Your paper trading account is ready.</p>
+        <p class="sub">{{ isTrader ? 'Your paper trading account is ready.' : 'Inference and GPU compute on prepaid credits. Here\'s where to start.' }}</p>
 
-        <div class="cards">
+        <!-- AI company (the live product): three first actions, numbers-first -->
+        <div v-if="!isTrader" class="cards">
+          <NuxtLink v-for="(q, i) in quickStart" :key="q.cap" :to="q.to" class="card qs" :class="`c-${i + 1}`">
+            <div class="cap">{{ q.cap }}</div>
+            <div class="big mono">{{ q.big }}</div>
+            <div class="sub-line">{{ q.sub }}</div>
+            <span class="qs-go">{{ q.go }}</span>
+          </NuxtLink>
+        </div>
+
+        <!-- Trader (paused exchange): the live index + markets showcase -->
+        <div v-else class="cards">
           <div class="card c-1">
             <div class="cap">Paper balance</div>
             <div class="big mono">$10,000.00</div>
@@ -101,8 +131,8 @@ function fmtDelta(pct: number): string {
         </div>
 
         <div class="cta-row">
-          <NuxtLink to="/trade" class="btn-primary">
-            Start trading
+          <NuxtLink :to="ctaTo" class="btn-primary">
+            {{ ctaLabel }}
             <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square">
               <path d="M3 8h10M9 4l4 4-4 4" />
             </svg>
@@ -114,9 +144,11 @@ function fmtDelta(pct: number): string {
 
     <footer class="page-foot">
       <span class="mono muted">
-        Account EX-PT-7A3C91 · paper-trading mode · capital trading requires further verification
+        {{ isTrader
+          ? 'Account EX-PT-7A3C91 · paper-trading mode · capital trading requires further verification'
+          : 'Sandbox mode · prepaid credits · real-money purchases require verification (KYC)' }}
       </span>
-      <a href="#" class="foot-link">What's paper trading? →</a>
+      <a href="#" class="foot-link">{{ isTrader ? "What's paper trading? →" : 'How credits work →' }}</a>
     </footer>
   </div>
 </template>
@@ -219,6 +251,24 @@ function fmtDelta(pct: number): string {
 .card.c-3 { animation-delay: 500ms; }
 .card:hover { border-color: var(--border-strong); }
 @keyframes cardIn { to { opacity: 1; transform: translateY(0); } }
+
+/* Quick-start cards (AI company) are clickable — whole card is a link to a first action */
+.card.qs {
+  text-decoration: none;
+  color: var(--text);
+}
+.card.qs:hover { border-color: var(--brand); }
+.card.qs .qs-go {
+  margin-top: auto;
+  padding-top: 14px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--accent);
+  transition: color 160ms ease;
+}
+.card.qs:hover .qs-go { color: var(--text); }
 
 .cap {
   font-family: var(--font-mono);

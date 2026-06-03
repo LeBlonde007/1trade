@@ -28,6 +28,10 @@ function startCooldown(secs: number) {
 const verified = ref(false)
 const verifyError = ref('')
 
+// After email verification everyone continues to the persona welcome + product tour (journey step 3).
+// KYC is a later, trading-only gate (handled after the tour) — not here.
+const nextStep = '/onboarding/welcome'
+
 async function onResend() {
   if (remaining.value > 0) return
   startCooldown(COOLDOWN_SECS)
@@ -43,7 +47,7 @@ onMounted(async () => {
   try {
     await $fetch('/api/auth/verify', { method: 'POST', body: { token } })
     verified.value = true
-    setTimeout(() => navigateTo('/console'), 800)
+    setTimeout(() => navigateTo(nextStep), 800)
   } catch {
     verifyError.value = 'This verification link is invalid or has already been used.'
   }
@@ -150,7 +154,7 @@ function commitChange() {
 
           <div class="below-actions">
             <button v-if="!showChange" type="button" class="link-btn" @click="openChange">Change email →</button>
-            <NuxtLink to="/onboarding/kyc" class="link-btn primary">I've verified my email →</NuxtLink>
+            <NuxtLink :to="nextStep" class="link-btn primary">I've verified my email →</NuxtLink>
           </div>
 
           <div v-if="showChange" class="change-form">
