@@ -4,6 +4,26 @@ All notable changes to Exascale. Format: [Keep a Changelog](https://keepachangel
 SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not dates — see
 `docs/plans/MANAGEMENT_PLAN.md`).
 
+## [v0.3.4] — Console restructured into a live command center (F20)
+
+### Changed
+- **`/console` rebuilt as a dense, institutional command center** (Bloomberg/Linear/Vercel-grade) per
+  the design system — and **fully live, no mock data**. A numbers-first KPI command strip (per-credit
+  balances with today-Δ ▲/▼, **GPU burn $/hr** computed from running instances × tier price, catalog
+  size, API-key count), then a two-column panel grid: **Wallet · balances**, **Activity** (the live
+  ledger tape), **GPU compute** (F13 instances — id · type · ● state · GPUs · ticking uptime),
+  **Inference** quick-run, **Monthly budget** meter, **API keys**, and a bottom row of **Purchases**
+  + **Audit log**.
+- Surfaces **F13 GPU instances live** for the first time on the console (via `useCompute`), with a
+  1-second uptime ticker and a real hourly burn-rate metric. Sharp 2px radius, Inter Tight +
+  JetBrains Mono, `tabular-nums`, semantic colour paired with ▲/▼, restrained palette, panel-row
+  hover, a subtle synced/activity pulse (honors `prefers-reduced-motion`).
+
+### Verified
+- Typecheck clean. Screenshotted live in k3d with real data: three inline-settled purchases populate
+  the balances/KPIs/activity/purchases, a launched `gpu_h100×2` instance shows Running with a ticking
+  uptime, and GPU burn reads **$5.98/hr** (2 × $2.99).
+
 ## [v0.3.3] — Sandbox buy actually settles (MockStripe inline-settle) (F06)
 
 ### Fixed
