@@ -8,6 +8,8 @@
  * balance cards + recent movements + Convert drawer).
  */
 
+import { compact, full } from '~/utils/format'
+
 definePageMeta({ layout: 'app' })
 useHead({ title: 'Wallet — Exascale' })
 

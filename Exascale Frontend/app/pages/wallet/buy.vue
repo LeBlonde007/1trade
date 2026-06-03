@@ -10,6 +10,8 @@
  * The USD figure is INDICATIVE (published reference prices) — Stripe shows the exact charge.
  * Real-money purchases pass the KYC gate first; sandbox + credits need none (preview with ?kyc=1).
  */
+import { compact, full } from '~/utils/format'
+
 definePageMeta({ layout: false, middleware: 'auth' })
 useHead({ title: 'Buy credits — Exascale', htmlAttrs: { 'data-theme': 'dark' } })
 

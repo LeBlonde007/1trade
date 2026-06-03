@@ -4,6 +4,15 @@ All notable changes to Exascale. Format: [Keep a Changelog](https://keepachangel
 SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not dates — see
 `docs/plans/MANAGEMENT_PLAN.md`).
 
+## [v0.3.6] — Fix: `compact`/`full` not resolved in templates (500) (F20)
+
+### Fixed
+- **500 `_ctx.compact is not a function`** on `/console`, `/wallet`, `/wallet/buy`. The new `compact`
+  / `full` helpers (v0.3.5) were used **only in templates**; Nuxt's auto-import (unimport) scans
+  `<script>`, not templates, so they weren't injected and were undefined at render. Now imported
+  explicitly (`import { compact, full } from '~/utils/format'`) in the three screens — deterministic
+  for SSR + production builds. Verified: all three load 200 and render compact numbers.
+
 ## [v0.3.5] — Compact K/M/B number formatting across the product UI (F20)
 
 ### Changed
