@@ -6,6 +6,8 @@
  * Always live — no mock data. Numbers-first: balances/usage are the largest elements, mono + tabular,
  * semantic colour paired with ▲/▼. Tokens only.
  */
+import { compact, full } from '~/utils/format'
+
 definePageMeta({ layout: 'app', middleware: 'auth' })
 useHead({ title: 'Console — Exascale' })
 
