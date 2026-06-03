@@ -9,12 +9,12 @@ import { getCookie, setCookie, deleteCookie, createError, type H3Event } from 'h
 /** Name of the httpOnly cookie holding the platform JWT. */
 export const SESSION_COOKIE = 'ex_session'
 
-type Service = 'platform' | 'gateway' | 'ledger'
+type Service = 'platform' | 'gateway' | 'ledger' | 'compute'
 
 /** upstreamBase returns the base URL for a platform service from runtime config. */
 function upstreamBase(event: H3Event, svc: Service): string {
   const c = useRuntimeConfig(event)
-  return { platform: c.platformCoreUrl, gateway: c.gatewayUrl, ledger: c.ledgerUrl }[svc] as string
+  return { platform: c.platformCoreUrl, gateway: c.gatewayUrl, ledger: c.ledgerUrl, compute: c.computeUrl }[svc] as string
 }
 
 /** sessionToken reads the platform JWT from the request's session cookie (empty when logged out). */

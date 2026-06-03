@@ -10,7 +10,10 @@ import (
 
 	"github.com/exascale/compute-control/internal/auth"
 	"github.com/exascale/compute-control/internal/config"
+	"github.com/exascale/compute-control/internal/domain"
 	"github.com/exascale/compute-control/internal/events"
+	"github.com/exascale/compute-control/internal/instance"
+	"github.com/exascale/compute-control/internal/pool"
 	"github.com/exascale/compute-control/internal/scheduler"
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -20,11 +23,14 @@ const (
 	testSvc    = "test-service-token"
 )
 
-// newServer builds a Server backed by the mock scheduler with a known secret + service token.
+// newServer builds a Server backed by the mock scheduler + instance manager sharing one GPU pool,
+// with a known secret + service token.
 func newServer() *Server {
 	cfg := config.Config{Env: "dev", Paper: true, SupplySource: "dc-owned-1"}
-	sched := scheduler.NewMock(8, 0, "dc-owned-1", events.NoopPublisher{})
-	return New(cfg, auth.NewResolver(testSecret, testSvc), sched)
+	p := pool.New(map[string]int{domain.CreditH100: 8, domain.CreditH200: 0})
+	sched := scheduler.NewMockWithPool(p, "dc-owned-1", events.NoopPublisher{})
+	mgr := instance.NewManager(p, "dc-owned-1", events.NoopPublisher{})
+	return New(cfg, auth.NewResolver(testSecret, testSvc), sched, mgr)
 }
 
 // tenantJWT mints a valid first-party tenant token.
@@ -140,5 +146,87 @@ func TestSubmit_CapacityExhausted(t *testing.T) {
 	w := do(s, "POST", "/v1/compute/jobs", testSvc, body, map[string]string{"Idempotency-Key": "k1", "X-Tenant-Id": "t1"})
 	if w.Code != 402 {
 		t.Fatalf("code = %d, want 402", w.Code)
+	}
+}
+
+// TestInstanceLifecycle_Endpoints walks create → get → list → stop → start → delete over the HTTP
+// surface with a tenant JWT, asserting status codes + connection info.
+func TestInstanceLifecycle_Endpoints(t *testing.T) {
+	s := newServer()
+	jwtTok := tenantJWT(t, "t1")
+	body, _ := json.Marshal(map[string]any{"type": "gpu_h100", "count": 2})
+	w := do(s, "POST", "/v1/compute/instances", jwtTok, body, map[string]string{"Idempotency-Key": "k1"})
+	if w.Code != 201 {
+		t.Fatalf("create code = %d body=%s", w.Code, w.Body.String())
+	}
+	var inst struct {
+		ID      string `json:"id"`
+		State   string `json:"state"`
+		Connect struct {
+			SSH string `json:"ssh"`
+		} `json:"connect"`
+	}
+	_ = json.Unmarshal(w.Body.Bytes(), &inst)
+	if inst.ID == "" || inst.State != "running" || inst.Connect.SSH == "" {
+		t.Fatalf("instance = %+v", inst)
+	}
+
+	if g := do(s, "GET", "/v1/compute/instances/"+inst.ID, jwtTok, nil, nil); g.Code != 200 {
+		t.Fatalf("get = %d", g.Code)
+	}
+	if l := do(s, "GET", "/v1/compute/instances?state=running", jwtTok, nil, nil); l.Code != 200 {
+		t.Fatalf("list = %d", l.Code)
+	}
+	if st := do(s, "POST", "/v1/compute/instances/"+inst.ID+"/stop", jwtTok, nil, nil); st.Code != 200 {
+		t.Fatalf("stop = %d", st.Code)
+	}
+	if sr := do(s, "POST", "/v1/compute/instances/"+inst.ID+"/start", jwtTok, nil, nil); sr.Code != 200 {
+		t.Fatalf("start = %d", sr.Code)
+	}
+	if d := do(s, "DELETE", "/v1/compute/instances/"+inst.ID, jwtTok, nil, nil); d.Code != 200 {
+		t.Fatalf("delete = %d", d.Code)
+	}
+}
+
+// TestInstance_RequiresAuth checks creating an instance needs a tenant JWT (service token alone is
+// rejected — instances are customer-facing).
+func TestInstance_RequiresAuth(t *testing.T) {
+	s := newServer()
+	body, _ := json.Marshal(map[string]any{"type": "gpu_h100"})
+	w := do(s, "POST", "/v1/compute/instances", "", body, map[string]string{"Idempotency-Key": "k1"})
+	if w.Code != 401 {
+		t.Fatalf("code = %d, want 401", w.Code)
+	}
+}
+
+// TestSharedPool_InstanceBlocksJob proves instances and jobs draw from one pool: an instance holding
+// all H100s makes a job 402, and stopping it frees capacity for the job.
+func TestSharedPool_InstanceBlocksJob(t *testing.T) {
+	s := newServer() // 8 H100s
+	jwtTok := tenantJWT(t, "t1")
+	body, _ := json.Marshal(map[string]any{"type": "gpu_h100", "count": 8})
+	w := do(s, "POST", "/v1/compute/instances", jwtTok, body, map[string]string{"Idempotency-Key": "k1"})
+	if w.Code != 201 {
+		t.Fatalf("create code = %d", w.Code)
+	}
+	var inst struct {
+		ID string `json:"id"`
+	}
+	_ = json.Unmarshal(w.Body.Bytes(), &inst)
+
+	// A job now finds no GPUs.
+	jb, _ := json.Marshal(map[string]any{"workload_class": "inference", "gpu_type": "gpu_h100", "gpus": 1})
+	j := do(s, "POST", "/v1/compute/jobs", testSvc, jb, map[string]string{"Idempotency-Key": "j1", "X-Tenant-Id": "t1"})
+	if j.Code != 402 {
+		t.Fatalf("job code = %d, want 402 (pool full)", j.Code)
+	}
+
+	// Stop the instance → GPUs return → the job fits.
+	if st := do(s, "POST", "/v1/compute/instances/"+inst.ID+"/stop", jwtTok, nil, nil); st.Code != 200 {
+		t.Fatalf("stop = %d", st.Code)
+	}
+	j2 := do(s, "POST", "/v1/compute/jobs", testSvc, jb, map[string]string{"Idempotency-Key": "j2", "X-Tenant-Id": "t1"})
+	if j2.Code != 202 {
+		t.Fatalf("job-after-stop code = %d, want 202", j2.Code)
 	}
 }

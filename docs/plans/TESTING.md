@@ -7,8 +7,9 @@ How to verify everything built so far. Two ways to read this:
 - **Part 2 — Backend / CLI / automated.** `curl`, the `exascale` CLI, and `go test` — the proof
   underneath the UI.
 
-Covers tags **v0.1.0 → v0.1.5** (M1) and **v0.2.0 → v0.2.8** (M2). Pair with
-[RUN_LOCAL.md](./RUN_LOCAL.md) (bring-up) and `CHANGELOG.md` (what each tag shipped).
+Covers tags **v0.1.0 → v0.1.5** (M1), **v0.2.0 → v0.2.16** (M2 + F01 hardening) and **v0.3.0** (M3 —
+F13 GPU instance lifecycle). Pair with [RUN_LOCAL.md](./RUN_LOCAL.md) (bring-up) and `CHANGELOG.md`
+(what each tag shipped).
 
 ---
 
@@ -104,16 +105,23 @@ gets the 4-step Light-KYC identity flow; **AI Company** is verified → straight
 **Quick pass/fail:** signup → catalog → (mint) → run → cost+meter → convert → movements → key. If each
 shows real data and balances move, the AI-Company surface is green.
 
-## 1B. Datacenter — Tom Reyes  ⬜ showcase
+## 1B. Datacenter / Compute — Tom Reyes  🟩 partly live
 
-Screens: `/datacenter`, `/datacenter/register`, `/compute`, `/compute/new`.
+Screens: `/compute`, `/compute/new` (**live, F13/v0.3.0**) · `/datacenter`, `/datacenter/register`
+(⬜ showcase — supply onboarding F16/F17 not built).
 
-**Walkthrough (mock or local — same):** open `/datacenter` (capacity overview) → `/datacenter/register`
-(onboard a GPU cluster: tier, count, region) → `/compute` (rentable GPU inventory).
+**Compute (live):** open `/compute` — the table lists **real instances** from compute-control
+(`GET /api/compute/instances`). Open `/compute/new`, pick **H100**, set a count, **Provision** — it
+calls the live API and routes back to `/compute` where the new instance appears **running** with
+connection info; the row **Stop** action releases its GPUs (live). A running instance meters
+`compute.usage.v1` → the ledger debits the `gpu_*` tier (visible in `/wallet` movements). _(v0.3.0)_
 
-> **Status:** the supply/compute control plane (**F12+**) isn't built yet, so these are **mock
-> showcases** even in local mode — realistic data, no live mutation. Review them for design/flow; they
-> are not a live backend test.
+> **Note:** locally the backend is the **mock-GPU** scheduler, so instances boot instantly (the real
+> K8s provisioner + <90s-P95 timing are GPU-node-gated). Per-GPU utilization and RAM/storage specs on
+> the page render as placeholders — the live API doesn't report them yet.
+
+> **Supply onboarding** (`/datacenter`, `/datacenter/register`) stays a **mock showcase** until
+> F16/F17 (supply-source abstraction + DC onboarding) land — review for design/flow only.
 
 ## 1C. Trader — Jordan Park  ⏸ showcase (exchange paused)
 
@@ -227,9 +235,27 @@ EM="cli+$(date +%s)@dev.test"
 ./bin/exascale keys create --name production
 ```
 
-### 2.9 Automated tests (no cluster)
+### 2.9 GPU instances — F13 (compute-control)
 ```bash
-for s in credit-ledger platform-core inference-gateway; do (cd services/$s && go vet ./... && go test ./...); done
+# Port-forward compute-control if testing the CLI from the host (Tilt forwards :8086):
+#   kubectl port-forward svc/compute-control 8086:8086 &
+./bin/exascale gpu types                         # H100/H200 + price/hr + availability
+./bin/exascale gpu create --type h100 --count 2  # → instance id + ssh/jupyter/http connect info
+./bin/exascale gpu list                          # the new instance, running
+ID=$(./bin/exascale gpu list | awk 'NR==2{print $1}')
+./bin/exascale gpu get "$ID"
+./bin/exascale gpu stop "$ID"                     # frees GPUs back to the pool; ends billing
+./bin/exascale gpu start "$ID"                    # re-reserves (capacity permitting)
+./bin/exascale gpu delete "$ID"                   # terminate
+# A running instance meters compute.usage.v1 → ledger debits gpu_* (idempotent on usage_id);
+# check the drop with: ./bin/exascale credits balance   (gpu_h100 ticks down per metering interval)
+```
+> Mock-GPU backend: instances boot instantly. The shared GPU pool is contended with the scheduler —
+> an instance holding all H100s makes a `POST /v1/compute/jobs` return **402** until it stops.
+
+### 2.10 Automated tests (no cluster)
+```bash
+for s in credit-ledger platform-core inference-gateway compute-control; do (cd services/$s && go vet ./... && go test ./...); done
 (cd apps/cli && go vet ./... && go test ./...)
 (cd "Exascale Frontend" && npm run typecheck)     # pre-existing chart-lib errors are unrelated
 ```
@@ -252,9 +278,12 @@ for s in credit-ledger platform-core inference-gateway; do (cd services/$s && go
 | F08 inference gateway | v0.2.0 | UI 1A·5 / §2.5 | ✅ |
 | F08↔F05 metered debit | v0.2.0, v0.2.7 | UI 1A·5 (balance drops) / §2.5 | ✅ |
 | F09 vLLM runtime (CPU stub) | v0.2.2 | §2.5 (real GPU: `GPU=1` + GPU node) | ✅ |
+| F12 compute control plane (jobs/quota/catalog) | v0.2.12 | §2.9 (mock-GPU; real K8s GPU-node-gated) | ✅ |
+| F13 GPU instance lifecycle | v0.3.0 | UI 1B / §2.9 (mock-GPU; <90s timing GPU-node-gated) | ✅ |
 | F20 console + live wiring | v0.2.3–v0.2.8 | Part 1A | ✅ |
 
-**Not built yet (don't test):** F12 compute control plane (Datacenter/Trader surfaces are showcase),
-the exchange/trading layer (paused), real observability dashboards, real Stripe/email (M3).
+**Not built yet (don't test):** supply onboarding (F16/F17 — `/datacenter` is showcase), the
+exchange/trading layer (paused), real observability dashboards, real Stripe/email (M3), the real
+Kueue+Volcano GPU backend + <90s-P95 timing (GPU-node-gated; mock-GPU is what's testable locally).
 
 > Legend: ✅ verified live · 🔁 runnable above · 📄 documented from the contract.

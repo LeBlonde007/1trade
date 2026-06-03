@@ -1,17 +1,19 @@
 openapi: 3.0.3
 info:
   title: Exascale Compute API (GPU types, quota, scheduled jobs, instances)
-  version: 1.0.0
+  version: 1.1.0
   description: >
     **The Exascale compute control-plane API.** Owned by `compute-platform` (the `compute-control`
     service). It wraps the Kubernetes scheduling stack (Kueue queues per workload class + Volcano gang
     scheduling + the NVIDIA GPU Operator) behind a stable API.
 
-    **Provisional (M2).** This milestone ships the *internal* scheduling + quota surface that
-    `inference-gateway`/`inference-runtime` use to place pods, plus a read-only GPU-type catalog. The
-    customer-facing GPU instance lifecycle (`/v1/compute/instances` create/stop, sub-90s start) and
-    clusters land in M3/M5; their shapes here are minimal and may change (final in `compute.yaml`
-    v1.1.0).
+    **v1.1.0 (M3, F13).** Adds the customer-facing **on-demand GPU instance lifecycle**:
+    create / list / get / stop / start / delete instances, each drawn from the same GPU pool the
+    internal scheduler (M2) places jobs on. Instances boot a versioned **Exascale ML Stack image** and
+    return connection info (ssh / jupyter / http). Target: <90s P95 time-to-running. Per-second GPU
+    usage meters to `events/compute.usage.v1` while an instance runs; stop releases its GPUs back to
+    the pool and ends billing. The M2 internal scheduling + quota surface and the GPU-type catalog are
+    unchanged and back-compatible. Clusters (multi-node / InfiniBand) land in M5.
 
     Auth: a first-party tenant **JWT** for customer reads (quota, types, instances); the internal
     **service token** for scheduling (`POST /v1/compute/jobs`, called by the gateway/runtime).
@@ -27,7 +29,7 @@ tags:
   - { name: catalog, description: "GPU types + availability (read-only)." }
   - { name: quota, description: "Per-tenant / per-sub-account GPU quota." }
   - { name: scheduling, description: "Internal: place workloads via Kueue + Volcano." }
-  - { name: instances, description: "Customer GPU instances (M3; minimal in M2)." }
+  - { name: instances, description: "Customer on-demand GPU instances (create / stop / start / delete)." }
 
 paths:
   /healthz:
@@ -116,8 +118,10 @@ paths:
   /v1/compute/instances:
     get:
       tags: [instances]
-      summary: List the tenant's GPU instances (M3 customer-facing; minimal in M2).
+      summary: List the tenant's GPU instances (newest first), optionally filtered by state.
       operationId: listInstances
+      parameters:
+        - { name: state, in: query, required: false, schema: { $ref: '#/components/schemas/InstanceState' } }
       responses:
         '200':
           description: Instances.
@@ -127,6 +131,63 @@ paths:
                 type: object
                 properties:
                   instances: { type: array, items: { $ref: '#/components/schemas/Instance' } }
+        '401': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [instances]
+      summary: >
+        Create an on-demand GPU instance (tenant JWT). Reserves GPUs from the pool, boots the chosen
+        ML-Stack image, and returns connection info once running (<90s P95). `is_paper` comes from the
+        principal. Idempotent on the Idempotency-Key — a retry returns the same instance.
+      operationId: createInstance
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/InstanceRequest' } } }
+      responses:
+        '201': { description: Created (provisioning)., content: { application/json: { schema: { $ref: '#/components/schemas/Instance' } } } }
+        '401': { $ref: '#/components/responses/Error' }
+        '402': { $ref: '#/components/responses/Error' }   # insufficient GPU capacity
+        '422': { $ref: '#/components/responses/Error' }
+
+  /v1/compute/instances/{id}:
+    parameters: [ { name: id, in: path, required: true, schema: { type: string } } ]
+    get:
+      tags: [instances]
+      summary: Get one instance (state + connection info).
+      operationId: getInstance
+      responses:
+        '200': { description: Instance., content: { application/json: { schema: { $ref: '#/components/schemas/Instance' } } } }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [instances]
+      summary: Terminate an instance and free its GPUs (irreversible).
+      operationId: deleteInstance
+      responses:
+        '200': { description: Terminated., content: { application/json: { schema: { $ref: '#/components/schemas/Instance' } } } }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /v1/compute/instances/{id}/stop:
+    parameters: [ { name: id, in: path, required: true, schema: { type: string } } ]
+    post:
+      tags: [instances]
+      summary: Stop a running instance — releases its GPUs back to the pool and ends billing.
+      operationId: stopInstance
+      responses:
+        '200': { description: Stopped (or stopping)., content: { application/json: { schema: { $ref: '#/components/schemas/Instance' } } } }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }   # not in a stoppable state
+
+  /v1/compute/instances/{id}/start:
+    parameters: [ { name: id, in: path, required: true, schema: { type: string } } ]
+    post:
+      tags: [instances]
+      summary: Start a stopped instance — re-reserves GPUs (capacity permitting) and resumes billing.
+      operationId: startInstance
+      responses:
+        '200': { description: Starting (or running)., content: { application/json: { schema: { $ref: '#/components/schemas/Instance' } } } }
+        '402': { $ref: '#/components/responses/Error' }   # no capacity to restart
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }   # not in a startable state
 
 components:
   parameters:
@@ -195,14 +256,48 @@ components:
         is_paper:        { type: boolean }
         created_at:      { type: string, format: date-time }
 
+    InstanceState:
+      type: string
+      description: >
+        Instance lifecycle. provisioning → running; running → stopping → stopped; stopped → starting →
+        running; any → terminated (irreversible).
+      enum: [provisioning, running, stopping, stopped, starting, terminated]
+
+    ConnectInfo:
+      type: object
+      description: "How to reach a running instance. Null fields until the instance is running."
+      properties:
+        ssh:     { type: [string, "null"], example: "ssh ubuntu@i-7c2a.gpu.exascale.io" }
+        jupyter: { type: [string, "null"], format: uri, example: "https://i-7c2a.gpu.exascale.io/jupyter" }
+        http:    { type: [string, "null"], format: uri, example: "https://i-7c2a.gpu.exascale.io" }
+
+    InstanceRequest:
+      type: object
+      required: [type]
+      properties:
+        type:           { type: string, enum: [gpu_h100, gpu_h200], description: "GPU tier (== credit_type debited)" }
+        count:          { type: integer, minimum: 1, maximum: 32, default: 1, description: "GPUs in this instance (self-serve up to 32)" }
+        image:          { type: string, default: "stable", description: "ML-Stack image: 'stable' | 'latest' | a pinned version id (e.g. 'exascale-ml-stack-2026.05')" }
+        region:         { type: string, default: "us-east-1" }
+        idle_stop_minutes: { type: [integer, "null"], minimum: 0, description: "auto-stop after this many idle minutes (null = no auto-stop; default per F06 policy)" }
+        sub_account_id: { type: [string, "null"], format: uuid }
+
     Instance:
       type: object
-      description: "Customer GPU instance (M3; minimal here)."
+      description: "Customer on-demand GPU instance."
       properties:
-        id:         { type: string }
-        gpu_type:   { type: string, enum: [gpu_h100, gpu_h200] }
-        status:     { type: string, enum: [provisioning, running, stopped, terminated] }
-        created_at: { type: string, format: date-time }
+        id:               { type: string, example: "i-7c2a" }
+        gpu_type:         { type: string, enum: [gpu_h100, gpu_h200] }
+        count:            { type: integer, description: "GPUs in this instance" }
+        state:            { $ref: '#/components/schemas/InstanceState' }
+        image:            { type: string, description: "resolved image version id" }
+        region:           { type: string }
+        connect:          { $ref: '#/components/schemas/ConnectInfo' }
+        supply_source_id: { type: string, description: "owned DC or partner that provided the GPUs (drives payout)" }
+        idle_stop_minutes: { type: [integer, "null"] }
+        is_paper:         { type: boolean }
+        created_at:       { type: string, format: date-time }
+        started_at:       { type: [string, "null"], format: date-time, description: "when it last entered running" }
 
     ApiError:
       type: object

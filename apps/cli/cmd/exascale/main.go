@@ -32,13 +32,22 @@ Inference:
   catalog                                 List available models
   infer chat -m MODEL "prompt"            Run a chat completion
 
+GPU instances:
+  gpu types                               List GPU types + price + availability
+  gpu create --type h100 [--count N] [--image stable] [--region R]   Launch an instance
+  gpu list [--state running]              List your instances
+  gpu get <id>                            Show one instance (+ connection info)
+  gpu stop <id>                           Stop an instance (frees its GPUs)
+  gpu start <id>                          Restart a stopped instance
+  gpu delete <id>                         Terminate an instance
+
 Keys:
   keys create --name N                    Mint an API key (shown once)
   keys list                               List API keys
   keys revoke <id>                        Revoke a key
 
 Config:
-  config get | set <key> <value>          View/set platform URLs (platform_url|gateway_url|ledger_url)
+  config get | set <key> <value>          View/set platform URLs (platform_url|gateway_url|ledger_url|compute_url)
   version                                 Print the CLI version
 `
 
@@ -66,6 +75,8 @@ func main() {
 		err = cmdCatalog(cfg, args)
 	case "infer":
 		err = cmdInfer(cfg, args)
+	case "gpu":
+		err = cmdGPU(cfg, args)
 	case "keys":
 		err = cmdKeys(cfg, args)
 	case "config":

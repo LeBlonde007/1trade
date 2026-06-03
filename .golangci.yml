@@ -59,6 +59,24 @@ linters:
         - name: error-return
         - name: context-as-argument
         - name: unhandled-error
+          # Ignore errors that are infallible by contract, not real I/O:
+          #  - fmt.*Print* — stdout/stderr (esp. the CLI, also exempt from forbidigo for this reason).
+          #  - strings.Builder / bytes.Buffer writes — documented to never return a non-nil error.
+          # Real io.Writer / file / net write errors are still flagged (handle hash writes with `_, _=`).
+          arguments:
+            - 'fmt\.Print'
+            - 'fmt\.Printf'
+            - 'fmt\.Println'
+            - 'fmt\.Fprint'
+            - 'fmt\.Fprintf'
+            - 'fmt\.Fprintln'
+            - 'strings\.Builder\.WriteString'
+            - 'strings\.Builder\.WriteByte'
+            - 'strings\.Builder\.WriteRune'
+            - 'bytes\.Buffer\.Write'
+            - 'bytes\.Buffer\.WriteString'
+            - 'bytes\.Buffer\.WriteByte'
+            - 'bytes\.Buffer\.WriteRune'
 
   exclusions:
     generated: lax

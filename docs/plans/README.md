@@ -178,6 +178,8 @@ Four documents:
   number formatting, mock-data realism, aesthetic guardrails). **Every frontend change conforms.**
 - [`STATUS.md`](STATUS.md) — the build-status **tree map** (✅ done / 🟩 in progress / ⬜ not started /
   ⏸ paused) with the ordered TO-DO. The quickest "where are we" view.
+- [`FEATURES_BY_PERSONA.md`](FEATURES_BY_PERSONA.md) — what **actually works today, per persona**
+  (✅ green = working / ⬜ showcase / ⏸ paused). The "what can I demo as live" view.
 
 ---
 

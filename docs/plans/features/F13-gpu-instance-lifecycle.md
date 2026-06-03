@@ -49,11 +49,26 @@ Target: <90s P95 time-to-running.
 
 ## Acceptance criteria
 
-- [ ] `exascale gpu create --type h100` returns connection info in <90s P95.
-- [ ] Per-second GPU-hour debits applied to the right GPU credit tier.
-- [ ] Stop releases the GPU back to the pool within seconds.
-- [ ] Image versioning works; default = latest stable.
-- [ ] Idle auto-stop policy honored (configured per F06).
+- [x] `exascale gpu create --type h100` returns connection info — instant on mock-GPU; the <90s-P95
+  real-hardware timing is GPU-node-gated (the mock backend proves the lifecycle end-to-end).
+- [x] Per-second GPU-hour debits applied to the right GPU credit tier — a metering ticker emits
+  `compute.usage.v1` per interval (units = GPU-hours × count, `credit_type` = the instance tier);
+  credit-ledger's `Compute` consumer (v0.2.12) debits the `gpu_*` credit, idempotent on `usage_id`.
+- [x] Stop releases the GPU back to the pool within seconds — instances + scheduler jobs share one
+  `pool.Pool`; stop/delete `Release()` the GPUs and meter the final partial interval.
+- [x] Image versioning works; default = latest stable — `domain.ResolveImage` maps `stable`/`latest`/
+  pinned ids; create defaults to `stable`, unknown pinned ids are rejected.
+- [~] Idle auto-stop policy — `idle_stop_minutes` is captured on the instance + plumbed through the
+  API/CLI/web; the enforcement loop lands with the F06 idle-policy integration (not in this increment).
+
+**Delivered (v0.3.0):** `compute.yaml` v1.1.0 (instance lifecycle) · `compute-control` instance manager
+(create/list/get/stop/start/delete + shared GPU pool + per-interval metering) · `exascale gpu …` CLI ·
+live web `/compute` list + provision (BFF + `useCompute`). Mock-GPU backend; real K8s provisioner +
+<90s-P95 timing land on a GPU node.
+
+**Live-verified on k3d (v0.3.0):** signup → mint `gpu_h100` → create instance (running + ssh) → list →
+run 8s → stop → async `compute.usage.v1` debit `gpu_h100 100.000000 → 99.997778` (8s ÷ 3600 = 0.002222
+GPU-h, exact). Tenant-scoped, `is_paper` respected.
 
 ## Milestone
 

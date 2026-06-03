@@ -4,6 +4,39 @@ All notable changes to Exascale. Format: [Keep a Changelog](https://keepachangel
 SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not dates — see
 `docs/plans/MANAGEMENT_PLAN.md`).
 
+## [v0.3.0] — F13 GPU instance lifecycle (on-demand) — M3 begins
+
+### Added
+- **Customer-facing on-demand GPU instances** (`compute-control`, `compute.yaml` **v1.1.0**):
+  `POST/GET /v1/compute/instances`, `GET/DELETE /v1/compute/instances/{id}`, `POST {id}/stop|start`.
+  Tenant-JWT scoped (cross-tenant → 404), `is_paper` derived from the principal, `Idempotency-Key` on
+  create. Versioned **Exascale ML-Stack image** catalog (`stable`/`latest`/pinned); connect info
+  (ssh/jupyter/http) on running instances.
+- **Shared GPU pool** (`internal/pool`): customer instances and internal scheduler jobs draw from one
+  per-tier pool, so capacity is never double-counted; stop/delete release GPUs back to it.
+- **Per-interval GPU metering**: a ticker emits `compute.usage.v1` (units = GPU-hours × count) →
+  credit-ledger's `Compute` consumer debits the `gpu_*` tier, idempotent on `usage_id`.
+- **`exascale gpu`** CLI — `types | create | list | get | stop | start | delete` (+ `compute_url`
+  config / `EXASCALE_COMPUTE_URL`).
+- **Live web `/compute`** — BFF (`/api/compute/*`) + `useCompute`; the instances list + provision flow
+  are wired to the real service (no mock mode).
+
+### Changed
+- Scheduler refactored onto the shared pool (`NewMockWithPool`); `compute.yaml` → v1.1.0
+  (back-compatible with the M2 catalog/quota/jobs surface).
+- `.golangci.yml`: `revive unhandled-error` now ignores infallible writers (`fmt.*Print*`,
+  `strings.Builder`/`bytes.Buffer`); the 4 sha256/hmac hash writes in `chain.go`/`stripe.go` use
+  explicit `_, _ =`. Closes a latent gap — all 5 modules are now lint-clean on a **cold** cache.
+
+### Verified
+- **Live e2e on k3d:** signup → mint `gpu_h100` → **create instance** (running + ssh connect info) →
+  list → run 8s → **stop** → async debit: `gpu_h100 100.000000 → 99.997778` (8s × 1 GPU ÷ 3600 =
+  0.002222 GPU-h, exact). Tenant-scoped, `is_paper` respected.
+- Unit + API tests green (manager lifecycle/capacity/metering with a controllable clock; shared-pool
+  instance↔job contention → 402). golangci-lint v2.12.2 clean; `/security-review` clean.
+- **Mock-GPU backend** — the real Kueue+Volcano provisioner (same interface) and the **<90s-P95**
+  real-hardware timing remain GPU-node-gated; idle auto-stop enforcement lands with the F06 policy.
+
 ## [v0.2.16] — golangci-lint v2 (Go 1.25) — lint is a hard CI gate again (F01 tooling)
 
 ### Changed

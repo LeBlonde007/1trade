@@ -14,6 +14,7 @@ type Config struct {
 	PlatformURL string `json:"platform_url"`
 	GatewayURL  string `json:"gateway_url"`
 	LedgerURL   string `json:"ledger_url"`
+	ComputeURL  string `json:"compute_url"`
 }
 
 // defaults are the local-dev service URLs (prod sets these to the api.exascale.io gateway).
@@ -22,6 +23,7 @@ func defaults() Config {
 		PlatformURL: "http://localhost:8001",
 		GatewayURL:  "http://localhost:8085",
 		LedgerURL:   "http://localhost:8002",
+		ComputeURL:  "http://localhost:8086",
 	}
 }
 
@@ -48,6 +50,9 @@ func Load() Config {
 	}
 	if v := os.Getenv("EXASCALE_LEDGER_URL"); v != "" {
 		c.LedgerURL = v
+	}
+	if v := os.Getenv("EXASCALE_COMPUTE_URL"); v != "" {
+		c.ComputeURL = v
 	}
 	if v := os.Getenv("EXASCALE_TOKEN"); v != "" {
 		c.Token = v

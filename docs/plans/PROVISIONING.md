@@ -9,6 +9,25 @@ Pair with [PLATFORM_GAPS.md](PLATFORM_GAPS.md).
 
 ---
 
+## Environments
+
+| `env` | What it is | GPU | Purpose |
+|---|---|---|---|
+| **`env=local`** | k3d on the dev box (Tilt) | **mock‑GPU** (`exascale.io/gpu=mock`) | Day‑to‑day dev; the whole stack runs GPU‑free. |
+| **`env=sandbox`** 🟢 | a single **RTX 5090** (32 GB, Blackwell) reached by **SSH over a Tailscale IP** | **real, 1× RTX 5090** | **Validation‑only** — prove the real‑GPU path (F09 real vLLM serving + the live meter→debit loop; F12/F13 on real hardware). NOT a sellable tier. |
+| **`env=prod`** 🔴/🟠 | managed K8s / bare‑metal (later) | **H100/H200 supply** | The sellable `gpu_*` tiers, 70B‑class models, multi‑GPU gangs, the <90s‑on‑H100 SLA. |
+
+> **Sandbox notes (RTX 5090).** Blackwell sm_120 needs **CUDA 12.8+ / PyTorch 2.7+ (cu128) / recent
+> vLLM (≥0.8.x)** — the current `Dockerfile.vllm` (`pytorch:24.10` + `vllm 0.6.3`) must be bumped before
+> it runs there; driver 570+ on the box. Fits **Llama‑3.1‑8B + Whisper** (bf16); **not** 70B (>32 GB).
+> Consumer card → **no MIG / no NVLink** (so F11 packing here = static co‑loc / hot‑swap only; single
+> GPU = no multi‑GPU gang). Real inference bills `text`/`speech` per token — **orthogonal to `gpu_*`**,
+> so validation needs **no `credit-types.md` change**. Wire it by running the runtime on the box
+> (`docker run --gpus all`) and pointing the gateway's `VLLM_BASE_URL` at its Tailscale IP +
+> `INFERENCE_BACKEND=vllm`. See memory `gpu-sandbox-40gb` for detail.
+
+---
+
 ## 🔴 Needed NOW — take real money + serve real inference (M2)
 
 | Account / service | Gives you (env / config) | What it's for |
@@ -18,7 +37,7 @@ Pair with [PLATFORM_GAPS.md](PLATFORM_GAPS.md).
 | **TLS certs** | — | `https://` (via Cloudflare or Let's Encrypt). |
 | **Container registry** | image host | GHCR / Docker Hub / cloud. GPU manifest refs `registry.exascale.io/inference-runtime:vllm`. |
 | **Managed K8s or bare‑metal k3s** | `KUBECONFIG` | Real cluster (local is k3d only). |
-| **GPU node(s)** | a 40 GB+ GPU | F09 to actually serve the M2 models (Lambda/CoreWeave/RunPod or owned). |
+| **GPU node(s)** | H100/H200 supply (`env=prod`) | The sellable `gpu_*` tiers + 70B‑class models in production. **Validation is already covered by `env=sandbox` (RTX 5090)** — see Environments above; this row is the *production supply* (Lambda/CoreWeave/RunPod or owned). |
 | **Hugging Face + Llama license** | `HF_TOKEN` | Pull gated Llama 3.1 weights to the PVC (Whisper is open; accept Meta's license). |
 | **NVIDIA NGC** (free) | NGC API key | `Dockerfile.vllm` base `nvcr.io/nvidia/pytorch`. *(Or switch base to `vllm/vllm-openai` on Docker Hub → skip NGC.)* |
 | **Transactional email** | `SMTP_*` / provider API key | Email verification + receipts (SES / Postmark / SendGrid). The "Verify" gap. |
@@ -56,6 +75,8 @@ GPU node · HF token (Llama license) · email provider.
 ## 🟢 Already have / auto‑handled
 - ✅ **GitHub** (`saadallahdev/ex-main`) — code + branches + tags pushed.
 - ✅ **SSH key** — push auth works.
+- ✅ **`env=sandbox` GPU** — RTX 5090 (32 GB) reachable via SSH over Tailscale, for real‑GPU
+  validation (see Environments above). Needs the `Dockerfile.vllm` CUDA‑12.8 bump before first use.
 - ✅ **PCI** — handled by Stripe; we never touch card data.
 - ✅ **JWT / service secrets** — generated into the `platform-auth` k8s Secret (dev). Prod moves them
   into the secrets manager below.

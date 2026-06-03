@@ -36,7 +36,7 @@ func canonicalJSON(p chainPayload) []byte {
 // hex-encoded. The genesis link uses an agreed seed string as prev_chain_hash.
 func computeChainHash(prevChainHash string, p chainPayload) string {
 	h := sha256.New()
-	h.Write([]byte(prevChainHash))
-	h.Write(canonicalJSON(p))
+	_, _ = h.Write([]byte(prevChainHash)) // hash.Hash.Write never returns an error
+	_, _ = h.Write(canonicalJSON(p))
 	return hex.EncodeToString(h.Sum(nil))
 }
