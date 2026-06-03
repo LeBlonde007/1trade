@@ -4,6 +4,23 @@ All notable changes to Exascale. Format: [Keep a Changelog](https://keepachangel
 SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not dates — see
 `docs/plans/MANAGEMENT_PLAN.md`).
 
+## [v0.3.5] — Compact K/M/B number formatting across the product UI (F20)
+
+### Changed
+- **Large credit amounts now render compactly** (`250,000 → 250K`, `1.2M`, `3.4B`) so the dense,
+  numbers-first screens stay readable; values under 1000 keep up to 2 decimals, and the **exact
+  value is on hover** (`title=`). A shared `compact` / `full` pair was added to `utils/format.ts`
+  (auto-imported), and `formatCredits` now delegates to `compact` — so every screen using the shared
+  util is compact automatically. Per-credit prices (sub-1 decimals like `$0.001210`) are untouched.
+- Applied across the live product screens: **console** (KPI hero, balances, activity tape, purchases,
+  budget), **/wallet/buy** (preview, current balance, quick-amount chips, success banner), and
+  **/wallet** (balance-card holdings + locked + convertible). Editable amount inputs keep full
+  grouping (so typing/parsing still works); only displays compact.
+
+### Verified
+- Typecheck clean; screenshotted live in k3d — `TEXT 250,000 → 250K` in the KPI hero, balances,
+  activity, and purchases, with `▲250K` deltas and full values on hover.
+
 ## [v0.3.4] — Console restructured into a live command center (F20)
 
 ### Changed

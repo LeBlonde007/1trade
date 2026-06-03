@@ -169,14 +169,14 @@ onMounted(() => {
           <span class="amount-suffix mono">{{ active.label.toUpperCase() }}</span>
         </label>
         <div class="qa-row" :style="{ gridTemplateColumns: `repeat(${quickAmounts.length}, 1fr)` }">
-          <button v-for="v in quickAmounts" :key="v" type="button" class="qa-btn mono" :class="{ active: amount === v }" @click="setQuick(v)">{{ fmtInt(v) }}</button>
+          <button v-for="v in quickAmounts" :key="v" type="button" class="qa-btn mono" :class="{ active: amount === v }" @click="setQuick(v)">{{ compact(v) }}</button>
         </div>
 
         <!-- Preview -->
         <div class="preview">
           <div class="preview-row major">
             <span class="lbl">You buy</span>
-            <span class="val mono">{{ fmtInt(amount) }}<span class="unit">{{ active.label }} credits</span></span>
+            <span class="val mono" :title="full(amount)">{{ compact(amount) }}<span class="unit">{{ active.label }} credits</span></span>
           </div>
           <div class="preview-row">
             <span class="lbl">Indicative cost</span>
@@ -184,13 +184,13 @@ onMounted(() => {
           </div>
           <div class="preview-row">
             <span class="lbl">Current balance</span>
-            <span class="val small mono">{{ fmtInt(currentBalance) }}<span class="unit">{{ active.label }}</span></span>
+            <span class="val small mono" :title="full(currentBalance)">{{ compact(currentBalance) }}<span class="unit">{{ active.label }}</span></span>
           </div>
         </div>
 
         <div v-if="error" class="banner neg">{{ error }}</div>
         <div v-else-if="settled" class="banner ok">
-          ✓ Purchased — {{ fmtInt(amount) }} {{ active.label }} credits added to your wallet (test mode).
+          ✓ Purchased — {{ compact(amount) }} {{ active.label }} credits added to your wallet (test mode).
           <NuxtLink to="/wallet" class="bk">View wallet →</NuxtLink>
         </div>
         <div v-else-if="done" class="banner ok">
