@@ -367,7 +367,8 @@ paths:
                 type: object
                 properties:
                   purchase_id:  { type: string, format: uuid }
-                  checkout_url: { type: string, description: "redirect the customer here to pay" }
+                  checkout_url: { type: string, description: "redirect the customer here to pay (real Stripe)" }
+                  settled:      { type: boolean, description: "dev/sandbox only — true when MockStripe booked the credits inline (no redirect / webhook); real Stripe returns false" }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '422': { description: Invalid order., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
 
