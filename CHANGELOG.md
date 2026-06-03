@@ -4,6 +4,36 @@ All notable changes to Exascale. Format: [Keep a Changelog](https://keepachangel
 SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not dates — see
 `docs/plans/MANAGEMENT_PLAN.md`).
 
+## [v0.3.2] — Live Stripe-only buy-credits screen (F06/F20)
+
+### Changed
+- **`/wallet/buy` is now live and Stripe-only** (was an 1,850-line standalone trader mock with
+  card/wire/ACH + fake "Order placed" + mock data). Rewritten lean (~330 lines): pick a real credit
+  type (`text` / `ai_index` / `speech` / `image` / `video` / `gpu_h100` / `gpu_h200`) + amount →
+  `useBilling().checkout(amount, credit_type, 'usd')` → redirect to the **Stripe-hosted** checkout;
+  the webhook books the credits on settlement. `amount` is credits (per the contract); the USD figure
+  is **indicative** (published reference prices) with the exact charge shown at Stripe.
+- Wire/ACH + JPY are removed from the screen (F06 ships Stripe only; ACH/wire/JPY are M3). All mock
+  data dropped (wallet `$10,118.46`, order id, fake email, price ticker, inline card form). Now
+  `middleware: 'auth'`; real wallet balance via `useWallet`; sandbox shows a test-mode note.
+- The real-money **KYC gate** (v0.3.1) carries over; the `PAPER/LIVE` pill reflects `is_paper`.
+
+### Verified
+- Typecheck clean. The checkout call mirrors the proven console buy panel exactly.
+
+## [v0.3.1] — AI-company onboarding Phase 1 → console (persona) + console KPIs + KYC gate (F20/F22)
+
+### Added
+- **AI-Company journey Phase 1 complete** (signup → verify → welcome → tour → `/console`),
+  persona-aware throughout: signup sets the runtime persona from the account type + the BFF sets the
+  session; `usePersona` gains `home`/`postOnboard` so each persona lands on its surface (AI company →
+  `/console`, never the paused exchange); the welcome is an inference/compute quick-start (not trading).
+- **Chrome de-trading-fied** for the platform persona: Topbar brand → persona home, AI-Index pill +
+  USD trading balance are trader-only (AI company gets a plain Wallet link); Sidebar gains a Console
+  home item. **Console** adopts the app layout + numbers-first KPI tiles (live today-delta, ▲/▼,
+  activity pulse). **KYC gate** at `/wallet/buy` blocks real-money for unverified accounts (sandbox
+  exempt; server enforcement = F22).
+
 ## [v0.3.0] — F13 GPU instance lifecycle (on-demand) — M3 begins
 
 ### Added
