@@ -16,11 +16,17 @@ import {
   LogOut,
   Building2,
   ExternalLink,
+  Wallet,
 } from 'lucide-vue-next'
 
 const palette = useCommandPalette()
 const notifications = useNotifications()
 const unreadCount = useState<number>('notif-unread', () => 2)
+
+// Persona drives the brand link + which chrome shows: the AI-Index market pill + USD trading balance
+// are trader-only; an AI company gets a plain Wallet link instead of a fake trading balance.
+const personaCx = usePersona()
+const isTrader = computed(() => personaCx.persona.value === 'trader')
 
 // ─── Live index ticker ───────────────────────────────────────
 const indexPrice = ref(0.001005)
@@ -95,11 +101,14 @@ function onKeyDown(e: KeyboardEvent) {
 onMounted(() => {
   document.addEventListener('mousedown', onDocMouseDown)
   document.addEventListener('keydown', onKeyDown)
-  tickerInterval = setInterval(() => {
-    const drift = (Math.random() - 0.5) * 0.000002
-    indexPrice.value = Math.max(0.0009, Math.min(0.0011, indexPrice.value + drift))
-    indexChange.value = (indexPrice.value - 0.001) / 0.001
-  }, 3000)
+  // The index ticker only drives the trader market pill — don't run it otherwise.
+  if (isTrader.value) {
+    tickerInterval = setInterval(() => {
+      const drift = (Math.random() - 0.5) * 0.000002
+      indexPrice.value = Math.max(0.0009, Math.min(0.0011, indexPrice.value + drift))
+      indexChange.value = (indexPrice.value - 0.001) / 0.001
+    }, 3000)
+  }
 })
 
 onBeforeUnmount(() => {
@@ -119,12 +128,13 @@ function orgTypeLabel(t: 'personal' | 'lab' | 'enterprise'): string {
   <header class="topbar">
     <!-- Left: brand + market selector -->
     <div class="left">
-      <NuxtLink to="/trade" class="brand-link">
+      <NuxtLink :to="personaCx.home.value" class="brand-link">
         <BrandLogo variant="mark" size="sm" />
         <span class="brand-text">EXASCALE</span>
       </NuxtLink>
 
-      <NuxtLink to="/markets/eai-idx" class="market-pill">
+      <!-- AI-Index market pill — trading only (paused exchange). Hidden for AI company / datacenter. -->
+      <NuxtLink v-if="isTrader" to="/markets/eai-idx" class="market-pill">
         <span class="sym">EAI-IDX</span>
         <span class="name">AI Index</span>
         <span class="px mono">{{ formatPrice(indexPrice) }}</span>
@@ -135,9 +145,15 @@ function orgTypeLabel(t: 'personal' | 'lab' | 'enterprise'): string {
 
     <!-- Right: balance + search + bell + avatar -->
     <div class="right">
-      <NuxtLink to="/wallet" class="balance">
+      <!-- Trader: USD trading balance (paused showcase). AI company / datacenter: a plain Wallet link
+           — no fake number; the real per-credit balances live on /wallet + the console strip. -->
+      <NuxtLink v-if="isTrader" to="/wallet" class="balance">
         <span class="amount mono">$10,247.83</span>
         <span class="cur">USD</span>
+      </NuxtLink>
+      <NuxtLink v-else to="/wallet" class="balance" title="Wallet — credit balances">
+        <Wallet :size="14" />
+        <span class="cur">Wallet</span>
       </NuxtLink>
 
       <button class="icon" aria-label="Search (⌘K)" title="Search · ⌘K" @click="palette.open()">

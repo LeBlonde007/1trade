@@ -78,8 +78,10 @@ function start() {
   }
 }
 
+// Skip the tour → land on the persona's product (AI company → console, datacenter → dashboard,
+// trader → KYC gate), never the hardcoded exchange.
 function skip() {
-  router.push('/trade')
+  router.push(personaCx.postOnboard.value)
 }
 </script>
 

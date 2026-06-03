@@ -61,5 +61,14 @@ export function usePersona() {
 
   const meta = computed<PersonaMeta>(() => PERSONA_META[persona.value])
 
-  return { persona, meta, set, belongsTo }
+  // home — where this persona's product lives. AI company → the console (live product); datacenter
+  // → the supply dashboard; trader → the (paused) exchange. Used by onboarding + nav to land users
+  // on the right surface instead of hardcoding `/trade` everywhere.
+  const home = computed(() => ({ trader: '/trade', enterprise: '/console', partner: '/datacenter' }[persona.value]))
+
+  // postOnboard — where to go after the welcome + tour. Same as home, except a trader hits the
+  // Light-KYC gate first (trading requires it); AI company + datacenter skip straight to their home.
+  const postOnboard = computed(() => persona.value === 'trader' ? '/onboarding/kyc' : home.value)
+
+  return { persona, meta, set, belongsTo, home, postOnboard }
 }

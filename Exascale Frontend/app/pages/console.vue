@@ -5,10 +5,10 @@
  * (balances + transactions), buy-credits, and API keys. Always live (no mock mode). Tokens only —
  * no raw values here.
  */
-definePageMeta({ layout: false, middleware: 'auth' })
-useHead({ title: 'Console — Exascale', htmlAttrs: { 'data-theme': 'dark' } })
+definePageMeta({ layout: 'app', middleware: 'auth' })
+useHead({ title: 'Console — Exascale' })
 
-const { user, logout } = useAuth()
+const { user } = useAuth()
 const { models, load: loadCatalog } = useCatalog()
 const { balances, transactions, loadBalances, loadTransactions } = useWallet()
 const { running, error: infError, insufficientCredit, result, run } = useInference()
@@ -67,6 +67,19 @@ function isDebit(amount: string): boolean {
 }
 const textBalance = computed(() => balances.value.find((b) => b.credit_type === 'text')?.balance ?? '0')
 
+// ── KPI deltas — numbers-first hero tiles show today's net movement per credit type ─────────
+// Net signed change today for a credit type (mint/purchase +, consumption −), from the live tx feed.
+const todayKey = new Date().toDateString()
+function todayNet(ct: string): number {
+  return transactions.value
+    .filter((t) => t.credit_type === ct && new Date(t.created_at).toDateString() === todayKey)
+    .reduce((s, t) => s + Number(t.amount), 0)
+}
+// Activity pulse: count of ledger movements today (a small "the market is live" signal in the header).
+const txTodayCount = computed(() =>
+  transactions.value.filter((t) => new Date(t.created_at).toDateString() === todayKey).length,
+)
+
 // ── Budget + activity panels ────────────────────────────────
 interface Budget { credit_type: string; monthly_limit: string }
 interface Purchase { id: string; amount: string; credit_type: string; currency: string; status: string; created_at: string }
@@ -111,30 +124,39 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="console" data-theme="dark">
-    <!-- Topbar -->
-    <header class="topbar">
-      <div class="brand">
-        <span class="mark">EXASCALE</span>
-        <span class="sub">Console</span>
-        <span class="mode mode-live">live</span>
+  <div class="console">
+    <!-- Page header (global nav + identity live in AppTopbar / AppSidebar) -->
+    <header class="page-head">
+      <div class="ph-titles">
+        <div class="eyebrow">Overview</div>
+        <h1 class="page-title">Console</h1>
       </div>
-      <div class="who">
+      <div class="ph-meta">
         <span class="bal mono">{{ fmt(textBalance) }} <span class="unit">text</span></span>
-        <span v-if="user?.is_paper" class="paper">paper</span>
-        <span class="email">{{ user?.email }}</span>
-        <button class="ghost" @click="logout().then(() => navigateTo('/login'))">Sign out</button>
+        <span v-if="txTodayCount" class="pulse mono"><span class="dot" />{{ txTodayCount }} today</span>
+        <span class="mode-live">live</span>
+        <span v-if="user?.is_paper" class="paper">sandbox</span>
       </div>
     </header>
 
-    <!-- Balances strip -->
-    <section class="strip">
-      <div v-for="b in balances" :key="b.credit_type" class="bal-tile">
-        <div class="label">{{ b.credit_type }}</div>
-        <div class="num mono">{{ fmt(b.balance) }}</div>
-        <div class="sub-meta">locked {{ fmt(b.locked_amount) }}</div>
+    <!-- KPI tiles — numbers-first: the balance is the largest element, with today's net movement -->
+    <section class="kpis">
+      <div v-for="b in balances" :key="b.credit_type" class="kpi">
+        <div class="kpi-label">{{ b.credit_type }}</div>
+        <div class="kpi-num mono">{{ fmt(b.balance) }}</div>
+        <div class="kpi-foot mono">
+          <span
+            v-if="todayNet(b.credit_type) !== 0"
+            class="delta"
+            :class="todayNet(b.credit_type) < 0 ? 'neg' : 'pos'"
+          >{{ todayNet(b.credit_type) < 0 ? '▼' : '▲' }} {{ fmt(String(Math.abs(todayNet(b.credit_type)))) }}</span>
+          <span v-else class="delta muted">— flat</span>
+          <span v-if="Number(b.locked_amount) > 0" class="locked">{{ fmt(b.locked_amount) }} locked</span>
+        </div>
       </div>
-      <div v-if="!balances.length" class="bal-tile empty">No credits yet — buy some →</div>
+      <NuxtLink v-if="!balances.length" to="/wallet/buy" class="kpi empty">
+        No credits yet — buy some →
+      </NuxtLink>
     </section>
 
     <div class="grid">
@@ -288,7 +310,6 @@ onMounted(async () => {
 
 <style scoped>
 .console {
-  min-height: 100vh;
   background: var(--canvas);
   color: var(--text);
   font-family: var(--font-sans);
@@ -301,27 +322,33 @@ onMounted(async () => {
 }
 .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
-/* Topbar */
-.topbar { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: var(--sp-4); }
-.brand { display: flex; align-items: baseline; gap: var(--sp-3); }
-.mark { font-weight: 700; letter-spacing: var(--ls-wide); font-size: var(--fs-md); }
-.sub { color: var(--text-3); font-size: var(--fs-sm); }
-.mode { font-size: var(--fs-tiny); text-transform: uppercase; letter-spacing: var(--ls-wide); padding: 2px var(--sp-2); border-radius: var(--radius-sm); }
-.mode-live { background: var(--pos-soft); color: var(--pos); }
-.mode-mock { background: var(--overlay); color: var(--text-3); border: 1px solid var(--border); }
-.who { display: flex; align-items: center; gap: var(--sp-4); font-size: var(--fs-sm); }
-.who .bal { font-size: var(--fs-md); }
-.who .unit { color: var(--text-3); font-size: var(--fs-xs); }
-.paper { font-size: var(--fs-tiny); text-transform: uppercase; letter-spacing: var(--ls-wide); color: var(--warn); border: 1px solid var(--border); padding: 1px var(--sp-2); border-radius: var(--radius-sm); }
-.email { color: var(--text-2); }
+/* Page header */
+.page-head { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 1px solid var(--border); padding-bottom: var(--sp-4); }
+.eyebrow { font-family: var(--font-mono); font-size: var(--fs-tiny); text-transform: uppercase; letter-spacing: var(--ls-wide); color: var(--text-3); }
+.page-title { font-size: var(--fs-xl, 28px); font-weight: 600; letter-spacing: -0.02em; margin: 4px 0 0; color: var(--text); }
+.ph-meta { display: flex; align-items: center; gap: var(--sp-3); font-size: var(--fs-sm); }
+.ph-meta .bal { font-size: var(--fs-md); }
+.ph-meta .unit { color: var(--text-3); font-size: var(--fs-xs); }
+.mode-live { font-size: var(--fs-tiny); text-transform: uppercase; letter-spacing: var(--ls-wide); padding: 2px var(--sp-2); border-radius: var(--radius-sm); background: var(--pos-soft); color: var(--pos); }
+.paper { font-size: var(--fs-tiny); text-transform: uppercase; letter-spacing: var(--ls-wide); color: var(--info); border: 1px solid var(--border); padding: 1px var(--sp-2); border-radius: var(--radius-sm); }
+/* Live activity pulse — subtle "the ledger is moving" signal (principle 5: live, but restrained) */
+.pulse { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-xs); color: var(--text-3); }
+.pulse .dot { width: 6px; height: 6px; border-radius: var(--radius-full); background: var(--pos); animation: pulse 2.4s ease-in-out infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+@media (prefers-reduced-motion: reduce) { .pulse .dot { animation: none; } }
 
-/* Balances strip */
-.strip { display: flex; gap: var(--sp-3); flex-wrap: wrap; }
-.bal-tile { flex: 1; min-width: 160px; background: var(--elevated); border: 1px solid var(--border); border-radius: var(--radius-md); padding: var(--sp-3) var(--sp-4); }
-.bal-tile.empty { color: var(--text-3); display: flex; align-items: center; }
-.bal-tile .label { font-size: var(--fs-tiny); text-transform: uppercase; letter-spacing: var(--ls-wide); color: var(--text-3); }
-.bal-tile .num { font-size: var(--fs-2xl); font-weight: 600; margin-top: var(--sp-1); }
-.bal-tile .sub-meta { font-size: var(--fs-xs); color: var(--text-3); margin-top: 2px; }
+/* KPI tiles (numbers-first: the balance is the largest element in its tile) */
+.kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: var(--sp-3); }
+.kpi { background: var(--elevated); border: 1px solid var(--border); border-radius: var(--radius-md); padding: var(--sp-3) var(--sp-4); transition: border-color var(--dur) var(--ease); }
+.kpi:hover { border-color: var(--border-strong); }
+.kpi-label { font-size: var(--fs-tiny); text-transform: uppercase; letter-spacing: var(--ls-wide); color: var(--text-3); }
+.kpi-num { font-size: var(--fs-2xl, 30px); font-weight: 600; letter-spacing: -0.01em; line-height: 1.1; margin-top: var(--sp-1); }
+.kpi-foot { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-2); font-size: var(--fs-xs); margin-top: var(--sp-2); }
+.kpi-foot .delta.pos { color: var(--pos); }
+.kpi-foot .delta.neg { color: var(--neg); }
+.kpi-foot .delta.muted, .kpi-foot .locked { color: var(--text-3); }
+.kpi.empty { color: var(--text-3); display: flex; align-items: center; justify-content: center; text-decoration: none; border-style: dashed; }
+.kpi.empty:hover { color: var(--text); border-color: var(--brand); }
 
 /* Grid */
 .grid { display: grid; grid-template-columns: 1.6fr 1fr; gap: var(--sp-4); }
@@ -366,6 +393,8 @@ onMounted(async () => {
 .tbl { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
 .tbl th { text-align: left; font-size: var(--fs-tiny); text-transform: uppercase; letter-spacing: var(--ls-wide); color: var(--text-3); font-weight: 500; padding: var(--sp-2); border-bottom: 1px solid var(--border); }
 .tbl td { padding: var(--sp-2); border-bottom: 1px solid var(--border); }
+.tbl tbody tr { transition: background var(--dur) var(--ease); }
+.tbl tbody tr:hover td { background: var(--overlay); }
 .tbl .r { text-align: right; }
 .tbl .muted { color: var(--text-3); }
 .tbl .prefix { color: var(--text-2); }

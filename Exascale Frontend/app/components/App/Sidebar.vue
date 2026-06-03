@@ -8,6 +8,7 @@
  * /onboarding/tour.
  */
 import {
+  LayoutDashboard,
   CandlestickChart,
   List,
   TrendingUp,
@@ -38,6 +39,9 @@ interface NavItem {
 }
 
 const items: NavItem[] = [
+  // Console — the AI company's home / overview (first thing after onboarding).
+  { icon: LayoutDashboard,  label: 'Console',   to: '/console',                        personas: ['enterprise'] },
+
   // Exchange / trading surfaces — TRADER only. (The exchange is paused per the GTM pivot; the
   // AI company consumes inference/compute, it does not trade — so these are not on `enterprise`.)
   { icon: CandlestickChart, label: 'Trade',     to: '/trade',                          personas: ['trader'] },

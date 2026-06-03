@@ -15,6 +15,17 @@ useHead({ title: 'Buy Credits — Exascale', htmlAttrs: { 'data-theme': 'dark' }
 
 const route = useRoute()
 
+// ── Real-money KYC gate (F22) ───────────────────────────────────────────────────────────────
+// KYC is NOT an onboarding step — it's a one-time gate at the first REAL-MONEY purchase. Sandbox
+// (paper) accounts and all credit usage (inference, GPU compute) need none. Server-side enforcement
+// lands with F22 (M3); this is the client gate that blocks a real-money order until identity is
+// verified. Preview the gate in dev with ?kyc=1.
+const { user } = useAuth()
+const realMoney = computed(() => user.value?.is_paper === false)
+// No verification backend yet → real-money accounts are treated as unverified until F22 marks them.
+const kycVerified = computed(() => (user.value as { kyc_status?: string } | null)?.kyc_status === 'verified')
+const showKycGate = computed(() => (realMoney.value && !kycVerified.value) || route.query.kyc === '1')
+
 type StepKey = 'amount' | 'payment' | 'confirm'
 type CreditType = 'AI_INDEX' | 'CASH' | 'SUB'
 type Payment = 'card' | 'wire' | 'ach'
@@ -86,6 +97,9 @@ const subCredit = ref('TEXT')
 const payment = ref<Payment>('wire')
 const termsAccepted = ref(false)
 const livePx = ref(0.001005)
+
+// The active step definition. stepIdx is always a valid index (clamped by next/back/goTo).
+const step = computed(() => STEPS[stepIdx.value]!)
 
 // Allow ?credit=ai|sub|cash for pre-selection from Wallet links
 onMounted(() => {
@@ -252,7 +266,7 @@ function goTrade()  { router.push('/trade') }
         EXASCALE
       </NuxtLink>
       <div class="topbar-right">
-        <span class="env-pill">PAPER</span>
+        <span class="env-pill" :class="{ live: realMoney }">{{ realMoney ? 'LIVE' : 'PAPER' }}</span>
         <span class="balance">
           Wallet balance
           <strong>${{ fmtUSD(walletBalance) }}</strong>
@@ -270,6 +284,34 @@ function goTrade()  { router.push('/trade') }
           Convert USD into AI Index credits or hold as cash. No conversion fee on bulk purchase.
           Settlement instant on card, 1–3 business days on wire.
         </p>
+      </div>
+
+      <!-- ===== KYC gate — a real-money purchase needs a one-time identity check (F22). Sandbox skips it. -->
+      <div v-if="showKycGate" class="kyc-gate">
+        <div class="kyc-eyebrow">Compliance · Identity verification</div>
+        <h2 class="kyc-title">Verify your identity to buy with real money.</h2>
+        <p class="kyc-lede">
+          Real-money purchases require a one-time identity check (KYC/AML) — credits are prepaid
+          service units, so we verify the buyer before the first real-money order. Your
+          <strong>sandbox</strong> account and all credit usage (inference, GPU compute) need none.
+        </p>
+        <ul class="kyc-list">
+          <li><span class="k-ix">01</span><div><strong>Government ID</strong><span>Passport or driver's licence — verified in minutes.</span></div></li>
+          <li><span class="k-ix">02</span><div><strong>Business details</strong><span>Legal entity + registered address for the account.</span></div></li>
+          <li><span class="k-ix">03</span><div><strong>Source of funds</strong><span>A short declaration for AML compliance.</span></div></li>
+        </ul>
+        <div class="kyc-actions">
+          <NuxtLink to="/onboarding/kyc" class="btn primary lg">Begin verification →</NuxtLink>
+          <NuxtLink to="/console" class="btn secondary lg">Keep using sandbox</NuxtLink>
+        </div>
+        <div class="kyc-foot">Identity data is handled under our KYC/AML policy · SOC 2 controls · encrypted at rest.</div>
+      </div>
+
+      <template v-else>
+      <!-- Sandbox reassurance — paper credits need no verification (the policy, surfaced up front) -->
+      <div v-if="!realMoney" class="sandbox-note">
+        <span class="sn-dot" />
+        Sandbox mode — buying paper credits, no identity verification needed. Real-money purchases will require a one-time KYC check.
       </div>
 
       <!-- Stepper -->
@@ -301,9 +343,9 @@ function goTrade()  { router.push('/trade') }
       <div class="card">
         <div class="card-head">
           <div>
-            <div class="eyebrow">{{ STEPS[stepIdx].eyebrow }}</div>
-            <h2 class="card-ttl">{{ STEPS[stepIdx].title }}</h2>
-            <p v-if="STEPS[stepIdx].lede" class="card-lede">{{ STEPS[stepIdx].lede }}</p>
+            <div class="eyebrow">{{ step.eyebrow }}</div>
+            <h2 class="card-ttl">{{ step.title }}</h2>
+            <p v-if="step.lede" class="card-lede">{{ step.lede }}</p>
           </div>
           <div class="card-meta">
             <strong>{{ String(stepIdx + 1).padStart(2, '0') }}</strong> / 03 ·
@@ -723,6 +765,7 @@ function goTrade()  { router.push('/trade') }
           </div>
         </div>
       </div>
+      </template>
     </div>
   </div>
 </template>
@@ -850,6 +893,41 @@ function goTrade()  { router.push('/trade') }
   margin: 0;
   max-width: 540px;
 }
+
+/* ===== KYC gate (real-money) ===== */
+.env-pill.live { color: var(--pos); background: rgba(22, 163, 74, 0.10); border-color: rgba(22, 163, 74, 0.25); }
+.sandbox-note {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 12.5px; color: var(--text-2);
+  background: var(--canvas); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 10px 14px; margin-bottom: 20px;
+}
+.sn-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+.kyc-gate {
+  background: var(--elevated); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 32px; max-width: 640px;
+}
+.kyc-eyebrow {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--text-3); margin-bottom: 14px;
+  display: inline-flex; align-items: center; gap: 8px;
+}
+.kyc-eyebrow::before { content: ''; width: 5px; height: 5px; background: var(--warn); display: inline-block; }
+.kyc-title {
+  font-family: var(--font-display); font-weight: 600; font-size: 24px; letter-spacing: -0.02em;
+  line-height: 1.15; margin: 0 0 10px; color: var(--text);
+}
+.kyc-lede { color: var(--text-2); font-size: 14px; line-height: 1.55; margin: 0 0 22px; max-width: 560px; }
+.kyc-lede strong { color: var(--text); font-weight: 600; }
+.kyc-list { list-style: none; margin: 0 0 22px; padding: 0; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.kyc-list li { display: flex; gap: 14px; align-items: flex-start; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+.kyc-list li:last-child { border-bottom: 0; }
+.k-ix { font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--text-3); padding-top: 2px; font-variant-numeric: tabular-nums; }
+.kyc-list strong { display: block; font-size: 14px; font-weight: 500; color: var(--text); margin-bottom: 2px; }
+.kyc-list li span:last-child { font-size: 12.5px; color: var(--text-2); }
+.kyc-actions { display: flex; gap: 8px; margin-bottom: 18px; }
+.kyc-actions .btn { text-decoration: none; }
+.kyc-foot { font-family: var(--font-mono); font-size: 11px; color: var(--text-3); letter-spacing: 0.04em; border-top: 1px dashed var(--border); padding-top: 14px; }
 
 /* ===== Stepper ===== */
 .steps {
