@@ -352,13 +352,13 @@ func cmdKeys(cfg config.Config, args []string) error {
 // cmdConfig views or sets a config value.
 func cmdConfig(cfg config.Config, args []string) error {
 	if len(args) == 0 || args[0] == "get" {
-		fmt.Printf("platform_url  %s\ngateway_url   %s\nledger_url    %s\nlogged_in     %v\nconfig file   %s\n",
-			cfg.PlatformURL, cfg.GatewayURL, cfg.LedgerURL, cfg.Token != "", config.Path())
+		fmt.Printf("platform_url  %s\ngateway_url   %s\nledger_url    %s\ncompute_url   %s\nlogged_in     %v\nconfig file   %s\n",
+			cfg.PlatformURL, cfg.GatewayURL, cfg.LedgerURL, cfg.ComputeURL, cfg.Token != "", config.Path())
 		return nil
 	}
 	if args[0] == "set" {
 		if len(args) < 3 {
-			return errors.New("usage: exascale config set <platform_url|gateway_url|ledger_url> <value>")
+			return errors.New("usage: exascale config set <platform_url|gateway_url|ledger_url|compute_url> <value>")
 		}
 		switch args[1] {
 		case "platform_url":
@@ -367,6 +367,8 @@ func cmdConfig(cfg config.Config, args []string) error {
 			cfg.GatewayURL = args[2]
 		case "ledger_url":
 			cfg.LedgerURL = args[2]
+		case "compute_url":
+			cfg.ComputeURL = args[2]
 		default:
 			return fmt.Errorf("unknown key %q", args[1])
 		}

@@ -49,7 +49,7 @@ func VerifyStripeSignature(payload []byte, sigHeader, secret string, tolerance t
 	}
 
 	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write([]byte(ts + "." + string(payload)))
+	_, _ = mac.Write([]byte(ts + "." + string(payload))) // hash.Hash.Write never returns an error
 	expected := mac.Sum(nil)
 	for _, v := range v1s {
 		sig, err := hex.DecodeString(v)
@@ -67,6 +67,6 @@ func VerifyStripeSignature(payload []byte, sigHeader, secret string, tolerance t
 // mock Stripe to emit webhooks the verifier accepts).
 func SignStripePayload(payload []byte, ts int64, secret string) string {
 	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write([]byte(strconv.FormatInt(ts, 10) + "." + string(payload)))
+	_, _ = mac.Write([]byte(strconv.FormatInt(ts, 10) + "." + string(payload))) // never errors
 	return hex.EncodeToString(mac.Sum(nil))
 }
