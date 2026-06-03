@@ -2,11 +2,12 @@
 
 **Living status.** ✅ done · 🟩 partly done / in progress · ⬜ not started · ⏸ paused (by design).
 Updated as work lands. Pair with `SEQUENCING.md` (plan), `MANAGEMENT_PLAN.md` (tracker), `CHANGELOG.md` (releases).
-Last updated: 2026-06-02.
+Last updated: 2026-06-03.
 
 > Legend: ✅ **green = done** · 🟩 in progress · ⬜ **white = not done** · ⏸ paused.
 > Tags shipped: `v0.1.0 … v0.1.5` (M1) · `v0.2.0 … v0.2.12` (M2) · `v0.2.13 … v0.2.16` (F01 hardening:
-> test-e2e, scheduling, CI build/test, golangci-lint v2). All on `main` (origin).
+> test-e2e, scheduling, CI build/test, golangci-lint v2) · `v0.3.0` (M3 — F13 GPU instance lifecycle).
+> All on `main` (origin).
 
 ```
 Exascale
@@ -17,8 +18,9 @@ Exascale
 │   ├── ✅ credit-types.md · schemas/types.sql
 │   ├── ✅ openapi/credit.yaml · openapi/platform-core.yaml (v1.5.0: auth+accounts+RBAC+keys+billing+verify)
 │   ├── ✅ openapi/inference.yaml (v1.0.0, OpenAI-compatible)
+│   ├── ✅ openapi/compute.yaml (v1.1.0 — catalog/quota/jobs + instance lifecycle, F12+F13)
 │   ├── ✅ events  credit.tx.v1 · inference.usage.v1 · compute.usage.v1 · admin.action.v1
-│   └── ⬜ openapi/{compute,supply,index}.yaml · events/partner.capacity.v1
+│   └── ⬜ openapi/{supply,index}.yaml · events/partner.capacity.v1
 │       └── ⏸ Phase 2: trading.yaml · events/{trades.executed,orders.state,surveillance.alert}.v1
 │
 ├── 🟩 F01 Foundation infra  (~68%) — owner infra-sre
@@ -61,14 +63,14 @@ Exascale
 │   │                            capacity, idempotent submit, supply attribution). Emits
 │   │                            compute.usage.v1 → ledger debits gpu_* (live: gang→cancel→debit
 │   │                            1000→999.976667). M3: real Kueue+Volcano backend (same interface),
-│   │                            F13 instance lifecycle, 32+ GPU correctness — GPU-node-gated.
+│   │                            ✅ F13 instance lifecycle (v0.3.0), 32+ GPU correctness — GPU-node-gated.
 │   └── ✅ F20 console wired      live-only BFF (proxies the platform; no mock mode, v0.2.11) + live
 │                                /console (auth, catalog, inference, wallet, buy, keys, budget,
 │                                purchases, audit). wallet convert (v0.2.5) + live movements (v0.2.6);
 │                                inference real credit cost + session meter (v0.2.7); settings · API
 │                                keys live (v0.2.8); persona-scoped nav + onboarding (v0.2.9–v0.2.10).
 │
-├── ⬜ M3+ — F10 catalog · F11 packing · F13 GPU lifecycle · F14 reserved · F15 clusters
+├── 🟩 M3+ — ✅ F13 GPU lifecycle (v0.3.0) · ⬜ F10 catalog · F11 packing · F14 reserved · F15 clusters
 │        · F16 supply abstraction · F17 DC onboarding · F18 payouts · F19 attestation
 │
 ├── 🟩 F23 Console v1.5 screens (~15%) — the v1.5 screen catalog itemized screen-by-screen
@@ -93,11 +95,17 @@ Exascale
   **F07 conversion** (AI-index↔text) live (v0.2.4); **F12 compute control plane v0** live (v0.2.12) —
   mock-GPU gang scheduling → `compute.usage.v1` → ledger `gpu_*` debit, proven in k3d. **Deferred to
   M3 (GPU-node-gated): F12's real Kueue+Volcano backend + F09 real GPU serving.**
+- **M3 (First real customer revenue):** 🟩 **started.** ✅ **F13 GPU instance lifecycle** (v0.3.0) —
+  customer-facing on-demand instances (create/list/get/stop/start/delete) over `compute.yaml` v1.1.0,
+  sharing one GPU pool with the scheduler; per-interval metering → `compute.usage.v1` → `gpu_*` debit;
+  `exascale gpu …` CLI + live web `/compute` list & provision. Mock-GPU backend (real K8s provisioner +
+  <90s-P95 timing GPU-node-gated). Next: F11 packing, F10 full catalog, F14 reserved, F16 supply.
 - **Pulled forward:** F03 audit-log + RBAC (sequenced M4) built in M1; email-verify + budgets
   (M3-ish) shipped as gap-closers (v0.1.3).
-- **M3–M6:** ⬜ not started.
+- **M4–M6:** ⬜ not started.
 
-Repo: trunk = `main`, pushed to `origin` (ex-main). Tags v0.1.0→v0.1.5 (M1), v0.2.0→v0.2.12 (M2).
+Repo: trunk = `main`, pushed to `origin` (ex-main). Tags v0.1.0→v0.1.5 (M1), v0.2.0→v0.2.16 (M2 +
+F01 hardening), v0.3.0 (M3 — F13).
 
 ---
 
@@ -108,19 +116,22 @@ Repo: trunk = `main`, pushed to `origin` (ex-main). Tags v0.1.0→v0.1.5 (M1), v
    v0.2.14). Remaining: observability (`OBS=1` Prometheus/Loki/Tempo + per-service `/metrics`; tasks
    #3/#13), SOPS secrets, real-env clusters, CI green (wire `make test-e2e` into the pre-staging gate).
    Prod-hardening before paying customers (M3).
-2. **M3 begins — F13 GPU instance lifecycle** (<90s start, CLI `gpu create/list/stop`), the direct
-   continuation of F12 on the `scheduler.Scheduler` seam; then F11 packing, F10 full catalog, F14
-   reserved, F16 supply abstraction.
+2. **M3 continues — F11 multi-model-per-GPU packing, F10 full catalog, F14 reserved capacity, F16
+   supply abstraction.** ✅ **F13 GPU instance lifecycle done** (v0.3.0). The real Kueue+Volcano
+   provisioner behind F13's instance manager (same interface) + <90s-P95 timing remain GPU-node-gated.
 3. **M3 provisioning (your side)** — Stripe + domain/Cloudflare + registry + GPU node + HF token +
    email provider. See `PROVISIONING.md`.
 
-_Done since last update:_ **F12 compute control plane v0 — M2 now complete** (v0.2.12): the
-`compute-control` service (mock-GPU gang scheduling, idempotent submit, supply attribution) emits
-`compute.usage.v1` → credit-ledger debits `gpu_*`, proven live in k3d (gang → cancel → debit
-`1000→999.976667`). Earlier: wallet screen fully live — convert drawer (v0.2.5) + live movements
-(v0.2.6); inference real credit cost + session meter, and the push→pull consumer fix so debits land
-~1s after a run (v0.2.7); settings API keys live (v0.2.8); Mailpit email + persona-scoped nav
-(v0.2.9); persona-aware onboarding (v0.2.10); live-only frontend, mock mode removed (v0.2.11).
+_Done since last update:_ **F13 GPU instance lifecycle — M3 begins** (v0.3.0): customer-facing
+on-demand instances (create/list/get/stop/start/delete) over `compute.yaml` v1.1.0, drawing from one
+shared `pool.Pool` with the scheduler (capacity never double-counted); a per-interval metering ticker
+emits `compute.usage.v1` → credit-ledger `Compute` consumer debits the `gpu_*` tier (idempotent on
+`usage_id`); versioned ML-Stack image catalog (stable/latest/pinned); `exascale gpu …` CLI + live web
+`/compute` list & provision (BFF + `useCompute`). Mock-GPU backend; security-review clean. Also closed
+a latent golangci-lint cold-cache gap (all 5 modules lint-clean cold). _Earlier:_ **F12 compute control
+plane v0 — M2 complete** (v0.2.12): mock-GPU gang scheduling → `gpu_*` debit (gang→cancel→debit
+`1000→999.976667`); wallet live (v0.2.5–v0.2.6); inference meter + pull-consumer fix (v0.2.7); settings
+keys (v0.2.8); Mailpit + persona nav (v0.2.9–v0.2.10); live-only frontend (v0.2.11).
 
 ### Decisions still open
 - **ADR-0002** (AI↔sub-credit conversion direction) — provisional (bidirectional, 1% spread); counsel
