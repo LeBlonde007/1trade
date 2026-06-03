@@ -229,10 +229,16 @@ function isExpanded(id: string) {
 // =====================================================
 // Stop / SSH actions
 // =====================================================
-function stopInstance(it: Instance) {
+async function stopInstance(it: Instance) {
   if (it.status !== 'running') return
-  it.status = 'stopping'
-  setTimeout(() => { it.status = 'stopped' }, 1800)
+  it.status = 'stopping'                       // optimistic
+  try {
+    await compute.stop(it.id)                  // live: releases GPUs, ends billing
+  } catch {
+    it.status = 'running'                      // revert on failure
+    return
+  }
+  await loadLive()
 }
 function copySsh(it: Instance) {
   if (typeof navigator !== 'undefined') {
@@ -312,20 +318,48 @@ function tickLive() {
   }
 }
 
+// =====================================================
+// Live data (F13) — replace the SSR placeholder rows with real instances from compute-control.
+// =====================================================
+const compute = useCompute()
+const HOURLY: Record<string, number> = { gpu_h100: 2.99, gpu_h200: 3.49 }
+
+/** mapLive converts a compute-control instance into this page's richer row shape. Fields the API
+ *  doesn't report (per-GPU util, RAM/storage specs) render as placeholders — never invented values. */
+function mapLive(i: import('~/composables/useCompute').Instance): Instance {
+  const gpu: GpuType = i.gpu_type === 'gpu_h200' ? 'H200' : 'H100'
+  const status: InstanceStatus =
+    i.state === 'running' ? 'running'
+    : i.state === 'stopping' ? 'stopping'
+    : (i.state === 'provisioning' || i.state === 'starting') ? 'provisioning'
+    : 'stopped'
+  const startedAt = i.started_at ? Math.floor(new Date(i.started_at).getTime() / 1000) : 0
+  const uptimeSec = status === 'running' && startedAt ? Math.max(0, Math.floor(Date.now() / 1000) - startedAt) : 0
+  const hourlyRate = (HOURLY[i.gpu_type] ?? 0) * i.count
+  const sshHost = i.connect?.ssh ? i.connect.ssh.replace(/^ssh\s+\w+@/, '') : '— instance stopped'
+  return {
+    id: i.id, name: i.id, status, gpu, gpuFull: gpu === 'H200' ? 'H200 141GB SXM5' : 'H100 80GB SXM5',
+    count: i.count, region: i.region, startedAt, uptimeSec, hourlyRate,
+    costSoFar: (uptimeSec / 3600) * hourlyRate,
+    ram: '—', storage: '—', network: '—', os: 'Ubuntu 22.04 LTS', image: i.image,
+    sshHost, sshKey: '—', util: Array.from({ length: i.count }, () => 0),
+  }
+}
+
+/** loadLive fetches non-terminated instances and replaces the table rows in place (keeps reactivity). */
+async function loadLive() {
+  try {
+    const live = await compute.loadInstances()
+    const rows = live.filter(i => i.state !== 'terminated').map(mapLive)
+    instances.splice(0, instances.length, ...rows)
+  } catch {
+    // leave the current rows on a transient error; the empty state covers a truly empty list
+  }
+}
+
 onMounted(() => {
+  loadLive()
   liveTimer = setInterval(tickLive, 3000)
-  // Auto-transition the "provisioning" row to running after 8s
-  provisionTimer = setTimeout(() => {
-    const pending = instances.find(i => i.status === 'provisioning')
-    if (pending) {
-      pending.status = 'running'
-      pending.startedAt = Math.floor(Date.now() / 1000)
-      pending.uptimeSec = 1
-      pending.sshHost = pending.name + '.tyo1.exascale.com'
-      pending.sshKey = 'SHA256:KM3pQz0…fE71'
-      pending.util = [12]
-    }
-  }, 8000)
 })
 onBeforeUnmount(() => {
   if (liveTimer) clearInterval(liveTimer)

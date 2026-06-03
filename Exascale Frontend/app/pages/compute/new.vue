@@ -166,14 +166,27 @@ watch(storageIdx, (i) => { form.storageGb = STORAGE_STOPS[i] ?? 1000 })
 // =====================================================
 // Provision action — fake transition
 // =====================================================
+const compute = useCompute()
 const provisioning = ref(false)
+const provisionError = ref('')
 async function provision() {
-  if (provisioning.value) return
+  if (provisioning.value || !canProvision.value) return
   provisioning.value = true
-  setTimeout(() => {
-    provisioning.value = false
+  provisionError.value = ''
+  try {
+    // Live create (F13). The ML-Stack image catalog ships 'stable'/'latest' this milestone; the page's
+    // image presets all resolve to the maintained stable image. is_paper is server-derived.
+    await compute.create({
+      type: form.gpu === 'h200' ? 'gpu_h200' : 'gpu_h100',
+      count: form.count,
+      image: 'stable',
+      region: form.region,
+    })
     router.push('/compute')
-  }, 1500)
+  } catch (e: unknown) {
+    provisioning.value = false
+    provisionError.value = (e as { data?: { message?: string } })?.data?.message || 'Could not provision the instance.'
+  }
 }
 
 const canProvision = computed(() => {
@@ -579,6 +592,7 @@ const overBudget = computed(() => cost30d.value > budgetRemaining)
                 </svg>
               </template>
             </button>
+            <div v-if="provisionError" class="provision-error">{{ provisionError }}</div>
             <div class="provision-note">
               Charges start the moment SSH is ready · typically ~90 seconds. Stop the instance any time from the dashboard or CLI.
             </div>
@@ -1476,6 +1490,16 @@ const overBudget = computed(() => cost30d.value > budgetRemaining)
   color: var(--text-3);
   letter-spacing: 0.04em;
   line-height: 1.55;
+  text-align: center;
+}
+.provision-error {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--neg);
+  background: var(--neg-soft);
+  border: 1px solid var(--neg);
+  border-radius: 6px;
+  padding: 8px 10px;
   text-align: center;
 }
 
