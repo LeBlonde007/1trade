@@ -158,3 +158,78 @@ func TestBillingCheckoutAndWebhook(t *testing.T) {
 		t.Fatalf("purchase not paid in history: %+v", pl.Purchases)
 	}
 }
+
+// TestMockCheckoutAutoSettles covers the dev/sandbox path: with BillingAutoSettle + MockStripe, a
+// checkout books the credits inline (no webhook) and reports settled=true. Idempotency key is the
+// synthetic evt_mock_<purchase_id>, distinct from the real webhook's Stripe event id.
+func TestMockCheckoutAutoSettles(t *testing.T) {
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		t.Skip("DATABASE_URL not set; skipping billing integration test")
+	}
+	st, err := store.New(context.Background(), dsn)
+	if err != nil {
+		t.Fatalf("store: %v", err)
+	}
+	defer st.Close()
+
+	booker := &stubBooker{}
+	cfg := config.Config{Env: "dev", JWTSecret: jwtSecret, StripeWebhookSecret: webhookSecret, BillingAutoSettle: true, TokenTTL: 3600_000_000_000}
+	srv := httptest.NewServer(api.NewWithBilling(cfg, st, billing.MockStripe{}, booker))
+	defer srv.Close()
+
+	doJSON := func(method, path, bearer string, body, out any) int {
+		var r *bytes.Reader
+		if body != nil {
+			b, _ := json.Marshal(body)
+			r = bytes.NewReader(b)
+		} else {
+			r = bytes.NewReader(nil)
+		}
+		req, _ := http.NewRequest(method, srv.URL+path, r)
+		if bearer != "" {
+			req.Header.Set("Authorization", "Bearer "+bearer)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("%s %s: %v", method, path, err)
+		}
+		defer resp.Body.Close()
+		if out != nil {
+			_ = json.NewDecoder(resp.Body).Decode(out)
+		}
+		return resp.StatusCode
+	}
+
+	var signup map[string]any
+	doJSON("POST", "/v1/auth/signup", "", map[string]string{
+		"email": "sandbox+" + uuid.NewString() + "@acme.ai", "password": "pw-123456", "tenant_name": "Acme",
+	}, &signup)
+	token, _ := signup["token"].(string)
+	if token == "" {
+		t.Fatal("no token from signup")
+	}
+
+	var co map[string]any
+	if code := doJSON("POST", "/v1/billing/checkout", token,
+		map[string]string{"amount": "1000.000000", "credit_type": "text", "currency": "usd"}, &co); code != 200 {
+		t.Fatalf("checkout status %d (%v)", code, co)
+	}
+	if co["settled"] != true {
+		t.Fatalf("expected settled=true on a mock auto-settle checkout: %+v", co)
+	}
+	purchaseID, _ := co["purchase_id"].(string)
+	calls := booker.snapshot()
+	if len(calls) != 1 || calls[0].Amount != "1000.000000" || calls[0].CreditType != "text" || calls[0].IdempotencyKey != "evt_mock_"+purchaseID {
+		t.Fatalf("auto-settle should book exactly once with the synthetic key: %+v", calls)
+	}
+
+	// The purchase is already paid — no webhook needed.
+	var pl struct {
+		Purchases []map[string]any `json:"purchases"`
+	}
+	doJSON("GET", "/v1/billing/purchases", token, nil, &pl)
+	if len(pl.Purchases) != 1 || pl.Purchases[0]["status"] != "paid" {
+		t.Fatalf("auto-settled purchase not marked paid: %+v", pl.Purchases)
+	}
+}

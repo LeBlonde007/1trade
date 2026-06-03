@@ -42,6 +42,7 @@ const amount = ref(100_000)
 const amountStr = ref('100,000')
 const error = ref('')
 const done = ref(false)
+const settled = ref(false)
 
 const active = computed<CreditDef>(() => CREDITS.find((c) => c.id === creditType.value) ?? CREDITS[0]!)
 const isGpu = computed(() => creditType.value.startsWith('gpu_'))
@@ -67,13 +68,19 @@ function pickType(id: string) {
 
 // ── Live Stripe checkout ────────────────────────────────────────────────────────────────────
 async function onCheckout() {
-  error.value = ''
+  error.value = ''; done.value = false; settled.value = false
   if (amount.value <= 0) { error.value = 'Enter how many credits to buy.'; return }
   try {
-    const { checkout_url } = await checkout(amount.value.toFixed(6), creditType.value, 'usd')
-    // Stripe-hosted checkout opens in a new tab; the webhook books the credits on settlement.
-    window.open(checkout_url, '_blank')
-    done.value = true
+    const res = await checkout(amount.value.toFixed(6), creditType.value, 'usd')
+    if (res.settled) {
+      // Sandbox: MockStripe booked the credits inline — refresh the balance and confirm in place.
+      await loadBalances()
+      settled.value = true
+    } else {
+      // Real Stripe: redirect to the hosted checkout; the webhook books the credits on settlement.
+      window.open(res.checkout_url, '_blank')
+      done.value = true
+    }
   } catch (e: unknown) {
     const ex = e as { data?: { message?: string }; statusCode?: number }
     error.value = ex?.data?.message || 'Could not start checkout. Please try again.'
@@ -182,6 +189,10 @@ onMounted(() => {
         </div>
 
         <div v-if="error" class="banner neg">{{ error }}</div>
+        <div v-else-if="settled" class="banner ok">
+          ✓ Purchased — {{ fmtInt(amount) }} {{ active.label }} credits added to your wallet (test mode).
+          <NuxtLink to="/wallet" class="bk">View wallet →</NuxtLink>
+        </div>
         <div v-else-if="done" class="banner ok">
           Secure checkout opened in a new tab — complete payment there. Credits arrive in your wallet on settlement.
         </div>
@@ -268,6 +279,7 @@ onMounted(() => {
 .banner { padding: 12px 14px; border-radius: var(--radius-sm); font-size: 13px; margin-bottom: 14px; }
 .banner.neg { background: var(--neg-soft, rgba(239,68,68,0.12)); border: 1px solid var(--neg); color: var(--text); }
 .banner.ok { background: var(--pos-soft, rgba(22,163,74,0.12)); border: 1px solid var(--pos); color: var(--text); }
+.banner .bk { color: var(--text); text-decoration: underline; margin-left: 8px; font-weight: 500; }
 .btn { height: 44px; padding: 0 20px; border-radius: var(--radius-sm); border: 1px solid transparent; font-size: 14px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; transition: background 120ms, border-color 120ms; }
 .btn.lg { height: 48px; font-size: 15px; }
 .btn.full { width: 100%; }

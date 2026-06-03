@@ -4,6 +4,27 @@ All notable changes to Exascale. Format: [Keep a Changelog](https://keepachangel
 SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not dates — see
 `docs/plans/MANAGEMENT_PLAN.md`).
 
+## [v0.3.3] — Sandbox buy actually settles (MockStripe inline-settle) (F06)
+
+### Fixed
+- **A sandbox purchase dead-ended.** MockStripe returned a placeholder `checkout.stripe.test`
+  checkout URL that doesn't resolve (`DNS_PROBE_FINISHED_NXDOMAIN`), and no Stripe webhook ever fires
+  in dev — so credits never minted. Now, when there's no real Stripe key (`STRIPE_SECRET_KEY`
+  empty → `BillingAutoSettle`), `createCheckout` **books the credits inline** (mark-paid + ledger
+  mint, exactly as the webhook would) and returns `settled: true`. Real Stripe (key set) is
+  untouched — it returns `settled: false` + a hosted URL and the signed webhook books on settlement.
+  The two paths are mutually exclusive (flag + MockStripe type), so there's no double-mint; the
+  webhook test (which uses the same MockStripe but leaves the flag off) is unaffected, and a new
+  test (`TestMockCheckoutAutoSettles`) covers the inline path.
+- **`/wallet/buy` completes in place** in sandbox: on `settled`, it refreshes the wallet and shows
+  "✓ Purchased — N credits added (test mode)" instead of opening the dead URL; real Stripe still
+  redirects. `useBilling` + the `platform-core.yaml` checkout response carry the optional `settled`.
+
+### Verified
+- Live in k3d: signup → `/wallet/buy` → "Continue to secure checkout" → balance `0 → 100,000 text`,
+  success banner shown (screenshotted). API proof: checkout returns `settled:true`, balance minted.
+  `go build`/`vet`/`test` green; typecheck clean.
+
 ## [v0.3.2] — Live Stripe-only buy-credits screen (F06/F20)
 
 ### Changed

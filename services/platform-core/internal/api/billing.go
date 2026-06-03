@@ -59,7 +59,29 @@ func (s *Server) createCheckout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	slog.Info("audit: checkout created", "tenant_id", p.TenantID, "purchase_id", purchaseID, "amount", b.Amount, "credit_type", b.CreditType)
-	writeJSON(w, http.StatusOK, map[string]any{"purchase_id": purchaseID, "checkout_url": session.URL})
+
+	// Dev/sandbox: MockStripe has no hosted checkout page and no webhook ever fires, so settle the
+	// purchase inline (mark paid + book the credits) exactly as the webhook would. Real Stripe
+	// deployments use a different StripeClient, so this never runs in prod — there, the signed
+	// checkout.session.completed webhook books the credits. Idempotent on a synthetic event id.
+	settled := false
+	if _, isMock := s.stripe.(billing.MockStripe); s.cfg.BillingAutoSettle && isMock {
+		evID := "evt_mock_" + purchaseID
+		if err := s.st.MarkPurchasePaid(r.Context(), session.ID, evID); err != nil {
+			serverError(w, err)
+			return
+		}
+		if err := s.booker.BookPurchase(r.Context(), billing.PurchaseBooking{
+			TenantID: p.TenantID, Amount: b.Amount, CreditType: b.CreditType, IsPaper: p.IsPaper,
+			ReferenceID: purchaseID, IdempotencyKey: evID,
+		}); err != nil {
+			serverError(w, err)
+			return
+		}
+		settled = true
+		slog.Info("audit: mock checkout settled instantly (dev)", "tenant_id", p.TenantID, "purchase_id", purchaseID)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"purchase_id": purchaseID, "checkout_url": session.URL, "settled": settled})
 }
 
 // stripeEvent is the slice of a Stripe Event payload we act on.
