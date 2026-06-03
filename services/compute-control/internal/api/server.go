@@ -15,20 +15,23 @@ import (
 	"github.com/exascale/compute-control/internal/auth"
 	"github.com/exascale/compute-control/internal/config"
 	"github.com/exascale/compute-control/internal/domain"
+	"github.com/exascale/compute-control/internal/instance"
 	"github.com/exascale/compute-control/internal/scheduler"
 )
 
-// Server wires config + the credential resolver + the scheduler backend behind one routed handler.
+// Server wires config + the credential resolver + the scheduler (internal jobs) + the instance
+// manager (customer GPU instances) behind one routed handler.
 type Server struct {
 	cfg   config.Config
 	auth  *auth.Resolver
 	sched scheduler.Scheduler
+	inst  *instance.Manager
 	mux   *http.ServeMux
 }
 
 // New builds the routed handler.
-func New(cfg config.Config, resolver *auth.Resolver, sched scheduler.Scheduler) *Server {
-	s := &Server{cfg: cfg, auth: resolver, sched: sched, mux: http.NewServeMux()}
+func New(cfg config.Config, resolver *auth.Resolver, sched scheduler.Scheduler, inst *instance.Manager) *Server {
+	s := &Server{cfg: cfg, auth: resolver, sched: sched, inst: inst, mux: http.NewServeMux()}
 	s.routes()
 	return s
 }
@@ -47,6 +50,11 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /v1/compute/jobs/{id}", s.getJob)
 	s.mux.HandleFunc("DELETE /v1/compute/jobs/{id}", s.cancelJob)
 	s.mux.HandleFunc("GET /v1/compute/instances", s.listInstances)
+	s.mux.HandleFunc("POST /v1/compute/instances", s.createInstance)
+	s.mux.HandleFunc("GET /v1/compute/instances/{id}", s.getInstance)
+	s.mux.HandleFunc("DELETE /v1/compute/instances/{id}", s.deleteInstance)
+	s.mux.HandleFunc("POST /v1/compute/instances/{id}/stop", s.stopInstance)
+	s.mux.HandleFunc("POST /v1/compute/instances/{id}/start", s.startInstance)
 }
 
 // listTypes serves the GPU-tier catalog with live availability. Public read (no auth) — it leaks no
@@ -174,20 +182,118 @@ func (s *Server) cancelJob(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, jobJSON(job))
 }
 
-// listInstances serves the tenant's live placements as minimal instances (M3 expands this).
+// listInstances serves the tenant's GPU instances newest-first, optionally filtered by ?state=.
 func (s *Server) listInstances(w http.ResponseWriter, r *http.Request) {
 	p, ok := s.requireTenant(w, r)
 	if !ok {
 		return
 	}
+	state := r.URL.Query().Get("state")
 	instances := make([]map[string]any, 0)
-	for _, j := range s.sched.Instances(p.TenantID) {
-		instances = append(instances, map[string]any{
-			"id": j.ID, "gpu_type": j.GPUType, "status": "running",
-			"created_at": j.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		})
+	for _, inst := range s.inst.List(p.TenantID, state) {
+		instances = append(instances, instanceJSON(inst))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"instances": instances})
+}
+
+// instanceRequest mirrors the contract's InstanceRequest.
+type instanceRequest struct {
+	Type            string  `json:"type"`
+	Count           int     `json:"count"`
+	Image           string  `json:"image"`
+	Region          string  `json:"region"`
+	IdleStopMinutes *int    `json:"idle_stop_minutes"`
+	SubAccountID    *string `json:"sub_account_id"`
+}
+
+// createInstance provisions an on-demand GPU instance for the authenticated tenant (tenant JWT).
+// is_paper comes from the principal, never the body. Idempotent on the required Idempotency-Key.
+func (s *Server) createInstance(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.requireTenant(w, r)
+	if !ok {
+		return
+	}
+	idem := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
+	if idem == "" {
+		writeErr(w, http.StatusBadRequest, "bad_request", "Idempotency-Key header is required")
+		return
+	}
+	var req instanceRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, http.StatusBadRequest, "bad_request", "invalid JSON body")
+		return
+	}
+	sub := p.SubAccountID
+	if req.SubAccountID != nil && *req.SubAccountID != "" {
+		sub = *req.SubAccountID
+	}
+	spec := instance.Spec{
+		TenantID: p.TenantID, SubAccountID: sub, IsPaper: p.IsPaper,
+		GPUType: req.Type, Count: req.Count, Image: req.Image, Region: req.Region,
+		IdleStopMinutes: req.IdleStopMinutes,
+	}
+	inst, err := s.inst.Create(spec, idem)
+	if err != nil {
+		writeInstErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, instanceJSON(inst))
+}
+
+// getInstance serves one instance, scoped to the tenant.
+func (s *Server) getInstance(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.requireTenant(w, r)
+	if !ok {
+		return
+	}
+	inst, err := s.inst.Get(p.TenantID, r.PathValue("id"))
+	if err != nil {
+		writeInstErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, instanceJSON(inst))
+}
+
+// stopInstance stops a running instance (releases its GPUs, ends billing).
+func (s *Server) stopInstance(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.requireTenant(w, r)
+	if !ok {
+		return
+	}
+	inst, err := s.inst.Stop(p.TenantID, r.PathValue("id"))
+	if err != nil {
+		writeInstErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, instanceJSON(inst))
+}
+
+// startInstance restarts a stopped instance (re-reserves GPUs, resumes billing).
+func (s *Server) startInstance(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.requireTenant(w, r)
+	if !ok {
+		return
+	}
+	inst, err := s.inst.Start(p.TenantID, r.PathValue("id"))
+	if err != nil {
+		writeInstErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, instanceJSON(inst))
+}
+
+// deleteInstance terminates an instance and frees its GPUs (irreversible).
+func (s *Server) deleteInstance(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.requireTenant(w, r)
+	if !ok {
+		return
+	}
+	inst, err := s.inst.Delete(p.TenantID, r.PathValue("id"))
+	if err != nil {
+		writeInstErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, instanceJSON(inst))
 }
 
 // requireTenant resolves a first-party tenant JWT; on failure it writes a 401 and returns ok=false.
@@ -236,6 +342,52 @@ func jobJSON(j domain.Job) map[string]any {
 		"gpu_type": j.GPUType, "gpus": j.GPUs, "pods": j.Pods, "reserved": j.Reserved,
 		"supply_source_id": j.SupplySourceID, "placement": placement, "is_paper": j.IsPaper,
 		"created_at": j.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+	}
+}
+
+// instanceJSON renders an Instance in the contract shape.
+func instanceJSON(inst domain.Instance) map[string]any {
+	var startedAt any
+	if !inst.StartedAt.IsZero() {
+		startedAt = inst.StartedAt.Format("2006-01-02T15:04:05Z07:00")
+	}
+	var idle any
+	if inst.IdleStopMinutes != nil {
+		idle = *inst.IdleStopMinutes
+	}
+	return map[string]any{
+		"id": inst.ID, "gpu_type": inst.GPUType, "count": inst.Count, "state": inst.State,
+		"image": inst.Image, "region": inst.Region,
+		"connect": map[string]any{
+			"ssh": orNil(inst.Connect.SSH), "jupyter": orNil(inst.Connect.Jupyter), "http": orNil(inst.Connect.HTTP),
+		},
+		"supply_source_id": inst.SupplySourceID, "idle_stop_minutes": idle, "is_paper": inst.IsPaper,
+		"created_at": inst.CreatedAt.Format("2006-01-02T15:04:05Z07:00"), "started_at": startedAt,
+	}
+}
+
+// orNil returns the string or nil when empty (so JSON renders null, matching the nullable contract).
+func orNil(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
+}
+
+// writeInstErr maps an instance-manager error to the right HTTP status + ApiError code.
+func writeInstErr(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, instance.ErrNotFound), errors.Is(err, instance.ErrForbidden):
+		writeErr(w, http.StatusNotFound, "not_found", "instance not found")
+	case errors.Is(err, instance.ErrCapacity):
+		writeErr(w, http.StatusPaymentRequired, "quota_exhausted", "insufficient GPU capacity for this tier")
+	case errors.Is(err, instance.ErrUnknownGPU), errors.Is(err, instance.ErrBadImage), errors.Is(err, instance.ErrBadRequest):
+		writeErr(w, http.StatusUnprocessableEntity, "invalid_request", err.Error())
+	case errors.Is(err, instance.ErrNotStoppable), errors.Is(err, instance.ErrNotStartable), errors.Is(err, instance.ErrTerminated):
+		writeErr(w, http.StatusConflict, "conflict", err.Error())
+	default:
+		slog.Error("instance error", "err", err)
+		writeErr(w, http.StatusInternalServerError, "internal_error", "an internal error occurred")
 	}
 }
 

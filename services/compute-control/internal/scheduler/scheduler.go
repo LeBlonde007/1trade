@@ -12,6 +12,7 @@ import (
 
 	"github.com/exascale/compute-control/internal/domain"
 	"github.com/exascale/compute-control/internal/events"
+	"github.com/exascale/compute-control/internal/pool"
 	"github.com/google/uuid"
 )
 
@@ -74,56 +75,45 @@ type idemKey struct {
 	key    string
 }
 
-// capacity is the per-tier total GPU count.
-type capacity struct{ h100, h200 int }
-
 // MockScheduler is an in-memory Scheduler: it admits a gang only if the whole footprint fits the
-// remaining pool for its tier, attributes every placement to the configured supply source, meters
-// nothing until a job is cancelled/completed, and is idempotent on (tenant, Idempotency-Key).
+// shared GPU pool for its tier (the same pool customer instances draw from), attributes every
+// placement to the configured supply source, meters nothing until a job is cancelled/completed, and
+// is idempotent on (tenant, Idempotency-Key).
 type MockScheduler struct {
 	mu       sync.Mutex
 	jobs     map[string]*domain.Job // jobID → job
 	idem     map[idemKey]string     // (tenant, key) → jobID
-	cap      capacity
+	pool     *pool.Pool             // shared GPU capacity (jobs + instances)
 	supplyID string
 	pub      events.Publisher
 	now      func() time.Time
 }
 
-// NewMock builds a MockScheduler with the given per-tier capacity, supply attribution, and usage
-// publisher (pass events.NoopPublisher{} when NATS is unconfigured).
+// NewMock builds a MockScheduler over a fresh private pool of the given per-tier capacity. Use this
+// when the scheduler owns all the GPUs (e.g. unit tests with no instance manager).
 func NewMock(h100, h200 int, supplyID string, pub events.Publisher) *MockScheduler {
+	return NewMockWithPool(pool.New(map[string]int{domain.CreditH100: h100, domain.CreditH200: h200}), supplyID, pub)
+}
+
+// NewMockWithPool builds a MockScheduler sharing an existing pool — so jobs and customer instances
+// contend for the same GPUs (the F13 wiring).
+func NewMockWithPool(p *pool.Pool, supplyID string, pub events.Publisher) *MockScheduler {
 	return &MockScheduler{
 		jobs:     make(map[string]*domain.Job),
 		idem:     make(map[idemKey]string),
-		cap:      capacity{h100: h100, h200: h200},
+		pool:     p,
 		supplyID: supplyID,
 		pub:      pub,
 		now:      time.Now,
 	}
 }
 
-// poolFor returns the total capacity for a tier.
-func (m *MockScheduler) poolFor(gpuType string) int {
-	switch gpuType {
-	case domain.CreditH100:
-		return m.cap.h100
-	case domain.CreditH200:
-		return m.cap.h200
-	default:
-		return 0
-	}
-}
-
-// inUseFor returns GPUs of a tier currently held by live jobs (optionally only one tenant's).
+// tenantInUse returns GPUs of a tier currently held by one tenant's live jobs (for quota display).
 // Caller must hold m.mu.
-func (m *MockScheduler) inUseFor(gpuType, tenantID string) int {
+func (m *MockScheduler) tenantInUse(gpuType, tenantID string) int {
 	n := 0
 	for _, j := range m.jobs {
-		if j.GPUType != gpuType {
-			continue
-		}
-		if tenantID != "" && j.TenantID != tenantID {
+		if j.GPUType != gpuType || j.TenantID != tenantID {
 			continue
 		}
 		if j.Status == domain.StatusScheduled || j.Status == domain.StatusRunning {
@@ -157,9 +147,9 @@ func (m *MockScheduler) Submit(spec JobSpec, idempotencyKey string) (domain.Job,
 		}
 	}
 
-	want := spec.TotalGPUs()
-	free := m.poolFor(spec.GPUType) - m.inUseFor(spec.GPUType, "")
-	if want > free {
+	// Reserve the whole gang atomically from the shared pool (all-or-nothing). A repeated idem key
+	// already returned above, so this never double-reserves.
+	if !m.pool.Reserve(spec.GPUType, spec.TotalGPUs()) {
 		return domain.Job{}, ErrCapacity
 	}
 
@@ -239,6 +229,7 @@ func (m *MockScheduler) Cancel(tenantID, jobID string) (domain.Job, error) {
 	snapshot := *j
 	m.mu.Unlock()
 
+	m.pool.Release(snapshot.GPUType, snapshot.TotalGPUs()) // GPUs go back to the shared pool
 	m.emitUsage(snapshot, elapsed)
 	return snapshot, nil
 }
@@ -274,12 +265,11 @@ func (m *MockScheduler) Quotas(tenantID string) []Quota {
 	tiers := []string{domain.CreditH100, domain.CreditH200}
 	out := make([]Quota, 0, len(tiers))
 	for _, t := range tiers {
-		pool := m.poolFor(t)
 		out = append(out, Quota{
 			GPUType:       t,
-			Capacity:      pool,
-			InUse:         m.inUseFor(t, tenantID),
-			RemainingPool: pool - m.inUseFor(t, ""),
+			Capacity:      m.pool.Capacity(t),
+			InUse:         m.tenantInUse(t, tenantID),
+			RemainingPool: m.pool.Available(t),
 		})
 	}
 	return out
@@ -302,10 +292,7 @@ func (m *MockScheduler) Instances(tenantID string) []domain.Job {
 	return out
 }
 
-// Capacity returns cluster-wide (h100Available, h200Available) for the catalog.
+// Capacity returns cluster-wide (h100Available, h200Available) from the shared pool — for the catalog.
 func (m *MockScheduler) Capacity() (int, int) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return m.cap.h100 - m.inUseFor(domain.CreditH100, ""),
-		m.cap.h200 - m.inUseFor(domain.CreditH200, "")
+	return m.pool.Available(domain.CreditH100), m.pool.Available(domain.CreditH200)
 }

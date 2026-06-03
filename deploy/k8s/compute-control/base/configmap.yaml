@@ -13,3 +13,4 @@ data:
   EXASCALE_PAPER: "true"                    # sandbox credits locally
   COMPUTE_H100_COUNT: "8"                   # mock-GPU pool sizes (real counts via the GPU Operator)
   COMPUTE_H200_COUNT: "0"
+  COMPUTE_METER_INTERVAL_SEC: "60"          # how often running instances meter → compute.usage.v1
