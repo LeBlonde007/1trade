@@ -474,8 +474,9 @@ const todayPct = computed(() => startTotal.value === 0 ? 0 : todayPnl.value / st
               <span
                 class="qty"
                 :class="{ 'flash-up': flashKeys[a.key] === 'up', 'flash-down': flashKeys[a.key] === 'down' }"
+                :title="full(a.qty)"
               >
-                {{ fmtInt(a.qty) }}
+                {{ compact(a.qty) }}
                 <span v-if="a.key === 'h100'" class="qty-unit">credits</span>
               </span>
               <span class="usd">
@@ -484,7 +485,7 @@ const todayPct = computed(() => startTotal.value === 0 ? 0 : todayPnl.value / st
               </span>
               <span v-if="a.locked" class="lock">
                 <svg viewBox="0 0 16 16"><rect x="3.5" y="7" width="9" height="6.5" /><path d="M5.5 7V5a2.5 2.5 0 015 0v2" /></svg>
-                {{ fmtInt(a.locked) }} locked in open orders
+                {{ compact(a.locked) }} locked in open orders
               </span>
               <svg class="spark" viewBox="0 0 240 36" preserveAspectRatio="none">
                 <path :d="sparkPaths(a.spark).fill" :fill="COLOR[a.color]" fill-opacity="0.10" />
@@ -557,7 +558,7 @@ const todayPct = computed(() => startTotal.value === 0 ? 0 : todayPnl.value / st
         <div class="field-block">
           <span class="lbl">
             — From
-            <span class="avail">{{ fmtInt(convFromAsset.qty) }} available</span>
+            <span class="avail">{{ compact(convFromAsset.qty) }} available</span>
           </span>
           <div class="select">
             <div class="sym-swatch" :style="{ background: COLOR[convFromAsset.color] }" />

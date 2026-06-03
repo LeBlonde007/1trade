@@ -18,11 +18,32 @@ export const formatUSD = (value: number, opts: { showSign?: boolean; compact?: b
   return `${sign}${formatter.format(value)}`
 }
 
-/** Format a credit count, e.g. 2425000 → "2,425,000". */
-export const formatCredits = (value: number): string => {
-  if (Number.isNaN(value)) return '—'
-  return new Intl.NumberFormat('en-US').format(Math.round(value))
+/**
+ * compact — K/M/B for big numbers so dense, numbers-first UIs stay readable (250000 → "250K",
+ * 1.2e6 → "1.2M"); values under 1000 keep up to 2 decimals. Accepts a string (fixed-point) too.
+ * Pair it with `full` in a `title=` for the exact value on hover. NOT for per-credit prices
+ * (sub-1 decimals) — use formatPrice for those.
+ */
+export const compact = (value: number | string, maxFrac = 1): string => {
+  const n = typeof value === 'string' ? Number(value) : value
+  if (!Number.isFinite(n)) return '—'
+  const abs = Math.abs(n)
+  const units: Array<[number, string]> = [[1e9, 'B'], [1e6, 'M'], [1e3, 'K']]
+  for (const [div, suffix] of units) {
+    if (abs >= div) return (n / div).toLocaleString('en-US', { maximumFractionDigits: maxFrac }) + suffix
+  }
+  return n.toLocaleString('en-US', { maximumFractionDigits: 2 })
 }
+
+/** full — the exact grouped value, for a `title=` tooltip on a compacted figure. */
+export const full = (value: number | string, dp = 2): string => {
+  const n = typeof value === 'string' ? Number(value) : value
+  if (!Number.isFinite(n)) return '—'
+  return n.toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: 6 })
+}
+
+/** Format a credit count compactly, e.g. 2425000 → "2.4M". (Compact everywhere — see `full`.) */
+export const formatCredits = (value: number): string => compact(value)
 
 /** Format a sub-credit price like 0.001005 → "$0.001005" (six decimals for AI credits). */
 export const formatPrice = (value: number, decimals = 6): string => {

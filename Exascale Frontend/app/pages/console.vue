@@ -76,10 +76,8 @@ const budgetPct = computed(() => {
 const budgetLevel = computed(() => (budgetPct.value >= 100 ? 'over' : budgetPct.value >= 80 ? 'warn' : budgetPct.value >= 50 ? 'mid' : 'ok'))
 
 // ── Formatting ──────────────────────────────────────────────────────────────────────────────
-function fmt(s: string, dp = 2): string {
-  const n = Number(s)
-  return Number.isNaN(n) ? s : n.toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: 6 })
-}
+// Credit amounts render compactly (250K · 1.2M); hover a hero/balance cell for the exact value (full).
+function fmt(s: string): string { return compact(s) }
 function fmtInt(n: number): string { return Math.round(n).toLocaleString('en-US') }
 function money(n: number): string { return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 function isDebit(amount: string): boolean { return amount.trim().startsWith('-') }
@@ -165,7 +163,7 @@ onBeforeUnmount(() => { if (ticker) clearInterval(ticker) })
     <section class="kpis">
       <div v-for="b in balances" :key="b.credit_type" class="kpi">
         <div class="kpi-cap">{{ b.credit_type }}</div>
-        <div class="kpi-num mono">{{ fmt(b.balance) }}</div>
+        <div class="kpi-num mono" :title="full(b.balance) + ' ' + b.credit_type">{{ fmt(b.balance) }}</div>
         <div class="kpi-delta mono" :class="todayNet(b.credit_type) < 0 ? 'neg' : todayNet(b.credit_type) > 0 ? 'pos' : 'flat'">
           <template v-if="todayNet(b.credit_type) !== 0">{{ todayNet(b.credit_type) < 0 ? '▼' : '▲' }} {{ fmt(String(Math.abs(todayNet(b.credit_type)))) }}</template>
           <template v-else>— no change today</template>
@@ -203,7 +201,7 @@ onBeforeUnmount(() => { if (ticker) clearInterval(ticker) })
             <tbody>
               <tr v-for="b in balances" :key="b.credit_type">
                 <td class="ct">{{ b.credit_type }}</td>
-                <td class="r mono strong">{{ fmt(b.balance) }}</td>
+                <td class="r mono strong" :title="full(b.balance)">{{ fmt(b.balance) }}</td>
                 <td class="r mono" :class="todayNet(b.credit_type) < 0 ? 'neg' : todayNet(b.credit_type) > 0 ? 'pos' : 'muted'">
                   <template v-if="todayNet(b.credit_type) !== 0">{{ todayNet(b.credit_type) < 0 ? '▼' : '▲' }} {{ fmt(String(Math.abs(todayNet(b.credit_type)))) }}</template>
                   <template v-else>—</template>
