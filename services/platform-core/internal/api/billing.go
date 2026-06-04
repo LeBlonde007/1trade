@@ -44,6 +44,31 @@ func (s *Server) createCheckout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// KYC gate (F22): a real-money purchase (is_paper=false) requires a verified tenant. Sandbox/paper
+	// flows carry no real-money/AML exposure and are exempt. This server-side check is authoritative —
+	// the web app's gate is convenience only and is never trusted.
+	if !p.IsPaper {
+		kyc, found, err := s.st.GetKYC(r.Context(), p.TenantID)
+		if err != nil {
+			serverError(w, err)
+			return
+		}
+		if !found || !domain.CanPurchaseRealMoney(kyc.Status) {
+			status := "unverified"
+			if found {
+				status = string(kyc.Status)
+			}
+			slog.Warn("audit: real-money checkout blocked — kyc not verified", "tenant_id", p.TenantID, "kyc_status", status)
+			_, _ = s.st.WriteAudit(r.Context(), store.AuditEntry{
+				TenantID: p.TenantID, ActorID: p.UserID, Action: "billing.checkout.blocked",
+				TargetType: "tenant", TargetID: p.TenantID,
+				After: map[string]any{"reason": "kyc_required", "kyc_status": status}, IsPaper: p.IsPaper,
+			})
+			writeErr(w, http.StatusForbidden, "kyc_required", "identity verification is required before real-money purchases")
+			return
+		}
+	}
+
 	purchaseID := uuid.NewString()
 	session, err := s.stripe.CreateCheckoutSession(r.Context(), billing.CheckoutParams{
 		PurchaseID: purchaseID, TenantID: p.TenantID, Amount: b.Amount, CreditType: b.CreditType, Currency: b.Currency,

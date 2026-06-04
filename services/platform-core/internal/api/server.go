@@ -77,6 +77,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /v1/auth/verify/resend", s.resendVerify)  // authed; dev returns the token
 	s.mux.HandleFunc("GET /v1/billing/budget", s.getBudget)
 	s.mux.HandleFunc("PUT /v1/billing/budget", s.setBudget)
+	s.mux.HandleFunc("GET /v1/account/kyc", s.getKYC)                          // F22 — caller's tenant KYC status
+	s.mux.HandleFunc("POST /v1/account/kyc", s.submitKYC)                      // F22 — submit identity verification
+	s.mux.HandleFunc("POST /v1/account/kyc/{tenant_id}/decision", s.reviewKYC) // F22 — internal compliance decision (service token)
 	// OAuth is scaffolded; real provider wiring (client secrets via Vault) is a follow-up.
 	s.mux.HandleFunc("GET /v1/auth/oauth/{provider}", notConfigured)
 	s.mux.HandleFunc("GET /v1/auth/oauth/{provider}/callback", notConfigured)
@@ -200,7 +203,7 @@ func (s *Server) me(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"user_id": idn.UserID, "email": idn.Email, "tenant_id": idn.TenantID,
-		"org_id": idn.OrgID, "roles": idn.Roles, "is_paper": idn.IsPaper,
+		"org_id": idn.OrgID, "roles": idn.Roles, "is_paper": idn.IsPaper, "kyc_status": idn.KYCStatus,
 	})
 }
 

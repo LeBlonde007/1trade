@@ -17,6 +17,7 @@ type Config struct {
 	StripeWebhookSecret string        // Stripe webhook signing secret (verifies inbound webhooks)
 	StripeSecretKey     string        // Stripe API key (real checkout sessions; empty → mock Stripe)
 	BillingAutoSettle   bool          // dev/sandbox: settle MockStripe checkouts inline (no webhook); never true in prod
+	KYCAutoApprove      bool          // dev/sandbox: a KYC submission is verified instantly (no compliance back-office); false in prod
 	SMTPAddr            string        // SMTP server host:port for transactional email (empty → email disabled)
 	EmailFrom           string        // From address for platform email
 	AppBaseURL          string        // public base URL of the web app, for links in emails
@@ -43,6 +44,9 @@ func Load() Config {
 		// No real Stripe key ⇒ MockStripe ⇒ no hosted page / webhook will ever fire, so settle
 		// checkouts inline. Real deployments set STRIPE_SECRET_KEY → false → the webhook books.
 		BillingAutoSettle: os.Getenv("STRIPE_SECRET_KEY") == "",
+		// Outside prod there is no compliance back-office, so a KYC submission is auto-verified to keep
+		// the real-money gate testable end-to-end. Prod requires a real review (manual or IDV vendor).
+		KYCAutoApprove:    os.Getenv("EXASCALE_ENV") != "prod",
 		SMTPAddr:            os.Getenv("SMTP_ADDR"),
 		EmailFrom:           envOr("EMAIL_FROM", "noreply@exascale.local"),
 		AppBaseURL:          envOr("APP_BASE_URL", "http://localhost:3000"),

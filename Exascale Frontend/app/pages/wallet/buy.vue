@@ -16,14 +16,39 @@ definePageMeta({ layout: false, middleware: 'auth' })
 useHead({ title: 'Buy credits — Exascale', htmlAttrs: { 'data-theme': 'dark' } })
 
 const route = useRoute()
-const { user } = useAuth()
+const { user, refresh } = useAuth()
 const { checkout, loading } = useBilling()
 const { balances, loadBalances } = useWallet()
+const { submitting: kycSubmitting, submit: submitKyc } = useKyc()
 
 // ── KYC gate (real-money only; sandbox + credits exempt). Server enforcement = F22. ─────────────
 const realMoney = computed(() => user.value?.is_paper === false)
-const kycVerified = computed(() => (user.value as { kyc_status?: string } | null)?.kyc_status === 'verified')
+const kycStatus = computed(() => user.value?.kyc_status ?? 'unverified')
+const kycVerified = computed(() => kycStatus.value === 'verified')
+const kycPending = computed(() => kycStatus.value === 'pending')
 const showKycGate = computed(() => (realMoney.value && !kycVerified.value) || route.query.kyc === '1')
+
+// Minimal KYC submission — the IDV vendor handles documents; we capture entity basics. POSTing this
+// flips the tenant to verified (dev auto-approve) or pending (prod review); the gate then re-reads
+// the status off the refreshed session user.
+const kycForm = reactive({ legal_name: '', country: 'US', entity_type: 'business' as 'individual' | 'business' })
+const kycError = ref('')
+const KYC_COUNTRIES = ['US', 'GB', 'CA', 'DE', 'FR', 'NL', 'CH', 'IE', 'JP', 'SG', 'AU', 'AE']
+
+async function onSubmitKyc() {
+  kycError.value = ''
+  if (!kycForm.legal_name.trim() || kycForm.country.length !== 2) {
+    kycError.value = 'Enter your legal name and country.'
+    return
+  }
+  try {
+    await submitKyc({ legal_name: kycForm.legal_name.trim(), country: kycForm.country, entity_type: kycForm.entity_type })
+    await refresh() // pull the new kyc_status onto the session user so the gate updates in place
+  } catch (e: unknown) {
+    const ex = e as { data?: { message?: string } }
+    kycError.value = ex?.data?.message || 'Could not submit verification. Please try again.'
+  }
+}
 
 // ── Purchasable credit types + published per-credit reference price (indicative USD only). ───────
 interface CreditDef { id: string; label: string; desc: string; refUsd: number }
@@ -122,22 +147,55 @@ onMounted(() => {
       <!-- ===== KYC gate — a real-money purchase needs a one-time identity check (F22). Sandbox skips it. -->
       <div v-if="showKycGate" class="kyc-gate">
         <div class="kyc-eyebrow">Compliance · Identity verification</div>
-        <h2 class="kyc-title">Verify your identity to buy with real money.</h2>
-        <p class="kyc-lede">
-          Real-money purchases require a one-time identity check (KYC/AML) — credits are prepaid
-          service units, so we verify the buyer before the first real-money order. Your
-          <strong>sandbox</strong> account and all credit usage (inference, GPU compute) need none.
-        </p>
-        <ul class="kyc-list">
-          <li><span class="k-ix">01</span><div><strong>Government ID</strong><span>Passport or driver's licence — verified in minutes.</span></div></li>
-          <li><span class="k-ix">02</span><div><strong>Business details</strong><span>Legal entity + registered address for the account.</span></div></li>
-          <li><span class="k-ix">03</span><div><strong>Source of funds</strong><span>A short declaration for AML compliance.</span></div></li>
-        </ul>
-        <div class="kyc-actions">
-          <NuxtLink to="/onboarding/kyc" class="btn primary lg">Begin verification →</NuxtLink>
-          <NuxtLink to="/console" class="btn secondary lg">Keep using sandbox</NuxtLink>
-        </div>
-        <div class="kyc-foot">Identity data is handled under our KYC/AML policy · SOC 2 controls · encrypted at rest.</div>
+
+        <!-- Submitted, awaiting a compliance decision (prod review path) -->
+        <template v-if="kycPending">
+          <h2 class="kyc-title">Verification in review.</h2>
+          <p class="kyc-lede">
+            Thanks — your identity submission is being reviewed. Real-money purchases unlock as soon as
+            it's approved. Your <strong>sandbox</strong> account and all credit usage keep working now.
+          </p>
+          <div class="kyc-actions">
+            <NuxtLink to="/console" class="btn secondary lg">Back to console</NuxtLink>
+          </div>
+        </template>
+
+        <!-- Submit identity verification (unverified / rejected) -->
+        <template v-else>
+          <h2 class="kyc-title">Verify your identity to buy with real money.</h2>
+          <p class="kyc-lede">
+            Real-money purchases require a one-time identity check (KYC/AML) — credits are prepaid
+            service units, so we verify the buyer first. Your <strong>sandbox</strong> account and all
+            credit usage (inference, GPU compute) need none.
+          </p>
+          <form class="kyc-form" @submit.prevent="onSubmitKyc">
+            <label class="kf-field">
+              <span class="kf-label">Legal name</span>
+              <input v-model="kycForm.legal_name" class="kf-input" type="text" placeholder="Registered legal entity or full name" autocomplete="organization" />
+            </label>
+            <div class="kf-row">
+              <label class="kf-field">
+                <span class="kf-label">Country</span>
+                <select v-model="kycForm.country" class="kf-input">
+                  <option v-for="c in KYC_COUNTRIES" :key="c" :value="c">{{ c }}</option>
+                </select>
+              </label>
+              <label class="kf-field">
+                <span class="kf-label">Account type</span>
+                <select v-model="kycForm.entity_type" class="kf-input">
+                  <option value="business">Business</option>
+                  <option value="individual">Individual</option>
+                </select>
+              </label>
+            </div>
+            <p v-if="kycError" class="kf-error">{{ kycError }}</p>
+            <div class="kyc-actions">
+              <button type="submit" class="btn primary lg" :disabled="kycSubmitting">{{ kycSubmitting ? 'Submitting…' : 'Submit verification →' }}</button>
+              <NuxtLink to="/console" class="btn secondary lg">Keep using sandbox</NuxtLink>
+            </div>
+          </form>
+          <div class="kyc-foot">Minimal details only — documents are handled by our IDV vendor under our KYC/AML policy · SOC 2 controls · encrypted at rest.</div>
+        </template>
       </div>
 
       <!-- ===== Live Stripe checkout ===== -->
@@ -306,6 +364,14 @@ onMounted(() => {
 .kyc-list strong { display: block; font-size: 14px; font-weight: 500; color: var(--text); margin-bottom: 2px; }
 .kyc-list li span:last-child { font-size: 12.5px; color: var(--text-2); }
 .kyc-actions { display: flex; gap: 8px; margin-bottom: 18px; }
+/* KYC submit form */
+.kyc-form { margin: 0 0 4px; }
+.kf-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; flex: 1; }
+.kf-row { display: flex; gap: 14px; }
+.kf-label { font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-3); }
+.kf-input { background: var(--canvas); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); color: var(--text); padding: 0 12px; height: 40px; font-size: 14px; font-family: var(--font-sans); outline: none; width: 100%; }
+.kf-input:focus { border-color: var(--brand); }
+.kf-error { color: var(--neg); font-size: 12.5px; margin: 0 0 12px; }
 .kyc-foot { font-family: var(--font-mono); font-size: 11px; color: var(--text-3); letter-spacing: 0.04em; border-top: 1px dashed var(--border); padding-top: 14px; }
 
 @media (max-width: 640px) {
