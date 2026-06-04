@@ -2,12 +2,14 @@
 
 **Living status.** ✅ done · 🟩 partly done / in progress · ⬜ not started · ⏸ paused (by design).
 Updated as work lands. Pair with `SEQUENCING.md` (plan), `MANAGEMENT_PLAN.md` (tracker), `CHANGELOG.md` (releases).
-Last updated: 2026-06-03.
+Last updated: 2026-06-04.
 
 > Legend: ✅ **green = done** · 🟩 in progress · ⬜ **white = not done** · ⏸ paused.
 > Tags shipped: `v0.1.0 … v0.1.5` (M1) · `v0.2.0 … v0.2.12` (M2) · `v0.2.13 … v0.2.16` (F01 hardening:
-> test-e2e, scheduling, CI build/test, golangci-lint v2) · `v0.3.0` (M3 — F13 GPU instance lifecycle).
-> All on `main` (origin).
+> test-e2e, scheduling, CI build/test, golangci-lint v2) · `v0.3.0` (M3 — F13 GPU instance lifecycle) ·
+> `v0.3.1 … v0.3.12` (M3 — live AI-company product: console command-center, compact UI, **rich audit
+> screen**, **honest teams/SSO**, Settings = single admin home, inference+wallet+**billing** live (no
+> mock), onboarding Walmart-mock removed, **F22 KYC/AML enforcement**). All on `main` (origin).
 
 ```
 Exascale
@@ -16,7 +18,7 @@ Exascale
 │
 ├── 🟩 Contracts — docs/contracts/
 │   ├── ✅ credit-types.md · schemas/types.sql
-│   ├── ✅ openapi/credit.yaml · openapi/platform-core.yaml (v1.5.0: auth+accounts+RBAC+keys+billing+verify)
+│   ├── ✅ openapi/credit.yaml · openapi/platform-core.yaml (v1.6.0: auth+accounts+RBAC+keys+billing+verify+**F22 KYC**)
 │   ├── ✅ openapi/inference.yaml (v1.0.0, OpenAI-compatible)
 │   ├── ✅ openapi/compute.yaml (v1.1.0 — catalog/quota/jobs + instance lifecycle, F12+F13)
 │   ├── ✅ events  credit.tx.v1 · inference.usage.v1 · compute.usage.v1 · admin.action.v1
@@ -75,12 +77,21 @@ Exascale
 ├── 🟩 M3+ — ✅ F13 GPU lifecycle (v0.3.0) · ⬜ F10 catalog · F11 packing · F14 reserved · F15 clusters
 │        · F16 supply abstraction · F17 DC onboarding · F18 payouts · F19 attestation
 │
-├── 🟩 F23 Console v1.5 screens (~15%) — the v1.5 screen catalog itemized screen-by-screen
-│        (Tiers E–N) vs the backend each needs. Built: detail drawers, toasts, status, markets
-│        index, tour, footer. Active: money/compute/enterprise/datacenter/marketing/help/polish;
-│        exchange tiers ⏸ Phase 2. See features/F23-console-v15-screens.md.
+├── 🟩 F23 Console v1.5 screens (~45%) — live, honest, no-mock screens shipped v0.3.1–v0.3.12:
+│        console command-center, /enterprise/audit (rich — filters + before→after diffs),
+│        /enterprise/teams & /sso (honest, M4-staged), /enterprise/billing (live budget + balances +
+│        purchases), Settings = single admin home, /wallet/buy (live Stripe + KYC gate), compact
+│        K/M/B numbers. Removed the /enterprise/onboarding Walmart mock. Exchange tiers ⏸ Phase 2.
+│        See features/F23-console-v15-screens.md.
 │
-├── 🟩 Compliance & trust  — ⬜ F21 SOC 2 (M4→M6) · 🟩 F22 licensing track (parallel)
+├── ⬜ F24 CLI developer experience (Claude-Code-grade) — DX layer over the live F04 CLI: P1
+│        streaming inference (SSE) + spinners + semantic colour + actionable errors + --json; P2
+│        `exascale chat` interactive REPL; P3 completion/browser-login/profiles. M3→M6, incremental.
+│        See features/F24-cli-dx.md.
+│
+├── 🟩 Compliance & trust  — ⬜ F21 SOC 2 (M4→M6) · 🟩 F22 licensing track: ✅ **KYC/AML enforcement**
+│        (v0.3.12 — real-money checkout gated server-side, sandbox exempt, audited) · ⬜ counsel
+│        sign-off / ADR-0002 · ⬜ prod manual-review wiring (decision endpoint exists, service-token)
 │
 └── ⏸ Phase 2 — Exchange (paused, license-gated, kept warm)
     └── ⏸ KW01 index · KW02 trading demo UI · KW03 matching · KW04 market maker · KW05 surveillance
@@ -101,13 +112,17 @@ Exascale
   customer-facing on-demand instances (create/list/get/stop/start/delete) over `compute.yaml` v1.1.0,
   sharing one GPU pool with the scheduler; per-interval metering → `compute.usage.v1` → `gpu_*` debit;
   `exascale gpu …` CLI + live web `/compute` list & provision. Mock-GPU backend (real K8s provisioner +
-  <90s-P95 timing GPU-node-gated). Next: F11 packing, F10 full catalog, F14 reserved, F16 supply.
+  <90s-P95 timing GPU-node-gated). **Since v0.3.0 (v0.3.1→v0.3.12):** the AI-company product hardened
+  to live / no-mock end-to-end (console command-center, inference, wallet, **billing**); the enterprise
+  admin surface went live + honest under **Settings** (audit · teams · SSO · billing); and **F22
+  KYC/AML enforcement** shipped (v0.3.12) — real-money purchases now gated server-side. Next: F11
+  packing, F10 full catalog, F14 reserved, F16 supply.
 - **Pulled forward:** F03 audit-log + RBAC (sequenced M4) built in M1; email-verify + budgets
   (M3-ish) shipped as gap-closers (v0.1.3).
 - **M4–M6:** ⬜ not started.
 
 Repo: trunk = `main`, pushed to `origin` (ex-main). Tags v0.1.0→v0.1.5 (M1), v0.2.0→v0.2.16 (M2 +
-F01 hardening), v0.3.0 (M3 — F13).
+F01 hardening), v0.3.0 (M3 — F13), v0.3.1→v0.3.12 (M3 — live AI-company product + F22 KYC enforcement).
 
 ---
 
@@ -124,7 +139,17 @@ F01 hardening), v0.3.0 (M3 — F13).
 3. **M3 provisioning (your side)** — Stripe + domain/Cloudflare + registry + GPU node + HF token +
    email provider. See `PROVISIONING.md`.
 
-_Done since last update:_ **F13 GPU instance lifecycle — M3 begins** (v0.3.0): customer-facing
+_Done since last update (v0.3.1 → v0.3.12):_ **live AI-company product + F22 KYC.** The product is now
+live / no-mock end-to-end — console command-center, inference, wallet, and **billing** wired to the real
+backend. The enterprise admin surface is consolidated under **Settings** as the single admin home, each
+linking to a live page: **/enterprise/audit** (rich — search/filter + before→after diffs, admin-only),
+**/enterprise/billing** (live budget get/set + real balances + purchase history), and honest
+**/enterprise/teams** + **/sso** (real account/roles + M4 roadmap, no mock). Removed the
+`/enterprise/onboarding` Walmart mock; added compact K/M/B number formatting. **F22 KYC/AML enforcement**
+(v0.3.12): real-money checkout 403s `kyc_required` unless the tenant is verified (sandbox exempt) —
+migration 0005 + domain status-machine + store + API (incl. service-token-only review endpoint) + tests,
+deployed to k3d and proven live; `/security-review` clean. Also added `WAY_OF_WORKING.md` (portable build
+playbook). _Earlier:_ **F13 GPU instance lifecycle — M3 begins** (v0.3.0): customer-facing
 on-demand instances (create/list/get/stop/start/delete) over `compute.yaml` v1.1.0, drawing from one
 shared `pool.Pool` with the scheduler (capacity never double-counted); a per-interval metering ticker
 emits `compute.usage.v1` → credit-ledger `Compute` consumer debits the `gpu_*` tier (idempotent on
