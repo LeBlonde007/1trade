@@ -55,7 +55,7 @@ each step marked done / showcase / paused. Pair with [STATUS.md](STATUS.md) (tre
 | Drive it all from the **CLI** — `login / infer / gpu / credits / keys` | `exascale …` | ✅ | F04 + F13 |
 | Console ops · budgets · purchase history | `/console` · billing | ✅ | F20 · F06 |
 | Audit log + RBAC (admin actions → queryable trail) | `/enterprise/audit` | ✅ backend + **rich screen live** (filters + before→after diffs, admin-only) | F03 (v0.1.2) + F23 |
-| Enterprise team management + SAML SSO + sub-accounts | `/enterprise/teams` · `/sso` | ⬜ | F02/F03 (M4) |
+| Enterprise team management + SAML SSO + sub-accounts | `/enterprise/teams` · `/enterprise/sso` | 🟩 **screens live + honest** (real account · member · roles · RBAC ref; sub-accounts / invites / SAML / SCIM / 2FA tagged M4 — no mock) | F02/F03 (M4) |
 
 **Live today:** all of Phase 1 (→ console) + Phase 2, except real-money KYC (M3), the rich audit
 *screen* (F23), and enterprise SSO/teams (M4).
