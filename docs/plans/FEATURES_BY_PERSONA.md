@@ -1,6 +1,6 @@
 # Persona journeys — what works end-to-end
 
-**As of 2026-06-03 (tags v0.1.0 → v0.3.0).** The **full journey** for each persona, step by step, with
+**As of 2026-06-04 (tags v0.1.0 → v0.3.11).** The **full journey** for each persona, step by step, with
 each step marked done / showcase / paused. Pair with [STATUS.md](STATUS.md) (tree map) and
 [TESTING.md](TESTING.md) (how to verify each).
 
@@ -53,12 +53,16 @@ each step marked done / showcase / paused. Pair with [STATUS.md](STATUS.md) (tre
 | Wallet — live balances + transaction movements | `/wallet` | ✅ | F05 (v0.2.6) |
 | Mint an **API key** (shown once) | `/settings` | ✅ | F02 (v0.2.8) |
 | Drive it all from the **CLI** — `login / infer / gpu / credits / keys` | `exascale …` | ✅ | F04 + F13 |
-| Console ops · budgets · purchase history | `/console` · billing | ✅ | F20 · F06 |
+| Console ops · budgets · purchase history | `/console` | ✅ | F20 · F06 |
+| **Admin home** — Settings → Account links to live Billing · Team · SSO · Audit (sidebar stays product-only) | `/settings` · `/enterprise/billing` | ✅ **live billing** (budget get/set · real balances + MTD spend · purchase history; honest Stripe/sandbox) | F06 (v0.3.11) |
 | Audit log + RBAC (admin actions → queryable trail) | `/enterprise/audit` | ✅ backend + **rich screen live** (filters + before→after diffs, admin-only) | F03 (v0.1.2) + F23 |
 | Enterprise team management + SAML SSO + sub-accounts | `/enterprise/teams` · `/enterprise/sso` | 🟩 **screens live + honest** (real account · member · roles · RBAC ref; sub-accounts / invites / SAML / SCIM / 2FA tagged M4 — no mock) | F02/F03 (M4) |
 
-**Live today:** all of Phase 1 (→ console) + Phase 2, except real-money KYC (M3), the rich audit
-*screen* (F23), and enterprise SSO/teams (M4).
+**Live today:** all of Phase 1 (→ console) + Phase 2, **including** the rich audit screen (F23) and
+the live Settings → Account admin home — **Billing · Team · SSO · Audit are all real screens on live
+data, no mock**. The remaining gaps are *features*, not screens: real-money **KYC enforcement** (M3),
+and the enterprise **team / SSO functionality itself** — sub-accounts, invites, SAML/SCIM/2FA — which
+is **M4** (the Team & SSO screens are live today and label exactly what's M4).
 
 ---
 
