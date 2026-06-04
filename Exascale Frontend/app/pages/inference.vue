@@ -7,6 +7,8 @@
  * sidebar inside the playground area.
  */
 
+import type { CatalogModel } from '~/composables/useCatalog'
+
 definePageMeta({ layout: 'app' })
 useHead({ title: 'Inference Playground — Exascale' })
 
@@ -29,18 +31,37 @@ interface ModelDef {
   sub?: string
 }
 
-const MODELS: ModelDef[] = [
-  { id: 'llama-3.3-70b',  name: 'Llama 3.3 70B Instruct', version: 'v3.3',  provider: 'Meta',          category: 'text',  priceIn: 0.55,  priceOut: 0.79, context: '128K context', speed: '142 tok/s · P50' },
-  { id: 'llama-3.1-8b',   name: 'Llama 3.1 8B Instruct',  version: 'v3.1',  provider: 'Meta',          category: 'text',  priceIn: 0.06,  priceOut: 0.06, context: '128K context', speed: '378 tok/s · P50' },
-  { id: 'deepseek-r1',    name: 'DeepSeek-R1 Distill 70B', version: 'v1',   provider: 'DeepSeek',      category: 'text',  priceIn: 0.40,  priceOut: 0.60, context: '64K context · reasoning', speed: '94 tok/s · P50' },
-  { id: 'mixtral-8x22b',  name: 'Mixtral 8×22B Instruct',  version: 'v0.1', provider: 'Mistral AI',    category: 'text',  priceIn: 0.65,  priceOut: 0.95, context: '64K context · MoE', speed: '128 tok/s · P50' },
-  { id: 'qwen-2.5-72b',   name: 'Qwen 2.5 72B Instruct',   version: 'v2.5', provider: 'Alibaba',       category: 'text',  priceIn: 0.50,  priceOut: 0.75, context: '128K context', speed: '136 tok/s · P50' },
-  { id: 'mistral-small-3',name: 'Mistral Small 3',         version: 'v3.0', provider: 'Mistral AI',    category: 'text',  priceIn: 0.12,  priceOut: 0.18, context: '32K context', speed: '244 tok/s · P50' },
-  { id: 'whisper-large-v3',name: 'Whisper Large v3',       version: 'v3',   provider: 'OpenAI',        category: 'speech', priceLabel: '$0.006 / minute', sub: 'audio → text · 99 languages' },
-  { id: 'flux-1-dev',     name: 'FLUX.1-dev',              version: 'v1',   provider: 'Black Forest Labs', category: 'image', priceLabel: '$0.045 / image', sub: '1024×1024 · 28-step default' },
-  { id: 'svd',            name: 'Stable Video Diffusion',  version: 'v1.1', provider: 'Stability AI',  category: 'video', priceLabel: '$0.18 / clip', sub: '4s · 720p · 24 fps' },
-  { id: 'bge-m3',         name: 'bge-m3',                  version: 'v1.5', provider: 'BAAI',          category: 'embed', priceLabel: '$0.015 per 1M', sub: '1024-dim · 8K context · multi-lingual' },
-]
+// ── Live catalog (no mock) ──────────────────────────────────────────────────────────────────────
+// The model list is the gateway's real catalog (GET /v1/models via the BFF). The live catalog carries
+// id · owned_by · modality · credit_type · unit · price (in credits); display names are derived.
+const catalog = useCatalog()
+
+/** humanizeId turns a model id (llama-3.1-8b) into a display name (Llama 3.1 8B). */
+function humanizeId(id: string): string {
+  return id.split('-')
+    .map((p) => /^[0-9]/.test(p) || /^v[0-9]/i.test(p) ? p.toUpperCase() : p.charAt(0).toUpperCase() + p.slice(1))
+    .join(' ')
+}
+/** toCategory maps an Exascale modality to a catalog UI category. */
+function toCategory(modality: string): Category {
+  if (modality === 'embeddings' || modality === 'embed') return 'embed'
+  if (modality === 'speech' || modality === 'image' || modality === 'video') return modality
+  return 'text'
+}
+/** toModelDef maps a live CatalogModel into the card display shape — real price, in credits. */
+function toModelDef(m: CatalogModel): ModelDef {
+  const x = m.exascale
+  return {
+    id: m.id,
+    name: humanizeId(m.id),
+    provider: m.owned_by || 'Exascale',
+    category: toCategory(x.modality),
+    priceLabel: `${Number(x.price).toLocaleString('en-US')} ${x.credit_type} / ${x.unit}`,
+    sub: `${x.unit} · billed in ${x.credit_type} credits`,
+  }
+}
+/** models — the live catalog mapped to cards (empty until loaded; never mock). */
+const models = computed<ModelDef[]>(() => catalog.models.value.map(toModelDef))
 
 const CATEGORY_META: Record<Category, { label: string; cls: string }> = {
   text:   { label: 'TEXT',     cls: 'cat-text' },
@@ -60,15 +81,17 @@ const filter = ref<Filter>('all')
 
 const filteredModels = computed(() => {
   const q = catalogQuery.value.trim().toLowerCase()
-  return MODELS.filter(m => {
+  return models.value.filter(m => {
     if (filter.value !== 'all' && m.category !== filter.value) return false
     if (!q) return true
-    return (m.name + ' ' + m.provider + ' ' + (m.sub ?? '') + ' ' + (m.context ?? '')).toLowerCase().includes(q)
+    return (m.name + ' ' + m.provider + ' ' + (m.sub ?? '')).toLowerCase().includes(q)
   })
 })
 
-const selectedId = ref('llama-3.3-70b')
-const selected = computed(() => MODELS.find(m => m.id === selectedId.value) ?? MODELS[0]!)
+// Empty placeholder while the live catalog loads — not mock data, just a safe non-null default.
+const EMPTY_MODEL: ModelDef = { id: '', name: '—', provider: '', category: 'text' }
+const selectedId = ref('')
+const selected = computed(() => models.value.find(m => m.id === selectedId.value) ?? models.value[0] ?? EMPTY_MODEL)
 
 function selectModel(id: string) {
   selectedId.value = id
@@ -127,7 +150,6 @@ const sending = ref(false)
 // F20×F08 — live credit economics: load the real model catalog (credit price per unit) + the tenant's
 // text-credit balance, so each run shows its true credit cost and the session meter reflects real
 // spend (the gateway debits the same tokens×price async via the ledger).
-const catalog = useCatalog()
 const wallet = useWallet()
 const catalogPrice = ref<Record<string, { price: number; creditType: string; unit: string }>>({})
 const textBalance = ref<number | null>(null)
@@ -149,10 +171,11 @@ function liveCreditCost(modelId: string, totalTokens: number): { cost: number; c
 
 onMounted(async () => {
   try {
-    const models = await catalog.load()
+    const list = await catalog.load()
     const map: Record<string, { price: number; creditType: string; unit: string }> = {}
-    for (const m of models) map[m.id] = { price: Number(m.exascale.price), creditType: m.exascale.credit_type, unit: m.exascale.unit }
+    for (const m of list) map[m.id] = { price: Number(m.exascale.price), creditType: m.exascale.credit_type, unit: m.exascale.unit }
     catalogPrice.value = map
+    if (!selectedId.value && list.length) selectedId.value = list[0]!.id   // select the first real model
   } catch { /* meter falls back to estimates only */ }
   await refreshBalance()
 })
@@ -257,14 +280,6 @@ function inlineMd(s: string) {
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
     .replace(/\n/g, '<br />')
 }
-function selectedBackend(m: ModelDef) {
-  if (m.category === 'speech') return 'whisper-pool-eu-west'
-  if (m.category === 'image')  return 'flux-pool-us-east'
-  if (m.category === 'video')  return 'svd-pool-us-east'
-  if (m.category === 'embed')  return 'embed-pool-tyo-1'
-  return 'vllm-pool-' + m.id + '-us-east'
-}
-
 // =====================================================
 // View toggle + metadata sidebar
 // =====================================================
@@ -375,7 +390,7 @@ async function copyText(text: string, label: string) {
         <span class="strong">Playground</span>
       </nav>
       <div class="subbar-right">
-        <span class="catalog-meta mono">{{ MODELS.length }} models · curated · monthly refresh</span>
+        <span class="catalog-meta mono">{{ models.length }} models · curated · live catalog</span>
         <span class="api-pill mono">api · /v1/chat/completions</span>
       </div>
     </div>
@@ -395,7 +410,7 @@ async function copyText(text: string, label: string) {
               v-model="catalogQuery"
               type="text"
               class="search-input"
-              :placeholder="`Search ${MODELS.length} models…`"
+              :placeholder="`Search ${models.length} models…`"
               autocomplete="off"
             />
           </div>
@@ -474,12 +489,13 @@ async function copyText(text: string, label: string) {
               <span class="cat-tag inline" :class="CATEGORY_META[selected.category].cls">{{ CATEGORY_META[selected.category].label }}</span>
               <h2 class="pg-name">{{ selected.name }}</h2>
               <span class="pg-version mono">{{ selected.version }}</span>
-              <span class="pg-backend mono dim">· {{ selectedBackend(selected) }}</span>
+              <span class="pg-backend mono dim">· {{ selected.priceLabel }}</span>
             </div>
             <div class="pg-status">
               <span class="status-tag">
                 <span class="pulse" />
-                Ready · 142 tok/s avg · 318ms P50
+                <template v-if="lastAssistant?.latencyMs">Ready · {{ lastAssistant.latencyMs }}ms last call</template>
+                <template v-else>Ready</template>
               </span>
             </div>
           </div>
@@ -757,7 +773,7 @@ async function copyText(text: string, label: string) {
                 {{ fmtNum(lastAssistant?.tokens?.in ?? 0) }} / {{ fmtNum(lastAssistant?.tokens?.out ?? 0) }}
               </dd>
 
-              <dt>Latency · P50</dt>
+              <dt>Latency · last</dt>
               <dd class="mono">{{ lastAssistant?.latencyMs ?? 0 }}ms</dd>
 
               <dt>Backend</dt>

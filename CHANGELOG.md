@@ -4,6 +4,33 @@ All notable changes to Exascale. Format: [Keep a Changelog](https://keepachangel
 SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not dates — see
 `docs/plans/MANAGEMENT_PLAN.md`).
 
+## [v0.3.9] — Settings is the single admin home; inference + wallet go fully live (F02/F03/F08, no mock)
+
+### Changed
+- **Account/org admin now lives under Settings — one admin home, no duplicates.** The main sidebar
+  stays **product-surface only** (Console · Wallet · Compute · Inference); the **Settings → Account**
+  group links out to the live admin pages: **Billing & payment → `/enterprise/billing`**, **Team &
+  access → `/enterprise/teams`**, **Single sign-on → `/enterprise/sso`**, **Audit log →
+  `/enterprise/audit`** (plus the inline KYC + Danger-zone sections). This retires three overlapping
+  duplications: Settings previously had its own placeholder **Billing / Team / Compliance** sections
+  while **Audit log** + **Billing** also sat at the top level of the sidebar.
+  - Removed **Audit log** + **Billing** from the sidebar's enterprise group (and their now-unused
+    icon imports); dropped the dead inline `billing`/`team`/`compliance` section keys from
+    `settings.vue`.
+- **`/inference` now renders the gateway's real catalog (no mock).** The hard-coded 9-model `MODELS`
+  array is gone; the playground maps the live `GET /v1/models` catalog into cards (`humanizeId`,
+  modality→category, **price in real credits per unit**). Empty until loaded; never fabricated.
+- **`/wallet` is overlaid with real ledger balances (no mock).** Removed the `genSpark()` fake
+  sparklines and seeded quantities; balances start at 0 and are filled from the tenant's real ledger
+  on mount. Per-credit USD figures are labelled **indicative** (there is no live price feed — the
+  exchange is paused), and 24h-change/sparklines are **omitted, not faked**. Added the `embeddings`
+  credit type to the wallet ↔ ledger map.
+
+### Verified
+- Typecheck clean on all changed files. Screenshotted live in k3d: the Settings **Account** group
+  shows KYC · Billing & payment ↗ · Team & access ↗ · Single sign-on ↗ · Audit log ↗ · Danger zone,
+  and all four admin links route to their live `/enterprise/*` pages (asserted in the harness).
+
 ## [v0.3.8] — Honest, live Team & SSO screens (F02/F03, M4-staged)
 
 ### Changed

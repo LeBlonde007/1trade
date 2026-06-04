@@ -18,9 +18,6 @@ type SectionKey =
   | 'notifications'
   | 'display'
   | 'kyc'
-  | 'billing'
-  | 'team'
-  | 'compliance'
   | 'danger'
 
 interface SectionDef {
@@ -36,11 +33,17 @@ const SECTIONS: SectionDef[] = [
   { key: 'api',           label: 'API Keys',               group: 'Personal' },
   { key: 'notifications', label: 'Notifications',          group: 'Personal' },
   { key: 'display',       label: 'Display preferences',    group: 'Personal' },
-  { key: 'kyc',           label: 'KYC status',             group: 'Account',  badge: 'Light · verified' },
-  { key: 'billing',       label: 'Billing & Payment',      group: 'Account' },
-  { key: 'team',          label: 'Team & Permissions',     group: 'Account',  badge: 'Enterprise' },
-  { key: 'compliance',    label: 'Compliance & Audit',     group: 'Account' },
+  { key: 'kyc',           label: 'KYC status',             group: 'Account' },
   { key: 'danger',        label: 'Danger zone',            group: 'Account',  danger: true },
+]
+
+// Account-admin areas live on their own live pages — the Account group links out to them (single
+// admin home: Settings) instead of duplicating the content inline.
+const ADMIN_LINKS = [
+  { label: 'Billing & payment', to: '/enterprise/billing' },
+  { label: 'Team & access',     to: '/enterprise/teams' },
+  { label: 'Single sign-on',    to: '/enterprise/sso' },
+  { label: 'Audit log',         to: '/enterprise/audit' },
 ]
 
 const active = ref<SectionKey>('profile')
@@ -297,15 +300,34 @@ onMounted(() => {
         <div class="nav-group">
           <div class="nav-group-head">Account</div>
           <ul>
-            <li v-for="s in SECTIONS.filter(x => x.group === 'Account')" :key="s.key">
+            <!-- Inline section (KYC) -->
+            <li v-for="s in SECTIONS.filter(x => x.group === 'Account' && !x.danger)" :key="s.key">
               <button
                 type="button"
                 class="nav-item"
-                :class="{ active: active === s.key, danger: s.danger }"
+                :class="{ active: active === s.key }"
                 @click="goTo(s.key)"
               >
                 <span class="nav-label">{{ s.label }}</span>
                 <span v-if="s.badge" class="nav-badge">{{ s.badge }}</span>
+              </button>
+            </li>
+            <!-- Admin areas — their own live pages -->
+            <li v-for="a in ADMIN_LINKS" :key="a.to">
+              <NuxtLink :to="a.to" class="nav-item link">
+                <span class="nav-label">{{ a.label }}</span>
+                <span class="nav-ext">↗</span>
+              </NuxtLink>
+            </li>
+            <!-- Inline section (Danger) -->
+            <li v-for="s in SECTIONS.filter(x => x.group === 'Account' && x.danger)" :key="s.key">
+              <button
+                type="button"
+                class="nav-item danger"
+                :class="{ active: active === s.key }"
+                @click="goTo(s.key)"
+              >
+                <span class="nav-label">{{ s.label }}</span>
               </button>
             </li>
           </ul>
@@ -680,16 +702,7 @@ onMounted(() => {
                   Theme, density and table formatting defaults.
                 </template>
                 <template v-else-if="active === 'kyc'">
-                  Light KYC is in effect. Upgrade to Full KYC to enable real-money trading.
-                </template>
-                <template v-else-if="active === 'billing'">
-                  Cards, bank accounts, paid plans and invoice history.
-                </template>
-                <template v-else-if="active === 'team'">
-                  Invite teammates, scope their permissions, view audit trails.
-                </template>
-                <template v-else-if="active === 'compliance'">
-                  Annual attestations, source-of-funds review, sanctions screening.
+                  Identity verification status. Required before your first real-money purchase.
                 </template>
                 <template v-else-if="active === 'danger'">
                   Irreversible operations on the account.
@@ -1041,6 +1054,12 @@ onMounted(() => {
   white-space: nowrap;
 }
 .nav-item.active .nav-badge { color: var(--text-2); border-color: var(--border-strong); }
+
+/* Admin links — same chrome as a nav item, but they navigate to their own live page. */
+.nav-item.link { text-decoration: none; color: var(--text-2); }
+.nav-ext { font-family: var(--font-mono); font-size: 11px; color: var(--text-3); justify-self: end; }
+.nav-item.link:hover .nav-ext { color: var(--text); }
+.router-link-active.nav-item.link { color: var(--text); border-left-color: var(--brand); background: var(--elevated); }
 
 .nav-foot {
   display: flex;
