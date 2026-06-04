@@ -337,12 +337,11 @@ function statusToneClass(tone: string): string {
     <!-- Admin chrome -->
     <header class="admin-chrome">
       <NuxtLink to="/" class="brand"><span class="mark" />Exascale</NuxtLink>
-      <NuxtLink to="/enterprise/onboarding" class="org" :title="ORG.enterpriseId">
+      <NuxtLink to="/settings" class="org" :title="ORG.enterpriseId">
         <span class="org-name">{{ ORG.name }}</span>
         <span class="org-pill">ENTERPRISE</span>
       </NuxtLink>
       <nav class="chrome-nav">
-        <NuxtLink to="/enterprise/onboarding" class="ch-link">Onboarding</NuxtLink>
         <NuxtLink to="/enterprise/teams" class="ch-link">Team</NuxtLink>
         <NuxtLink to="/enterprise/audit" class="ch-link">Audit Log</NuxtLink>
         <a href="#" class="ch-link active" aria-current="page">Billing</a>
@@ -354,7 +353,7 @@ function statusToneClass(tone: string): string {
     </header>
 
     <div class="crumb">
-      <NuxtLink to="/enterprise/onboarding">Admin</NuxtLink>
+      <NuxtLink to="/settings">Admin</NuxtLink>
       <span class="sep">›</span>
       <span class="cur">Billing</span>
     </div>

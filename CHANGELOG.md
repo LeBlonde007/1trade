@@ -4,6 +4,24 @@ All notable changes to Exascale. Format: [Keep a Changelog](https://keepachangel
 SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not dates — see
 `docs/plans/MANAGEMENT_PLAN.md`).
 
+## [v0.3.10] — Remove the pre-pivot `/enterprise/onboarding` Walmart mock
+
+### Removed
+- **Deleted `/enterprise/onboarding`** — a fully-hardcoded design mockup from before the GTM pivot:
+  a fake "Walmart Inc." $5M contract, a fake CSM, a simulated SAML wizard (a `setTimeout` that always
+  "passed"), rendered standalone (`layout: false`, light theme, **no `auth` middleware**). It
+  duplicated the now-honest `/enterprise/teams` + `/enterprise/sso` screens and violated the no-mock
+  mandate, so it's gone rather than kept as dead mock.
+- Cleared every code reference so nothing dangles: the sidebar nav item (+ its now-unused `Building2`
+  icon import), the command-palette entry, the two product-tour steps (`useTour.ts` + `tour-scripts.ts`
+  `ent.onboarding`), and the three `/enterprise/onboarding` links in the billing chrome (re-pointed to
+  `/settings`, the admin home; the dead "Onboarding" nav link dropped).
+
+### Verified
+- Typecheck introduces no new errors (the 3 remaining CommandPalette/billing chart-typing errors
+  pre-exist on `main`). Live in k3d: the route no longer renders the Walmart mock, the sidebar has
+  **zero** Onboarding links, and `/console` still renders live.
+
 ## [v0.3.9] — Settings is the single admin home; inference + wallet go fully live (F02/F03/F08, no mock)
 
 ### Changed

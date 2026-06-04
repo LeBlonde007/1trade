@@ -69,8 +69,6 @@ export const TOUR_PERSONAS: PersonaScript[] = [
     color: 'var(--info)',
     steps: [
       { route: '/',                            target: '.audiences, .for-ai, .container-x',                title: 'Audience split',   body: 'Enterprise procurement is sales-assisted, not self-serve. Maya was handed an onboarding URL.',               ms: 5500 },
-      { route: '/enterprise/onboarding',       target: '.csm-card, h1, .pc-title',                         title: 'Sales-assist',     body: 'Dedicated CSM with email, Slack, and phone. MSA + pricing schedule on the right rail.',                       ms: 7000 },
-      { route: '/enterprise/onboarding',       target: '.checklist, .checklist-items',                     title: 'Activation steps', body: '6-step checklist: MSA · credit · billing entity · IdP · invite team · first instance. Every check unlocks usage.', ms: 7000 },
       { route: '/enterprise/teams',            target: 'h1, .teams-head',                                  title: 'Team & sub-accounts', body: '8 members across 4 sub-accounts. Per-seat budgets so finance keeps the lid on.',                          ms: 6500 },
       { route: '/enterprise/teams',            target: '.budget-bars, .budgets, .sub-account-budgets',     title: 'Per-seat budgets', body: 'AI Research at $50K/mo, Customer Service AI at $30K. Hard caps + auto-stop.',                                ms: 6500 },
       { route: '/compute',                     target: 'h1, .compute-head',                                title: 'Compute',          body: '8 instances across 4 regions. Real-time utilization + spend per row.',                                       ms: 6500 },

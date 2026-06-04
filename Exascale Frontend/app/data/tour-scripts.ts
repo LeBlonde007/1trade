@@ -301,28 +301,6 @@ const enterpriseTour: TourStep[] = [
     askFeedback: true,
   },
   {
-    id: 'ent.onboarding',
-    route: '/enterprise/onboarding',
-    section: 'Enterprise onboarding',
-    element: 'h1, .page-head, main',
-    title: 'Activation checklist + CSM contact',
-    body: `
-      <p>Personalised landing for an executed MSA. Header shows the assigned CSM with email / Slack / phone CTAs.</p>
-      <p><strong>Six-step activation checklist</strong>:</p>
-      <ol>
-        <li>✅ Master service agreement signed</li>
-        <li>✅ Initial credit purchase</li>
-        <li>✅ Billing entity verified</li>
-        <li>◐ Identity provider connected (SSO/SAML)</li>
-        <li>☐ Invite team</li>
-        <li>☐ Provision first compute instance</li>
-      </ol>
-      <p>Right rail: MSA · pricing schedule · DPA · order form (all signed PDFs).</p>
-    `,
-    side: 'bottom',
-    askFeedback: true,
-  },
-  {
     id: 'ent.teams',
     route: '/enterprise/teams',
     section: 'Teams & sub-accounts',
