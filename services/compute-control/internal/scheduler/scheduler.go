@@ -12,6 +12,7 @@ import (
 
 	"github.com/exascale/compute-control/internal/domain"
 	"github.com/exascale/compute-control/internal/events"
+	"github.com/exascale/compute-control/internal/metrics"
 	"github.com/exascale/compute-control/internal/pool"
 	"github.com/google/uuid"
 )
@@ -243,19 +244,21 @@ func (m *MockScheduler) emitUsage(j domain.Job, elapsedSeconds int64) {
 	if j.SubAccountID != "" {
 		sub = &j.SubAccountID
 	}
+	gpuSeconds := domain.TotalGPUSeconds(elapsedSeconds, j.TotalGPUs())
 	m.pub.PublishUsage(events.ComputeUsage{
 		UsageID:        uuid.NewString(),
 		TenantID:       j.TenantID,
 		SubAccountID:   sub,
 		InstanceID:     j.ID,
 		CreditType:     j.GPUType,
-		GPUSeconds:     domain.TotalGPUSeconds(elapsedSeconds, j.TotalGPUs()),
+		GPUSeconds:     gpuSeconds,
 		Units:          domain.BillableGPUHours(elapsedSeconds, j.TotalGPUs()),
 		Reserved:       j.Reserved,
 		SupplySourceID: j.SupplySourceID,
 		IsPaper:        j.IsPaper,
 		TS:             events.NewTimestamp(),
 	})
+	metrics.RecordComputeUsage(j.GPUType, gpuSeconds, j.Reserved)
 }
 
 // Quotas returns per-tier capacity + this tenant's live usage + the free pool.

@@ -4,6 +4,25 @@ All notable changes to Exascale. Format: [Keep a Changelog](https://keepachangel
 SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not dates — see
 `docs/plans/MANAGEMENT_PLAN.md`).
 
+## [v0.3.15] — Domain metrics on inference-gateway + compute-control (F01 observability)
+
+### Added
+- **inference-gateway:** `inference_requests_total{model,modality}` and
+  `inference_tokens_total{model,direction}` (input|output) — recorded once per served request at
+  metering time (a service-specific `internal/metrics` package, same pattern as the ledger counter).
+- **compute-control:** `compute_gpu_seconds_total{credit_type,reserved}` and
+  `compute_usage_events_total{credit_type}` — recorded at every `compute.usage.v1` emit (both the
+  scheduler's gang-job path and the on-demand instance path). GPU-seconds is parsed best-effort from
+  the fixed-point string (advisory metric, not the billing source of truth).
+
+### Verified
+- Both modules build + test green. Live in k3d: six funded inferences moved
+  `inference_requests_total{model="llama-3.1-8b",modality="text"} 6` +
+  `inference_tokens_total` (input 48 / output 84); an instance create→run→stop moved
+  `compute_gpu_seconds_total{credit_type="gpu_h100",reserved="false"} 22` +
+  `compute_usage_events_total 1`. With v0.3.14 the three core services now emit business metrics
+  (credits moved · tokens served · GPU-seconds metered) alongside HTTP RED.
+
 ## [v0.3.14] — Ledger domain metric + `/metrics` live on all four services (F01 observability)
 
 ### Added

@@ -17,6 +17,7 @@ import (
 	"github.com/exascale/inference-gateway/internal/catalog"
 	"github.com/exascale/inference-gateway/internal/config"
 	"github.com/exascale/inference-gateway/internal/events"
+	"github.com/exascale/inference-gateway/internal/metrics"
 	"github.com/exascale/inference-gateway/internal/model"
 	"github.com/exascale/inference-gateway/internal/pricing"
 	"github.com/google/uuid"
@@ -183,6 +184,7 @@ func (s *Server) chatCompletions(w http.ResponseWriter, r *http.Request) {
 // failure is logged, never fails the customer (the response was already produced).
 func (s *Server) meter(p auth.Principal, m catalog.Model, modelID string, res model.ChatResult, units string, latencyMS int, requestID string) {
 	in, out, lat := res.PromptTokens, res.CompletionTokens, latencyMS
+	metrics.RecordInference(modelID, m.Exascale.Modality, in, out)
 	e := events.UsageEvent{
 		RequestID: requestID, TenantID: p.TenantID, Model: modelID,
 		Modality: m.Exascale.Modality, CreditType: m.Exascale.CreditType,
