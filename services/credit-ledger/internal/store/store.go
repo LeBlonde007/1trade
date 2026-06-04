@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/exascale/credit-ledger/internal/domain"
+	"github.com/exascale/credit-ledger/internal/metrics"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -129,6 +130,10 @@ func applyLeg(ctx context.Context, dbtx pgx.Tx, m Movement) (domain.Transaction,
 		applied.CreatedAt, applied.ChainHash); err != nil {
 		return domain.Transaction{}, fmt.Errorf("insert tx: %w", err)
 	}
+	// Count the written transaction. Idempotent replays return before this insert, so they are not
+	// counted; a rare post-insert commit failure may over-count by one (acceptable for an advisory
+	// counter). Labels are bounded (operation × credit-type enum).
+	metrics.TransactionsTotal.WithLabelValues(string(applied.Operation), string(applied.CreditType)).Inc()
 
 	if _, err := dbtx.Exec(ctx,
 		`UPDATE credit_balances SET balance=$1::numeric, last_chain_hash=$2, updated_at=now()
