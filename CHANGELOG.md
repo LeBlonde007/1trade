@@ -4,6 +4,25 @@ All notable changes to Exascale. Format: [Keep a Changelog](https://keepachangel
 SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not dates — see
 `docs/plans/MANAGEMENT_PLAN.md`).
 
+## [v0.3.8] — Honest, live Team & SSO screens (F02/F03, M4-staged)
+
+### Changed
+- **`/enterprise/teams` and `/enterprise/sso` replaced their mocks with honest, live screens.** Team
+  management + SAML SSO + sub-accounts are M4 (the contract notes "SAML/SCIM/2FA are M4 additions"),
+  so rather than fabricate members/budgets/IdP connections, the screens show what's **real now** and
+  clearly tag the rest **M4**:
+  - **Teams:** the live tenant + signed-in member + roles (from the session), the F03 RBAC role
+    reference (admin/billing/engineer/viewer/trader), and an M4 roadmap (sub-accounts, invites, SSO,
+    SCIM, 2FA).
+  - **SSO:** the live current sign-in method (email/password + OAuth scaffold, "SSO not enforced —
+    M4"), the M4 feature list (SAML 2.0, SCIM, enforced 2FA, JIT users), and planned IdPs.
+  - Removed the standalone light-theme mocks (the 61KB "Walmart" teams grid + the fake SSO wizard);
+    both now use the app layout, dark tokens, and no mock data.
+
+### Verified
+- Typecheck clean; screenshotted live in k3d — real `ADMIN` role + tenant id on Teams, real email +
+  "not enforced" on SSO, M4 items tagged. Both load 200, no JS errors.
+
 ## [v0.3.7] — Rich audit-log screen, live-wired (F03/F23)
 
 ### Added
