@@ -18,7 +18,6 @@ import {
   Server,
   MessageSquare,
   Settings,
-  Building2,
   Database,
 } from 'lucide-vue-next'
 import { type ActivePersona } from '~/composables/usePersona'
@@ -54,9 +53,8 @@ const items: NavItem[] = [
   { icon: Server,           label: 'Compute',   to: '/compute',                        personas: ['enterprise'] },
   { icon: MessageSquare,    label: 'Inference', to: '/inference',                      personas: ['enterprise'] },
 
-  // AI-company admin. (Billing · Audit · Team · SSO now live under Settings → Account, the single
-  // admin home — see app/pages/settings.vue. The sidebar stays product-surface only.)
-  { icon: Building2,        label: 'Onboarding', to: '/enterprise/onboarding',         personas: ['enterprise'], group: 'enterprise' },
+  // AI-company admin (Billing · Audit · Team · SSO) lives under Settings → Account, the single admin
+  // home — see app/pages/settings.vue. The sidebar stays product-surface only, so nothing here.
 
   // Datacenter partner — supply side.
   { icon: Database,         label: 'DC dashboard', to: '/datacenter', match: '/datacenter', personas: ['partner'], group: 'partner' },

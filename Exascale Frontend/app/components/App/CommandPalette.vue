@@ -73,7 +73,6 @@ const ALL_ITEMS = computed<Item[]>(() => ([
   { id: 'p-set',     category: 'Pages', icon: 'cog',       label: 'Settings',           hint: '/settings',      shortcut: 'G S', chord: 's', to: '/settings' },
 
   // Enterprise / admin
-  { id: 'p-ent',     category: 'Admin', icon: 'briefcase', label: 'Enterprise onboarding', hint: '/enterprise/onboarding',          to: '/enterprise/onboarding' },
   { id: 'p-team',    category: 'Admin', icon: 'briefcase', label: 'Team & sub-accounts',   hint: '/enterprise/teams',                to: '/enterprise/teams' },
   { id: 'p-audit',   category: 'Admin', icon: 'shield',    label: 'Audit log',             hint: '/enterprise/audit · compliance',   to: '/enterprise/audit' },
   { id: 'p-bill',    category: 'Admin', icon: 'wallet',    label: 'Billing dashboard',     hint: '/enterprise/billing · invoices, budget, alerts', to: '/enterprise/billing' },
