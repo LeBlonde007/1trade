@@ -4,6 +4,32 @@ All notable changes to Exascale. Format: [Keep a Changelog](https://keepachangel
 SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not dates — see
 `docs/plans/MANAGEMENT_PLAN.md`).
 
+## [v0.3.11] — Live, honest `/enterprise/billing` (F05/F06, no mock)
+
+### Changed
+- **`/enterprise/billing` rewritten from a 1,045-line Walmart mock into a live, honest screen.** The
+  old page faked a "Walmart Inc." org, a `$42,847` month-to-date spend, a `Chase ••4421` payment
+  method, sub-account/service Chart.js donuts, and invoice history — rendered `layout: false`, light
+  theme, **no `auth` middleware**. It now uses the app layout + dark tokens and wires to the real F06
+  surface via the BFF:
+  - **Monthly budget** — live `GET`/`PUT /api/billing/budget`, with a usage meter computed from real
+    ledger consumption this month (50/80/100% bands); `403` on save (non-billing/admin role) is
+    surfaced cleanly.
+  - **Credit balances** — the tenant's real per-type balances + locked + month-to-date spend
+    (`useWallet`), no cross-type dollar roll-up (there's no live price feed — the exchange is paused).
+  - **Payment method** — honest: Stripe Checkout, sandbox settles instantly via MockStripe, **no card
+    stored** (Stripe holds it). No fabricated card/bank.
+  - **Purchase history** — the real `GET /api/billing/purchases` rows (date · credit · amount ·
+    currency · status), with empty state linking to `/wallet/buy`.
+  - Dropped the Chart.js dependency from the page (and with it the two pre-existing chart-typing
+    errors). This is the page the v0.3.9 Settings → **Billing & payment** link points at, so the admin
+    surface is now live end-to-end.
+
+### Verified
+- Typecheck clean. Screenshotted live in k3d after seeding real state through the BFF: two settled
+  purchases (Text 500K + AI index 120K, both Paid), a saved 250K text budget, and real month-to-date
+  text consumption from live inference calls showing on the meter + balances table.
+
 ## [v0.3.10] — Remove the pre-pivot `/enterprise/onboarding` Walmart mock
 
 ### Removed
