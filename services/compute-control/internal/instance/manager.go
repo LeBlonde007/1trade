@@ -12,6 +12,7 @@ import (
 
 	"github.com/exascale/compute-control/internal/domain"
 	"github.com/exascale/compute-control/internal/events"
+	"github.com/exascale/compute-control/internal/metrics"
 	"github.com/exascale/compute-control/internal/pool"
 	"github.com/google/uuid"
 )
@@ -292,17 +293,19 @@ func (m *Manager) emit(inst domain.Instance, elapsedSeconds int64) {
 	if inst.SubAccountID != "" {
 		sub = &inst.SubAccountID
 	}
+	gpuSeconds := domain.TotalGPUSeconds(elapsedSeconds, inst.Count)
 	m.pub.PublishUsage(events.ComputeUsage{
 		UsageID:        uuid.NewString(),
 		TenantID:       inst.TenantID,
 		SubAccountID:   sub,
 		InstanceID:     inst.ID,
 		CreditType:     inst.GPUType,
-		GPUSeconds:     domain.TotalGPUSeconds(elapsedSeconds, inst.Count),
+		GPUSeconds:     gpuSeconds,
 		Units:          domain.BillableGPUHours(elapsedSeconds, inst.Count),
 		Reserved:       false, // on-demand
 		SupplySourceID: inst.SupplySourceID,
 		IsPaper:        inst.IsPaper,
 		TS:             events.NewTimestamp(),
 	})
+	metrics.RecordComputeUsage(inst.GPUType, gpuSeconds, false)
 }
