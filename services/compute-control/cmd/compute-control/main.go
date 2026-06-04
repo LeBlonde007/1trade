@@ -17,6 +17,7 @@ import (
 	"github.com/exascale/compute-control/internal/domain"
 	"github.com/exascale/compute-control/internal/events"
 	"github.com/exascale/compute-control/internal/instance"
+	"github.com/exascale/compute-control/internal/obs"
 	"github.com/exascale/compute-control/internal/pool"
 	"github.com/exascale/compute-control/internal/scheduler"
 )
@@ -66,9 +67,13 @@ func main() {
 	}
 	resolver := auth.NewResolver(cfg.JWTSecret, cfg.ServiceToken)
 
+	// Expose Prometheus /metrics next to the app (same port, cluster-internal) + instrument app routes.
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", obs.Handler())
+	mux.Handle("/", obs.Instrument(api.New(cfg, resolver, sched, mgr)))
 	srv := &http.Server{
 		Addr:              cfg.Addr,
-		Handler:           api.New(cfg, resolver, sched, mgr),
+		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	slog.Info("compute-control listening", "addr", cfg.Addr, "env", cfg.Env, "version", Version)

@@ -12,6 +12,7 @@ import (
 	"github.com/exascale/credit-ledger/internal/config"
 	"github.com/exascale/credit-ledger/internal/consumer"
 	"github.com/exascale/credit-ledger/internal/events"
+	"github.com/exascale/credit-ledger/internal/obs"
 	"github.com/exascale/credit-ledger/internal/store"
 )
 
@@ -60,9 +61,14 @@ func main() {
 		}
 	}
 
+	// Mount the app behind RED-metrics instrumentation, and expose Prometheus /metrics alongside it on
+	// the same port (cluster-internal; scraped by Prometheus, not customer-facing).
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", obs.Handler())
+	mux.Handle("/", obs.Instrument(api.New(cfg, st, pub)))
 	srv := &http.Server{
 		Addr:              cfg.Addr,
-		Handler:           api.New(cfg, st, pub),
+		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	slog.Info("credit-ledger listening", "addr", cfg.Addr, "env", cfg.Env, "version", Version)

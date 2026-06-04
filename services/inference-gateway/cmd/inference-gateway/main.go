@@ -12,6 +12,7 @@ import (
 	"github.com/exascale/inference-gateway/internal/events"
 	"github.com/exascale/inference-gateway/internal/ledger"
 	"github.com/exascale/inference-gateway/internal/model"
+	"github.com/exascale/inference-gateway/internal/obs"
 )
 
 // Version is set at build time (-ldflags -X main.Version=...).
@@ -50,9 +51,13 @@ func main() {
 		slog.Warn("PLATFORM_JWT_SECRET unset; credit pre-flight disabled")
 	}
 
+	// Expose Prometheus /metrics next to the app (same port, cluster-internal) + instrument app routes.
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", obs.Handler())
+	mux.Handle("/", obs.Instrument(api.New(cfg, backend, usage, credit)))
 	srv := &http.Server{
 		Addr:              cfg.Addr,
-		Handler:           api.New(cfg, backend, usage, credit),
+		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	slog.Info("inference-gateway listening", "addr", cfg.Addr, "env", cfg.Env, "version", Version)

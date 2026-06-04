@@ -4,6 +4,30 @@ All notable changes to Exascale. Format: [Keep a Changelog](https://keepachangel
 SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not dates — see
 `docs/plans/MANAGEMENT_PLAN.md`).
 
+## [v0.3.13] — Prometheus `/metrics` on every Go service (F01 observability)
+
+### Added
+- **All four Go services now expose Prometheus `/metrics`** (credit-ledger · platform-core ·
+  inference-gateway · compute-control) — the first slice of F01 `OBS=1` observability (was a no-op
+  before; only the Python vLLM runtime had metrics).
+  - A small, copy-verbatim `internal/obs` package per service (no shared-module coupling): RED metrics
+    — `http_requests_total`, `http_request_duration_seconds`, `http_requests_in_flight` — wrapped via
+    `promhttp` instrument middleware, **labelled by method × status code only** (no per-path/id label,
+    so cardinality stays bounded). Go-runtime + process collectors (goroutines, GC, RSS, fds, CPU) ship
+    for free off the default registry.
+  - `/metrics` is mounted on the same port as the API, **cluster-internal** (scraped by Prometheus,
+    not customer-facing).
+- **Scrape wiring:** `deploy/k8s/observability/servicemonitors.yaml` — one ServiceMonitor selecting all
+  four services on their named `http` port at `/metrics`, labelled `release: kube-prom` so the
+  kube-prometheus-stack Prometheus auto-discovers it. Applied automatically by `OBS=1` in
+  `install-data-plane.sh` (after the operator CRDs exist).
+
+### Verified
+- All 5 Go modules build + test green (`scripts/go-all.sh`). Deployed credit-ledger to k3d and scraped
+  it live: `http_requests_total{code="200",method="get"} 97` + `{code="401"} 1`, the latency histogram,
+  the in-flight gauge, and `go_goroutines` / `process_resident_memory_bytes`. (Dashboards + SLO alerts
+  + the other three services' redeploy are the next slices.)
+
 ## [v0.3.12] — Real-money KYC/AML gate, server-enforced (F22, M3)
 
 ### Added
