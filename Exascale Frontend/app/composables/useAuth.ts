@@ -10,6 +10,8 @@ export interface Identity {
   org_id?: string
   roles: string[]
   is_paper: boolean
+  /** Tenant KYC state (F22) — gates real-money purchases. From /v1/auth/me. */
+  kyc_status?: 'unverified' | 'pending' | 'verified' | 'rejected'
 }
 
 export function useAuth() {

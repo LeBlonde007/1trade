@@ -114,11 +114,13 @@ func (s *Store) GetUserByEmail(ctx context.Context, email string) (AuthUser, boo
 	return u, true, nil
 }
 
-// Identity is the current-user view returned by /v1/auth/me.
+// Identity is the current-user view returned by /v1/auth/me. KYCStatus lets the web app render the
+// real-money gate without a second round trip (the gate reads it off the /me user object).
 type Identity struct {
 	UserID, Email, TenantID, OrgID string
 	Roles                          []domain.Role
 	IsPaper                        bool
+	KYCStatus                      domain.KYCStatus
 }
 
 // GetUserByID loads a user's identity by id (for /me). ok=false if not found.
@@ -126,10 +128,11 @@ func (s *Store) GetUserByID(ctx context.Context, id string) (Identity, bool, err
 	var idn Identity
 	var org *string
 	var roles []string
+	var kyc string
 	err := s.pool.QueryRow(ctx,
-		`SELECT u.id, u.email, u.tenant_id, u.org_id, u.roles, t.is_paper
+		`SELECT u.id, u.email, u.tenant_id, u.org_id, u.roles, t.is_paper, t.kyc_status
 		 FROM users u JOIN tenants t ON t.id = u.tenant_id WHERE u.id = $1`, id).
-		Scan(&idn.UserID, &idn.Email, &idn.TenantID, &org, &roles, &idn.IsPaper)
+		Scan(&idn.UserID, &idn.Email, &idn.TenantID, &org, &roles, &idn.IsPaper, &kyc)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Identity{}, false, nil
 	}
@@ -140,6 +143,7 @@ func (s *Store) GetUserByID(ctx context.Context, id string) (Identity, bool, err
 		idn.OrgID = *org
 	}
 	idn.Roles = toRoles(roles)
+	idn.KYCStatus = domain.KYCStatus(kyc)
 	return idn, true, nil
 }
 

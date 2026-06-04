@@ -4,6 +4,38 @@ All notable changes to Exascale. Format: [Keep a Changelog](https://keepachangel
 SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not dates — see
 `docs/plans/MANAGEMENT_PLAN.md`).
 
+## [v0.3.12] — Real-money KYC/AML gate, server-enforced (F22, M3)
+
+### Added
+- **KYC/AML now gates real-money purchases server-side** — the M3 enforcement behind the existing
+  `/wallet/buy` client gate. KYC is per-tenant; a tenant verifies once.
+  - **Enforcement:** `POST /v1/billing/checkout` blocks a real-money (`is_paper=false`) order with
+    **403 `kyc_required`** unless the tenant is `verified`. **Sandbox (`is_paper=true`) is exempt** —
+    paper credits carry no real-money/AML exposure. The block is audited (`billing.checkout.blocked`).
+    This is authoritative; the web app gate is convenience only.
+  - **Status machine** (`domain.KYCStatus`): `unverified → pending → verified | rejected` (rejected may
+    resubmit). Only `verified` permits a real-money purchase (`CanPurchaseRealMoney`).
+  - **Endpoints:** `GET /v1/account/kyc` (status), `POST /v1/account/kyc` (submit minimal PII — legal
+    name · ISO-3166 country · entity type), and an **internal** `POST /v1/account/kyc/{tenant}/decision`
+    (service-token only — a tenant can't verify itself; the prod manual-review / IDV-vendor path).
+    `kyc_status` is now on `/v1/auth/me`. Submissions are audited (`kyc.submit` / `kyc.verified`).
+  - **Dev/sandbox auto-approve** (`KYCAutoApprove`, derived from `EXASCALE_ENV != prod`): a submission
+    verifies instantly so the flow is testable end-to-end without a compliance back-office. Prod lands
+    `pending` for real review.
+  - **Migration** `0005_kyc.sql` adds the KYC columns to `tenants` (minimal PII; documents stay with
+    the IDV vendor).
+- **Frontend:** `/wallet/buy` gate is now live — it reads the real `kyc_status` (off `/me`) and submits
+  inline (legal name · country · account type) via `useKyc` → `POST /api/account/kyc`, then refreshes
+  the session so the gate clears (or shows a "verification in review" state for the prod pending path).
+  Replaces the link-out to the old trader KYC mock.
+
+### Verified
+- Unit tests (status machine) + a Postgres integration test proving the gate end-to-end: sandbox
+  checkout exempt → real-money checkout **403 kyc_required** while unverified → submit → **verified** →
+  real-money checkout settles; resubmit-while-verified is a 409. Deployed to k3d (migration applied,
+  image rolled) and exercised live through the BFF (signup → unverified → submit → verified on `/me`).
+  `/security-review` clean on the diff.
+
 ## [v0.3.11] — Live, honest `/enterprise/billing` (F05/F06, no mock)
 
 ### Changed

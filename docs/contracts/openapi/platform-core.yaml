@@ -338,6 +338,71 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { description: Insufficient role., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
 
+  /v1/account/kyc:
+    get:
+      tags: [accounts]
+      summary: The caller's tenant KYC status (gates real-money purchases).
+      operationId: getKyc
+      security: [{ tenantJwt: [] }]
+      responses:
+        '200':
+          description: KYC status.
+          content: { application/json: { schema: { $ref: '#/components/schemas/Kyc' } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [accounts]
+      summary: >
+        Submit identity verification (KYC/AML) for the caller's tenant. Captures minimal PII (legal
+        name · ISO-3166 country · entity type). In prod the submission lands `pending` for review; in
+        dev/sandbox it is auto-verified. Allowed only from unverified/rejected.
+      operationId: submitKyc
+      security: [{ tenantJwt: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [legal_name, country, entity_type]
+              properties:
+                legal_name:  { type: string }
+                country:     { type: string, description: "ISO 3166-1 alpha-2" }
+                entity_type: { type: string, enum: [individual, business] }
+      responses:
+        '200':
+          description: The resulting KYC state (verified in dev, else pending).
+          content: { application/json: { schema: { $ref: '#/components/schemas/Kyc' } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { description: "Already pending or verified (code kyc_not_submittable).", content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+        '422': { description: Invalid submission., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+
+  /v1/account/kyc/{tenant_id}/decision:
+    post:
+      tags: [accounts]
+      summary: >
+        Apply a compliance decision (verified|rejected) to a pending tenant submission. INTERNAL —
+        authorized by the service-to-service token, never an end-user bearer (a tenant cannot verify
+        itself). The prod manual-review / IDV-vendor callback path.
+      operationId: reviewKyc
+      security: [{ serviceToken: [] }]
+      parameters:
+        - { name: tenant_id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [verified, rejected] }
+      responses:
+        '200':
+          description: Decision applied.
+          content: { application/json: { schema: { type: object, properties: { tenant_id: { type: string, format: uuid }, status: { $ref: '#/components/schemas/KycStatus' } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { description: "No pending submission for this tenant.", content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+
   /v1/billing/checkout:
     post:
       tags: [billing]
@@ -370,6 +435,12 @@ paths:
                   checkout_url: { type: string, description: "redirect the customer here to pay (real Stripe)" }
                   settled:      { type: boolean, description: "dev/sandbox only — true when MockStripe booked the credits inline (no redirect / webhook); real Stripe returns false" }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: >
+            Real-money purchase blocked — the tenant is not KYC-verified (code `kyc_required`).
+            Sandbox (is_paper) purchases never hit this. Submit identity verification at POST
+            /v1/account/kyc, then retry.
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
         '422': { description: Invalid order., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
 
   /v1/billing/webhook/stripe:
@@ -462,6 +533,24 @@ components:
         org_id:    { type: string, format: uuid, nullable: true }
         roles:     { type: array, items: { $ref: '#/components/schemas/Role' } }
         is_paper:  { type: boolean }
+        kyc_status: { $ref: '#/components/schemas/KycStatus', description: "tenant KYC state; gates real-money purchases (the web app reads this for the buy gate)" }
+    KycStatus:
+      type: string
+      enum: [unverified, pending, verified, rejected]
+      description: >
+        Tenant identity-verification state (F22). Only `verified` permits a real-money (is_paper=false)
+        purchase. Transitions: unverified → pending → verified | rejected (rejected may resubmit).
+    Kyc:
+      type: object
+      properties:
+        status:       { $ref: '#/components/schemas/KycStatus' }
+        can_purchase: { type: boolean, description: "true ⇔ status=verified — may buy with real money now" }
+        can_submit:   { type: boolean, description: "true when a (re)submission is allowed (unverified|rejected)" }
+        legal_name:   { type: string }
+        country:      { type: string, description: "ISO 3166-1 alpha-2" }
+        entity_type:  { type: string, enum: [individual, business] }
+        submitted_at: { type: string, format: date-time, nullable: true }
+        reviewed_at:  { type: string, format: date-time, nullable: true }
     Tenant:
       type: object
       properties:
