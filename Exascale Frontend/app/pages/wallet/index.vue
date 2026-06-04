@@ -47,27 +47,19 @@ const COLOR: Record<ColorKey, string> = {
   h200:   '#E89818',
 }
 
-function genSpark(): number[] {
-  let v = 1.0
-  const out: number[] = []
-  const trend = Math.random() - 0.4
-  for (let i = 0; i < 24; i++) {
-    v += (Math.random() - 0.5 + trend * 0.02) * 0.022
-    out.push(v)
-  }
-  return out
-}
-
+// Balances start at 0 and are overlaid with the tenant's REAL ledger balances on mount
+// (refreshLiveBalances). usdPrice is a static indicative reference (GPU prices are the real catalog
+// rate; the per-credit USD figures are indicative — there is no live price feed: the exchange is
+// paused). No 24h change / sparkline — those need the (paused) market, so they're omitted, not faked.
 const assets = reactive<Asset[]>([
-  { key: 'cash',   name: 'Cash · USD',       sym: 'USD',    qty: 3891.42, usdPrice: 1,        color: 'cash',   change: 0,     locked: 0,     secondary: '¥0', cls: 'cash', spark: [] },
-  { key: 'ai',     name: 'AI Credits',       sym: 'EAI',    qty: 2425000, usdPrice: 0.001005, color: 'ai',     change: 1.05,  locked: 50000, featured: true, description: 'Unified inference index', spark: genSpark() },
-  { key: 'text',   name: 'Text Credits',     sym: 'TEXT',   qty: 1200000, usdPrice: 0.001210, color: 'text',   change: 0.42,  locked: 0,     spark: genSpark() },
-  { key: 'speech', name: 'Speech Credits',   sym: 'SPEECH', qty: 480000,  usdPrice: 0.001200, color: 'speech', change: -0.18, locked: 0,     spark: genSpark() },
-  { key: 'image',  name: 'Image Credits',    sym: 'IMAGE',  qty: 152000,  usdPrice: 0.008000, color: 'image',  change: 1.24,  locked: 12000, spark: genSpark() },
-  { key: 'video',  name: 'Video Credits',    sym: 'VIDEO',  qty: 7240,    usdPrice: 0.250000, color: 'video',  change: -0.65, locked: 0,     spark: genSpark() },
-  { key: 'niche',  name: 'Niche Credits',    sym: 'NICHE',  qty: 320000,  usdPrice: 0.000400, color: 'niche',  change: 0.31,  locked: 0,     spark: genSpark() },
-  { key: 'h100',   name: 'H100 GPU Credits', sym: 'H100',   qty: 245,     usdPrice: 2.99,     color: 'h100',   change: 0.41,  locked: 8,     spark: genSpark() },
-  { key: 'h200',   name: 'H200 GPU Credits', sym: 'H200',   qty: 0,       usdPrice: 3.49,     color: 'h200',   change: 0,     locked: 0,     empty: true, spark: [] },
+  { key: 'ai',     name: 'AI Credits',       sym: 'EAI',    qty: 0, usdPrice: 0.001005, color: 'ai',     change: 0, locked: 0, featured: true, description: 'Unified inference index', spark: [] },
+  { key: 'text',   name: 'Text Credits',     sym: 'TEXT',   qty: 0, usdPrice: 0.001210, color: 'text',   change: 0, locked: 0, spark: [] },
+  { key: 'speech', name: 'Speech Credits',   sym: 'SPEECH', qty: 0, usdPrice: 0.001200, color: 'speech', change: 0, locked: 0, spark: [] },
+  { key: 'image',  name: 'Image Credits',    sym: 'IMAGE',  qty: 0, usdPrice: 0.008000, color: 'image',  change: 0, locked: 0, spark: [] },
+  { key: 'video',  name: 'Video Credits',    sym: 'VIDEO',  qty: 0, usdPrice: 0.250000, color: 'video',  change: 0, locked: 0, spark: [] },
+  { key: 'embed',  name: 'Embeddings Credits', sym: 'EMBED', qty: 0, usdPrice: 0.000400, color: 'niche', change: 0, locked: 0, spark: [] },
+  { key: 'h100',   name: 'H100 GPU Credits', sym: 'H100',   qty: 0, usdPrice: 2.99,     color: 'h100',   change: 0, locked: 0, spark: [] },
+  { key: 'h200',   name: 'H200 GPU Credits', sym: 'H200',   qty: 0, usdPrice: 3.49,     color: 'h200',   change: 0, locked: 0, empty: true, spark: [] },
 ])
 
 // =====================================================
@@ -96,7 +88,7 @@ const toasts = useToasts()
 
 // asset key → ledger credit_type. Drives both the balance overlay and the live convert lookup.
 const creditTypeFor: Record<string, string> = {
-  ai: 'ai_index', text: 'text', speech: 'speech', image: 'image', video: 'video', h100: 'gpu_h100', h200: 'gpu_h200',
+  ai: 'ai_index', text: 'text', speech: 'speech', image: 'image', video: 'video', embed: 'embeddings', h100: 'gpu_h100', h200: 'gpu_h200',
 }
 
 /** refreshLiveBalances overlays the tenant's real ledger balances onto the asset cards. */
@@ -122,40 +114,15 @@ onMounted(async () => {
 
 interface AllocGroup { key: string; name: string; color: string; usd: number }
 const allocationGroups = computed<AllocGroup[]>(() => {
-  const get = (k: string) => assets.find(a => a.key === k)!
+  const usdOf = (k: string) => { const a = assets.find(x => x.key === k); return a ? a.qty * a.usdPrice : 0 }
   return [
-    { key: 'cash',  name: 'Cash',       color: COLOR.cash,  usd: get('cash').qty },
-    { key: 'ai',    name: 'AI Credits', color: COLOR.ai,    usd: get('ai').qty * get('ai').usdPrice },
-    { key: 'text',  name: 'Text',       color: COLOR.text,  usd: get('text').qty * get('text').usdPrice },
-    { key: 'image', name: 'Image',      color: COLOR.image, usd: get('image').qty * get('image').usdPrice },
-    { key: 'h100',  name: 'H100',       color: COLOR.h100,  usd: get('h100').qty * get('h100').usdPrice },
-    {
-      key: 'other', name: 'Other', color: '#5F5F5C',
-      usd: get('speech').qty * get('speech').usdPrice
-         + get('video').qty * get('video').usdPrice
-         + get('niche').qty * get('niche').usdPrice,
-    },
+    { key: 'ai',    name: 'AI Credits', color: COLOR.ai,    usd: usdOf('ai') },
+    { key: 'text',  name: 'Text',       color: COLOR.text,  usd: usdOf('text') },
+    { key: 'image', name: 'Image',      color: COLOR.image, usd: usdOf('image') },
+    { key: 'h100',  name: 'H100',       color: COLOR.h100,  usd: usdOf('h100') },
+    { key: 'other', name: 'Other',      color: '#5F5F5C',   usd: usdOf('speech') + usdOf('video') + usdOf('embed') },
   ]
 })
-
-// =====================================================
-// Sparkline path generator
-// =====================================================
-function sparkPaths(pts: number[], w = 240, h = 36) {
-  if (!pts.length) return { line: '', fill: '' }
-  const min = Math.min(...pts), max = Math.max(...pts)
-  const range = max - min || 1
-  const pad = 3
-  const usableH = h - pad * 2
-  const stepX = w / (pts.length - 1)
-  const line = pts.map((p, i) => {
-    const x = i * stepX
-    const y = pad + usableH - ((p - min) / range) * usableH
-    return (i === 0 ? 'M' : 'L') + x.toFixed(1) + ' ' + y.toFixed(1)
-  }).join(' ')
-  const fill = line + ` L ${w} ${h} L 0 ${h} Z`
-  return { line, fill }
-}
 
 // =====================================================
 // Recent movements
@@ -318,27 +285,9 @@ function swapDirection() {
 }
 
 // =====================================================
-// Live drift simulation (subtle qty/price updates)
+// Total flash on real balance changes (convert / refresh) — no simulated market drift.
 // =====================================================
-const flashKeys = reactive<Record<string, 'up' | 'down' | undefined>>({})
-let tickInterval: ReturnType<typeof setInterval> | null = null
-
-function tick() {
-  for (const a of assets) {
-    if (a.empty) continue
-    const noise = (Math.random() - 0.5) * (a.usdPrice * 0.002)
-    a.usdPrice = Math.max(a.usdPrice * 0.98, a.usdPrice + noise)
-    if (Math.random() < 0.25) {
-      const dq = (Math.random() - 0.5) * (a.qty * 0.0008)
-      const next = Math.max(0, a.qty + dq)
-      if (Math.abs(next - a.qty) > 1) {
-        flashKeys[a.key] = next > a.qty ? 'up' : 'down'
-        setTimeout(() => { flashKeys[a.key] = undefined }, 700)
-      }
-      a.qty = next
-    }
-  }
-}
+const flashKeys = reactive<Record<string, 'up' | 'down' | undefined>>({})  // populated only by real updates
 const totalFlash = ref<'up' | 'down' | undefined>(undefined)
 let lastTotal = 0
 watch(totalUsd, (v) => {
@@ -349,13 +298,9 @@ watch(totalUsd, (v) => {
   lastTotal = v
 })
 
+// startTotal anchors the session "since open" delta to the real loaded total (no fake P&L baseline).
 const startTotal = ref(0)
-onMounted(() => {
-  lastTotal = totalUsd.value
-  startTotal.value = totalUsd.value - 23.41
-  tickInterval = setInterval(tick, 3000)
-})
-onBeforeUnmount(() => { if (tickInterval) clearInterval(tickInterval) })
+watch(totalUsd, (v) => { if (!startTotal.value) startTotal.value = v }, { immediate: true })
 
 const todayPnl = computed(() => totalUsd.value - startTotal.value)
 const todayPct = computed(() => startTotal.value === 0 ? 0 : todayPnl.value / startTotal.value * 100)
@@ -417,7 +362,7 @@ const todayPct = computed(() => startTotal.value === 0 ? 0 : todayPnl.value / st
         <!-- ================= BALANCES ================= -->
         <div class="sec-head">
           <h2>Balances</h2>
-          <span class="right">9 ASSETS · LIVE</span>
+          <span class="right">{{ assets.length }} CREDIT TYPES · LIVE</span>
         </div>
 
         <div class="balance-grid" :class="{ 'two-col': drawerOpen }">
@@ -427,8 +372,9 @@ const todayPct = computed(() => startTotal.value === 0 ? 0 : todayPnl.value / st
 
             <div class="head-row">
               <span class="ttl">— {{ a.name }}</span>
+              <!-- 24h change needs the (paused) market feed — omitted, not faked -->
               <span
-                v-if="!a.empty && a.cls !== 'cash'"
+                v-if="a.change"
                 class="badge"
                 :class="a.change >= 0 ? 'pos' : 'neg'"
               >
@@ -483,29 +429,18 @@ const todayPct = computed(() => startTotal.value === 0 ? 0 : todayPnl.value / st
               </span>
               <span class="usd">
                 {{ fmtUsd(a.qty * a.usdPrice, (a.qty * a.usdPrice) < 1 ? 4 : 2) }}
-                <span class="secondary-tag">USD equivalent</span>
+                <span class="secondary-tag">≈ USD · indicative</span>
               </span>
               <span v-if="a.locked" class="lock">
                 <svg viewBox="0 0 16 16"><rect x="3.5" y="7" width="9" height="6.5" /><path d="M5.5 7V5a2.5 2.5 0 015 0v2" /></svg>
-                {{ compact(a.locked) }} locked in open orders
+                {{ compact(a.locked) }} locked
               </span>
-              <svg class="spark" viewBox="0 0 240 36" preserveAspectRatio="none">
-                <path :d="sparkPaths(a.spark).fill" :fill="COLOR[a.color]" fill-opacity="0.10" />
-                <path :d="sparkPaths(a.spark).line" fill="none" :stroke="COLOR[a.color]" stroke-width="1.4" />
-              </svg>
               <div class="actions">
                 <button class="act primary" @click="openDrawer(a.key)">
                   <svg viewBox="0 0 16 16"><path d="M3 5h8l-2-2M13 11H5l2 2" /></svg>
                   Convert
                 </button>
-                <button class="act">
-                  <svg viewBox="0 0 16 16"><path d="M2 12l4-6 3 4 5-7" /></svg>
-                  Trade
-                </button>
-                <button class="act">
-                  <svg viewBox="0 0 16 16"><path d="M4 12L12 4M6 4h6v6" /></svg>
-                  Send
-                </button>
+                <!-- Trade button hidden: the exchange is paused and the AI-company persona doesn't trade. -->
               </div>
             </template>
           </div>
