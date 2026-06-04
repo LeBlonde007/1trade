@@ -1,0 +1,27 @@
+# ServiceMonitor for the Exascale Go services. Requires the Prometheus Operator CRDs, which the
+# kube-prometheus-stack install provides (OBS=1 in deploy/k8s/local/install-data-plane.sh) — applying
+# this without that stack will fail (unknown kind). Each service exposes Prometheus metrics at /metrics
+# on its named `http` port (the same port as the API; cluster-internal, not customer-facing).
+#
+# The `release: kube-prom` label matches kube-prometheus-stack's default serviceMonitorSelector, so the
+# bundled Prometheus picks this up automatically. Scrape applies as soon as a selected Service exists.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: exascale-go-services
+  namespace: default
+  labels:
+    release: kube-prom
+spec:
+  namespaceSelector:
+    matchNames: [default]
+  selector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values: [credit-ledger, platform-core, inference-gateway, compute-control]
+  endpoints:
+    - port: http        # the named service port; /metrics is served on the same port as the API
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s

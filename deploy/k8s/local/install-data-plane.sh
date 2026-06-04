@@ -59,6 +59,9 @@ if [ "$OBS" = "1" ]; then
   helm upgrade --install kube-prom prometheus-community/kube-prometheus-stack -n observability --wait
   helm upgrade --install loki grafana/loki-stack -n observability --wait || true
   helm upgrade --install tempo grafana/tempo -n observability --wait || true
+  # Scrape the Go services' /metrics (CRDs now exist from kube-prometheus-stack). Harmless before the
+  # app services are deployed — the ServiceMonitor just matches nothing until they exist.
+  kubectl apply -f "$HERE/../observability/servicemonitors.yaml"
 fi
 
 if [ "$GPU" = "1" ]; then

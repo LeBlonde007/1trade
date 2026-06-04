@@ -10,6 +10,7 @@ import (
 
 	"github.com/exascale/platform-core/internal/api"
 	"github.com/exascale/platform-core/internal/config"
+	"github.com/exascale/platform-core/internal/obs"
 	"github.com/exascale/platform-core/internal/store"
 )
 
@@ -36,9 +37,14 @@ func main() {
 	}
 	defer st.Close()
 
+	// Expose Prometheus /metrics next to the app (same port, cluster-internal) and instrument all app
+	// routes with RED metrics.
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", obs.Handler())
+	mux.Handle("/", obs.Instrument(api.New(cfg, st)))
 	srv := &http.Server{
 		Addr:              cfg.Addr,
-		Handler:           api.New(cfg, st),
+		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	slog.Info("platform-core listening", "addr", cfg.Addr, "env", cfg.Env, "version", Version)
