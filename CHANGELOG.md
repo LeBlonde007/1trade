@@ -4,6 +4,25 @@ All notable changes to Exascale. Format: [Keep a Changelog](https://keepachangel
 SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not dates — see
 `docs/plans/MANAGEMENT_PLAN.md`).
 
+## [v0.3.14] — Ledger domain metric + `/metrics` live on all four services (F01 observability)
+
+### Added
+- **`ledger_transactions_total{operation, credit_type}`** — the credit-ledger's first business metric
+  (not just HTTP RED). A small service-specific `internal/metrics` package; the counter is incremented
+  in `applyLeg` at insert time, so it counts transactions **actually written** and **excludes
+  idempotent replays** (which return before the insert). Covers every movement — purchase, mint,
+  debit, and both conversion legs — on the same `/metrics` endpoint. Labels are bounded (operation ×
+  credit-types enum).
+
+### Changed
+- Redeployed **platform-core, inference-gateway, and compute-control** so the `/metrics` shipped in
+  v0.3.13 is now **live on all four Go services** (credit-ledger already was).
+
+### Verified
+- All five Go modules build + test green. Live in k3d: a checkout (mint of `text` credits) moved
+  `ledger_transactions_total{credit_type="text",operation="purchase"} 1`, and `http_requests_total`
+  scrapes cleanly on all four service `/metrics` endpoints.
+
 ## [v0.3.13] — Prometheus `/metrics` on every Go service (F01 observability)
 
 ### Added
