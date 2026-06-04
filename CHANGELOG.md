@@ -4,6 +4,24 @@ All notable changes to Exascale. Format: [Keep a Changelog](https://keepachangel
 SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not dates — see
 `docs/plans/MANAGEMENT_PLAN.md`).
 
+## [v0.3.7] — Rich audit-log screen, live-wired (F03/F23)
+
+### Added
+- **`/enterprise/audit` is now a live, rich audit-trail screen** (was a standalone mock with
+  fabricated ip/geo/hash-chain/"Walmart" data). Wired to the real F03 backend
+  (`/v1/account/audit`, admin-only, a SOC 2 control): a dense, institutional table of the tenant's
+  sensitive admin actions — **time · actor · action · target · mode** — with client-side **filters**
+  (search + action + target dropdowns), a **limit** selector (50–500, forwarded through the BFF), and
+  an expandable **before→after diff** per change (added/removed fields in semantic green/red). Admin
+  403 → a clean "administrator access required" state. No mock data.
+- The audit log is **append-only** (not hash-chained — the hash chain is the credit ledger), so the
+  screen shows the real recorded fields rather than inventing an integrity chain.
+
+### Verified
+- Typecheck clean; screenshotted live in k3d — `tenant.signup`, `budget.set` ×2, `apikey.create`
+  with real actor/targets/sandbox chips, and the `apikey.create` diff showing
+  `name → "production"`, `scopes → ["inference:read"]`.
+
 ## [v0.3.6] — Fix: `compact`/`full` not resolved in templates (500) (F20)
 
 ### Fixed

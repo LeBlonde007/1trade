@@ -54,7 +54,7 @@ each step marked done / showcase / paused. Pair with [STATUS.md](STATUS.md) (tre
 | Mint an **API key** (shown once) | `/settings` | ✅ | F02 (v0.2.8) |
 | Drive it all from the **CLI** — `login / infer / gpu / credits / keys` | `exascale …` | ✅ | F04 + F13 |
 | Console ops · budgets · purchase history | `/console` · billing | ✅ | F20 · F06 |
-| Audit log + RBAC (admin actions → queryable trail) | F03 backend | ✅ backend · ⬜ rich screen | F03 (v0.1.2) |
+| Audit log + RBAC (admin actions → queryable trail) | `/enterprise/audit` | ✅ backend + **rich screen live** (filters + before→after diffs, admin-only) | F03 (v0.1.2) + F23 |
 | Enterprise team management + SAML SSO + sub-accounts | `/enterprise/teams` · `/sso` | ⬜ | F02/F03 (M4) |
 
 **Live today:** all of Phase 1 (→ console) + Phase 2, except real-money KYC (M3), the rich audit
