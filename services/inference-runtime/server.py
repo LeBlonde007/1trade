@@ -9,6 +9,7 @@ local dev use stub/server.py, which speaks the same contract.
 Speech models (Whisper) are served by a separate runtime variant; this worker is the text path the
 gateway's chat route uses today.
 """
+
 import os
 import time
 
@@ -71,7 +72,9 @@ async def metrics() -> PlainTextResponse:
 
 def _render_prompt(tokenizer, messages: list[dict]) -> str:
     """Render chat messages to a prompt via the model's chat template."""
-    return tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    return tokenizer.apply_chat_template(
+        messages, tokenize=False, add_generation_prompt=True
+    )
 
 
 @app.post("/v1/chat/completions")
@@ -101,19 +104,23 @@ async def chat_completions(request: Request) -> JSONResponse:
     completion_tokens = len(final.outputs[0].token_ids or [])
     finish = final.outputs[0].finish_reason or "stop"
 
-    return JSONResponse({
-        "id": "chatcmpl_" + request_id,
-        "object": "chat.completion",
-        "created": int(time.time()),
-        "model": MODEL_ID,
-        "choices": [{
-            "index": 0,
-            "message": {"role": "assistant", "content": text},
-            "finish_reason": finish,
-        }],
-        "usage": {
-            "prompt_tokens": prompt_tokens,
-            "completion_tokens": completion_tokens,
-            "total_tokens": prompt_tokens + completion_tokens,
-        },
-    })
+    return JSONResponse(
+        {
+            "id": "chatcmpl_" + request_id,
+            "object": "chat.completion",
+            "created": int(time.time()),
+            "model": MODEL_ID,
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": text},
+                    "finish_reason": finish,
+                }
+            ],
+            "usage": {
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "total_tokens": prompt_tokens + completion_tokens,
+            },
+        }
+    )

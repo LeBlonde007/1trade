@@ -4,6 +4,33 @@ All notable changes to Exascale. Format: [Keep a Changelog](https://keepachangel
 SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not dates — see
 `docs/plans/MANAGEMENT_PLAN.md`).
 
+## [v0.3.17] — CI hygiene: fix check-yaml, ruff-format, whitespace hooks (F01)
+
+### Fixed
+- Several non-Go pre-commit hooks were red; fixed the config + formatting so they pass:
+  - **`check-yaml`** failed on the multi-document Kubernetes manifests (`runtime-gpu.yaml`,
+    `kueue-config.yaml`, `data-plane.yaml`, …). Added `--allow-multiple-documents`.
+  - **`ruff-format`** reformatted two un-formatted Python files (`inference-runtime/server.py`,
+    `stub/server.py`) — quote normalization, blank-line-after-docstring, line wrapping. Committed the
+    formatting.
+  - **`end-of-file-fixer` / `mixed-line-ending`** now exempt `*.md` (consistent with
+    `trailing-whitespace`, which already did) — markdown EOF/endings are left to authors.
+  - Added a top-level `exclude` for verbatim **design exports** (`docs/htmls/`) and **runtime data**
+    (`Exascale Frontend/server/data/`), so whitespace hooks + gitleaks false-positives on the mock
+    KYC/brand HTML don't fail the build.
+
+### Verified
+- These hooks now pass on `--all-files`: the universal hygiene set, gitleaks, **golangci-lint** (all 5
+  Go modules, 0 issues — incl. the new `obs`/`metrics` packages), **ruff**, **ruff-format**, eslint,
+  and the regulatory-framing guard.
+
+### Known-red (tracked, not fixed here)
+- **`design-tokens-guard`** still fails on a **pre-existing backlog of ~344 raw-hex color literals
+  across 25 `.vue` files** — mostly the paused-exchange and mockup-derived screens (and a few in the
+  live screens). The guard's own intent is to catch *new* hex in changed files; CI's `--all-files`
+  surfaces the whole backlog. Burning this down (raw hex → `var(--token)`) is a frontend-design-system
+  task, not a hygiene-config change, so it's deferred.
+
 ## [v0.3.16] — SOPS-sealed secrets convention + sample (F01)
 
 ### Added

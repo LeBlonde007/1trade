@@ -6,6 +6,7 @@ Speaks the same gateway↔runtime contract as the real vLLM worker (OpenAI-compa
 gateway's VLLMBackend can be exercised end-to-end in k3d without a GPU. Output is deterministic; the
 real vLLM server (../server.py) swaps in on a GPU node with no gateway change.
 """
+
 import json
 import os
 import time
@@ -44,7 +45,7 @@ class Handler(BaseHTTPRequestHandler):
             metrics = (
                 f"# HELP inference_runtime_requests_total Requests served.\n"
                 f"# TYPE inference_runtime_requests_total counter\n"
-                f"inference_runtime_requests_total {{model=\"{MODEL_ID}\"}} {_requests}\n"
+                f'inference_runtime_requests_total {{model="{MODEL_ID}"}} {_requests}\n'
                 f"# HELP inference_runtime_uptime_seconds Uptime.\n"
                 f"# TYPE inference_runtime_uptime_seconds gauge\n"
                 f"inference_runtime_uptime_seconds {time.time() - _started:.0f}\n"
@@ -68,8 +69,17 @@ class Handler(BaseHTTPRequestHandler):
         _requests += 1
 
         messages = req.get("messages", [])
-        last_user = next((m.get("content", "") for m in reversed(messages) if m.get("role") == "user"), "")
-        prompt = "\n".join(m.get("role", "") + ": " + m.get("content", "") for m in messages)
+        last_user = next(
+            (
+                m.get("content", "")
+                for m in reversed(messages)
+                if m.get("role") == "user"
+            ),
+            "",
+        )
+        prompt = "\n".join(
+            m.get("role", "") + ": " + m.get("content", "") for m in messages
+        )
         content = f"[stub:{req.get('model', MODEL_ID)}] You said: {last_user[:200]}"
 
         resp = {
@@ -77,11 +87,13 @@ class Handler(BaseHTTPRequestHandler):
             "object": "chat.completion",
             "created": int(time.time()),
             "model": req.get("model", MODEL_ID),
-            "choices": [{
-                "index": 0,
-                "message": {"role": "assistant", "content": content},
-                "finish_reason": "stop",
-            }],
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": content},
+                    "finish_reason": "stop",
+                }
+            ],
             "usage": {
                 "prompt_tokens": count_tokens(prompt),
                 "completion_tokens": count_tokens(content),
@@ -94,7 +106,12 @@ class Handler(BaseHTTPRequestHandler):
 def main():
     """Start the threaded HTTP server on :8000."""
     port = int(os.getenv("PORT", "8000"))
-    print(json.dumps({"msg": "inference-runtime stub listening", "port": port, "model": MODEL_ID}), flush=True)
+    print(
+        json.dumps(
+            {"msg": "inference-runtime stub listening", "port": port, "model": MODEL_ID}
+        ),
+        flush=True,
+    )
     ThreadingHTTPServer(("0.0.0.0", port), Handler).serve_forever()
 
 
