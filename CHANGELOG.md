@@ -4,6 +4,32 @@ All notable changes to Exascale. Format: [Keep a Changelog](https://keepachangel
 SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not dates — see
 `docs/plans/MANAGEMENT_PLAN.md`).
 
+## [v0.3.16] — SOPS-sealed secrets convention + sample (F01)
+
+### Added
+- **Secrets can now live encrypted in-repo** via [SOPS](https://getsops.io) + [age](https://age-encryption.org)
+  — the F01 secrets-management gap. Encrypts only a Kubernetes Secret's values (`encrypted_regex:
+  ^(data|stringData)$`), so the manifest stays diff-friendly (you can see it's `platform-auth` while the
+  material is `ENC[AES256_GCM,…]`).
+  - `.sops.yaml` — creation rules + the dev age recipient (public key; safe to commit). Add a prod
+    recipient (KMS/Vault-held private half) before any real-money deploy and `sops updatekeys`.
+  - `deploy/secrets/platform-auth.sops.yaml` — the shared `platform-auth` Secret
+    (`PLATFORM_JWT_SECRET` + `SERVICE_TOKEN`), **encrypted** and committed (dev values, local-cluster
+    only). Plus `platform-auth.example.yaml` (plaintext template, no real values).
+  - `scripts/secrets.sh` (encrypt / decrypt / edit / apply) + `make secrets-apply` / `make
+    secrets-edit` — apply decrypts straight into `kubectl`, never writing plaintext to disk.
+  - `deploy/secrets/README.md` — the convention; Tiltfile points at it.
+- **The age private key is never committed** — `.gitignore` excludes `deploy/secrets/*.key` and any
+  decrypted plaintext; the key comes from the team vault / CI (locally `deploy/secrets/age.key`).
+
+### Verified
+- Round-trip proven: `sops --encrypt` → committed ciphertext (metadata cleartext, values
+  `ENC[AES256_GCM,…]`) → `sops --decrypt` returns the exact `platform-auth` Secret (both keys, 64-char
+  values). `git check-ignore` confirms `age.key` is ignored while `*.sops.yaml` is committable.
+  (The `kubectl apply` step is the standard deploy path; the local k3d API server was down at
+  verification time, so applying to the live cluster is deferred — the encrypt/decrypt round-trip,
+  which is the feature, is proven.)
+
 ## [v0.3.15] — Domain metrics on inference-gateway + compute-control (F01 observability)
 
 ### Added
