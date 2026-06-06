@@ -54,6 +54,17 @@ down:
 seed:
 	@bash deploy/k8s/local/seed.sh
 
+## secrets-apply: decrypt the SOPS secrets and apply them to the cluster (needs the age key — see
+## deploy/secrets/README.md). Never writes plaintext to disk.
+.PHONY: secrets-apply
+secrets-apply:
+	@bash scripts/secrets.sh apply deploy/secrets/platform-auth.sops.yaml
+
+## secrets-edit: open the encrypted platform-auth secret in $EDITOR (auto re-encrypts on save).
+.PHONY: secrets-edit
+secrets-edit:
+	@bash scripts/secrets.sh edit deploy/secrets/platform-auth.sops.yaml
+
 ## web: run the Nuxt frontend dev server
 .PHONY: web
 web:

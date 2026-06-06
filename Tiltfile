@@ -6,8 +6,8 @@ allow_k8s_contexts('k3d-exascale')  # guard: never act on a non-local cluster
 
 # --- shared auth secret (F02/F08) — PLATFORM_JWT_SECRET (platform-core issues with it; credit-ledger
 # and inference-gateway verify/mint with it) and SERVICE_TOKEN (the gateway uses it to introspect API
-# keys at platform-core). Generated locally on first run, kept in the cluster, never committed. Prod
-# sources them from SOPS/Vault.
+# keys at platform-core). Generated locally on first run, kept in the cluster, never committed. The
+# committed/prod source of truth is SOPS (deploy/secrets/ — `make secrets-apply`); see its README.
 local_resource(
     'platform-auth',
     cmd='kubectl get secret platform-auth >/dev/null 2>&1 || ' +

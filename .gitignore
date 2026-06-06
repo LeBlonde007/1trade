@@ -65,3 +65,10 @@ kubeconfig
 .idea/
 .vscode/
 !.vscode/extensions.json
+
+# SOPS — encrypted *.sops.yaml files ARE committed; the age PRIVATE key and any decrypted
+# plaintext are NEVER committed (key comes from the team vault / CI; local dev key below).
+deploy/secrets/age.key
+deploy/secrets/*.key
+deploy/secrets/*.dec.yaml
+deploy/secrets/*.plain.yaml

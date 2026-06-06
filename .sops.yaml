@@ -1,0 +1,15 @@
+# SOPS config — how secrets in this repo are encrypted (getsops.io). Encrypted secret files
+# (deploy/secrets/*.sops.yaml) ARE committed; the matching age PRIVATE key is NEVER committed — it
+# lives in the team vault / CI secret store, and locally at deploy/secrets/age.key (gitignored).
+#
+# For a Kubernetes Secret we encrypt only the values (data / stringData) via encrypted_regex, so the
+# file stays diff-friendly: reviewers see it is a Secret named `platform-auth` while the secret
+# material itself is ciphertext.
+#
+# `age:` recipients are age PUBLIC keys (safe to commit). The one below is the DEV cluster key. Before
+# any real-money deploy, add a PROD recipient (an age public key whose private half is held in KMS /
+# Vault) and re-encrypt every file: `sops updatekeys deploy/secrets/*.sops.yaml`.
+creation_rules:
+  - path_regex: deploy/secrets/.*\.sops\.ya?ml$
+    encrypted_regex: ^(data|stringData)$
+    age: age1hwhpzgfgvkk4fzlexfhmn9jnthfrhm3ek9gqera3xlzm7z2jagmq8dm4u5
