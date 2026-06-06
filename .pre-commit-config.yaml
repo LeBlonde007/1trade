@@ -8,6 +8,15 @@
 minimum_pre_commit_version: "3.5.0"
 fail_fast: false
 
+# Verbatim design exports (docs/htmls — the original HTML screen mockups being migrated to Nuxt) and
+# runtime data (the BFF feedback store) are NOT hand-maintained source: exempt them from every hook
+# (whitespace / line-endings, and gitleaks false-positives on the mock KYC / brand HTML).
+exclude: |
+  (?x)^(
+    docs/htmls/.*|
+    Exascale\ Frontend/server/data/.*
+  )$
+
 repos:
   # --- universal hygiene ---
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -16,13 +25,16 @@ repos:
       - id: trailing-whitespace
         exclude: '\.md$'
       - id: end-of-file-fixer
+        exclude: '\.md$'              # markdown EOF left to authors (consistent with trailing-whitespace)
       - id: check-merge-conflict
       - id: check-added-large-files
         args: ["--maxkb=1024"]   # model weights / binaries do NOT belong in git
       - id: check-yaml
+        args: ["--allow-multiple-documents"]   # k8s manifests are multi-doc ('---'-separated)
       - id: check-json
       - id: mixed-line-ending
         args: ["--fix=lf"]
+        exclude: '\.md$'
 
   # --- secrets: nothing sensitive ever enters history ---
   - repo: https://github.com/gitleaks/gitleaks
