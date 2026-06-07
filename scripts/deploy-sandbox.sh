@@ -7,11 +7,16 @@
 #   TLS=1 ACME_EMAIL=you@example.com SANDBOX_HOST=app.example.com scripts/deploy-sandbox.sh   # + HTTPS
 #
 # Env:
-#   SANDBOX_HOST  (required)  DNS name (or IP) the app is served at.
-#   TLS=0|1                   1 → cert-manager + Let's Encrypt (needs a real domain + ACME_EMAIL).
-#   ACME_EMAIL                contact email for Let's Encrypt (TLS=1 only).
-#   INSTALL_K3S=0|1           1 → install k3s if it's not present.
-#   IMPORT=k3s|k3d|none       how locally-built images reach the cluster (default k3s).
+#   SANDBOX_HOST     (required) DNS name (or IP) the WEB app is served at (e.g. sandbox.example.com).
+#   SANDBOX_API_HOST            DNS name the JSON API (/v1/*, for the CLI) is served at. Default
+#                              api.$SANDBOX_HOST — override for a custom host (e.g. sandboxapi.example.com).
+#   TLS=0|1                    1 → cert-manager + Let's Encrypt (needs real domains + ACME_EMAIL).
+#   ACME_EMAIL                 contact email for Let's Encrypt (TLS=1 only).
+#   INSTALL_K3S=0|1            1 → install k3s if it's not present.
+#   IMPORT=k3s|k3d|none        how locally-built images reach the cluster (default k3s; ignored in no-source).
+#   IMAGE_REGISTRY             NO-SOURCE deploy: pull prebuilt images from here (e.g. ghcr.io/<owner>)
+#                              instead of building from source on this box. + REGISTRY_USER/REGISTRY_TOKEN
+#                              for a private registry. See `make sandbox-bundle` to ship only manifests/SQL.
 #   INFERENCE_API_KEY         OPTIONAL. Set it to serve REAL model output via a hosted OpenAI-compatible
 #                             provider (OpenRouter by default) instead of the echo-style CPU stub. The key
 #                             is injected into the `platform-auth` Secret at deploy — never committed.
@@ -20,14 +25,21 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
 
-SANDBOX_HOST="${SANDBOX_HOST:-}"   # one host serves both the web app (/) and the JSON APIs (/v1/*)
+SANDBOX_HOST="${SANDBOX_HOST:-}"   # the WEB host (browser); the /v1 API gets its own host (below)
 TLS="${TLS:-0}"; ACME_EMAIL="${ACME_EMAIL:-}"
 INSTALL_K3S="${INSTALL_K3S:-0}"; IMPORT="${IMPORT:-k3s}"; TAG="${TAG:-sandbox}"
 SVCS="platform-core credit-ledger inference-gateway compute-control inference-runtime-stub web"
+# NO-SOURCE MODE: set IMAGE_REGISTRY (e.g. ghcr.io/saadallahdev) to PULL prebuilt images instead of
+# building from source on this box — so no .go/.vue source ever lands here. For a private registry,
+# also set REGISTRY_USER + REGISTRY_TOKEN (a read:packages token) to create an imagePullSecret. Pair
+# with `make sandbox-bundle` (ship only manifests + SQL, not the repo). Default empty = build locally.
+IMAGE_REGISTRY="${IMAGE_REGISTRY:-}"; REGISTRY_USER="${REGISTRY_USER:-}"; REGISTRY_TOKEN="${REGISTRY_TOKEN:-}"
 
 [ -z "$SANDBOX_HOST" ] && { echo "ERROR: SANDBOX_HOST is required (e.g. SANDBOX_HOST=sandbox.example.com $0)"; exit 2; }
+SANDBOX_API_HOST="${SANDBOX_API_HOST:-api.$SANDBOX_HOST}"   # the /v1 API host (CLI/external clients)
 SCHEME=http; [ "$TLS" = 1 ] && SCHEME=https
 URL="$SCHEME://$SANDBOX_HOST"
+API_URL="$SCHEME://$SANDBOX_API_HOST"
 SUDO=""; [ "$(id -u)" != 0 ] && SUDO=sudo
 say(){ printf "\n\033[1;36m==> %s\033[0m\n" "$*"; }
 
@@ -41,23 +53,39 @@ fi
 command -v kubectl >/dev/null || { echo "ERROR: kubectl not found"; exit 1; }
 kubectl get nodes >/dev/null 2>&1 || { echo "ERROR: cannot reach a cluster (set KUBECONFIG)"; exit 1; }
 
-# 2. build the six images.
-say "building images (:$TAG)"
-docker build -t "exascale/platform-core:$TAG"          services/platform-core
-docker build -t "exascale/credit-ledger:$TAG"          services/credit-ledger
-docker build -t "exascale/inference-gateway:$TAG"      services/inference-gateway
-docker build -t "exascale/compute-control:$TAG"        services/compute-control
-docker build -t "exascale/inference-runtime-stub:$TAG" services/inference-runtime/stub
-docker build -t "exascale/web:$TAG"                    "Exascale Frontend"
+# 2 + 3. images. Two mutually-exclusive paths:
+#   • NO-SOURCE (IMAGE_REGISTRY set): pull prebuilt images — no `docker build`, no source on this box.
+#   • default: build the six images from source here and import them into the cluster's containerd.
+if [ -n "$IMAGE_REGISTRY" ]; then
+  say "no-source mode — pulling prebuilt images from $IMAGE_REGISTRY (no build on this box)"
+  if [ -n "$REGISTRY_TOKEN" ]; then
+    # Private registry → imagePullSecret on the namespace's default ServiceAccount, so every pod uses it.
+    kubectl create secret docker-registry exascale-pull \
+      --docker-server="${IMAGE_REGISTRY%%/*}" \
+      --docker-username="${REGISTRY_USER:?REGISTRY_USER is required with REGISTRY_TOKEN}" \
+      --docker-password="$REGISTRY_TOKEN" \
+      --dry-run=client -o yaml | kubectl apply -f -
+    kubectl patch serviceaccount default -p '{"imagePullSecrets":[{"name":"exascale-pull"}]}'
+  else
+    echo "   (no REGISTRY_TOKEN — assuming the $IMAGE_REGISTRY packages are public)"
+  fi
+else
+  say "building images (:$TAG)"
+  docker build -t "exascale/platform-core:$TAG"          services/platform-core
+  docker build -t "exascale/credit-ledger:$TAG"          services/credit-ledger
+  docker build -t "exascale/inference-gateway:$TAG"      services/inference-gateway
+  docker build -t "exascale/compute-control:$TAG"        services/compute-control
+  docker build -t "exascale/inference-runtime-stub:$TAG" services/inference-runtime/stub
+  docker build -t "exascale/web:$TAG"                    "Exascale Frontend"
 
-# 3. make the images visible to the cluster (k3s runs its own containerd).
-case "$IMPORT" in
-  k3s)  say "importing images into k3s containerd"
-        for i in $SVCS; do docker save "exascale/$i:$TAG" | $SUDO k3s ctr images import -; done ;;
-  k3d)  say "importing images into k3d"
-        for i in $SVCS; do k3d image import "exascale/$i:$TAG" -c exascale; done ;;
-  none) echo "IMPORT=none — images must be pullable from a registry the cluster can reach." ;;
-esac
+  case "$IMPORT" in
+    k3s)  say "importing images into k3s containerd"
+          for i in $SVCS; do docker save "exascale/$i:$TAG" | $SUDO k3s ctr images import -; done ;;
+    k3d)  say "importing images into k3d"
+          for i in $SVCS; do k3d image import "exascale/$i:$TAG" -c exascale; done ;;
+    none) echo "IMPORT=none — images must be pullable from a registry the cluster can reach." ;;
+  esac
+fi
 
 # 4. out-of-band Secret + migration ConfigMaps (mirrors the Tiltfile; the initContainers consume them).
 say "auth secret + migration config"
@@ -96,10 +124,16 @@ spec:
 EOF
 fi
 
-# 7. services + web + ingress (substitute the host/url placeholders into the rendered overlay).
-say "deploying services + web + ingress (host=$SANDBOX_HOST url=$URL)"
+# 7. services + web + ingress. Substitute the host/url placeholders; in no-source mode also rewrite the
+#    local image names (exascale/<svc>) to the registry ones (<registry>/exascale-<svc>) so the cluster
+#    pulls the prebuilt images. Build the sed program in an array so the registry rule is optional.
+say "deploying services + web + ingress (web=$SANDBOX_HOST api=$SANDBOX_API_HOST url=$URL)"
+SED_ARGS=(-e "s|EXASCALE_SANDBOX_API_HOST|$SANDBOX_API_HOST|g" \
+          -e "s|EXASCALE_SANDBOX_HOST|$SANDBOX_HOST|g" \
+          -e "s|EXASCALE_SANDBOX_URL|$URL|g")
+[ -n "$IMAGE_REGISTRY" ] && SED_ARGS+=(-e "s|image: exascale/|image: $IMAGE_REGISTRY/exascale-|g")
 kubectl kustomize deploy/k8s/overlays/sandbox \
-  | sed -e "s|EXASCALE_SANDBOX_HOST|$SANDBOX_HOST|g" -e "s|EXASCALE_SANDBOX_URL|$URL|g" \
+  | sed "${SED_ARGS[@]}" \
   | kubectl apply -f -
 for d in platform-core credit-ledger inference-gateway compute-control inference-runtime web; do
   kubectl rollout status "deploy/$d" --timeout=300s
@@ -112,9 +146,9 @@ if [ -n "${INFERENCE_API_KEY:-}" ]; then
   bash scripts/inference-provider.sh
 fi
 
-say "sandbox up → $URL"
-echo "   • DNS: point one A record for $SANDBOX_HOST at this node's public IP (open ports 80/443)."
-[ "$TLS" != 1 ] && echo "   • HTTP only. For HTTPS re-run with: TLS=1 ACME_EMAIL=you@example.com (needs a real domain that resolves first)."
+say "sandbox up → web $URL · api $API_URL"
+echo "   • DNS: point A records for BOTH $SANDBOX_HOST and $SANDBOX_API_HOST at this node's IP (open 80/443)."
+[ "$TLS" != 1 ] && echo "   • HTTP only. For HTTPS re-run with: TLS=1 ACME_EMAIL=you@example.com (both domains must resolve first)."
 echo "   • web flow: sign up → buy credits (MockStripe settles instantly) → run inference → see the ledger debit."
-echo "   • CLI (same host, /v1/* routes to the services):  EXASCALE_API_URL=$URL exascale login   → balance / catalog / infer / gpu."
+echo "   • CLI (the api host, /v1/* → services):  EXASCALE_API_URL=$API_URL exascale login   → balance / catalog / infer / gpu."
 echo "   • captured email (verification/receipts) lands in Mailpit: kubectl -n data port-forward svc/mailpit 8025:8025"

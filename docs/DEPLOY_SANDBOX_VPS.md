@@ -81,14 +81,16 @@ cd exascale
 
 ## 5. DNS (only if you want HTTPS / a domain)
 
-Add an **A record** pointing your hostname at the VPS IP, e.g.:
+Add **two A records** — one for the web app, one for the `/v1` API — both pointing at the VPS IP:
 
-| Type | Name              | Value          |
-|------|-------------------|----------------|
-| A    | `sandbox`         | `203.0.113.10` |
+| Type | Name              | Value          | Serves                          |
+|------|-------------------|----------------|---------------------------------|
+| A    | `sandbox`         | `203.0.113.10` | web app (browser)               |
+| A    | `sandboxapi`      | `203.0.113.10` | JSON API (`exascale` CLI/clients) |
 
-→ gives you `sandbox.yourdomain.com`. Wait for it to resolve (`dig +short sandbox.yourdomain.com`
-should return the IP). **Skip this** if you'll just use the raw IP over HTTP.
+→ gives you `sandbox.yourdomain.com` (web) and `sandboxapi.yourdomain.com` (api). Wait for **both** to
+resolve (`dig +short sandbox.yourdomain.com`) — for TLS, Let's Encrypt validates each host. **Skip this**
+if you'll just use the raw IP over HTTP (the api host then defaults to `api.<host>`).
 
 ---
 
@@ -100,10 +102,15 @@ From the repo root on the VPS. Pick the line that matches you:
 # (a) HTTP, served at the raw IP — quickest:
 INSTALL_K3S=1 SANDBOX_HOST=203.0.113.10 scripts/deploy-sandbox.sh
 
-# (b) HTTPS on your domain (needs §5 done + ports 80/443 open):
-INSTALL_K3S=1 TLS=1 ACME_EMAIL=you@example.com SANDBOX_HOST=sandbox.yourdomain.com \
+# (b) HTTPS on your domains (needs §5 done + ports 80/443 open):
+INSTALL_K3S=1 TLS=1 ACME_EMAIL=you@example.com \
+  SANDBOX_HOST=sandbox.yourdomain.com SANDBOX_API_HOST=sandboxapi.yourdomain.com \
   scripts/deploy-sandbox.sh
 ```
+
+> **Deploying to a box you don't own (e.g. a client's droplet)?** Both (a) and (b) build the source on
+> the box. Don't — use the **no-source** path in §7b (prebuilt images + a manifests-only bundle) so no
+> `.go`/`.vue` ever lands there.
 
 The script is **idempotent** (safe to re-run) and does, in order:
 
@@ -150,10 +157,11 @@ kubectl create configmap credit-ledger-migrations \
   --from-file=0002_conversion.sql=services/credit-ledger/migrations/0002_conversion.sql
 kubectl apply -f deploy/k8s/local/data-plane.yaml
 
-# Services + web + ingress (substitute your host/url):
-HOST=sandbox.yourdomain.com; URL=https://$HOST
+# Services + web + ingress (substitute your web host, api host, and url):
+HOST=sandbox.yourdomain.com; API_HOST=sandboxapi.yourdomain.com; URL=https://$HOST
 kubectl kustomize deploy/k8s/overlays/sandbox \
-  | sed -e "s|EXASCALE_SANDBOX_HOST|$HOST|g" -e "s|EXASCALE_SANDBOX_URL|$URL|g" \
+  | sed -e "s|EXASCALE_SANDBOX_API_HOST|$API_HOST|g" \
+        -e "s|EXASCALE_SANDBOX_HOST|$HOST|g" -e "s|EXASCALE_SANDBOX_URL|$URL|g" \
   | kubectl apply -f -
 ```
 
@@ -163,23 +171,37 @@ kubectl kustomize deploy/k8s/overlays/sandbox \
 
 ---
 
-## 7b. Pull prebuilt images from GHCR (skip on-box builds)
+## 7b. No-source deploy — pull prebuilt images (skip on-box builds)
 
-The `release` GitHub Actions workflow (`.github/workflows/release.yml`) builds + pushes all six images
-to **`ghcr.io/saadallahdev/exascale-<service>`** on every push to `main` (tag `:sandbox`) and every
-`vX.Y.Z` tag. Once it's run — and you've made the packages **Public** (repo → Packages → each package →
-Settings), or added an `imagePullSecret` — the VPS can pull instead of build:
+**Use this for a box you don't fully control (a client's droplet), or any 2 GB VPS.** It never builds on
+the box, so no `.go`/`.vue` source ever lands there — the compiled product arrives as images.
+
+The `release` GitHub Actions workflow (`.github/workflows/release.yml`) builds + pushes all six images to
+**`ghcr.io/<owner>/exascale-<service>`** on every push to `main` (tag `:sandbox`) and every `vX.Y.Z` tag.
+Make those packages **Public** (repo → Packages → each → Settings) — or keep them private and mint a
+`read:packages` token. Then:
 
 ```bash
-OWNER=saadallahdev; HOST=sandbox.yourdomain.com; URL=https://$HOST
-kubectl kustomize deploy/k8s/overlays/sandbox \
-  | sed -e "s|EXASCALE_SANDBOX_HOST|$HOST|g" -e "s|EXASCALE_SANDBOX_URL|$URL|g" \
-        -e "s|image: exascale/\([a-z-]*\):sandbox|image: ghcr.io/$OWNER/exascale-\1:sandbox|g" \
-  | kubectl apply -f -
+# 1) On your machine (full checkout): build the manifests-only bundle — no source goes in it.
+make sandbox-bundle                                  # → sandbox-bundle.tar.gz
+scp sandbox-bundle.tar.gz root@203.0.113.10:/root/
+
+# 2) On the box: extract + deploy in pull-mode. IMAGE_REGISTRY set ⇒ no build, no source.
+tar xzf sandbox-bundle.tar.gz
+IMAGE_REGISTRY=ghcr.io/<owner> \
+  REGISTRY_USER=<owner> REGISTRY_TOKEN=<read:packages PAT> \   # omit both if the packages are public
+  INSTALL_K3S=1 TLS=1 ACME_EMAIL=you@example.com \
+  SANDBOX_HOST=sandbox.yourdomain.com SANDBOX_API_HOST=sandboxapi.yourdomain.com \
+  scripts/deploy-sandbox.sh
 ```
 
-This skips steps 2–3 of the script entirely — no Docker build on the box, much lighter (works on a
-2 GB VPS). Re-run after the workflow publishes a newer `:sandbox` to update.
+`deploy-sandbox.sh` then skips the build, rewrites the overlay's `exascale/<svc>` image names to
+`ghcr.io/<owner>/exascale-<svc>`, and (if a token is given) creates an `imagePullSecret` on the default
+ServiceAccount so the cluster can pull. Re-run after the workflow publishes a newer `:sandbox` to update.
+
+> **Honest limit:** whoever controls the box can still copy a *running* image (the web bundle is minified
+> JS, recoverable-ish; Go binaries less so). No-source removes the easy `cat *.go` leak, not physical
+> access. Pre-payment, hosting on **your** infra and giving the client only a URL is the real protection.
 
 ---
 

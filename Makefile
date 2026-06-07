@@ -65,6 +65,13 @@ secrets-apply:
 secrets-edit:
 	@bash scripts/secrets.sh edit deploy/secrets/platform-auth.sops.yaml
 
+## sandbox-bundle: build sandbox-bundle.tar.gz — the NO-SOURCE deploy bundle (k8s manifests + SQL +
+## deploy scripts only) for a box you don't control. Pair with IMAGE_REGISTRY=… on the box. See
+## deploy/k8s/overlays/sandbox/README.md § No-source deploy.
+.PHONY: sandbox-bundle
+sandbox-bundle:
+	@bash scripts/make-sandbox-bundle.sh
+
 ## web: run the Nuxt frontend dev server
 .PHONY: web
 web:
