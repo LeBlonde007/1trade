@@ -36,8 +36,8 @@ func main() {
 	// Backend selection (F09): the real vLLM runtime or the GPU-free mock, behind one interface.
 	var backend model.Backend = model.MockBackend{}
 	if cfg.InferenceBackend == "vllm" {
-		backend = model.NewVLLMBackend(cfg.VLLMBaseURL, cfg.InferenceTimeout)
-		slog.Info("inference backend: vllm", "runtime", cfg.VLLMBaseURL)
+		backend = model.NewVLLMBackend(cfg.VLLMBaseURL, cfg.InferenceAPIKey, cfg.InferenceModelMap, cfg.InferenceTimeout)
+		slog.Info("inference backend: vllm", "runtime", cfg.VLLMBaseURL, "hosted", cfg.InferenceAPIKey != "", "model_map", len(cfg.InferenceModelMap))
 	} else {
 		slog.Info("inference backend: mock")
 	}

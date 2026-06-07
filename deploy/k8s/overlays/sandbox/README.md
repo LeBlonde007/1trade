@@ -41,9 +41,57 @@ Then point DNS at the node and open `http(s)://$SANDBOX_HOST`.
 ## What this overlay does (vs. the bases)
 
 The service **bases are already paper-mode**, so the overlay is thin: it adds the **web** frontend
-(`deploy/k8s/web/base`), the public **Ingress** (web is the only public surface — the BFF proxies to
-the Go services in-cluster), retags images to **`:sandbox`**, and points **`APP_BASE_URL`** at the
-public URL. `EXASCALE_SANDBOX_HOST` / `EXASCALE_SANDBOX_URL` are placeholders the script substitutes.
+(`deploy/k8s/web/base`), a single public **Ingress**, retags images to **`:sandbox`**, points
+**`APP_BASE_URL`** at the public URL, and **hardens `EXASCALE_ENV=sandbox`** (see security note below).
+`EXASCALE_SANDBOX_HOST` / `EXASCALE_SANDBOX_URL` are placeholders the script substitutes.
+
+## One host, web + API (for the `exascale` CLI)
+
+The sandbox needs **exactly one subdomain** (e.g. `sandboxapi.exascale.ai`). That host serves both:
+
+- **the web app** (browser) — everything except `/v1/*`, including the Nuxt BFF at `/api/*`;
+- **the JSON APIs** (`exascale` CLI + external clients) — `/v1/*`, routed by path prefix to the Go
+  services: `/v1/auth`,`/v1/account`,`/v1/billing` → platform-core · `/v1/credits` → credit-ledger ·
+  `/v1/models`,`/v1/chat` → inference-gateway · `/v1/compute` → compute-control.
+
+Point the CLI at the same host (one env var sets all four service URLs):
+
+```bash
+EXASCALE_API_URL=https://sandboxapi.exascale.ai exascale login     # then: balance · catalog · infer · gpu
+```
+
+### Security: going public turns off the dev auth shortcut
+
+The credit-ledger trusts an `X-Dev-Tenant` header as an auth shortcut **only when `EXASCALE_ENV=dev`**
+(it lets you mint credits / act as any tenant with no token — fine on a laptop, fatal if public). The
+overlay therefore sets **`EXASCALE_ENV=sandbox`** on all four services so the server **never** trusts
+that header, and a Traefik **`strip-dev-headers`** middleware deletes `X-Dev-Tenant`/`X-Dev-Paper` at
+the edge as defence-in-depth. Credit creation (`/v1/credits/mint|burn|debit|purchase`) needs the
+internal `SERVICE_TOKEN`, which is never public — those endpoints 401 from the internet. **Consequence:**
+the local `seed.sh`/`verify-inference.sh` X-Dev-Tenant minting does **not** work against the sandbox; on
+the sandbox you get credits the real way — sign up → **buy credits** (MockStripe settles instantly).
+
+## Real inference output (optional — hosted provider)
+
+By default the sandbox serves inference from the **CPU stub** (echo-style output — fine for proving the
+plumbing, the ledger debit, and the UI, but not real model answers). To get **real model output** for a
+demo without a GPU, point the gateway at a hosted **OpenAI-compatible** provider (OpenRouter by default)
+— just pass a key at deploy:
+
+```bash
+INFERENCE_API_KEY=sk-or-... INSTALL_K3S=1 SANDBOX_HOST=<vps-ip> scripts/deploy-sandbox.sh
+```
+
+The script injects the key into the `platform-auth` Secret (never committed), flips
+`INFERENCE_BACKEND=vllm` at `VLLM_BASE_URL=https://openrouter.ai/api/v1`, and sets a default
+`INFERENCE_MODEL_MAP` translating our catalog ids to provider slugs
+(`llama-3.1-70b`/`llama-3.1-8b` → `meta-llama/llama-3.1-…-instruct`). Override `VLLM_BASE_URL`
+(e.g. a Groq endpoint) or `INFERENCE_MODEL_MAP` to use a different provider/model set. Nothing else
+changes — the customer API, metering, and ledger debit are identical; only the upstream that produces
+tokens differs. Leave `INFERENCE_API_KEY` unset to keep the keyless CPU stub.
+
+> **Key hygiene:** the provider key lives only in the cluster Secret. Rotate it from the provider
+> dashboard if it ever leaks; re-run the deploy with the new key to roll it.
 
 ## Notes & limits
 

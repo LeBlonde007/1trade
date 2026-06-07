@@ -19,7 +19,7 @@ resources:
   - ../../compute-control/base
   - ../../inference-runtime/base
   - ../../web/base
-  - ingress.yaml
+  - ingress.yaml   # one host: / → web, /v1/* → the platform services (for the exascale CLI + clients)
 
 images:
   - { name: exascale/platform-core, newTag: sandbox }
@@ -31,3 +31,9 @@ images:
 
 patches:
   - path: patch-app-url.yaml
+  # Harden EXASCALE_ENV=dev → sandbox on the Go services so the credit-ledger stops trusting the
+  # X-Dev-Tenant auth shortcut once the API is publicly reachable. Applied to every *-env ConfigMap.
+  - path: patch-env-sandbox.yaml
+    target:
+      kind: ConfigMap
+      name: (platform-core|credit-ledger|inference-gateway|compute-control)-env

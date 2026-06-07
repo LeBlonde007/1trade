@@ -10,20 +10,38 @@ import (
 	"time"
 )
 
-// VLLMBackend serves inference by calling a runtime pod's OpenAI-compatible API (vLLM's native
-// shape) over HTTP. It implements model.Backend, so swapping it in for MockBackend gives the gateway
-// real model output with no change to the customer API. See services/inference-runtime/README.md.
+// VLLMBackend serves inference by calling any OpenAI-compatible chat API over HTTP — either our own
+// vLLM runtime pod (keyless, in-cluster) or a hosted provider such as OpenRouter/Groq (bearer key).
+// It implements model.Backend, so swapping it in for MockBackend gives the gateway real model output
+// with no change to the customer API. See services/inference-runtime/README.md.
 type VLLMBackend struct {
-	baseURL string
-	http    *http.Client
+	baseURL  string
+	apiKey   string            // bearer key for a hosted provider; empty for the keyless in-cluster runtime
+	modelMap map[string]string // optional catalog-id → provider-id translation (e.g. OpenRouter slugs)
+	http     *http.Client
 }
 
-// NewVLLMBackend builds a backend pointed at a runtime base URL (e.g. http://inference-runtime:8000).
-func NewVLLMBackend(baseURL string, timeout time.Duration) *VLLMBackend {
+// NewVLLMBackend builds a backend pointed at an OpenAI-compatible base URL (e.g.
+// http://inference-runtime:8000 for the local runtime, or https://openrouter.ai/api/v1 for a hosted
+// provider). apiKey is sent as a bearer token when non-empty; modelMap (may be nil) translates our
+// catalog ids to the provider's model slugs.
+func NewVLLMBackend(baseURL, apiKey string, modelMap map[string]string, timeout time.Duration) *VLLMBackend {
 	return &VLLMBackend{
-		baseURL: strings.TrimRight(baseURL, "/"),
-		http:    &http.Client{Timeout: timeout},
+		baseURL:  strings.TrimRight(baseURL, "/"),
+		apiKey:   apiKey,
+		modelMap: modelMap,
+		http:     &http.Client{Timeout: timeout},
 	}
+}
+
+// providerModel maps a catalog model id to the upstream provider's slug via modelMap, falling back to
+// the id unchanged when there's no mapping (so the in-cluster runtime, which serves by raw id, works
+// untouched).
+func (b *VLLMBackend) providerModel(id string) string {
+	if m, ok := b.modelMap[id]; ok {
+		return m
+	}
+	return id
 }
 
 // vllmChatResponse is the slice of the runtime's OpenAI chat.completion response the gateway needs.
@@ -48,7 +66,7 @@ func (b *VLLMBackend) Chat(ctx context.Context, req ChatRequest) (ChatResult, er
 	for i, m := range req.Messages {
 		msgs[i] = map[string]string{"role": m.Role, "content": m.Content}
 	}
-	reqBody := map[string]any{"model": req.Model, "messages": msgs, "stream": false}
+	reqBody := map[string]any{"model": b.providerModel(req.Model), "messages": msgs, "stream": false}
 	if req.MaxTokens > 0 {
 		reqBody["max_tokens"] = req.MaxTokens
 	}
@@ -59,6 +77,9 @@ func (b *VLLMBackend) Chat(ctx context.Context, req ChatRequest) (ChatResult, er
 		return ChatResult{}, err
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
+	if b.apiKey != "" { // hosted provider (OpenRouter/Groq/…); the in-cluster runtime is keyless
+		httpReq.Header.Set("Authorization", "Bearer "+b.apiKey)
+	}
 
 	resp, err := b.http.Do(httpReq)
 	if err != nil {
