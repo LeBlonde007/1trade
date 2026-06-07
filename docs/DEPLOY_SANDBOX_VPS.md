@@ -163,6 +163,26 @@ kubectl kustomize deploy/k8s/overlays/sandbox \
 
 ---
 
+## 7b. Pull prebuilt images from GHCR (skip on-box builds)
+
+The `release` GitHub Actions workflow (`.github/workflows/release.yml`) builds + pushes all six images
+to **`ghcr.io/saadallahdev/exascale-<service>`** on every push to `main` (tag `:sandbox`) and every
+`vX.Y.Z` tag. Once it's run — and you've made the packages **Public** (repo → Packages → each package →
+Settings), or added an `imagePullSecret` — the VPS can pull instead of build:
+
+```bash
+OWNER=saadallahdev; HOST=sandbox.yourdomain.com; URL=https://$HOST
+kubectl kustomize deploy/k8s/overlays/sandbox \
+  | sed -e "s|EXASCALE_SANDBOX_HOST|$HOST|g" -e "s|EXASCALE_SANDBOX_URL|$URL|g" \
+        -e "s|image: exascale/\([a-z-]*\):sandbox|image: ghcr.io/$OWNER/exascale-\1:sandbox|g" \
+  | kubectl apply -f -
+```
+
+This skips steps 2–3 of the script entirely — no Docker build on the box, much lighter (works on a
+2 GB VPS). Re-run after the workflow publishes a newer `:sandbox` to update.
+
+---
+
 ## 8. Verify it's up
 
 ```bash

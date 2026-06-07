@@ -1,0 +1,76 @@
+# Release / CD — build the six container images and push them to GHCR (GitHub Container Registry).
+# CI (ci.yml) gates correctness; this publishes the artifacts the sandbox/prod clusters pull.
+#
+#   push to main      → tags :latest, :sandbox, :sha-<short>   (the sandbox overlay can pull :sandbox)
+#   push tag vX.Y.Z   → tags :X.Y.Z, :X.Y, :sha-<short>
+#   pull_request      → builds only (no push) — a packaging smoke test
+#   workflow_dispatch → manual run
+#
+# Images land at ghcr.io/<owner>/exascale-<service>. They are PRIVATE by default — to let a cluster
+# pull without auth, make each package Public (repo → Packages → package → Settings), or add an
+# imagePullSecret. No extra secrets needed to PUSH: the built-in GITHUB_TOKEN has packages:write.
+name: release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  images:
+    name: build + push ${{ matrix.svc.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        svc:
+          - { name: platform-core,          context: services/platform-core }
+          - { name: credit-ledger,          context: services/credit-ledger }
+          - { name: inference-gateway,      context: services/inference-gateway }
+          - { name: compute-control,        context: services/compute-control }
+          - { name: inference-runtime-stub, context: services/inference-runtime/stub }
+          - { name: web,                    context: Exascale Frontend }
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Log in to GHCR only when we intend to push (skip on PRs).
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Image metadata (tags + labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/exascale-${{ matrix.svc.name }}
+          tags: |
+            type=sha,format=short
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=sandbox,enable={{is_default_branch}}
+
+      - name: Build + push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.svc.context }}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
