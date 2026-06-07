@@ -1,0 +1,33 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# env=sandbox — a single-node (k3s) paper-mode deployment for a VPS. The service bases are ALREADY
+# paper-mode (MockStripe settles inline, mock-GPU scheduling, KYC auto-approves outside prod, the CPU
+# stub inference runtime), so this overlay only: (1) adds the web frontend, (2) adds the public
+# Ingress, (3) retags images to :sandbox, (4) points APP_BASE_URL at the public URL.
+#
+# The DATA PLANE (Postgres/TimescaleDB/Redis/NATS/Mailpit, namespace `data`) and the out-of-band
+# Secret/ConfigMaps (platform-auth, *-migrations) are applied SEPARATELY by scripts/deploy-sandbox.sh —
+# they aren't kustomize resources here (the data plane pins namespace `data`).
+#
+# `EXASCALE_SANDBOX_HOST` / `EXASCALE_SANDBOX_URL` are placeholders the deploy script substitutes.
+namespace: default
+
+resources:
+  - ../../platform-core/base
+  - ../../credit-ledger/base
+  - ../../inference-gateway/base
+  - ../../compute-control/base
+  - ../../inference-runtime/base
+  - ../../web/base
+  - ingress.yaml
+
+images:
+  - { name: exascale/platform-core, newTag: sandbox }
+  - { name: exascale/credit-ledger, newTag: sandbox }
+  - { name: exascale/inference-gateway, newTag: sandbox }
+  - { name: exascale/compute-control, newTag: sandbox }
+  - { name: exascale/inference-runtime-stub, newTag: sandbox }
+  - { name: exascale/web, newTag: sandbox }
+
+patches:
+  - path: patch-app-url.yaml

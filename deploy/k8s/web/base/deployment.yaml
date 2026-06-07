@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  labels: { app: web }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: web }
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+  template:
+    metadata:
+      labels: { app: web }
+    spec:
+      containers:
+        - name: web
+          image: exascale/web:dev
+          ports: [{ containerPort: 3000 }]
+          envFrom:
+            - configMapRef: { name: web-env }
+          # `/` is the public marketing landing (200, no auth) — a safe health target.
+          livenessProbe:
+            httpGet: { path: /, port: 3000 }
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet: { path: /, port: 3000 }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 100m, memory: 192Mi }
+            limits: { cpu: "1", memory: 512Mi }
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000              # node:alpine 'node' user
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }   # Nitro may write temp files; root fs stays read-only
+      volumes:
+        - name: tmp
+          emptyDir: {}
