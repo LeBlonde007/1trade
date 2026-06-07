@@ -134,6 +134,7 @@ See [`features/`](features/) for one doc per feature.
 | [F21](features/F21-soc2-type1.md) | SOC 2 Type I (Vanta, controls, evidence) | `security-compliance` + `infra-sre` | active |
 | [F22](features/F22-licensing-track.md) | Licensing track (jurisdiction, counsel, prepaid framing sign-off) | `security-compliance` | parallel |
 | [F23](features/F23-console-v15-screens.md) | Console v1.5 screens (frontend depth — Tiers E–N, itemized vs backend) | `trading-frontend` | active |
+| [F24](features/F24-cli-dx.md) | CLI developer experience (streaming, interactive chat REPL, colour, productivity) | `platform-core` | active |
 
 ### Phase 2 — Exchange (keep-warm)
 

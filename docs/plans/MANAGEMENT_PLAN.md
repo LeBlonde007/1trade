@@ -170,6 +170,7 @@ Status legend: ⬜ Not started · 🔵 In progress · ✅ Done · ⚠️ At risk
 | F21 | SOC 2 Type I (Vanta, controls, evidence) | Security + Infra | M4 / M6 | ⬜ | 0% | |
 | F22 | Licensing track (jurisdiction, counsel, prepaid framing) | Security | parallel | 🔵 | ~10% | Counsel engagement starting; keeps Phase 2 unblockable. |
 | F23 | Console v1.5 screens (frontend depth — Tiers E–N) | Frontend | M3→M6 | 🔵 | ~15% | Itemizes the v1.5 screen catalog (`exascale_v15_screens_prompts.md`) screen-by-screen with the backend feature each needs. **Built:** order/position/tx detail drawers, toasts, status page, markets index, tour, footer (F4/E1/E5/J3/M4/L6/N3). Active track: F (money) · G (compute) · H (enterprise) · I (datacenter) · J (marketing) · L (help) · M/N (polish), gated per-screen. Exchange tiers (E, trading-K) ⏸ Phase 2 (KW). See `features/F23-console-v15-screens.md`. |
+| F24 | CLI developer experience (Claude-Code-grade) | Platform | M3→M6 | ⬜ | 0% | DX layer over the live F04 CLI — institutional, not flashy. **P1:** streaming inference (gateway SSE), spinners, semantic colour (▲/▼), actionable errors, `--json`, per-command help, destructive-op confirms. **P2:** `exascale chat` interactive streaming REPL + slash commands + live cost meter (charm `bubbletea`/`lipgloss` or stdlib — TBD). **P3:** shell completion, browser/device login (F02 OAuth), config profiles, `exascale status`. No new service contract. See `features/F24-cli-dx.md`. |
 
 ---
 
