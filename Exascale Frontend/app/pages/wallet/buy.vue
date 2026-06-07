@@ -344,7 +344,7 @@ onMounted(() => {
 .btn.lg { height: 48px; font-size: 15px; }
 .btn.full { width: 100%; }
 .btn.primary { background: var(--text); color: var(--elevated); border-color: var(--text); }
-.btn.primary:hover { background: #222; }
+.btn.primary:hover { filter: brightness(0.92); }
 .btn.primary:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn.secondary { background: var(--elevated); color: var(--text); border-color: var(--border-strong); }
 .btn.secondary:hover { background: var(--canvas); }

@@ -618,8 +618,8 @@ function copyText(t: string) {
 
 <style scoped>
 .page {
-  background: var(--surface-canvas, #0A0B0E);
-  color: var(--text-primary, #E8E6E0);
+  background: var(--surface-canvas);
+  color: var(--text-primary);
   min-height: 100vh;
   font-family: 'Inter', system-ui, sans-serif;
   font-feature-settings: 'tnum';
@@ -632,7 +632,7 @@ function copyText(t: string) {
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text-tertiary, #5F5F5C);
+  color: var(--text-tertiary);
 }
 
 .dot-sep { color: var(--text-tertiary); margin: 0 4px; }
@@ -641,7 +641,7 @@ function copyText(t: string) {
 
 /* Header ------------------------------------------- */
 .head {
-  background: var(--surface-elevated, #14161B);
+  background: var(--surface-elevated);
   border-bottom: 1px solid rgba(255,255,255,0.08);
   padding: 16px 24px 0;
 }
@@ -653,7 +653,7 @@ function copyText(t: string) {
   color: var(--text-tertiary);
   margin-bottom: 12px;
 }
-.crumbs a { color: var(--text-secondary, #9A9A95); text-decoration: none; }
+.crumbs a { color: var(--text-secondary); text-decoration: none; }
 .crumbs a:hover { color: var(--text-primary); }
 
 .head-main {
@@ -783,7 +783,7 @@ function copyText(t: string) {
 .tab:hover { color: var(--text-primary); }
 .tab.active {
   color: var(--text-primary);
-  border-bottom-color: var(--brand-accent, #4A90E2);
+  border-bottom-color: var(--brand-accent);
 }
 
 /* Body --------------------------------------------- */
@@ -807,7 +807,7 @@ function copyText(t: string) {
 }
 
 .card {
-  background: var(--surface-elevated, #14161B);
+  background: var(--surface-elevated);
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 4px;
   padding: 16px;
@@ -1206,7 +1206,7 @@ function copyText(t: string) {
   backdrop-filter: blur(4px);
 }
 .modal {
-  background: var(--surface-overlay, #1C1F26);
+  background: var(--surface-overlay);
   border: 1px solid rgba(255,255,255,0.16);
   border-radius: 6px;
   padding: 20px;

@@ -330,13 +330,13 @@ void notifApi
   width: 400px;
   max-width: 100vw;
   height: 100%;
-  background: var(--overlay, #1C1F26);
+  background: var(--overlay);
   border-left: 1px solid var(--border-strong, rgba(255, 255, 255, 0.14));
   box-shadow: -24px 0 60px rgba(0, 0, 0, 0.45);
   display: flex;
   flex-direction: column;
   font-family: var(--font-sans);
-  color: var(--text, #E8E6E0);
+  color: var(--text);
   font-feature-settings: 'ss01' on, 'tnum' on;
 }
 .mono {
@@ -367,7 +367,7 @@ void notifApi
   font-weight: 600;
   letter-spacing: -0.015em;
   margin: 0;
-  color: var(--text, #E8E6E0);
+  color: var(--text);
 }
 .head-actions {
   display: flex;
@@ -377,7 +377,7 @@ void notifApi
 .link-btn {
   background: transparent;
   border: 0;
-  color: var(--text-2, #9A9A95);
+  color: var(--text-2);
   font-family: var(--font-sans);
   font-size: 12px;
   cursor: pointer;
@@ -386,11 +386,11 @@ void notifApi
   transition: background 120ms, color 120ms;
 }
 .link-btn:hover:enabled {
-  color: var(--text, #E8E6E0);
+  color: var(--text);
   background: rgba(255, 255, 255, 0.04);
 }
 .link-btn:disabled {
-  color: var(--text-3, #5F5F5C);
+  color: var(--text-3);
   cursor: not-allowed;
 }
 .close-btn {
@@ -398,7 +398,7 @@ void notifApi
   height: 28px;
   background: transparent;
   border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
-  color: var(--text-2, #9A9A95);
+  color: var(--text-2);
   border-radius: var(--radius-sm, 2px);
   cursor: pointer;
   display: grid;
@@ -406,7 +406,7 @@ void notifApi
 }
 .close-btn:hover {
   background: rgba(255, 255, 255, 0.04);
-  color: var(--text, #E8E6E0);
+  color: var(--text);
 }
 .close-btn svg { width: 12px; height: 12px; }
 
@@ -419,7 +419,7 @@ void notifApi
 .filter-chip {
   background: transparent;
   border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
-  color: var(--text-2, #9A9A95);
+  color: var(--text-2);
   font-family: var(--font-sans);
   font-size: 11.5px;
   font-weight: 500;
@@ -433,21 +433,21 @@ void notifApi
   transition: background 120ms, color 120ms, border-color 120ms;
 }
 .filter-chip:hover {
-  color: var(--text, #E8E6E0);
+  color: var(--text);
   background: rgba(255, 255, 255, 0.03);
   border-color: var(--border-strong, rgba(255, 255, 255, 0.16));
 }
 .filter-chip.active {
-  background: var(--text, #E8E6E0);
-  color: var(--canvas, #0A0B0E);
-  border-color: var(--text, #E8E6E0);
+  background: var(--text);
+  color: var(--canvas);
+  border-color: var(--text);
   font-weight: 600;
 }
 .chip-count {
   font-family: var(--font-mono);
   font-size: 10px;
-  color: var(--text-3, #5F5F5C);
-  background: var(--canvas, #0A0B0E);
+  color: var(--text-3);
+  background: var(--canvas);
   border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
   padding: 1px 5px;
   border-radius: 2px;
@@ -455,7 +455,7 @@ void notifApi
   font-variant-numeric: tabular-nums;
 }
 .filter-chip.active .chip-count {
-  color: var(--canvas, #0A0B0E);
+  color: var(--canvas);
   background: rgba(255, 255, 255, 0.85);
   border-color: transparent;
 }
@@ -505,7 +505,7 @@ void notifApi
   transition: background 120ms;
 }
 .notif-row.unread::before {
-  background: var(--brand, #C8F25C);
+  background: var(--brand);
 }
 
 .row-ic {
@@ -520,23 +520,23 @@ void notifApi
 .row-ic svg { width: 14px; height: 14px; }
 .row-ic.ic-pos {
   background: rgba(25, 195, 125, 0.12);
-  color: var(--pos, #19C37D);
+  color: var(--pos);
 }
 .row-ic.ic-neg {
   background: rgba(239, 68, 68, 0.12);
-  color: var(--neg, #EF4444);
+  color: var(--neg);
 }
 .row-ic.ic-warn {
   background: rgba(245, 158, 11, 0.12);
-  color: var(--warn, #F59E0B);
+  color: var(--warn);
 }
 .row-ic.ic-info {
   background: rgba(74, 144, 226, 0.12);
-  color: var(--accent, #4A90E2);
+  color: var(--accent);
 }
 .row-ic.ic-neutral {
   background: rgba(255, 255, 255, 0.04);
-  color: var(--text-2, #9A9A95);
+  color: var(--text-2);
 }
 
 .row-body { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
@@ -551,19 +551,19 @@ void notifApi
   font-size: 13px;
   font-weight: 600;
   letter-spacing: -0.005em;
-  color: var(--text, #E8E6E0);
+  color: var(--text);
   line-height: 1.35;
 }
 .row-ts {
   font-family: var(--font-mono);
   font-size: 10.5px;
-  color: var(--text-3, #5F5F5C);
+  color: var(--text-3);
   letter-spacing: 0.04em;
   flex-shrink: 0;
 }
 .row-text {
   font-size: 12px;
-  color: var(--text-2, #9A9A95);
+  color: var(--text-2);
   line-height: 1.5;
   margin: 0;
 }
@@ -572,7 +572,7 @@ void notifApi
   align-self: flex-start;
   font-family: var(--font-sans);
   font-size: 12px;
-  color: var(--brand, #C8F25C);
+  color: var(--brand);
   font-weight: 600;
   letter-spacing: -0.005em;
   border-bottom: 1px solid transparent;
@@ -580,14 +580,14 @@ void notifApi
   transition: border-color 120ms;
 }
 .notif-row:hover .row-action {
-  border-bottom-color: var(--brand, #C8F25C);
+  border-bottom-color: var(--brand);
 }
 
 .unread-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--brand, #C8F25C);
+  background: var(--brand);
   align-self: center;
   flex-shrink: 0;
   box-shadow: 0 0 0 2px rgba(200, 242, 92, 0.15);
@@ -599,24 +599,24 @@ void notifApi
 .empty {
   padding: 48px 24px 32px;
   text-align: center;
-  color: var(--text-2, #9A9A95);
+  color: var(--text-2);
 }
 .empty-ic {
   width: 28px;
   height: 28px;
   margin: 0 auto 12px;
-  color: var(--text-3, #5F5F5C);
+  color: var(--text-3);
 }
 .empty-title {
   font-family: var(--font-display);
   font-size: 14px;
   font-weight: 600;
-  color: var(--text, #E8E6E0);
+  color: var(--text);
   margin-bottom: 4px;
 }
 .empty-sub {
   font-size: 12px;
-  color: var(--text-3, #5F5F5C);
+  color: var(--text-3);
   line-height: 1.5;
 }
 
@@ -636,19 +636,19 @@ void notifApi
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--text-2, #9A9A95);
+  color: var(--text-2);
   text-decoration: none;
   font-family: var(--font-sans);
   font-size: 12px;
   font-weight: 500;
   letter-spacing: -0.005em;
 }
-.foot-link:hover { color: var(--text, #E8E6E0); }
+.foot-link:hover { color: var(--text); }
 .foot-link svg { width: 12px; height: 12px; }
 .foot-meta {
   font-family: var(--font-mono);
   font-size: 10.5px;
-  color: var(--text-3, #5F5F5C);
+  color: var(--text-3);
   letter-spacing: 0.04em;
 }
 

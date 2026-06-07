@@ -121,9 +121,9 @@ const buildIndexChart = async () => {
   data[data.length - 1] = 1.0024
 
   const root = getComputedStyle(document.documentElement)
-  const brandHex = root.getPropertyValue('--brand').trim() || '#C8F25C'
-  const textHex  = root.getPropertyValue('--text').trim()  || '#0A0B0E'
-  const t3Hex    = root.getPropertyValue('--text-3').trim() || '#9A9A95'
+  const brandHex = root.getPropertyValue('--brand').trim()
+  const textHex  = root.getPropertyValue('--text').trim()
+  const t3Hex    = root.getPropertyValue('--text-3').trim()
 
   const ctx = indexCanvas.value
   const grad = ctx.getContext('2d')!.createLinearGradient(0, 0, 0, 320)
