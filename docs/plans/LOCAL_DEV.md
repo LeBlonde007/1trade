@@ -143,6 +143,26 @@ exascale login --dev          # bypasses OAuth, uses a dev token
 `exascale --help` is the contract; any new command needs a corresponding OpenAPI route in
 `docs/contracts/openapi/`.
 
+  Use it
+
+  ./bin/exascale help                                  # the command list above
+  ./bin/exascale login --email you@dev.test            # or: signup --email … --password …
+  ./bin/exascale whoami
+  ./bin/exascale catalog                               # live model list
+  ./bin/exascale credits balance
+  ./bin/exascale infer chat -m llama-3.1-8b "Define a GPU in one line"
+  ./bin/exascale gpu types                             # H100 $2.99/hr, H200 $3.49/hr
+  ./bin/exascale gpu create --type h100 --count 2      # → instance id + ssh/jupyter/http
+  ./bin/exascale keys create --name production         # secret shown once
+
+  Notes:
+  - Config + token live in ~/.exascale/config.json (token is the platform JWT from login/signup).
+  - Point at a different backend with ./bin/exascale config set platform_url <url> (or env vars EXASCALE_PLATFORM_URL, EXASCALE_GATEWAY_URL, EXASCALE_LEDGER_URL, EXASCALE_COMPUTE_URL).
+  - Want it on your PATH? sudo ln -s "$PWD/bin/exascale" /usr/local/bin/exascale, then just exascale ….
+
+  Quick check it's wired right now (you're logged in): ./bin/exascale catalog — if it returns models, the gateway forward is live; if it hangs/errors, start the port-forwards above.
+
+  Want me to verify it end-to-end against the running cluster (catalog → infer → balance), or get back to the .claude-work-tai progress copy?
 ---
 
 ## 8. Per-agent local-dev checklist
