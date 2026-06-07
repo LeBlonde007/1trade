@@ -401,11 +401,11 @@ function cursorIndexFor(it: Item): number {
 .cmd-palette {
   width: 100%;
   max-width: 640px;
-  background: var(--overlay, #1C1F26);
+  background: var(--overlay);
   border: 1px solid var(--border-strong, rgba(255, 255, 255, 0.14));
   border-radius: var(--radius-sm, 2px);
   box-shadow: 0 24px 56px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.30);
-  color: var(--text, #E8E6E0);
+  color: var(--text);
   font-family: var(--font-sans);
   font-feature-settings: 'ss01' on, 'tnum' on;
   display: flex;
@@ -427,7 +427,7 @@ function cursorIndexFor(it: Item): number {
   gap: 8px;
 }
 .cmd-search-ic {
-  color: var(--text-3, #5F5F5C);
+  color: var(--text-3);
   display: grid;
   place-items: center;
 }
@@ -436,7 +436,7 @@ function cursorIndexFor(it: Item): number {
   background: transparent;
   border: 0;
   outline: 0;
-  color: var(--text, #E8E6E0);
+  color: var(--text);
   font-size: 15px;
   font-family: inherit;
   letter-spacing: -0.005em;
@@ -444,7 +444,7 @@ function cursorIndexFor(it: Item): number {
   width: 100%;
   padding: 0;
 }
-.cmd-input::placeholder { color: var(--text-3, #5F5F5C); }
+.cmd-input::placeholder { color: var(--text-3); }
 .cmd-shortcut-bg {
   display: inline-flex;
   align-items: center;
@@ -470,7 +470,7 @@ function cursorIndexFor(it: Item): number {
   font-weight: 600;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--text-3, #5F5F5C);
+  color: var(--text-3);
   padding: 12px 16px 6px;
 }
 
@@ -484,7 +484,7 @@ function cursorIndexFor(it: Item): number {
   padding: 0 12px 0 14px;
   border: 0;
   background: transparent;
-  color: var(--text, #E8E6E0);
+  color: var(--text);
   cursor: pointer;
   font-family: inherit;
   text-align: left;
@@ -504,21 +504,21 @@ function cursorIndexFor(it: Item): number {
 .cmd-row.active {
   background: rgba(255, 255, 255, 0.05);
 }
-.cmd-row.active::before { background: var(--brand, #C8F25C); }
+.cmd-row.active::before { background: var(--brand); }
 
 .cmd-row-ic {
   width: 28px;
   height: 28px;
   display: grid;
   place-items: center;
-  color: var(--text-2, #9A9A95);
+  color: var(--text-2);
   border-radius: 2px;
   flex-shrink: 0;
 }
 .cmd-row-ic svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.5; }
-.cmd-row.active .cmd-row-ic { color: var(--text, #E8E6E0); }
+.cmd-row.active .cmd-row-ic { color: var(--text); }
 /* Subtle accent for Markets pulse icon */
-.cmd-row .cmd-row-ic[data-icon='pulse'] { color: var(--brand, #C8F25C); opacity: 0.85; }
+.cmd-row .cmd-row-ic[data-icon='pulse'] { color: var(--brand); opacity: 0.85; }
 
 .cmd-row-body {
   display: flex;
@@ -531,7 +531,7 @@ function cursorIndexFor(it: Item): number {
   font-size: 13.5px;
   font-weight: 500;
   letter-spacing: -0.005em;
-  color: var(--text, #E8E6E0);
+  color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -539,7 +539,7 @@ function cursorIndexFor(it: Item): number {
 .cmd-row-hint {
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--text-3, #5F5F5C);
+  color: var(--text-3);
   letter-spacing: 0.02em;
   white-space: nowrap;
   overflow: hidden;
@@ -551,12 +551,12 @@ function cursorIndexFor(it: Item): number {
   font-variant-numeric: tabular-nums;
   font-size: 12px;
   letter-spacing: 0.02em;
-  color: var(--text-2, #9A9A95);
+  color: var(--text-2);
   white-space: nowrap;
 }
-.cmd-row-meta.pos { color: var(--pos, #19C37D); }
-.cmd-row-meta.neg { color: var(--neg, #EF4444); }
-.cmd-row-meta.dim { color: var(--text-3, #5F5F5C); }
+.cmd-row-meta.pos { color: var(--pos); }
+.cmd-row-meta.neg { color: var(--neg); }
+.cmd-row-meta.dim { color: var(--text-3); }
 
 .cmd-row-shortcut {
   display: inline-flex;
@@ -572,7 +572,7 @@ function cursorIndexFor(it: Item): number {
   align-items: center;
   gap: 14px;
   padding: 28px 22px;
-  color: var(--text-2, #9A9A95);
+  color: var(--text-2);
 }
 .cmd-empty-ic {
   width: 32px;
@@ -582,7 +582,7 @@ function cursorIndexFor(it: Item): number {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
   border-radius: 2px;
-  color: var(--text-3, #5F5F5C);
+  color: var(--text-3);
   flex-shrink: 0;
 }
 .cmd-empty-ic svg { width: 14px; height: 14px; }
@@ -590,11 +590,11 @@ function cursorIndexFor(it: Item): number {
   font-size: 13px;
   line-height: 1.5;
 }
-.cmd-empty-text strong { color: var(--text, #E8E6E0); font-weight: 600; }
+.cmd-empty-text strong { color: var(--text); font-weight: 600; }
 .cmd-empty-sub {
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--text-3, #5F5F5C);
+  color: var(--text-3);
   letter-spacing: 0.04em;
   margin-top: 4px;
 }
@@ -611,7 +611,7 @@ function cursorIndexFor(it: Item): number {
   background: rgba(255, 255, 255, 0.02);
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--text-3, #5F5F5C);
+  color: var(--text-3);
   letter-spacing: 0.04em;
 }
 .hint-group {
@@ -630,7 +630,7 @@ kbd {
   padding: 0 5px;
   font-family: var(--font-mono);
   font-size: 10px;
-  color: var(--text-2, #9A9A95);
+  color: var(--text-2);
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
   border-bottom-width: 2px;

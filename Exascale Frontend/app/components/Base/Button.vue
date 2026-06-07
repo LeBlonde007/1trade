@@ -102,19 +102,19 @@ const props = withDefaults(
 
 .btn-buy {
   background: var(--pos);
-  color: #fff;
+  color: var(--text-on-color);
 }
 .btn-buy:hover { filter: brightness(1.08); }
 
 .btn-sell {
   background: var(--neg);
-  color: #fff;
+  color: var(--text-on-color);
 }
 .btn-sell:hover { filter: brightness(1.08); }
 
 .btn-destructive {
   background: var(--neg);
-  color: #fff;
+  color: var(--text-on-color);
 }
 .btn-destructive:hover { filter: brightness(1.08); }
 </style>

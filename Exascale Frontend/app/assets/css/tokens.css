@@ -27,6 +27,7 @@
   --text-3:           #8A8A82;   /* tertiary, eyebrows, meta */
   --text-inverse:     #EAE6DA;   /* text on dark inverse blocks */
   --text-on-accent:   #0E0E0E;   /* text on lime brand accent */
+  --text-on-color:    #FFFFFF;   /* text on saturated semantic fills (pos/neg/info badges + buttons) */
 
   /* Borders */
   --border:           #E4E0D6;
@@ -62,6 +63,7 @@
   --text-3:           #5F5F5C;
   --text-inverse:     #0E0E0E;
   --text-on-accent:   #0E0E0E;
+  --text-on-color:    #FFFFFF;   /* text on saturated semantic fills (pos/neg/info badges + buttons) */
 
   /* Borders */
   --border:           rgba(255, 255, 255, 0.08);

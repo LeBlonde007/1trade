@@ -944,7 +944,7 @@ onMounted(() => {
   text-transform: uppercase;
   padding: 4px 8px;
   background: var(--info);
-  color: #fff;
+  color: var(--text-on-color);
   border-radius: var(--radius-sm);
   font-weight: 600;
   opacity: 0.9;

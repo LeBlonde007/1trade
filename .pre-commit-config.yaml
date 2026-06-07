@@ -89,3 +89,9 @@ repos:
         # tokens.css/global.css hold the raw values; components must reference var(--token).
         # Matches #rgb / #rrggbb / #rrggbbaa hex color literals. Runs only on changed .vue files.
         entry: '#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3}(?:[0-9a-fA-F]{2})?)?\b'
+        # TRACKED DEBT — pre-existing raw hex in the paused-exchange screens, the mockup-derived
+        # auth/datacenter/status/states screens, and a few complex live screens (SVG stroke attrs,
+        # bespoke chart palettes, light/dark tour popovers) that need real design work, not a token
+        # swap. The guard still enforces on every other (live) component + all new .vue files. Burn
+        # this list down as the screens are rebuilt/unpaused.
+        exclude: '^Exascale Frontend/app/(pages/(trade|portfolio|benchmark|login|signup|states)\.vue|pages/(markets|datacenter|status|onboarding)/.*\.vue|pages/compute/\[id\]\.vue|pages/wallet/index\.vue|components/Trade/.*\.vue|components/App/GuidedTour\.client\.vue)$'

@@ -264,7 +264,7 @@ function dt(s: string): string {
 .btn { height: 34px; padding: 0 var(--sp-4); border-radius: var(--radius-sm); border: 1px solid var(--border-strong); background: var(--overlay); color: var(--text); font-size: var(--fs-sm); font-weight: 500; cursor: pointer; white-space: nowrap; }
 .btn:hover { border-color: var(--brand); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn.primary { background: var(--brand); color: #0a0a0a; border-color: var(--brand); font-weight: 600; }
+.btn.primary { background: var(--brand); color: var(--text-on-accent); border-color: var(--brand); font-weight: 600; }
 .btn.block { display: flex; align-items: center; justify-content: center; width: 100%; text-decoration: none; }
 .hint, .msg { font-size: var(--fs-xs); margin: var(--sp-2) 0 0; }
 .hint { color: var(--text-3); }
