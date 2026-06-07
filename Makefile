@@ -92,6 +92,11 @@ test:
 test-e2e:
 	@bash scripts/e2e.sh
 
+## backup-restore-drill: dump+restore the ledger DB; assert row counts + hash-chain digest survive. Needs the data plane.
+.PHONY: backup-restore-drill
+backup-restore-drill:
+	@bash scripts/backup-restore-drill.sh
+
 ## lint: golangci-lint across every Go module (scripts/lint.sh); add --fix to auto-fix
 .PHONY: lint
 lint:

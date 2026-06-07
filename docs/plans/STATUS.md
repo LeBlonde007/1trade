@@ -34,8 +34,10 @@ Exascale
 │   ├── 🟩 CI: go job builds + race-tests all 5 modules (Go 1.25, scripts/go-all.sh) + golangci-lint
 │   │      v2.12.2 hard gate, all modules lint-clean (scripts/lint.sh) + contracts YAML multi-doc fix
 │   │      (v0.2.15–v0.2.16). go + contracts jobs green; hygiene red only on non-Go pre-commit hooks.
-│   └── 🟩 Envs: ✅ env=local (mock-GPU) · 🟢 env=sandbox (RTX 5090 32GB over Tailscale, real-GPU
-│          validation; needs Dockerfile.vllm CUDA-12.8 bump) · ⬜ env=prod (H100/H200) · backup/restore
+│   ├── 🟩 Envs: ✅ env=local (mock-GPU) · 🟢 env=sandbox (RTX 5090 32GB over Tailscale, real-GPU
+│   │      validation; needs Dockerfile.vllm CUDA-12.8 bump) · ⬜ env=prod (H100/H200)
+│   └── ✅ Backup/restore drill (make backup-restore-drill) — dump→restore the ledger DB; asserts row
+│          counts + hash-chain digest survive. Live: 14 hash-chained txns, digest unchanged.
 │
 ├── ✅ M1 — Foundation (shipped; F04 CLI v0 done)
 │   ├── ✅ F05 credit-ledger     financial heart — append-only hash chain, fixed-point, atomic,
