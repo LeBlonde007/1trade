@@ -12,10 +12,15 @@
 #   ACME_EMAIL                contact email for Let's Encrypt (TLS=1 only).
 #   INSTALL_K3S=0|1           1 → install k3s if it's not present.
 #   IMPORT=k3s|k3d|none       how locally-built images reach the cluster (default k3s).
+#   INFERENCE_API_KEY         OPTIONAL. Set it to serve REAL model output via a hosted OpenAI-compatible
+#                             provider (OpenRouter by default) instead of the echo-style CPU stub. The key
+#                             is injected into the `platform-auth` Secret at deploy — never committed.
+#   VLLM_BASE_URL             provider base URL (default https://openrouter.ai/api/v1 when a key is set).
+#   INFERENCE_MODEL_MAP       JSON catalog-id→provider-slug map (default maps the two Llama text models).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
 
-SANDBOX_HOST="${SANDBOX_HOST:-}"
+SANDBOX_HOST="${SANDBOX_HOST:-}"   # one host serves both the web app (/) and the JSON APIs (/v1/*)
 TLS="${TLS:-0}"; ACME_EMAIL="${ACME_EMAIL:-}"
 INSTALL_K3S="${INSTALL_K3S:-0}"; IMPORT="${IMPORT:-k3s}"; TAG="${TAG:-sandbox}"
 SVCS="platform-core credit-ledger inference-gateway compute-control inference-runtime-stub web"
@@ -100,8 +105,16 @@ for d in platform-core credit-ledger inference-gateway compute-control inference
   kubectl rollout status "deploy/$d" --timeout=300s
 done
 
+# 7b. (optional) hosted inference provider — REAL model output instead of the echo CPU stub.
+# Opt-in: only when INFERENCE_API_KEY is set. Delegates to scripts/inference-provider.sh (same flip works
+# against the local cluster), which injects the key into the platform-auth Secret + patches the ConfigMap.
+if [ -n "${INFERENCE_API_KEY:-}" ]; then
+  bash scripts/inference-provider.sh
+fi
+
 say "sandbox up → $URL"
-echo "   • point an A record for $SANDBOX_HOST at this node's public IP (open ports 80/443)."
-[ "$TLS" != 1 ] && echo "   • HTTP only. For HTTPS re-run with: TLS=1 ACME_EMAIL=you@example.com (needs a real domain)."
-echo "   • flow: sign up → buy credits (MockStripe settles instantly) → run inference → see the ledger debit."
+echo "   • DNS: point one A record for $SANDBOX_HOST at this node's public IP (open ports 80/443)."
+[ "$TLS" != 1 ] && echo "   • HTTP only. For HTTPS re-run with: TLS=1 ACME_EMAIL=you@example.com (needs a real domain that resolves first)."
+echo "   • web flow: sign up → buy credits (MockStripe settles instantly) → run inference → see the ledger debit."
+echo "   • CLI (same host, /v1/* routes to the services):  EXASCALE_API_URL=$URL exascale login   → balance / catalog / infer / gpu."
 echo "   • captured email (verification/receipts) lands in Mailpit: kubectl -n data port-forward svc/mailpit 8025:8025"

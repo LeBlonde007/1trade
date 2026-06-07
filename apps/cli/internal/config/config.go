@@ -42,6 +42,12 @@ func Load() Config {
 	if b, err := os.ReadFile(Path()); err == nil {
 		_ = json.Unmarshal(b, &c)
 	}
+	// EXASCALE_API_URL points every service at one host (the sandbox/prod api gateway, which routes by
+	// path: /v1/auth+/v1/account+/v1/billing→platform, /v1/credits→ledger, /v1/models+/v1/chat→gateway,
+	// /v1/compute→compute). Per-service EXASCALE_*_URL below still override it for split deployments.
+	if v := os.Getenv("EXASCALE_API_URL"); v != "" {
+		c.PlatformURL, c.GatewayURL, c.LedgerURL, c.ComputeURL = v, v, v, v
+	}
 	if v := os.Getenv("EXASCALE_PLATFORM_URL"); v != "" {
 		c.PlatformURL = v
 	}

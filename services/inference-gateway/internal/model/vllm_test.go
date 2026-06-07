@@ -33,7 +33,7 @@ func TestVLLMBackendChat(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	b := NewVLLMBackend(srv.URL, 5*time.Second)
+	b := NewVLLMBackend(srv.URL, "", nil, 5*time.Second)
 	res, err := b.Chat(context.Background(), ChatRequest{
 		Model: "llama-3.1-8b", Messages: []Message{{Role: "user", Content: "hi"}},
 	})
@@ -58,7 +58,7 @@ func TestVLLMBackendFallbackTokens(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	res, err := NewVLLMBackend(srv.URL, 5*time.Second).Chat(context.Background(), ChatRequest{
+	res, err := NewVLLMBackend(srv.URL, "", nil, 5*time.Second).Chat(context.Background(), ChatRequest{
 		Model: "llama-3.1-8b", Messages: []Message{{Role: "user", Content: "a longer prompt to estimate"}},
 	})
 	if err != nil {
@@ -76,9 +76,42 @@ func TestVLLMBackendError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	if _, err := NewVLLMBackend(srv.URL, 2*time.Second).Chat(context.Background(), ChatRequest{
+	if _, err := NewVLLMBackend(srv.URL, "", nil, 2*time.Second).Chat(context.Background(), ChatRequest{
 		Model: "llama-3.1-8b", Messages: []Message{{Role: "user", Content: "hi"}},
 	}); err == nil {
 		t.Fatal("expected error on runtime 503")
+	}
+}
+
+// TestVLLMBackendHostedProvider verifies that with an API key + model map (the hosted-provider path,
+// e.g. OpenRouter), the backend sends a bearer token and translates the catalog id to the provider
+// slug — while the customer still asked for our catalog id.
+func TestVLLMBackendHostedProvider(t *testing.T) {
+	var gotAuth, gotModel string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		var body struct {
+			Model string `json:"model"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		gotModel = body.Model
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"choices": []map[string]any{{"message": map[string]string{"content": "hi"}, "finish_reason": "stop"}},
+			"usage":   map[string]int{"prompt_tokens": 3, "completion_tokens": 2},
+		})
+	}))
+	defer srv.Close()
+
+	b := NewVLLMBackend(srv.URL, "sk-test-key", map[string]string{"llama-3.1-8b": "meta-llama/llama-3.1-8b-instruct"}, 5*time.Second)
+	if _, err := b.Chat(context.Background(), ChatRequest{
+		Model: "llama-3.1-8b", Messages: []Message{{Role: "user", Content: "hi"}},
+	}); err != nil {
+		t.Fatalf("chat: %v", err)
+	}
+	if gotAuth != "Bearer sk-test-key" {
+		t.Fatalf("expected bearer auth header, got %q", gotAuth)
+	}
+	if gotModel != "meta-llama/llama-3.1-8b-instruct" {
+		t.Fatalf("expected provider slug, got %q", gotModel)
 	}
 }
