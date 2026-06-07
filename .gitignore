@@ -72,3 +72,6 @@ deploy/secrets/age.key
 deploy/secrets/*.key
 deploy/secrets/*.dec.yaml
 deploy/secrets/*.plain.yaml
+
+# Database dumps from the backup/restore drill (scripts/backup-restore-drill.sh) — never committed.
+backups/

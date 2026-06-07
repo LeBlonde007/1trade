@@ -226,6 +226,14 @@ PostgreSQL via CloudNativePG operator (Postgres 16):
 - Continuous archiving (WAL-G to S3-compatible storage).
 - Daily logical backup + monthly restore test (owned by `infra-sre`).
 
+**Backup/restore drill (`make backup-restore-drill` · `scripts/backup-restore-drill.sh`).**
+Proves the relational state — above all the **credit ledger** — survives a dump+restore intact.
+It `pg_dump`s the `exascale` DB, restores it into a scratch DB, then asserts (1) **every table's row
+count** matches the live DB and (2) the **ledger hash-chain digest** (`md5` over `credit_transactions.
+chain_hash` ordered by `tx_id`) is **byte-identical** — any tamper/loss changes the digest. Postgres-only
+(needs just the data plane). Verified live: 14 hash-chained txns across 3 tenants restored with an
+unchanged digest. Run it after every backup-tooling change and as the monthly restore test.
+
 TimescaleDB (separate cluster) for time-series:
 - Index prints history.
 - Candlestick data (kept for the keep-warm trading UI).
