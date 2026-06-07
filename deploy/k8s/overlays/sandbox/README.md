@@ -8,10 +8,12 @@ ledger debit → wallet/billing/audit → CLI), hosted.
 
 ## What you need
 
-- A VPS — **4 vCPU / 8 GB / 80 GB SSD, Ubuntu 22.04/24.04** is comfortable (2 vCPU / 4 GB works if you
-  build images elsewhere). Open ports **80/443**.
-- **Docker** + **kubectl** on the box. The deploy script can install **k3s** for you (`INSTALL_K3S=1`).
-- (For HTTPS) a **domain** with an A record at the VPS IP, and an email for Let's Encrypt.
+- A VPS — **4 vCPU / 8 GB / 80 GB SSD, Ubuntu 22.04/24.04** is comfortable (2 vCPU / 4 GB works in the
+  **no-source** path below, since the box doesn't build images). Open ports **80/443**.
+- **kubectl** on the box (+ **Docker** only if you build on the box). The deploy script can install
+  **k3s** for you (`INSTALL_K3S=1`).
+- (For HTTPS) **two A records** — `SANDBOX_HOST` (web) and `SANDBOX_API_HOST` (the `/v1` API) — both at
+  the VPS IP, and an email for Let's Encrypt. One SAN cert covers both.
 - Nothing else — no Stripe/HF/GPU/NVIDIA accounts (those are the *prod* list in `PROVISIONING.md`).
 
 ## Deploy
@@ -19,12 +21,17 @@ ledger debit → wallet/billing/audit → CLI), hosted.
 From the repo root on the VPS (or anywhere with `KUBECONFIG` pointing at it):
 
 ```bash
-# HTTP, install k3s, serve at the node IP:
+# HTTP, install k3s, serve at the node IP (api host defaults to api.<host>):
 INSTALL_K3S=1 SANDBOX_HOST=<vps-ip> scripts/deploy-sandbox.sh
 
-# HTTPS on a real domain:
-INSTALL_K3S=1 TLS=1 ACME_EMAIL=you@example.com SANDBOX_HOST=sandbox.example.com scripts/deploy-sandbox.sh
+# HTTPS on real domains (web + api):
+INSTALL_K3S=1 TLS=1 ACME_EMAIL=you@example.com \
+  SANDBOX_HOST=sandbox.example.com SANDBOX_API_HOST=sandboxapi.example.com \
+  scripts/deploy-sandbox.sh
 ```
+
+> **Deploying to a box you don't own (a client's droplet)?** Don't run the above — it builds source on
+> the box. Use the **No-source deploy** path below (prebuilt images + a manifests-only bundle).
 
 The script (idempotent — safe to re-run):
 1. installs k3s (optional) — single node, ships Traefik as the ingress controller;
@@ -45,16 +52,19 @@ The service **bases are already paper-mode**, so the overlay is thin: it adds th
 **`APP_BASE_URL`** at the public URL, and **hardens `EXASCALE_ENV=sandbox`** (see security note below).
 `EXASCALE_SANDBOX_HOST` / `EXASCALE_SANDBOX_URL` are placeholders the script substitutes.
 
-## One host, web + API (for the `exascale` CLI)
+## Two hosts: web + API (for the `exascale` CLI)
 
-The sandbox needs **exactly one subdomain** (e.g. `sandboxapi.exascale.ai`). That host serves both:
+The sandbox uses **two subdomains**, both A-records at the node IP:
 
-- **the web app** (browser) — everything except `/v1/*`, including the Nuxt BFF at `/api/*`;
-- **the JSON APIs** (`exascale` CLI + external clients) — `/v1/*`, routed by path prefix to the Go
-  services: `/v1/auth`,`/v1/account`,`/v1/billing` → platform-core · `/v1/credits` → credit-ledger ·
-  `/v1/models`,`/v1/chat` → inference-gateway · `/v1/compute` → compute-control.
+- **`SANDBOX_HOST`** (e.g. `sandbox.exascale.ai`) — the **web app** (browser). Its Nuxt BFF (`/api/*`)
+  talks to the services in-cluster, so the browser only needs this host.
+- **`SANDBOX_API_HOST`** (e.g. `sandboxapi.exascale.ai`) — the **JSON API** for the `exascale` CLI +
+  external clients: `/v1/*` routed by path prefix to the Go services (`/v1/auth`,`/v1/account`,
+  `/v1/billing` → platform-core · `/v1/credits` → credit-ledger · `/v1/models`,`/v1/chat` →
+  inference-gateway · `/v1/compute` → compute-control). It also serves the web app at `/` so a browser
+  hitting it gets a page, not a 404.
 
-Point the CLI at the same host (one env var sets all four service URLs):
+Point the CLI at the API host (one env var sets all four service URLs):
 
 ```bash
 EXASCALE_API_URL=https://sandboxapi.exascale.ai exascale login     # then: balance · catalog · infer · gpu
@@ -70,6 +80,33 @@ the edge as defence-in-depth. Credit creation (`/v1/credits/mint|burn|debit|purc
 internal `SERVICE_TOKEN`, which is never public — those endpoints 401 from the internet. **Consequence:**
 the local `seed.sh`/`verify-inference.sh` X-Dev-Tenant minting does **not** work against the sandbox; on
 the sandbox you get credits the real way — sign up → **buy credits** (MockStripe settles instantly).
+
+## No-source deploy (a box you don't control — e.g. a client's droplet)
+
+The default deploy **builds the images on the box**, so it needs the full source there. On a machine you
+don't own that hands your unpaid work to whoever controls the disk. Avoid it: deploy from **prebuilt
+images** instead, and ship only manifests + SQL — never `.go`/`.vue`.
+
+1. **Publish images once** (from your machine or CI). The `release` GitHub Action pushes
+   `ghcr.io/<owner>/exascale-<svc>:sandbox` on every push to `main`. Make those packages **public**
+   (simplest), or keep them private and mint a `read:packages` token for the box.
+2. **Make the bundle** (no source): `scripts/make-sandbox-bundle.sh` → `sandbox-bundle.tar.gz`
+   (k8s manifests + migration SQL + deploy scripts only; it refuses to ship if any source slips in).
+3. **On the box** — extract and deploy in pull-mode (`IMAGE_REGISTRY` set ⇒ no build, no source):
+
+   ```bash
+   tar xzf sandbox-bundle.tar.gz
+   IMAGE_REGISTRY=ghcr.io/<owner> \
+     REGISTRY_USER=<owner> REGISTRY_TOKEN=<read:packages PAT> \   # omit both if packages are public
+     INSTALL_K3S=1 TLS=1 ACME_EMAIL=you@example.com \
+     SANDBOX_HOST=sandbox.example.com SANDBOX_API_HOST=sandboxapi.example.com \
+     scripts/deploy-sandbox.sh
+   ```
+
+   `REGISTRY_TOKEN` becomes an `imagePullSecret` on the namespace's default ServiceAccount. The cluster
+   pulls the compiled images; the manifests/SQL are config, not the product. (Still: anyone with the box
+   can copy a running image — the web bundle is minified JS, recoverable-ish; pre-payment, hosting on
+   **your** box behind a URL remains the only true protection.)
 
 ## Real inference output (optional — hosted provider)
 

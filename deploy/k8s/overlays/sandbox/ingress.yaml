@@ -1,22 +1,24 @@
-# Single public host for the sandbox (e.g. sandboxapi.exascale.ai) — serves BOTH:
-#   • the web app (browser)            → everything except /v1/* (this includes the Nuxt BFF at /api/*)
-#   • the JSON APIs (exascale CLI etc.) → /v1/* routed to the platform services by path prefix:
-#       /v1/auth, /v1/account, /v1/billing → platform-core   /v1/credits → credit-ledger
-#       /v1/models, /v1/chat               → inference-gateway /v1/compute → compute-control
-# Traefik prioritises longer path prefixes, so the specific /v1/* rules win over the "/" catch-all.
+# Two public hosts for the sandbox:
+#   • EXASCALE_SANDBOX_HOST      (e.g. sandbox.exascale.ai)    → the web app (browser).
+#   • EXASCALE_SANDBOX_API_HOST  (e.g. sandboxapi.exascale.ai) → the JSON API (exascale CLI + clients),
+#       /v1/* routed by path prefix: /v1/auth,/v1/account,/v1/billing → platform-core ·
+#       /v1/credits → credit-ledger · /v1/models,/v1/chat → inference-gateway · /v1/compute → compute.
+# The api host also serves the web app at "/" so a browser hitting it gets a page, not a 404. The web
+# app's own BFF (/api/*) talks to the services in-cluster (ClusterIP), so the browser only needs the
+# web host. Both A records must point at the node IP; for TLS both must resolve before deploy.
 #
 # SECURITY model for a publicly-reachable API:
 #   • EXASCALE_ENV=sandbox (patch-env-sandbox.yaml) makes the credit-ledger stop trusting the
 #     `X-Dev-Tenant` dev auth shortcut — the server rejects it.
 #   • The strip-dev-headers middleware below is defence-in-depth: it deletes X-Dev-Tenant / X-Dev-Paper
-#     at the edge for every request to this host, so the bypass can never be invoked from outside.
+#     at the edge for every request to these hosts, so the bypass can never be invoked from outside.
 #   • Credit creation (/v1/credits/mint|burn|debit|purchase) needs the internal SERVICE_TOKEN, which is
 #     never public — those endpoints 401 from the internet. The CLI uses only tenant-JWT endpoints.
 #
 # k3s ships Traefik as the default IngressController (class `traefik`). HTTP works as soon as DNS points
 # at the node. HTTPS activates when scripts/deploy-sandbox.sh is run with TLS=1 (a real domain): it
-# installs cert-manager + a `letsencrypt` ClusterIssuer, which mints the cert into `web-tls` — the
-# annotation + tls block are inert until then, so plain HTTP keeps working in the meantime.
+# installs cert-manager + a `letsencrypt` ClusterIssuer, which mints one SAN cert (both hosts) into
+# `web-tls` — the annotation + tls block are inert until then, so plain HTTP keeps working meanwhile.
 apiVersion: traefik.io/v1alpha1 # Traefik v3 (k3s default). Older k3s ships traefik.containo.us/v1alpha1.
 kind: Middleware
 metadata:
@@ -37,10 +39,14 @@ metadata:
 spec:
   ingressClassName: traefik
   tls:
-    - hosts: [EXASCALE_SANDBOX_HOST]
+    - hosts: [EXASCALE_SANDBOX_HOST, EXASCALE_SANDBOX_API_HOST] # one SAN cert covers both
       secretName: web-tls
   rules:
-    - host: EXASCALE_SANDBOX_HOST
+    - host: EXASCALE_SANDBOX_HOST # web app (browser); the BFF /api/* proxies to services in-cluster
+      http:
+        paths:
+          - { path: /, pathType: Prefix, backend: { service: { name: web, port: { number: 3000 } } } }
+    - host: EXASCALE_SANDBOX_API_HOST # JSON API for the exascale CLI + external clients
       http:
         paths:
           - { path: /v1/auth, pathType: Prefix, backend: { service: { name: platform-core, port: { number: 8001 } } } }
@@ -50,4 +56,4 @@ spec:
           - { path: /v1/models, pathType: Prefix, backend: { service: { name: inference-gateway, port: { number: 8085 } } } }
           - { path: /v1/chat, pathType: Prefix, backend: { service: { name: inference-gateway, port: { number: 8085 } } } }
           - { path: /v1/compute, pathType: Prefix, backend: { service: { name: compute-control, port: { number: 8086 } } } }
-          - { path: /, pathType: Prefix, backend: { service: { name: web, port: { number: 3000 } } } } # catch-all → web
+          - { path: /, pathType: Prefix, backend: { service: { name: web, port: { number: 3000 } } } } # friendly landing
