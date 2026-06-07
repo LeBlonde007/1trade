@@ -1,0 +1,14 @@
+# web (Nuxt SSR + BFF) non-secret config. The BFF proxies to the platform services over in-cluster
+# DNS. The upstream URLs are Nuxt runtimeConfig (server-only); Nuxt overrides them at RUNTIME from the
+# NUXT_<KEY> env vars below, so the image is environment-agnostic and these can change per overlay.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: web-env
+data:
+  NITRO_PORT: "3000"
+  NITRO_HOST: "0.0.0.0"
+  NUXT_PLATFORM_CORE_URL: "http://platform-core:8001"   # runtimeConfig.platformCoreUrl
+  NUXT_GATEWAY_URL: "http://inference-gateway:8085"      # runtimeConfig.gatewayUrl
+  NUXT_LEDGER_URL: "http://credit-ledger:8002"           # runtimeConfig.ledgerUrl
+  NUXT_COMPUTE_URL: "http://compute-control:8086"        # runtimeConfig.computeUrl

@@ -1,0 +1,28 @@
+# Public ingress for the sandbox. The web app (Nuxt SSR + BFF) is the only public surface — the BFF
+# proxies to the platform services in-cluster, so the Go services stay internal (ClusterIP).
+#
+# k3s ships Traefik as the default IngressController (class `traefik`). HTTP works as soon as DNS
+# points at the node. HTTPS activates when scripts/deploy-sandbox.sh is run with TLS=1 (a real domain):
+# it installs cert-manager + a `letsencrypt` ClusterIssuer, which mints the cert into `web-tls` — the
+# annotation + tls block below are inert until then, so plain HTTP keeps working in the meantime.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: exascale-web
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt   # inert until cert-manager + this issuer exist (TLS=1)
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts: [EXASCALE_SANDBOX_HOST]
+      secretName: web-tls
+  rules:
+    - host: EXASCALE_SANDBOX_HOST
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port: { number: 3000 }
