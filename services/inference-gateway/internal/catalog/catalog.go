@@ -63,6 +63,43 @@ var models = []Model{
 		ID: "qwen3-32b", Name: "Qwen3 32B", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
 		Exascale: Pricing{Modality: "text", CreditType: "text", Unit: "1K tokens", Price: "6.000000"},
 	},
+	// Image generation (billed in `image` credits, per image). Inline playground is chat-only — these
+	// run via the image API/SDK; the catalog surfaces them so the marketplace reads as multi-modal.
+	{
+		ID: "stable-diffusion-3.5", Name: "Stable Diffusion 3.5", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
+		Exascale: Pricing{Modality: "image", CreditType: "image", Unit: "1 image", Price: "80.000000"},
+	},
+	{
+		ID: "flux-schnell", Name: "Flux Schnell", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
+		Exascale: Pricing{Modality: "image", CreditType: "image", Unit: "1 image", Price: "30.000000"},
+	},
+	{
+		ID: "gpt-image-1.5", Name: "GPT Image 1.5", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
+		Exascale: Pricing{Modality: "image", CreditType: "image", Unit: "1 image", Price: "120.000000"},
+	},
+	// Speech / audio (text-to-speech), billed in `speech` credits per 1K characters.
+	{
+		ID: "elevenlabs-tts", Name: "ElevenLabs TTS Multilingual", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
+		Exascale: Pricing{Modality: "speech", CreditType: "speech", Unit: "1K chars", Price: "2.000000"},
+	},
+	{
+		ID: "qwen3-tts", Name: "Qwen3 TTS", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
+		Exascale: Pricing{Modality: "speech", CreditType: "speech", Unit: "1K chars", Price: "1.000000"},
+	},
+	// Video (text-to-video), billed in `video` credits per clip.
+	{
+		ID: "wan-t2v", Name: "Wan 2.2 Text-to-Video", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
+		Exascale: Pricing{Modality: "video", CreditType: "video", Unit: "1 video", Price: "600.000000"},
+	},
+	// Embeddings, billed in `embeddings` credits per 1M tokens.
+	{
+		ID: "bge-m3", Name: "BGE M3", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
+		Exascale: Pricing{Modality: "embeddings", CreditType: "embeddings", Unit: "1M tokens", Price: "2.000000"},
+	},
+	{
+		ID: "e5-large", Name: "E5 Large v2", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
+		Exascale: Pricing{Modality: "embeddings", CreditType: "embeddings", Unit: "1M tokens", Price: "2.000000"},
+	},
 }
 
 // List returns the full curated catalog (defensive copy so callers can't mutate the source).
