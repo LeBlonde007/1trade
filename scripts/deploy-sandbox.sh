@@ -30,9 +30,11 @@
 #                             hello@exascale.ai. Token → platform-auth Secret; never committed.
 #   STORAGE_SECRET_KEY        OPTIONAL. Set it (+ STORAGE_ACCESS_KEY, STORAGE_BUCKET) to enable file
 #                             uploads to DigitalOcean Spaces (S3-compatible). STORAGE_ENDPOINT (default
-#                             nyc3.digitaloceanspaces.com), STORAGE_REGION (nyc3), STORAGE_PUBLIC_BASE
-#                             (CDN URL, optional). Keys → platform-auth Secret. The Space needs CORS to
-#                             allow PUT from the web origin ($SANDBOX_HOST).
+#                             nyc3.digitaloceanspaces.com), STORAGE_REGION (nyc3). STORAGE_CDN=true serves
+#                             file URLs via the Space's CDN edge (enable the CDN on the Space first);
+#                             STORAGE_PUBLIC_BASE overrides the URL base (e.g. a custom CDN subdomain).
+#                             Keys → platform-auth Secret. The Space needs CORS to allow PUT from the web
+#                             origin ($SANDBOX_HOST), and objects must be public-read for the link to load.
 #   SMTP_PASS                 OPTIONAL (SMTP fallback; many VPS block 25/465/587). With it: SMTP_ADDR
 #                             (default mail.privateemail.com:465), SMTP_TLS (implicit|starttls), EMAIL_FROM
 #                             + SMTP_USER (default hello@exascale.ai). Neither set → no gate (paper demo).
@@ -239,6 +241,7 @@ data:
   STORAGE_REGION: "$STORAGE_REGION_V"
   STORAGE_BUCKET: "$STORAGE_BUCKET"
   STORAGE_PUBLIC_BASE: "${STORAGE_PUBLIC_BASE:-}"
+  STORAGE_CDN: "${STORAGE_CDN:-false}"
 EOF
 )"
   kubectl rollout restart deploy/platform-core

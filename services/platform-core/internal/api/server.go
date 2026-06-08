@@ -46,7 +46,8 @@ func NewWithBilling(cfg config.Config, st *store.Store, stripe billing.StripeCli
 	// Object storage (DigitalOcean Spaces) for uploads — disabled (presign 501s) when unconfigured.
 	objStore, err := storage.New(storage.Config{
 		Endpoint: cfg.StorageEndpoint, Region: cfg.StorageRegion, Bucket: cfg.StorageBucket,
-		AccessKey: cfg.StorageAccessKey, SecretKey: cfg.StorageSecretKey, PublicBase: cfg.StoragePublicBase,
+		AccessKey: cfg.StorageAccessKey, SecretKey: cfg.StorageSecretKey,
+		PublicBase: cfg.StoragePublicBase, UseCDN: cfg.StorageUseCDN, PublicRead: cfg.StoragePublicRead,
 	})
 	if err != nil {
 		slog.Error("storage init failed; uploads disabled", "err", err)

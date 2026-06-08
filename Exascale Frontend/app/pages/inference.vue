@@ -358,10 +358,12 @@ async function onFiles(e: Event) {
     // Direct-to-Spaces upload via a presigned PUT. Degrades silently when storage is off (501) or the
     // bucket lacks CORS — the file still works as context.
     try {
-      const sig = await $fetch<{ upload_url: string; file_url: string }>('/api/files/presign', {
+      const sig = await $fetch<{ upload_url: string; file_url: string; headers?: Record<string, string> }>('/api/files/presign', {
         method: 'POST', body: { filename: f.name, content_type: f.type || 'application/octet-stream' },
       })
-      await fetch(sig.upload_url, { method: 'PUT', body: f })
+      // Echo any headers the presign signed (e.g. x-amz-acl: public-read) — the signature covers them,
+      // so the PUT 403s if they're missing.
+      await fetch(sig.upload_url, { method: 'PUT', body: f, headers: sig.headers ?? {} })
       att.url = sig.file_url
     } catch { /* storage unavailable — attachment still works as context */ }
     att.uploading = false
