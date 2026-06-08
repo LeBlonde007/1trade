@@ -158,6 +158,40 @@ const lastAssistant = computed(() => {
   return null
 })
 
+// ── Session persistence (so a refresh doesn't wipe the chat — sandbox + local) ────────────────────
+// The transcript, params, and selected model are mirrored to localStorage, namespaced per user so a
+// shared browser never leaks one tenant's chat into another's. This is UI state only (no credits or
+// orders — the real spend already lives in the ledger), so localStorage is the right, client-side home;
+// it works the same on the deployed sandbox. Hydration happens in onMounted (post-SSR) to avoid a
+// hydration mismatch, matching the useGuidedTour idiom.
+const CHAT_STORE_VERSION = 'v1'
+const chatStoreKey = computed(() => `exa:inference:chat:${CHAT_STORE_VERSION}:${user.value?.user_id ?? 'anon'}`)
+interface PersistedChat { turns?: Turn[]; params?: Partial<typeof params>; selectedId?: string }
+
+/** loadChat reads the saved session for the current user (client-only; safe on SSR + malformed JSON). */
+function loadChat(): PersistedChat | null {
+  if (typeof localStorage === 'undefined') return null
+  try {
+    const raw = localStorage.getItem(chatStoreKey.value)
+    return raw ? (JSON.parse(raw) as PersistedChat) : null
+  } catch { return null }
+}
+/** saveChat mirrors the live session to localStorage, capping the transcript so it can't grow unbounded. */
+function saveChat() {
+  if (typeof localStorage === 'undefined') return
+  try {
+    const payload: PersistedChat = { turns: turns.slice(-100), params, selectedId: selectedId.value }
+    localStorage.setItem(chatStoreKey.value, JSON.stringify(payload))
+  } catch { /* quota / serialization — keep the in-memory session */ }
+}
+/** clearChat empties the transcript and forgets the saved session (the "Clear chat" affordance). */
+function clearChat() {
+  turns.splice(0, turns.length)
+  if (typeof localStorage !== 'undefined') {
+    try { localStorage.removeItem(chatStoreKey.value) } catch { /* ignore */ }
+  }
+}
+
 // =====================================================
 // Input + cost preview + send
 // =====================================================
@@ -188,14 +222,24 @@ function liveCreditCost(modelId: string, totalTokens: number): { cost: number; c
 }
 
 onMounted(async () => {
+  // Restore a previous session first (independent of the catalog) so a refresh keeps the chat + params.
+  const saved = loadChat()
+  if (saved) {
+    if (Array.isArray(saved.turns)) turns.splice(0, turns.length, ...saved.turns)
+    if (saved.params && typeof saved.params === 'object') Object.assign(params, saved.params)
+  }
   try {
     const list = await catalog.load()
     const map: Record<string, { price: number; creditType: string; unit: string }> = {}
     for (const m of list) map[m.id] = { price: Number(m.exascale.price), creditType: m.exascale.credit_type, unit: m.exascale.unit }
     catalogPrice.value = map
-    if (!selectedId.value && list.length) selectedId.value = list[0]!.id   // select the first real model
+    // The saved model wins if the gateway still serves it; otherwise default to the first real model.
+    if (saved?.selectedId && list.some((m) => m.id === saved.selectedId)) selectedId.value = saved.selectedId
+    else if (!selectedId.value && list.length) selectedId.value = list[0]!.id
   } catch { /* meter falls back to estimates only */ }
   await refreshBalance()
+  // From here on, mirror every change to localStorage (set up after restore so we don't overwrite it).
+  watch([turns, params, selectedId], saveChat, { deep: true })
 })
 
 // The gateway serves the 8B/70B Llamas; any other showcase pick routes to 8B for the live call.
@@ -563,6 +607,17 @@ async function copyText(text: string, label: string) {
               <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square">
                 <rect x="2.5" y="2.5" width="11" height="11" />
                 <path d="M10 2.5v11" />
+              </svg>
+            </button>
+            <button
+              v-if="turns.length"
+              type="button"
+              class="icon-btn"
+              title="Clear chat — empties this saved transcript"
+              @click="clearChat"
+            >
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="square">
+                <path d="M3 4.5h10M6 4.5V3h4v1.5M4.5 4.5l.6 8.5h5.8l.6-8.5" />
               </svg>
             </button>
           </div>
