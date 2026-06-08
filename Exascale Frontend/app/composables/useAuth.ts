@@ -56,5 +56,14 @@ export function useAuth() {
     user.value = null
   }
 
-  return { user, login, signup, refresh, logout }
+  /**
+   * resendVerification re-sends the email-verification link for an unverified address. Used by the
+   * login screen when sign-in is blocked by the verification gate (no session yet). The backend always
+   * responds 200 whether or not the email exists, so this never reveals account existence.
+   */
+  async function resendVerification(email: string) {
+    return await $fetch<{ sent: boolean }>('/api/auth/resend', { method: 'POST', body: { email } })
+  }
+
+  return { user, login, signup, refresh, logout, resendVerification }
 }
