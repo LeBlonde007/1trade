@@ -37,7 +37,11 @@ func New(cfg config.Config, st *store.Store) *Server {
 // NewWithBilling builds the handler with explicit billing collaborators (tests inject fakes). The
 // mailer comes from config (Mailpit locally; a no-op when no SMTP server is set).
 func NewWithBilling(cfg config.Config, st *store.Store, stripe billing.StripeClient, booker billing.PurchaseBooker) *Server {
-	s := &Server{cfg: cfg, st: st, stripe: stripe, booker: booker, mailer: email.New(cfg.SMTPAddr, cfg.EmailFrom, cfg.SMTPUser, cfg.SMTPPass, cfg.SMTPTLS), mux: http.NewServeMux()}
+	mailer := email.New(email.Config{
+		From: cfg.EmailFrom, Addr: cfg.SMTPAddr, User: cfg.SMTPUser, Pass: cfg.SMTPPass, TLS: cfg.SMTPTLS,
+		APIURL: cfg.EmailAPIURL, APIToken: cfg.EmailAPIToken,
+	})
+	s := &Server{cfg: cfg, st: st, stripe: stripe, booker: booker, mailer: mailer, mux: http.NewServeMux()}
 	s.routes()
 	return s
 }

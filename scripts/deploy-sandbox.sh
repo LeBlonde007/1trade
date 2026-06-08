@@ -22,11 +22,15 @@
 #                             is injected into the `platform-auth` Secret at deploy — never committed.
 #   VLLM_BASE_URL             provider base URL (default https://openrouter.ai/api/v1 when a key is set).
 #   INFERENCE_MODEL_MAP       JSON catalog-id→provider-slug map (default maps the two Llama text models).
-#   SMTP_PASS                 OPTIONAL. Set it to send REAL verification email via a provider and gate
-#                             login on a verified email. Injected into the platform-auth Secret; never
-#                             committed. With it: SMTP_ADDR (default mail.privateemail.com:465),
-#                             SMTP_TLS (implicit|starttls, default implicit), EMAIL_FROM + SMTP_USER
-#                             (default hello@exascale.ai). Unset → Mailpit-style, no gate (paper demo).
+#   EMAIL_API_TOKEN           OPTIONAL (preferred). Send REAL verification email via an HTTP Email API
+#                             (Mailtrap-style, HTTPS/443 — works where the VPS blocks SMTP ports) and gate
+#                             login on a verified email. EMAIL_API_URL = send URL (default Mailtrap live
+#                             https://send.api.mailtrap.io/api/send; sandbox inbox:
+#                             https://sandbox.api.mailtrap.io/api/send/<inbox_id>). EMAIL_FROM default
+#                             hello@exascale.ai. Token → platform-auth Secret; never committed.
+#   SMTP_PASS                 OPTIONAL (SMTP fallback; many VPS block 25/465/587). With it: SMTP_ADDR
+#                             (default mail.privateemail.com:465), SMTP_TLS (implicit|starttls), EMAIL_FROM
+#                             + SMTP_USER (default hello@exascale.ai). Neither set → no gate (paper demo).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
 
@@ -162,16 +166,35 @@ if [ -n "${INFERENCE_API_KEY:-}" ]; then
   bash scripts/inference-provider.sh
 fi
 
-# 7c. (optional) real transactional email + verify-before-login gate. Opt-in: only when SMTP_PASS is set.
-# Wires a provider (PrivateEmail by default), injects the mailbox creds into the platform-auth Secret,
-# and turns on REQUIRE_EMAIL_VERIFICATION. Default off keeps the paper demo unbricked (no mailer → no
-# gate, immediate login). The verification link points at $URL (APP_BASE_URL).
-if [ -n "${SMTP_PASS:-}" ]; then
+# 7c. (optional) real transactional email + verify-before-login gate. Two transports; default off keeps
+# the paper demo unbricked (no mailer → no gate, immediate login). The verification link points at $URL.
+#   • EMAIL_API_TOKEN set → HTTP Email API (Mailtrap-style, HTTPS/443) — the right call when the host
+#     blocks SMTP egress ports (most cloud VPS do). EMAIL_API_URL is the send URL.
+#   • else SMTP_PASS set  → SMTP (PrivateEmail by default). Note: many VPS block 25/465/587.
+if [ -n "${EMAIL_API_TOKEN:-}" ]; then
+  EMAIL_API_URL_V="${EMAIL_API_URL:-https://send.api.mailtrap.io/api/send}"
+  EMAIL_FROM_V="${EMAIL_FROM:-hello@exascale.ai}"
+  say "transactional email via HTTP API $EMAIL_API_URL_V (from $EMAIL_FROM_V) — login gated on email verification"
+  kubectl patch secret platform-auth --type merge -p "$(cat <<EOF
+stringData:
+  EMAIL_API_TOKEN: '$EMAIL_API_TOKEN'
+EOF
+)"
+  kubectl patch configmap platform-core-env --type merge -p "$(cat <<EOF
+data:
+  EMAIL_API_URL: "$EMAIL_API_URL_V"
+  EMAIL_FROM: "$EMAIL_FROM_V"
+  REQUIRE_EMAIL_VERIFICATION: "true"
+EOF
+)"
+  kubectl rollout restart deploy/platform-core
+  kubectl rollout status deploy/platform-core --timeout=120s
+elif [ -n "${SMTP_PASS:-}" ]; then
   SMTP_ADDR_V="${SMTP_ADDR:-mail.privateemail.com:465}"
   SMTP_TLS_V="${SMTP_TLS:-implicit}"
   EMAIL_FROM_V="${EMAIL_FROM:-hello@exascale.ai}"
   SMTP_USER_V="${SMTP_USER:-$EMAIL_FROM_V}"
-  say "transactional email via $SMTP_ADDR_V (from $EMAIL_FROM_V) — login gated on email verification"
+  say "transactional email via SMTP $SMTP_ADDR_V (from $EMAIL_FROM_V) — login gated on email verification"
   kubectl patch secret platform-auth --type merge -p "$(cat <<EOF
 stringData:
   SMTP_USER: '$SMTP_USER_V'
