@@ -7,7 +7,7 @@
 .env.*
 !.env.example
 sandbox.env
-!sandbox.env.example
+sandbox.env.example
 *.pem
 *.key
 *.p12
@@ -77,3 +77,6 @@ deploy/secrets/*.plain.yaml
 
 # Database dumps from the backup/restore drill (scripts/backup-restore-drill.sh) — never committed.
 backups/
+
+# Generated CLI distribution (built into the web image at release; never committed)
+Exascale Frontend/public/cli/
