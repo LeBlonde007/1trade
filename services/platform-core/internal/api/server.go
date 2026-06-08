@@ -14,18 +14,20 @@ import (
 	"github.com/exascale/platform-core/internal/config"
 	"github.com/exascale/platform-core/internal/domain"
 	"github.com/exascale/platform-core/internal/email"
+	"github.com/exascale/platform-core/internal/storage"
 	"github.com/exascale/platform-core/internal/store"
 	"github.com/google/uuid"
 )
 
 // Server wires config + store + the billing collaborators into an http.Handler.
 type Server struct {
-	cfg    config.Config
-	st     *store.Store
-	stripe billing.StripeClient
-	booker billing.PurchaseBooker
-	mailer email.Sender
-	mux    *http.ServeMux
+	cfg     config.Config
+	st      *store.Store
+	stripe  billing.StripeClient
+	booker  billing.PurchaseBooker
+	mailer  email.Sender
+	storage *storage.Store
+	mux     *http.ServeMux
 }
 
 // New builds the routed handler with the default billing collaborators (mock Stripe until a key is
@@ -41,7 +43,16 @@ func NewWithBilling(cfg config.Config, st *store.Store, stripe billing.StripeCli
 		From: cfg.EmailFrom, Addr: cfg.SMTPAddr, User: cfg.SMTPUser, Pass: cfg.SMTPPass, TLS: cfg.SMTPTLS,
 		APIURL: cfg.EmailAPIURL, APIToken: cfg.EmailAPIToken,
 	})
-	s := &Server{cfg: cfg, st: st, stripe: stripe, booker: booker, mailer: mailer, mux: http.NewServeMux()}
+	// Object storage (DigitalOcean Spaces) for uploads — disabled (presign 501s) when unconfigured.
+	objStore, err := storage.New(storage.Config{
+		Endpoint: cfg.StorageEndpoint, Region: cfg.StorageRegion, Bucket: cfg.StorageBucket,
+		AccessKey: cfg.StorageAccessKey, SecretKey: cfg.StorageSecretKey, PublicBase: cfg.StoragePublicBase,
+	})
+	if err != nil {
+		slog.Error("storage init failed; uploads disabled", "err", err)
+		objStore = &storage.Store{}
+	}
+	s := &Server{cfg: cfg, st: st, stripe: stripe, booker: booker, mailer: mailer, storage: objStore, mux: http.NewServeMux()}
 	s.routes()
 	return s
 }
@@ -68,6 +79,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /v1/auth/keys", s.createKey)
 	s.mux.HandleFunc("DELETE /v1/auth/keys/{id}", s.revokeKey)
 	s.mux.HandleFunc("POST /v1/auth/keys/introspect", s.introspectKey) // internal (service token)
+	s.mux.HandleFunc("POST /v1/files/presign", s.presignUpload)        // object storage (Spaces) — presigned upload
 	s.mux.HandleFunc("POST /v1/billing/checkout", s.createCheckout)
 	s.mux.HandleFunc("POST /v1/billing/webhook/stripe", s.stripeWebhook) // auth = Stripe signature
 	s.mux.HandleFunc("GET /v1/billing/purchases", s.listPurchases)
