@@ -50,9 +50,34 @@ func (s *Server) verifyEmail(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"verified": true})
 }
 
-// resendVerify issues a fresh verification token for the caller. In dev the raw token is returned so
-// the flow is testable without an email provider; in prod it is only emailed.
+// resendVerify issues a fresh email-verification token. Two modes:
+//   - UNAUTHENTICATED with {"email": ...} — the login screen, where a user blocked by the verification
+//     gate has no session yet. It resends only if that email exists and is still unverified, but ALWAYS
+//     returns {"sent": true} so it never reveals whether an email is registered (account enumeration),
+//     and it never returns the dev token on this path.
+//   - AUTHED (valid session — e.g. an in-app resend button) — resend for the caller; in dev with no
+//     mailer the raw token is returned so the flow stays testable.
 func (s *Server) resendVerify(w http.ResponseWriter, r *http.Request) {
+	var b struct {
+		Email string `json:"email"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&b) // body is optional (authed mode sends none)
+
+	if b.Email != "" {
+		if au, found, err := s.st.GetUserByEmail(r.Context(), b.Email); err != nil {
+			serverError(w, err)
+			return
+		} else if found && !au.EmailVerified {
+			if raw := s.issueVerifyToken(r, au.UserID); raw != "" {
+				if err := s.mailer.SendVerification(b.Email, email.VerifyURL(s.cfg.AppBaseURL, raw)); err != nil {
+					slog.Error("resend verification email (by email)", "err", err)
+				}
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"sent": true}) // constant response — no enumeration
+		return
+	}
+
 	p, ok := s.authed(w, r)
 	if !ok {
 		return

@@ -54,7 +54,8 @@ func TestVerifyAndBudget(t *testing.T) {
 	}
 
 	var signup map[string]any
-	do("POST", "/v1/auth/signup", "", map[string]string{"email": "verify+" + uuid.NewString() + "@acme.ai", "password": "pw-123456"}, &signup)
+	email := "verify+" + uuid.NewString() + "@acme.ai"
+	do("POST", "/v1/auth/signup", "", map[string]string{"email": email, "password": "pw-123456"}, &signup)
 	tok, _ := signup["token"].(string)
 
 	// resend → dev token; verify once → 200; reuse → 400; bad token → 400
@@ -72,6 +73,21 @@ func TestVerifyAndBudget(t *testing.T) {
 	}
 	if code := do("POST", "/v1/auth/verify", "", map[string]string{"token": "not-a-token"}, nil); code != 400 {
 		t.Fatalf("verify bad token = %d, want 400", code)
+	}
+
+	// Unauthenticated resend-by-email (the login screen): always 200 {sent:true}, never returns a
+	// dev_token, and behaves identically for an unknown address — so it can't be used to enumerate accounts.
+	for _, addr := range []string{email, "nobody+" + uuid.NewString() + "@acme.ai"} {
+		var ur map[string]any
+		if code := do("POST", "/v1/auth/verify/resend", "", map[string]string{"email": addr}, &ur); code != 200 {
+			t.Fatalf("unauth resend(%s) = %d, want 200", addr, code)
+		}
+		if ur["sent"] != true {
+			t.Fatalf("unauth resend(%s): sent=%v, want true", addr, ur["sent"])
+		}
+		if _, leaked := ur["dev_token"]; leaked {
+			t.Fatalf("unauth resend(%s) leaked a dev_token", addr)
+		}
 	}
 
 	// budget set (admin satisfies billing) → get

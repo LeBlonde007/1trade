@@ -240,11 +240,22 @@ paths:
   /v1/auth/verify/resend:
     post:
       tags: [auth]
-      summary: Issue a fresh verification token for the caller (emailed in prod; returned in dev).
+      summary: >-
+        Resend an email-verification link. Authenticated → for the caller (dev returns the token).
+        Unauthenticated with {email} → for that address if it exists and is unverified; the response is
+        a constant {sent:true} that never reveals whether the email is registered (used by the login
+        screen's "resend verification" when sign-in is blocked by the verification gate).
       operationId: resendVerify
-      security: [{ tenantJwt: [] }]
+      security: [{ tenantJwt: [] }, {}]   # authed (caller) OR anonymous (by email)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email: { type: string, format: email, description: "anonymous mode — resend for this address" }
       responses:
-        '200': { description: Sent. }
+        '200': { description: Sent — constant response (no account enumeration). }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
   /v1/billing/budget:

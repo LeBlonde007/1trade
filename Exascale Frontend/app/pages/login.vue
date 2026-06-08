@@ -12,6 +12,10 @@ const email = ref('')
 const password = ref('')
 const authError = ref('')
 const submitting = ref(false)
+// Email-verification gate (403 email_unverified): a distinct, non-error state with a resend affordance.
+const needsVerify = ref(false)
+const resending = ref(false)
+const resent = ref(false)
 // Shown after the user confirms their email and is redirected here (verify.vue → /login?verified=1).
 const justVerified = computed(() => useRoute().query.verified === '1')
 const showPw = ref(false)
@@ -23,16 +27,38 @@ const codeInputs = ref<Array<HTMLInputElement | null>>([])
 async function onCreds(e: Event) {
   e.preventDefault()
   authError.value = ''
+  needsVerify.value = false
+  resent.value = false
   if (!email.value || !password.value) return
   submitting.value = true
   try {
     await useAuth().login(email.value, password.value)
     await navigateTo('/console')
   } catch (err: unknown) {
-    const ex = err as { data?: { message?: string } }
-    authError.value = ex?.data?.message || 'Invalid email or password'
+    const ex = err as { statusCode?: number; data?: { code?: string; message?: string } }
+    // 403 email_unverified is a distinct case (correct password, unconfirmed email) — show a verify
+    // prompt + resend, not the generic "invalid email or password".
+    if (ex?.statusCode === 403 && ex?.data?.code === 'email_unverified') {
+      needsVerify.value = true
+    } else {
+      authError.value = ex?.data?.message || 'Invalid email or password'
+    }
   } finally {
     submitting.value = false
+  }
+}
+
+/** resendVerification re-sends the confirmation email for the address the user just tried to sign in with. */
+async function resendVerification() {
+  if (resending.value || !email.value) return
+  resending.value = true
+  try {
+    await useAuth().resendVerification(email.value)
+    resent.value = true
+  } catch {
+    /* the endpoint always 200s by design; ignore transport hiccups */
+  } finally {
+    resending.value = false
   }
 }
 
@@ -148,6 +174,13 @@ onBeforeUnmount(() => {
 
           <p v-if="justVerified" class="form-ok" role="status">Email verified — sign in to continue.</p>
           <p v-if="authError" class="form-error" role="alert">{{ authError }}</p>
+          <div v-if="needsVerify" class="form-notice" role="alert">
+            <p class="fn-text">Your email isn't verified yet — check your inbox for the confirmation link.</p>
+            <p v-if="resent" class="fn-ok">✓ Sent — check your inbox at {{ email }}.</p>
+            <button v-else type="button" class="fn-resend" :disabled="resending" @click="resendVerification">
+              {{ resending ? 'Sending…' : 'Resend verification email' }}
+            </button>
+          </div>
 
           <form @submit="onCreds">
             <div class="field">
@@ -531,6 +564,28 @@ onBeforeUnmount(() => {
   font-size: 13px;
   font-family: var(--font-mono);
 }
+.form-notice {
+  margin: 0 0 18px;
+  padding: 12px;
+  border: 1px solid var(--warn);
+  border-radius: 2px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+.fn-text { margin: 0 0 8px; color: var(--text); }
+.fn-ok { margin: 0; color: var(--pos); }
+.fn-resend {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--warn);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.fn-resend:disabled { opacity: 0.6; cursor: default; text-decoration: none; }
 
 .field { margin-bottom: 16px; position: relative; }
 .field-label {
