@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -59,6 +60,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /v1/models", s.listModels)
 	s.mux.HandleFunc("POST /v1/chat/completions", s.chatCompletions)
 	s.mux.HandleFunc("POST /v1/images/generations", s.imageGenerations)
+	s.mux.HandleFunc("POST /v1/videos", s.submitVideo)            // async text-to-video: submit
+	s.mux.HandleFunc("GET /v1/videos/{id}", s.getVideo)           // poll job status
+	s.mux.HandleFunc("GET /v1/videos/{id}/content", s.getVideoContent) // stream the finished mp4
 }
 
 // listModels serves the curated catalog in the OpenAI list shape (auth required).
@@ -302,6 +306,109 @@ func (s *Server) meterImage(p auth.Principal, m catalog.Model, modelID string, c
 		slog.Error("publish inference.usage.v1 (image) failed", "request_id", requestID, "err", err)
 	}
 	_ = count // count is reflected in `units`; kept for symmetry with meter()'s signature
+}
+
+// videoRequest is the text-to-video submit body.
+type videoRequest struct {
+	Model  string `json:"model"`
+	Prompt string `json:"prompt"`
+	Size   string `json:"size"`
+}
+
+// submitVideo serves POST /v1/videos — authenticate → resolve the video model → video-credit pre-flight
+// → submit the async job → meter one clip → return {id, status}. The client polls GET /v1/videos/{id}
+// until status=="completed", then GET /v1/videos/{id}/content.
+func (s *Server) submitVideo(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+	var req videoRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Model == "" || strings.TrimSpace(req.Prompt) == "" {
+		writeErr(w, http.StatusBadRequest, "bad_request", "model and prompt are required")
+		return
+	}
+	m, found := catalog.Lookup(req.Model)
+	if !found {
+		writeErr(w, http.StatusNotFound, "model_not_found", "unknown model: "+req.Model)
+		return
+	}
+	if m.Exascale.Modality != "video" {
+		writeErr(w, http.StatusNotFound, "model_not_found", req.Model+" is not a video model")
+		return
+	}
+	if s.credit != nil {
+		okBal, bal, err := s.credit.Sufficient(r.Context(), p.TenantID, p.IsPaper, m.Exascale.CreditType)
+		if err != nil {
+			slog.Warn("pre-flight balance check failed; serving anyway", "tenant_id", p.TenantID, "err", err)
+		} else if !okBal {
+			writeJSON(w, http.StatusPaymentRequired, map[string]any{
+				"code": "INSUFFICIENT_CREDIT", "message": "Not enough " + m.Exascale.CreditType + " credits to generate this video.",
+				"details": map[string]any{"credit_type": m.Exascale.CreditType, "balance": bal, "required": m.Exascale.Price, "buy_credits_url": buyCreditsURL},
+			})
+			return
+		}
+	}
+	vb, ok := s.backend.(model.VideoBackend)
+	if !ok {
+		writeErr(w, http.StatusNotImplemented, "unsupported", "video generation is not available on this deployment (no video provider configured)")
+		return
+	}
+	job, err := vb.SubmitVideo(r.Context(), model.VideoRequest{Model: req.Model, Prompt: req.Prompt, Size: req.Size})
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	// Bill one clip on a successful submit (units = price × 1).
+	units, _ := pricing.UnitsForCount(m.Exascale.Price, 1)
+	s.meterImage(p, m, req.Model, 1, units, 0, "vidreq_"+uuid.NewString())
+	writeJSON(w, http.StatusAccepted, map[string]any{"id": job.ID, "status": job.Status, "model": req.Model})
+}
+
+// getVideo serves GET /v1/videos/{id} — poll the async job (auth required).
+func (s *Server) getVideo(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireAuth(w, r); !ok {
+		return
+	}
+	vb, ok := s.backend.(model.VideoBackend)
+	if !ok {
+		writeErr(w, http.StatusNotImplemented, "unsupported", "video generation is not available")
+		return
+	}
+	job, err := vb.GetVideo(r.Context(), r.PathValue("id"))
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	out := job.Raw
+	if out == nil {
+		out = map[string]any{"id": job.ID, "status": job.Status}
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// getVideoContent serves GET /v1/videos/{id}/content — stream the finished mp4 through (auth required).
+func (s *Server) getVideoContent(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireAuth(w, r); !ok {
+		return
+	}
+	vb, ok := s.backend.(model.VideoBackend)
+	if !ok {
+		writeErr(w, http.StatusNotImplemented, "unsupported", "video generation is not available")
+		return
+	}
+	body, ctype, status, err := vb.GetVideoContent(r.Context(), r.PathValue("id"))
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	defer body.Close()
+	if ctype == "" {
+		ctype = "video/mp4"
+	}
+	w.Header().Set("Content-Type", ctype)
+	w.WriteHeader(status)
+	_, _ = io.Copy(w, body)
 }
 
 // streamChat sends the completion as an SSE stream of OpenAI chat.completion.chunk objects: a role

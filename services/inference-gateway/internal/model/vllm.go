@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -180,4 +181,99 @@ func (b *VLLMBackend) Image(ctx context.Context, req ImageRequest) (ImageResult,
 		return ImageResult{}, fmt.Errorf("image provider returned no images for model %q (check the model slug / availability)", b.providerModel(req.Model))
 	}
 	return ImageResult{B64: imgs}, nil
+}
+
+// videoJobResponse is the slice of DO's /v1/videos object the gateway needs.
+type videoJobResponse struct {
+	ID     string `json:"id"`
+	Status string `json:"status"`
+}
+
+// decodeVideoJob parses a /v1/videos response body into a typed handle plus the raw object.
+func decodeVideoJob(body io.Reader) (VideoJob, error) {
+	data, err := io.ReadAll(io.LimitReader(body, 1<<16))
+	if err != nil {
+		return VideoJob{}, err
+	}
+	var j videoJobResponse
+	if err := json.Unmarshal(data, &j); err != nil {
+		return VideoJob{}, fmt.Errorf("decode video response: %w", err)
+	}
+	raw := map[string]any{}
+	_ = json.Unmarshal(data, &raw)
+	return VideoJob{ID: j.ID, Status: j.Status, Raw: raw}, nil
+}
+
+// SubmitVideo starts an async text-to-video job (DO POST /v1/videos → 202 queued) and returns the
+// job handle. Satisfies model.VideoBackend.
+func (b *VLLMBackend) SubmitVideo(ctx context.Context, req VideoRequest) (VideoJob, error) {
+	size := req.Size
+	if size == "" {
+		size = "1280x720"
+	}
+	body, _ := json.Marshal(map[string]any{"model": b.providerModel(req.Model), "prompt": req.Prompt, "size": size})
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, b.baseURL+"/v1/videos", bytes.NewReader(body))
+	if err != nil {
+		return VideoJob{}, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	if b.apiKey != "" {
+		httpReq.Header.Set("Authorization", "Bearer "+b.apiKey)
+	}
+	resp, err := b.http.Do(httpReq)
+	if err != nil {
+		return VideoJob{}, fmt.Errorf("video submit call: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
+		excerpt, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return VideoJob{}, fmt.Errorf("video provider returned %d for model %q: %s", resp.StatusCode, b.providerModel(req.Model), bytes.TrimSpace(excerpt))
+	}
+	job, err := decodeVideoJob(resp.Body)
+	if err != nil {
+		return VideoJob{}, err
+	}
+	if job.ID == "" {
+		return VideoJob{}, fmt.Errorf("video provider returned no job id")
+	}
+	return job, nil
+}
+
+// GetVideo polls a video job (DO GET /v1/videos/{id}).
+func (b *VLLMBackend) GetVideo(ctx context.Context, id string) (VideoJob, error) {
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, b.baseURL+"/v1/videos/"+url.PathEscape(id), nil)
+	if err != nil {
+		return VideoJob{}, err
+	}
+	if b.apiKey != "" {
+		httpReq.Header.Set("Authorization", "Bearer "+b.apiKey)
+	}
+	resp, err := b.http.Do(httpReq)
+	if err != nil {
+		return VideoJob{}, fmt.Errorf("video poll call: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		excerpt, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return VideoJob{}, fmt.Errorf("video provider returned %d polling job: %s", resp.StatusCode, bytes.TrimSpace(excerpt))
+	}
+	return decodeVideoJob(resp.Body)
+}
+
+// GetVideoContent streams the finished mp4 (DO GET /v1/videos/{id}/content). The caller copies the body
+// through to the client and closes it. While the job is unfinished the provider 200s with a small JSON
+// "video_not_ready" body, so callers should poll GetVideo for status=="completed" before fetching.
+func (b *VLLMBackend) GetVideoContent(ctx context.Context, id string) (io.ReadCloser, string, int, error) {
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, b.baseURL+"/v1/videos/"+url.PathEscape(id)+"/content", nil)
+	if err != nil {
+		return nil, "", 0, err
+	}
+	if b.apiKey != "" {
+		httpReq.Header.Set("Authorization", "Bearer "+b.apiKey)
+	}
+	resp, err := b.http.Do(httpReq)
+	if err != nil {
+		return nil, "", 0, fmt.Errorf("video content call: %w", err)
+	}
+	return resp.Body, resp.Header.Get("Content-Type"), resp.StatusCode, nil
 }

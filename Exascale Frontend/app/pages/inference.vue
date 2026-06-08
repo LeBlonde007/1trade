@@ -151,6 +151,8 @@ interface Turn {
   streaming?: boolean
   /** Generated images (data URIs or URLs) for an image-model turn — rendered as a grid. */
   images?: string[]
+  /** Generated video URL (the BFF content route) for a video-model turn — rendered in a player. */
+  video?: string
   /** Names of files attached to this user turn (their content is sent as context, not shown inline). */
   files?: string[]
 }
@@ -435,6 +437,58 @@ async function generateImage() {
     } else {
       aTurn.text = 'No image was returned.'
       aTurn.html = '<p>No image was returned.</p>'
+    }
+  } catch (e: unknown) {
+    renderAssistantError(aTurn, e)
+  } finally {
+    generating.value = false
+    await nextTick(); scrollToBottom()
+  }
+}
+
+// ── Video generation (async) — submit → poll status → play. Billed one clip on submit (video credits).
+const videoCost = computed(() => catalogPrice.value[selectedId.value]?.price ?? 0)
+
+// generateVideo submits a text→video job, polls until the clip is ready (or fails/times out), then
+// renders it in a <video> player. The placeholder turn shows live elapsed time while it generates.
+async function generateVideo() {
+  const prompt = draft.value.trim()
+  if (!prompt || generating.value) return
+  turns.push({ id: nextId(), role: 'user', text: prompt })
+  draft.value = ''
+  generating.value = true
+  const startedAt = Date.now()
+  const modelId = selectedId.value
+  turns.push({ id: nextId(), role: 'assistant', text: 'Submitting video…', streaming: true, backend: modelId })
+  const aTurn = turns[turns.length - 1]!
+  await nextTick(); scrollToBottom()
+  try {
+    const sub = await $fetch<{ id: string; status: string }>('/api/inference/video', {
+      method: 'POST', body: { model: modelId, prompt, size: '1280x720' },
+    })
+    let status = sub.status
+    const deadline = Date.now() + 6 * 60 * 1000 // cap polling at ~6 min
+    while (status !== 'completed' && status !== 'failed' && Date.now() < deadline) {
+      aTurn.text = `Generating video… ${Math.round((Date.now() - startedAt) / 1000)}s`
+      await new Promise((r) => setTimeout(r, 5000))
+      const poll = await $fetch<{ status: string }>(`/api/inference/video/${encodeURIComponent(sub.id)}`)
+      status = poll.status
+    }
+    aTurn.streaming = false
+    aTurn.latencyMs = Date.now() - startedAt
+    aTurn.backend = modelId
+    if (status === 'completed') {
+      aTurn.video = `/api/inference/video/${encodeURIComponent(sub.id)}/content`
+      aTurn.text = ''
+      const p = catalogPrice.value[modelId]
+      if (p) { aTurn.creditCost = p.price; aTurn.creditType = p.creditType } // one clip, billed on submit
+      void refreshBalance()
+    } else if (status === 'failed') {
+      aTurn.text = 'Video generation failed.'
+      aTurn.html = '<p>Video generation failed.</p>'
+    } else {
+      aTurn.text = 'Video is taking longer than expected — it keeps rendering on the server; try again shortly.'
+      aTurn.html = '<p>Video is taking longer than expected — it keeps rendering on the server.</p>'
     }
   } catch (e: unknown) {
     renderAssistantError(aTurn, e)
@@ -1006,7 +1060,10 @@ async function copyText(text: string, label: string) {
                   </div>
                   <!-- Assistant: animated dots until the first token, then live markdown with a blinking caret -->
                   <div class="turn-body assistant-body" v-else>
-                    <div v-if="t.images && t.images.length" class="img-grid">
+                    <div v-if="t.video" class="vid-out">
+                      <video :src="t.video" controls preload="metadata" playsinline />
+                    </div>
+                    <div v-else-if="t.images && t.images.length" class="img-grid">
                       <a v-for="(src, idx) in t.images" :key="idx" :href="src" target="_blank" rel="noopener" class="img-out" title="Open full size">
                         <img :src="src" :alt="'generated image ' + (idx + 1)" loading="lazy" />
                       </a>
@@ -1130,7 +1187,35 @@ async function copyText(text: string, label: string) {
                 </div>
               </form>
 
-              <!-- Speech / video / embeddings: not inline yet — point to the API/CLI. Catalog + pricing live. -->
+              <!-- Video models: async text→video (submit → poll → play), via the BFF → gateway → DO. -->
+              <form v-else-if="selected.category === 'video'" class="composer" @submit.prevent="generateVideo">
+                <div class="composer-box">
+                  <textarea
+                    v-model="draft"
+                    class="composer-input"
+                    placeholder="Describe the video to generate…  (a clip takes ~1–3 min)"
+                    rows="3"
+                    @keydown.enter.exact.prevent="generateVideo"
+                  />
+                  <div class="composer-foot">
+                    <span class="composer-hint mono">{{ selected.name }} · {{ selected.priceLabel }}</span>
+                    <div class="composer-actions">
+                      <span class="cost-preview mono">Cost: <strong>{{ fmtCredits(videoCost) }} video credits</strong></span>
+                      <button v-if="generating" type="button" class="send-btn stop-btn" disabled>
+                        <span class="spinner" /> Generating…
+                      </button>
+                      <button v-else type="submit" class="send-btn" :disabled="!draft.trim()">
+                        Generate
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square">
+                          <path d="M3 8h10M9 4l4 4-4 4" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </form>
+
+              <!-- Speech / embeddings: not inline yet — point to the API/CLI. Catalog + pricing live. -->
               <div v-else class="api-only">
                 <div class="api-only-icon">{{ CATEGORY_META[selected.category].label }}</div>
                 <h4>{{ selected.name }} runs via the API</h4>
@@ -2052,6 +2137,9 @@ ratelimit-remaining:   58 / 60 RPS</pre>
 }
 .img-out:hover { border-color: var(--brand); }
 .img-out img { display: block; width: 100%; height: auto; }
+/* Generated-video player (text→video turns). */
+.vid-out { border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; background: var(--canvas); max-width: 640px; }
+.vid-out video { display: block; width: 100%; height: auto; }
 
 /* Composer */
 .composer {
