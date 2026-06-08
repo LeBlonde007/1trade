@@ -64,6 +64,16 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=raw,value=sandbox,enable={{is_default_branch}}
 
+      # The web image also ships the CLI: cross-compile the binaries (sandbox api URL baked in) into the
+      # Nuxt public/cli dir so they're served at /cli/ → `curl https://<host>/cli/install.sh | sh`.
+      - name: Set up Go (web bundles the CLI)
+        if: matrix.svc.name == 'web'
+        uses: actions/setup-go@v5
+        with: { go-version: '1.25' }
+      - name: Stage CLI binaries + installer into the web public dir
+        if: matrix.svc.name == 'web'
+        run: bash scripts/build-cli-dist.sh
+
       - name: Build + push
         uses: docker/build-push-action@v6
         with:

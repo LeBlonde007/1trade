@@ -17,8 +17,17 @@ type Config struct {
 	ComputeURL  string `json:"compute_url"`
 }
 
-// defaults are the local-dev service URLs (prod sets these to the api.exascale.io gateway).
+// DefaultAPIURL is baked in at build time via ldflags
+// (-X github.com/exascale/cli/internal/config.DefaultAPIURL=https://sandboxapi.exascale.ai) so a
+// distributed binary points every service at the sandbox/prod api host with zero config. Empty in a
+// dev build → local-dev defaults.
+var DefaultAPIURL = ""
+
+// defaults are the service URLs: the baked-in api host when set (distributed binaries), else local dev.
 func defaults() Config {
+	if DefaultAPIURL != "" {
+		return Config{PlatformURL: DefaultAPIURL, GatewayURL: DefaultAPIURL, LedgerURL: DefaultAPIURL, ComputeURL: DefaultAPIURL}
+	}
 	return Config{
 		PlatformURL: "http://localhost:8001",
 		GatewayURL:  "http://localhost:8085",

@@ -85,6 +85,8 @@ else
   docker build -t "exascale/inference-gateway:$TAG"      services/inference-gateway
   docker build -t "exascale/compute-control:$TAG"        services/compute-control
   docker build -t "exascale/inference-runtime-stub:$TAG" services/inference-runtime/stub
+  # Bundle the CLI binaries into the web image (served at /cli/) — bake the api host into them.
+  CLI_API_URL="$API_URL" bash scripts/build-cli-dist.sh
   docker build -t "exascale/web:$TAG"                    "Exascale Frontend"
 
   case "$IMPORT" in
