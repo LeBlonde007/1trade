@@ -17,9 +17,10 @@ func TestDisabledStore(t *testing.T) {
 	}
 }
 
-// TestObjectKey checks keys are tenant-scoped, path-safe, and collision-resistant (unique per call).
+// TestObjectKey checks keys are tenant-scoped, path-safe, collision-resistant (unique per call), and
+// honor the optional bucket-directory prefix.
 func TestObjectKey(t *testing.T) {
-	k := objectKey("tenant-123", "../../etc/My Report (final).pdf")
+	k := objectKey("", "tenant-123", "../../etc/My Report (final).pdf")
 	if !strings.HasPrefix(k, "uploads/tenant-123/") {
 		t.Fatalf("key not tenant-scoped: %q", k)
 	}
@@ -29,8 +30,11 @@ func TestObjectKey(t *testing.T) {
 	if !strings.HasSuffix(k, "My-Report-final-.pdf") && !strings.HasSuffix(k, "My-Report-final.pdf") {
 		t.Fatalf("key lost the filename: %q", k)
 	}
-	if k1, k2 := objectKey("t", "a.txt"), objectKey("t", "a.txt"); k1 == k2 {
+	if k1, k2 := objectKey("", "t", "a.txt"), objectKey("", "t", "a.txt"); k1 == k2 {
 		t.Fatal("keys must be unique per call (uuid)")
+	}
+	if got := objectKey("sandbox", "t", "a.txt"); !strings.HasPrefix(got, "sandbox/uploads/t/") {
+		t.Fatalf("prefix (bucket directory) not applied: %q", got)
 	}
 }
 

@@ -33,6 +33,7 @@ type Config struct {
 	StoragePublicBase        string        // explicit public object URL base; overrides the derived origin/CDN base
 	StorageUseCDN            bool          // serve uploaded objects via the DigitalOcean Spaces CDN edge (STORAGE_CDN)
 	StoragePublicRead        bool          // sign uploads public-read so public/CDN links load (STORAGE_PUBLIC_READ, default on)
+	StoragePrefix            string        // optional bucket "directory" prefix for uploads (STORAGE_PREFIX)
 	EmailFrom                string        // From address for platform email
 	AppBaseURL               string        // public base URL of the web app, for links in emails
 	RequireEmailVerification bool          // gate login on a verified email; opt-in (default off), enabled by the deploy only when real SMTP is wired
@@ -76,6 +77,7 @@ func Load() Config {
 		StoragePublicBase: os.Getenv("STORAGE_PUBLIC_BASE"),
 		StorageUseCDN:     envBool("STORAGE_CDN", false),
 		StoragePublicRead: envBool("STORAGE_PUBLIC_READ", true),
+		StoragePrefix:     os.Getenv("STORAGE_PREFIX"),
 		EmailFrom:         envOr("EMAIL_FROM", "noreply@exascale.local"),
 		AppBaseURL:        envOr("APP_BASE_URL", "http://localhost:3000"),
 		// Gate login on a verified email. OPT-IN (default off) and coupled to a working mailer: the deploy
