@@ -6,6 +6,8 @@
 .env
 .env.*
 !.env.example
+sandbox.env
+!sandbox.env.example
 *.pem
 *.key
 *.p12
