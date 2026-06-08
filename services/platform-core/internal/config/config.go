@@ -23,6 +23,8 @@ type Config struct {
 	SMTPUser                 string        // SMTP AUTH username (empty → no auth, e.g. Mailpit)
 	SMTPPass                 string        // SMTP AUTH password (from a Secret — never hardcoded)
 	SMTPTLS                  string        // transport: "implicit" (465) | "starttls" (587) | "" (plain/Mailpit; inferred from port)
+	EmailAPIURL              string        // HTTP Email-API send URL (Mailtrap etc.); preferred over SMTP when set (works where SMTP ports are blocked)
+	EmailAPIToken            string        // bearer token for the HTTP Email API (from a Secret)
 	EmailFrom                string        // From address for platform email
 	AppBaseURL               string        // public base URL of the web app, for links in emails
 	RequireEmailVerification bool          // gate login on a verified email; opt-in (default off), enabled by the deploy only when real SMTP is wired
@@ -56,6 +58,8 @@ func Load() Config {
 		SMTPUser:       os.Getenv("SMTP_USER"),
 		SMTPPass:       os.Getenv("SMTP_PASS"),
 		SMTPTLS:        os.Getenv("SMTP_TLS"),
+		EmailAPIURL:    os.Getenv("EMAIL_API_URL"),
+		EmailAPIToken:  os.Getenv("EMAIL_API_TOKEN"),
 		EmailFrom:      envOr("EMAIL_FROM", "noreply@exascale.local"),
 		AppBaseURL:     envOr("APP_BASE_URL", "http://localhost:3000"),
 		// Gate login on a verified email. OPT-IN (default off) and coupled to a working mailer: the deploy

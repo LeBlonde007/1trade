@@ -2,7 +2,10 @@ package email
 
 import (
 	"bufio"
+	"io"
 	"net"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 )
@@ -81,9 +84,9 @@ func TestVerifyURL(t *testing.T) {
 // TestDisabledSenderNoop confirms a Sender with no SMTP address sends nothing and returns nil, so the
 // platform runs without a mail server.
 func TestDisabledSenderNoop(t *testing.T) {
-	s := New("", "", "", "", "")
+	s := New(Config{})
 	if s.Enabled() {
-		t.Fatal("Enabled() should be false with no SMTP address")
+		t.Fatal("Enabled() should be false with no transport configured")
 	}
 	if err := s.SendVerification("a@b.com", "http://x/verify?token=1"); err != nil {
 		t.Fatalf("disabled SendVerification should be a nil no-op, got %v", err)
@@ -99,12 +102,12 @@ func TestTLSModeInferredFromPort(t *testing.T) {
 		{"mailpit.data.svc.cluster.local:1025", ""},
 	}
 	for _, c := range cases {
-		if got := New(c.addr, "from@x", "u", "p", "").tls; got != c.want {
+		if got := New(Config{Addr: c.addr, From: "from@x", User: "u", Pass: "p"}).tls; got != c.want {
 			t.Errorf("New(%q).tls = %q, want %q", c.addr, got, c.want)
 		}
 	}
 	// An explicit mode always wins over the port inference.
-	if got := New("mail.x:465", "from@x", "u", "p", "starttls").tls; got != "starttls" {
+	if got := New(Config{Addr: "mail.x:465", From: "from@x", User: "u", Pass: "p", TLS: "starttls"}).tls; got != "starttls" {
 		t.Errorf("explicit tlsMode should win, got %q", got)
 	}
 }
@@ -113,11 +116,53 @@ func TestTLSModeInferredFromPort(t *testing.T) {
 // SMTP server, asserting the MAIL/RCPT/DATA conversation completes and the message body is delivered.
 func TestPlainDelivery(t *testing.T) {
 	addr, got := fakeSMTP(t)
-	s := New(addr, "from@exascale.ai", "", "", "")
+	s := New(Config{Addr: addr, From: "from@exascale.ai"})
 	if err := s.SendVerification("user@example.com", "http://app/verify?token=tok123"); err != nil {
 		t.Fatalf("SendVerification: %v", err)
 	}
 	if !strings.Contains(<-got, "tok123") {
 		t.Fatal("delivered message did not contain the verification link")
+	}
+}
+
+// TestAPIDelivery exercises the HTTP Email-API path (Mailtrap shape): the bearer token is sent, the
+// JSON carries the recipient + the verification link, and a 2xx is treated as success.
+func TestAPIDelivery(t *testing.T) {
+	var gotAuth, gotBody string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		b, _ := io.ReadAll(r.Body)
+		gotBody = string(b)
+		w.WriteHeader(200)
+		_, _ = w.Write([]byte(`{"success":true}`))
+	}))
+	defer srv.Close()
+
+	s := New(Config{From: "hello@exascale.ai", APIURL: srv.URL, APIToken: "tok-abc"})
+	if !s.Enabled() {
+		t.Fatal("Enabled() should be true when an API URL is set")
+	}
+	if err := s.SendVerification("user@example.com", "http://app/verify?token=apitok9"); err != nil {
+		t.Fatalf("SendVerification (api): %v", err)
+	}
+	if gotAuth != "Bearer tok-abc" {
+		t.Fatalf("auth header = %q, want Bearer tok-abc", gotAuth)
+	}
+	if !strings.Contains(gotBody, "user@example.com") || !strings.Contains(gotBody, "apitok9") {
+		t.Fatalf("api payload missing recipient or link: %s", gotBody)
+	}
+}
+
+// TestAPIErrorSurfaced confirms a non-2xx from the Email API surfaces the provider's response body.
+func TestAPIErrorSurfaced(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(401)
+		_, _ = w.Write([]byte(`{"errors":["Unauthorized"]}`))
+	}))
+	defer srv.Close()
+	s := New(Config{From: "hello@exascale.ai", APIURL: srv.URL, APIToken: "bad"})
+	err := s.SendVerification("user@example.com", "http://app/verify?token=x")
+	if err == nil || !strings.Contains(err.Error(), "401") {
+		t.Fatalf("expected a 401 error surfaced, got %v", err)
 	}
 }
