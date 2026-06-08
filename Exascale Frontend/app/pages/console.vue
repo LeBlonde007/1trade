@@ -161,6 +161,9 @@ onBeforeUnmount(() => { if (ticker) clearInterval(ticker) })
       </div>
     </header>
 
+    <!-- ── Install the CLI (one-line, copy-able) ──────────────────────────────── -->
+    <AppCliInstall />
+
     <!-- ── KPI command strip ──────────────────────────────────────────────────── -->
     <section class="kpis">
       <div v-for="b in balances" :key="b.credit_type" class="kpi">

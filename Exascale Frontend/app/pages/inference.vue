@@ -457,6 +457,9 @@ async function copyText(text: string, label: string) {
       </div>
     </div>
 
+    <!-- ── Install the CLI (one-line, copy-able) ──────────────────────────────── -->
+    <AppCliInstall class="inf-cli" />
+
     <main class="layout">
       <!-- ============ LEFT: Model catalog ============ -->
       <aside class="catalog">
@@ -988,6 +991,9 @@ ratelimit-remaining:   58 / 60 RPS</pre>
   border-radius: var(--radius-sm);
   letter-spacing: 0.06em;
 }
+
+/* CLI install strip — sits between the sub-topbar and the split layout (doesn't scroll). */
+.inf-cli { margin: 10px 24px; flex-shrink: 0; }
 
 /* ============================================================
    Layout
