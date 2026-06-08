@@ -28,6 +28,11 @@
 #                             https://send.api.mailtrap.io/api/send; sandbox inbox:
 #                             https://sandbox.api.mailtrap.io/api/send/<inbox_id>). EMAIL_FROM default
 #                             hello@exascale.ai. Token → platform-auth Secret; never committed.
+#   STORAGE_SECRET_KEY        OPTIONAL. Set it (+ STORAGE_ACCESS_KEY, STORAGE_BUCKET) to enable file
+#                             uploads to DigitalOcean Spaces (S3-compatible). STORAGE_ENDPOINT (default
+#                             nyc3.digitaloceanspaces.com), STORAGE_REGION (nyc3), STORAGE_PUBLIC_BASE
+#                             (CDN URL, optional). Keys → platform-auth Secret. The Space needs CORS to
+#                             allow PUT from the web origin ($SANDBOX_HOST).
 #   SMTP_PASS                 OPTIONAL (SMTP fallback; many VPS block 25/465/587). With it: SMTP_ADDR
 #                             (default mail.privateemail.com:465), SMTP_TLS (implicit|starttls), EMAIL_FROM
 #                             + SMTP_USER (default hello@exascale.ai). Neither set → no gate (paper demo).
@@ -209,6 +214,31 @@ data:
   SMTP_TLS: "$SMTP_TLS_V"
   EMAIL_FROM: "$EMAIL_FROM_V"
   REQUIRE_EMAIL_VERIFICATION: "true"
+EOF
+)"
+  kubectl rollout restart deploy/platform-core
+  kubectl rollout status deploy/platform-core --timeout=120s
+fi
+
+# 7d. (optional) object storage for uploads — DigitalOcean Spaces (S3-compatible). Opt-in: only when
+# STORAGE_SECRET_KEY is set. Keys go into the platform-auth Secret; endpoint/region/bucket are config.
+# Presigned uploads need the Space's CORS to allow PUT from $URL (the web origin).
+if [ -n "${STORAGE_SECRET_KEY:-}" ]; then
+  STORAGE_ENDPOINT_V="${STORAGE_ENDPOINT:-nyc3.digitaloceanspaces.com}"
+  STORAGE_REGION_V="${STORAGE_REGION:-nyc3}"
+  say "object storage (Spaces) — bucket ${STORAGE_BUCKET:?set STORAGE_BUCKET} @ $STORAGE_ENDPOINT_V"
+  kubectl patch secret platform-auth --type merge -p "$(cat <<EOF
+stringData:
+  STORAGE_ACCESS_KEY: '${STORAGE_ACCESS_KEY:?set STORAGE_ACCESS_KEY}'
+  STORAGE_SECRET_KEY: '$STORAGE_SECRET_KEY'
+EOF
+)"
+  kubectl patch configmap platform-core-env --type merge -p "$(cat <<EOF
+data:
+  STORAGE_ENDPOINT: "$STORAGE_ENDPOINT_V"
+  STORAGE_REGION: "$STORAGE_REGION_V"
+  STORAGE_BUCKET: "$STORAGE_BUCKET"
+  STORAGE_PUBLIC_BASE: "${STORAGE_PUBLIC_BASE:-}"
 EOF
 )"
   kubectl rollout restart deploy/platform-core

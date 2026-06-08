@@ -336,20 +336,35 @@ async function send() {
   }
 }
 
-// ── Attachments — read text/code files client-side and send their content as context (no backend
-// change; works with any text model). Binary/oversized files are rejected. ─────────────────────────
-interface Attachment { name: string; content: string }
+// ── Attachments — text/code file content is sent as model context; every file is also uploaded to
+// object storage (DigitalOcean Spaces) via a presigned PUT (best-effort) so it persists + gets a URL.
+interface Attachment { name: string; content: string; url?: string; uploading?: boolean }
 const attachments = ref<Attachment[]>([])
 const fileInput = ref<HTMLInputElement | null>(null)
 const attachError = ref('')
 function pickFiles() { fileInput.value?.click() }
+// isTextLike — read content (→ model context) only for text/code files; binaries (images) upload but
+// aren't inlined.
+function isTextLike(f: File): boolean {
+  return !f.type || f.type.startsWith('text/') || /\.(txt|md|markdown|json|csv|tsv|log|ya?ml|xml|html|css|sql|sh|py|js|ts|tsx|vue|go|java|rb|rs|c|h|cpp)$/i.test(f.name)
+}
 async function onFiles(e: Event) {
   const input = e.target as HTMLInputElement
   attachError.value = ''
   for (const f of Array.from(input.files ?? [])) {
-    if (f.size > 200_000) { attachError.value = `${f.name} is too large (max 200 KB)`; continue }
-    try { attachments.value.push({ name: f.name, content: await f.text() }) }
-    catch { attachError.value = `couldn't read ${f.name}` }
+    if (f.size > 2_000_000) { attachError.value = `${f.name} is too large (max 2 MB)`; continue }
+    const att = reactive<Attachment>({ name: f.name, content: isTextLike(f) ? await f.text() : '', uploading: true })
+    attachments.value.push(att)
+    // Direct-to-Spaces upload via a presigned PUT. Degrades silently when storage is off (501) or the
+    // bucket lacks CORS — the file still works as context.
+    try {
+      const sig = await $fetch<{ upload_url: string; file_url: string }>('/api/files/presign', {
+        method: 'POST', body: { filename: f.name, content_type: f.type || 'application/octet-stream' },
+      })
+      await fetch(sig.upload_url, { method: 'PUT', body: f })
+      att.url = sig.file_url
+    } catch { /* storage unavailable — attachment still works as context */ }
+    att.uploading = false
   }
   input.value = '' // let the same file be re-picked
 }
@@ -825,6 +840,8 @@ async function copyText(text: string, label: string) {
                   <div v-if="attachments.length || attachError" class="cmp-chips">
                     <span v-for="(a, i) in attachments" :key="a.name + i" class="cmp-chip">
                       <Paperclip :size="12" /> {{ a.name }}
+                      <a v-if="a.url" :href="a.url" target="_blank" rel="noopener" class="cmp-chip-link" title="Stored in object storage">↗</a>
+                      <span v-else-if="a.uploading" class="cmp-chip-up" title="Uploading…">↑</span>
                       <button type="button" class="cmp-chip-x" title="Remove" @click="removeAttachment(i)">×</button>
                     </span>
                     <span v-if="attachError" class="cmp-attach-err">{{ attachError }}</span>
@@ -1817,6 +1834,8 @@ ratelimit-remaining:   58 / 60 RPS</pre>
 }
 .cmp-chip-x { background: none; border: none; color: var(--text-3); cursor: pointer; font-size: 14px; line-height: 1; padding: 0 0 0 2px; }
 .cmp-chip-x:hover { color: var(--neg); }
+.cmp-chip-link { color: var(--accent); text-decoration: none; font-weight: 600; }
+.cmp-chip-up { color: var(--text-3); animation: rec-pulse 1s ease-in-out infinite; }
 .cmp-attach-err { font-size: 12px; color: var(--neg); align-self: center; }
 .composer-tools { display: inline-flex; align-items: center; gap: 6px; }
 .cmp-tool {
