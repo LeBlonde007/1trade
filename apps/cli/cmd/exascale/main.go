@@ -4,10 +4,13 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
+	"github.com/exascale/cli/internal/client"
 	"github.com/exascale/cli/internal/config"
+	"github.com/exascale/cli/internal/ui"
 )
 
 // Version is set at build time (-ldflags -X main.Version=...).
@@ -49,6 +52,11 @@ Keys:
 Config:
   config get | set <key> <value>          View/set platform URLs (platform_url|gateway_url|ledger_url|compute_url)
   version                                 Print the CLI version
+
+Conventions:
+  infer chat streams by default; add --json for the full object (scripting/CI).
+  Destructive commands (gpu delete, keys revoke) confirm; --yes skips.
+  Colour is on for a terminal and off when piped or under NO_COLOR.
 `
 
 // main dispatches the subcommand and prints a friendly error on failure.
@@ -91,7 +99,14 @@ func main() {
 		os.Exit(2)
 	}
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "error: "+err.Error())
+		fmt.Fprintln(os.Stderr, ui.Red("error:")+" "+err.Error())
+		// Map upstream errors to a next step so the failure is a fork in the road, not a dead end.
+		var ae *client.APIError
+		if errors.As(err, &ae) {
+			if hint := ui.Hint(ae.Status, ae.Code); hint != "" {
+				fmt.Fprintln(os.Stderr, ui.Dim("  → "+hint))
+			}
+		}
 		os.Exit(1)
 	}
 }

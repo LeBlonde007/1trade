@@ -30,15 +30,18 @@ plain tables, blocking requests, no streaming, terse errors. F24 is the **DX lay
 
 ## Phases (each ships independently)
 
-### Phase 1 — "feels alive" (no heavy deps, highest impact-per-effort)
-- [ ] **Streaming inference** — set `stream:true` and render the gateway's SSE token-by-token (the
-      typewriter feel). Non-stream path kept for `--json` / pipes.
-- [ ] **Spinners** for in-flight work ("Thinking…", "Provisioning…", "Minting key…"); auto-off when not a TTY.
-- [ ] **Semantic colour** — green `▲` / red `▼` on credit deltas, dim secondary, bold headers; honour `NO_COLOR`.
-- [ ] **Actionable errors** — map upstream codes to next steps (`402` → "buy credits", `401` → "run `exascale login`").
-- [ ] **`--json`** global flag — machine-readable output for scripting/CI (`… --json | jq`).
-- [ ] **Per-command help + examples**; did-you-mean on unknown commands.
-- [ ] **Confirm destructive ops** — `gpu delete`, `keys revoke` → `[y/N]` (skippable with `--yes`).
+### Phase 1 — "feels alive" (no heavy deps, highest impact-per-effort) — **shipped (v0.3.x)**
+- [x] **Streaming inference** — `infer chat` sets `stream:true` and renders the gateway SSE token-by-token
+      (`internal/client/stream.go`); `--json` keeps the full non-streamed object for pipes/CI.
+- [x] **Spinners** — `internal/ui.StartSpinner` ("Provisioning…" on `gpu create`); auto-off when not a TTY.
+- [x] **Semantic colour** — `internal/ui` (green `▲` / red `▼` via `Delta`, bold headers, dim secondary);
+      auto-off off-TTY and under `NO_COLOR` (`SetColor` for tests).
+- [x] **Actionable errors** — `ui.Hint` maps codes to next steps (`402`→top up, `401`→login,
+      `email_unverified`→verify, 404/429/5xx…), printed under the error in `main`.
+- [x] **`--json`** — on `infer chat` (the streaming command); other commands' tabular output stays pipe-friendly.
+- [ ] **Per-command help + examples**; did-you-mean on unknown commands. *(next)*
+- [x] **Confirm destructive ops** — `gpu delete`, `keys revoke` → `[y/N]` (skippable with `--yes`; non-TTY aborts).
+- Tests: SSE parser (`stream_test.go`) + formatter/hint (`ui_test.go`). golangci-lint clean.
 
 ### Phase 2 — the interactive chat REPL (the headline Claude-Code-like feature)
 - [ ] `exascale chat` — a persistent, multi-turn, **streaming** session.
@@ -58,8 +61,10 @@ plain tables, blocking requests, no streaming, terse errors. F24 is the **DX lay
 
 - **TUI library:** charm (`bubbletea`/`lipgloss`) for the Phase-2 REPL (heavier dep, polished) **vs.**
   stdlib-only (lighter binary, plainer). Ships as one binary regardless.
-- **Distribution** (out of scope here, tracked in F04): brew / apt / `go install` / static release
-  binaries land M6.
+- **Distribution** — ✅ **done early**: one-line install `curl -fsSL https://sandbox.exascale.ai/cli/install.sh | sh`.
+  Cross-compiled static binaries (linux/darwin/windows × amd64/arm64, sandbox api URL baked in via ldflags)
+  are built into the web image and served at `/cli/` (`scripts/build-cli-dist.sh` + `scripts/cli-install.sh`,
+  staged by the release pipeline). brew/apt remain a later nicety.
 
 ## Acceptance criteria
 
