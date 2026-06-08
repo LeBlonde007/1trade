@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/exascale/cli/internal/client"
 	"github.com/exascale/cli/internal/config"
+	"github.com/exascale/cli/internal/ui"
 	"golang.org/x/term"
 )
 
@@ -177,9 +179,9 @@ func creditsBalance(cfg config.Config) error {
 		fmt.Println("No credits yet.")
 		return nil
 	}
-	fmt.Printf("%-14s %16s %16s\n", "CREDIT", "BALANCE", "LOCKED")
+	fmt.Println(ui.Bold(fmt.Sprintf("%-14s %16s %16s", "CREDIT", "BALANCE", "LOCKED")))
 	for _, b := range out.Balances {
-		fmt.Printf("%-14s %16s %16s\n", b.CreditType, b.Balance, b.LockedAmount)
+		fmt.Printf("%-14s %16s %16s\n", b.CreditType, b.Balance, ui.Dim(b.LockedAmount))
 	}
 	return nil
 }
@@ -252,9 +254,9 @@ func cmdCatalog(cfg config.Config, _ []string) error {
 	if err := client.Do("GET", cfg.GatewayURL, "/v1/models", cfg.Token, nil, nil, &out); err != nil {
 		return err
 	}
-	fmt.Printf("%-20s %-10s %14s  %s\n", "MODEL", "MODALITY", "PRICE", "UNIT")
+	fmt.Println(ui.Bold(fmt.Sprintf("%-20s %-10s %14s  %s", "MODEL", "MODALITY", "PRICE", "UNIT")))
 	for _, m := range out.Data {
-		fmt.Printf("%-20s %-10s %14s  %s\n", m.ID, m.Exascale.Modality, m.Exascale.Price, m.Exascale.Unit)
+		fmt.Printf("%-20s %-10s %14s  %s\n", m.ID, m.Exascale.Modality, m.Exascale.Price, ui.Dim(m.Exascale.Unit))
 	}
 	return nil
 }
@@ -269,31 +271,37 @@ func cmdInfer(cfg config.Config, args []string) error {
 	}
 	fs := flag.NewFlagSet("chat", flag.ExitOnError)
 	model := fs.String("m", "llama-3.1-8b", "model id")
+	jsonOut := fs.Bool("json", false, "print the full non-streamed JSON response (scripting/CI)")
 	_ = fs.Parse(args[1:])
 	text := strings.TrimSpace(strings.Join(fs.Args(), " "))
 	if text == "" {
 		return errors.New(`provide a prompt: exascale infer chat -m llama-3.1-8b "hello"`)
 	}
-	body := map[string]any{"model": *model, "messages": []map[string]string{{"role": "user", "content": text}}}
-	var out struct {
-		Choices []struct {
-			Message struct {
-				Content string `json:"content"`
-			} `json:"message"`
-		} `json:"choices"`
-		Usage struct {
-			PromptTokens     int `json:"prompt_tokens"`
-			CompletionTokens int `json:"completion_tokens"`
-			TotalTokens      int `json:"total_tokens"`
-		} `json:"usage"`
+	msgs := []map[string]string{{"role": "user", "content": text}}
+
+	// --json (or a non-TTY pipe): one blocking request, print the raw OpenAI object for jq/scripts.
+	if *jsonOut {
+		body := map[string]any{"model": *model, "messages": msgs}
+		var raw json.RawMessage
+		if err := client.Do("POST", cfg.GatewayURL, "/v1/chat/completions", cfg.Token, nil, body, &raw); err != nil {
+			return err
+		}
+		fmt.Println(string(raw))
+		return nil
 	}
-	if err := client.Do("POST", cfg.GatewayURL, "/v1/chat/completions", cfg.Token, nil, body, &out); err != nil {
+
+	// Default: stream tokens as they arrive (the typewriter feel).
+	body := map[string]any{"model": *model, "messages": msgs, "stream": true}
+	usage, err := client.StreamChat(cfg.GatewayURL, "/v1/chat/completions", cfg.Token, body, func(tok string) {
+		fmt.Print(tok)
+	})
+	fmt.Println()
+	if err != nil {
 		return err
 	}
-	if len(out.Choices) > 0 {
-		fmt.Println(out.Choices[0].Message.Content)
+	if usage.TotalTokens > 0 {
+		fmt.Fprintln(os.Stderr, ui.Dim(fmt.Sprintf("[%d in · %d out · %d tokens]", usage.PromptTokens, usage.CompletionTokens, usage.TotalTokens)))
 	}
-	fmt.Fprintf(os.Stderr, "\n[%d in · %d out · %d tokens]\n", out.Usage.PromptTokens, out.Usage.CompletionTokens, out.Usage.TotalTokens)
 	return nil
 }
 
@@ -336,13 +344,18 @@ func cmdKeys(cfg config.Config, args []string) error {
 		}
 		return nil
 	case "revoke":
-		if len(args) < 2 {
-			return errors.New("usage: exascale keys revoke <id>")
+		yes, rest := stripYes(args[1:])
+		if len(rest) < 1 {
+			return errors.New("usage: exascale keys revoke <id> [--yes]")
 		}
-		if err := client.Do("DELETE", cfg.PlatformURL, "/v1/auth/keys/"+args[1], cfg.Token, nil, nil, nil); err != nil {
+		if !yes && !ui.Confirm("Revoke API key "+rest[0]+"? This is permanent.") {
+			fmt.Fprintln(os.Stderr, "aborted")
+			return nil
+		}
+		if err := client.Do("DELETE", cfg.PlatformURL, "/v1/auth/keys/"+rest[0], cfg.Token, nil, nil, nil); err != nil {
 			return err
 		}
-		fmt.Println("Revoked.")
+		fmt.Println(ui.Green("✓") + " Revoked.")
 		return nil
 	default:
 		return fmt.Errorf("unknown keys subcommand %q", args[0])

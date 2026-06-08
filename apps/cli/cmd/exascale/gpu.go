@@ -4,10 +4,12 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/exascale/cli/internal/client"
 	"github.com/exascale/cli/internal/config"
+	"github.com/exascale/cli/internal/ui"
 )
 
 // instance mirrors the compute.yaml Instance shape (the fields the CLI prints).
@@ -99,11 +101,14 @@ func gpuCreate(cfg config.Config, args []string) error {
 	}
 	body := map[string]any{"type": normalizeGPUType(*gtype), "count": *count, "image": *image, "region": *region}
 	var inst instance
-	if err := client.Do("POST", cfg.ComputeURL, "/v1/compute/instances", cfg.Token,
-		map[string]string{"Idempotency-Key": newIdempotencyKey()}, body, &inst); err != nil {
+	sp := ui.StartSpinner("Provisioning…")
+	err := client.Do("POST", cfg.ComputeURL, "/v1/compute/instances", cfg.Token,
+		map[string]string{"Idempotency-Key": newIdempotencyKey()}, body, &inst)
+	sp.Stop()
+	if err != nil {
 		return err
 	}
-	fmt.Printf("Instance %s — %s (%d × %s), image %s\n", inst.ID, inst.State, inst.Count, inst.GPUType, inst.Image)
+	fmt.Printf("%s Instance %s — %s (%d × %s), image %s\n", ui.Green("✓"), inst.ID, inst.State, inst.Count, inst.GPUType, inst.Image)
 	printConnect(inst)
 	return nil
 }
@@ -180,15 +185,34 @@ func gpuDelete(cfg config.Config, args []string) error {
 	if err := requireToken(cfg); err != nil {
 		return err
 	}
-	if len(args) < 1 {
-		return errors.New("usage: exascale gpu delete <id>")
+	yes, rest := stripYes(args)
+	if len(rest) < 1 {
+		return errors.New("usage: exascale gpu delete <id> [--yes]")
+	}
+	if !yes && !ui.Confirm("Terminate instance "+rest[0]+"? This frees its GPUs and is permanent.") {
+		fmt.Fprintln(os.Stderr, "aborted")
+		return nil
 	}
 	var inst instance
-	if err := client.Do("DELETE", cfg.ComputeURL, "/v1/compute/instances/"+args[0], cfg.Token, nil, nil, &inst); err != nil {
+	if err := client.Do("DELETE", cfg.ComputeURL, "/v1/compute/instances/"+rest[0], cfg.Token, nil, nil, &inst); err != nil {
 		return err
 	}
-	fmt.Printf("Instance %s — %s\n", inst.ID, inst.State)
+	fmt.Printf("%s Instance %s — %s\n", ui.Green("✓"), inst.ID, inst.State)
 	return nil
+}
+
+// stripYes removes --yes/-y from args and reports whether it was present (skip the [y/N] confirm).
+func stripYes(args []string) (bool, []string) {
+	yes := false
+	rest := make([]string, 0, len(args))
+	for _, a := range args {
+		if a == "--yes" || a == "-y" {
+			yes = true
+			continue
+		}
+		rest = append(rest, a)
+	}
+	return yes, rest
 }
 
 // printConnect prints the connection endpoints when present.
