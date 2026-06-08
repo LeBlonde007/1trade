@@ -24,3 +24,17 @@ func UnitsForTokens(price string, totalTokens int) (string, error) {
 	units := new(big.Rat).Mul(p, big.NewRat(int64(totalTokens), tokensPerUnit))
 	return units.FloatString(6), nil
 }
+
+// UnitsForCount returns price × count as a fixed-point 6-decimal string, for per-item priced models
+// (image: credits per image; video: credits per clip). `price` is the catalog's credits-per-unit.
+func UnitsForCount(price string, count int) (string, error) {
+	p, ok := new(big.Rat).SetString(price)
+	if !ok {
+		return "", fmt.Errorf("invalid price %q", price)
+	}
+	if count < 0 {
+		count = 0
+	}
+	units := new(big.Rat).Mul(p, new(big.Rat).SetInt64(int64(count)))
+	return units.FloatString(6), nil
+}
