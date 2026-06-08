@@ -312,3 +312,72 @@ func (b *VLLMBackend) Speech(ctx context.Context, req SpeechRequest) (io.ReadClo
 	}
 	return resp.Body, resp.Header.Get("Content-Type"), resp.StatusCode, nil
 }
+
+// visionChatResponse adds reasoning_content to the chat response — reasoning VLMs (Nemotron) put the
+// answer in `content` after thinking in `reasoning_content`; if cut off, content is null.
+type visionChatResponse struct {
+	Choices []struct {
+		Message struct {
+			Content          string `json:"content"`
+			ReasoningContent string `json:"reasoning_content"`
+		} `json:"message"`
+	} `json:"choices"`
+	Usage struct {
+		PromptTokens     int `json:"prompt_tokens"`
+		CompletionTokens int `json:"completion_tokens"`
+	} `json:"usage"`
+}
+
+// Vision sends a text prompt + one image to a VLM over the provider's /v1/chat/completions (with an
+// image_url content part) and returns the text answer. It satisfies model.VisionBackend. Falls back to
+// reasoning_content when the model omits a final content (e.g. truncated reasoning).
+func (b *VLLMBackend) Vision(ctx context.Context, req VisionRequest) (VisionResult, error) {
+	maxTok := req.MaxTokens
+	if maxTok <= 0 {
+		maxTok = 512
+	}
+	content := []map[string]any{
+		{"type": "text", "text": req.Prompt},
+		{"type": "image_url", "image_url": map[string]any{"url": req.ImageURL}},
+	}
+	reqBody := map[string]any{
+		"model":      b.providerModel(req.Model),
+		"messages":   []map[string]any{{"role": "user", "content": content}},
+		"max_tokens": maxTok, "stream": false,
+	}
+	body, _ := json.Marshal(reqBody)
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, b.baseURL+"/v1/chat/completions", bytes.NewReader(body))
+	if err != nil {
+		return VisionResult{}, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	if b.apiKey != "" {
+		httpReq.Header.Set("Authorization", "Bearer "+b.apiKey)
+	}
+	resp, err := b.http.Do(httpReq)
+	if err != nil {
+		return VisionResult{}, fmt.Errorf("vision provider call: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		excerpt, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return VisionResult{}, fmt.Errorf("vision provider returned %d for model %q: %s", resp.StatusCode, b.providerModel(req.Model), bytes.TrimSpace(excerpt))
+	}
+	var out visionChatResponse
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return VisionResult{}, fmt.Errorf("decode vision response: %w", err)
+	}
+	if len(out.Choices) == 0 {
+		return VisionResult{}, fmt.Errorf("vision provider returned no choices for model %q", b.providerModel(req.Model))
+	}
+	text := strings.TrimSpace(out.Choices[0].Message.Content)
+	if text == "" {
+		text = strings.TrimSpace(out.Choices[0].Message.ReasoningContent)
+	}
+	pt, ct := out.Usage.PromptTokens, out.Usage.CompletionTokens
+	if ct == 0 {
+		ct = CountTokens(text)
+	}
+	return VisionResult{Text: text, PromptTokens: pt, CompletionTokens: ct}, nil
+}

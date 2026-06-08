@@ -7,7 +7,7 @@
  * sidebar inside the playground area.
  */
 
-import { Paperclip, Mic, Volume2, Headphones } from 'lucide-vue-next'
+import { Paperclip, Mic, Volume2, Headphones, Monitor } from 'lucide-vue-next'
 import type { CatalogModel } from '~/composables/useCatalog'
 import type { ChatUsage } from '~/composables/useInference'
 
@@ -17,7 +17,7 @@ useHead({ title: 'Inference Playground — Exascale' })
 // =====================================================
 // Model catalog
 // =====================================================
-type Category = 'text' | 'speech' | 'image' | 'video' | 'embed'
+type Category = 'text' | 'speech' | 'image' | 'video' | 'embed' | 'vision'
 interface ModelDef {
   id: string
   name: string
@@ -47,7 +47,7 @@ function humanizeId(id: string): string {
 /** toCategory maps an Exascale modality to a catalog UI category. */
 function toCategory(modality: string): Category {
   if (modality === 'embeddings' || modality === 'embed') return 'embed'
-  if (modality === 'speech' || modality === 'image' || modality === 'video') return modality
+  if (modality === 'speech' || modality === 'image' || modality === 'video' || modality === 'vision') return modality
   return 'text'
 }
 /**
@@ -79,6 +79,7 @@ const CATEGORY_META: Record<Category, { label: string; cls: string }> = {
   image:  { label: 'IMAGE',    cls: 'cat-image' },
   video:  { label: 'VIDEO',    cls: 'cat-video' },
   embed:  { label: 'EMBED',    cls: 'cat-embed' },
+  vision: { label: 'VISION',   cls: 'cat-speech' },
 }
 
 // =====================================================
@@ -86,7 +87,7 @@ const CATEGORY_META: Record<Category, { label: string; cls: string }> = {
 // =====================================================
 const catalogQuery = ref('')
 type Filter = 'all' | Category
-const FILTERS: Filter[] = ['all', 'text', 'speech', 'image', 'video', 'embed']
+const FILTERS: Filter[] = ['all', 'text', 'vision', 'speech', 'image', 'video', 'embed']
 const filter = ref<Filter>('all')
 
 const filteredModels = computed(() => {
@@ -543,6 +544,77 @@ async function generateSpeech() {
     const p = catalogPrice.value[modelId]
     if (p) { aTurn.creditCost = p.price * (input.length / 1000); aTurn.creditType = p.creditType }
     void refreshBalance()
+  } catch (e: unknown) {
+    renderAssistantError(aTurn, e)
+  } finally {
+    generating.value = false
+    await nextTick(); scrollToBottom()
+  }
+}
+
+// ── Vision (share screen → describe → speak) — capture the screen, send a frame to a VLM, read the
+// answer aloud. All browser-native capture + the gateway VLM + the speak() TTS.
+const screenStream = ref<MediaStream | null>(null)
+const screenVideoEl = ref<HTMLVideoElement | null>(null) // hidden element that plays the shared screen
+const sharingScreen = computed(() => !!screenStream.value)
+
+/** stopScreen ends the screen share and releases the capture tracks. */
+function stopScreen() {
+  screenStream.value?.getTracks().forEach((t) => t.stop())
+  screenStream.value = null
+}
+/** shareScreen prompts for a screen/window/tab to share (or stops an active share). */
+async function shareScreen() {
+  if (screenStream.value) { stopScreen(); return }
+  if (!import.meta.client || !navigator.mediaDevices?.getDisplayMedia) { attachError.value = 'screen share needs a modern browser'; return }
+  try {
+    const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false })
+    screenStream.value = stream
+    stream.getVideoTracks()[0]?.addEventListener('ended', stopScreen) // user stopped via the browser bar
+    await nextTick()
+    if (screenVideoEl.value) { screenVideoEl.value.srcObject = stream; await screenVideoEl.value.play().catch(() => {}) }
+  } catch { attachError.value = 'screen share cancelled' }
+}
+/** captureFrame grabs the current screen frame as a downscaled JPEG data URI (null if not ready). */
+function captureFrame(): string | null {
+  const v = screenVideoEl.value
+  if (!v || !screenStream.value || !v.videoWidth) return null
+  const maxW = 1280
+  const scale = Math.min(1, maxW / v.videoWidth)
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.round(v.videoWidth * scale)
+  canvas.height = Math.round(v.videoHeight * scale)
+  canvas.getContext('2d')?.drawImage(v, 0, 0, canvas.width, canvas.height)
+  return canvas.toDataURL('image/jpeg', 0.7)
+}
+
+// askVision captures a screen frame + the prompt, asks the VLM, then speaks the answer aloud.
+async function askVision() {
+  if (generating.value) return
+  if (!screenStream.value) { attachError.value = 'share your screen first'; return }
+  const img = captureFrame()
+  if (!img) { attachError.value = 'could not capture the screen — try again'; return }
+  const prompt = draft.value.trim() || 'Describe what is on the screen, concisely.'
+  turns.push({ id: nextId(), role: 'user', text: prompt + '  🖥️' })
+  draft.value = ''
+  generating.value = true
+  const startedAt = Date.now()
+  const modelId = selectedId.value
+  turns.push({ id: nextId(), role: 'assistant', text: '', streaming: true, backend: modelId })
+  const aTurn = turns[turns.length - 1]!
+  await nextTick(); scrollToBottom()
+  try {
+    const res = await $fetch<{ text: string; usage?: ChatUsage }>('/api/inference/vision', {
+      method: 'POST', body: { model: modelId, prompt, image_url: img, max_tokens: 400 },
+    })
+    aTurn.streaming = false
+    aTurn.latencyMs = Date.now() - startedAt
+    aTurn.text = res.text || '(no answer)'
+    aTurn.html = renderMarkdownLite(aTurn.text)
+    const p = catalogPrice.value[modelId]
+    if (p && res.usage) { aTurn.creditCost = p.price * (res.usage.total_tokens / 1000); aTurn.creditType = p.creditType }
+    void refreshBalance()
+    speak(aTurn.text) // vision → speech
   } catch (e: unknown) {
     renderAssistantError(aTurn, e)
   } finally {
@@ -1290,6 +1362,43 @@ async function copyText(text: string, label: string) {
                       </button>
                       <button v-else type="submit" class="send-btn" :disabled="!draft.trim()">
                         Speak
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square">
+                          <path d="M3 8h10M9 4l4 4-4 4" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </form>
+
+              <!-- Vision models: share your screen → a frame goes to the VLM → the answer is read aloud. -->
+              <form v-else-if="selected.category === 'vision'" class="composer" @submit.prevent="askVision">
+                <video ref="screenVideoEl" class="screen-hidden" muted playsinline />
+                <div class="composer-box">
+                  <div class="vision-bar">
+                    <button
+                      type="button" class="cmp-tool" :class="{ active: sharingScreen }"
+                      :title="sharingScreen ? 'Stop sharing' : 'Share your screen'" @click="shareScreen"
+                    >
+                      <Monitor :size="14" />
+                    </button>
+                    <span class="composer-hint mono">{{ sharingScreen ? 'Sharing — ask about your screen; the answer is read aloud' : 'Share your screen, then ask' }}</span>
+                  </div>
+                  <textarea
+                    v-model="draft"
+                    class="composer-input"
+                    placeholder="Ask about your screen…  (or leave blank to describe it)"
+                    rows="2"
+                    @keydown.enter.exact.prevent="askVision"
+                  />
+                  <div class="composer-foot">
+                    <span class="composer-hint mono">{{ selected.name }} · reads the reply aloud</span>
+                    <div class="composer-actions">
+                      <button v-if="generating" type="button" class="send-btn stop-btn" disabled>
+                        <span class="spinner" /> Looking…
+                      </button>
+                      <button v-else type="submit" class="send-btn" :disabled="!sharingScreen">
+                        Ask
                         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square">
                           <path d="M3 8h10M9 4l4 4-4 4" />
                         </svg>
@@ -2227,6 +2336,9 @@ ratelimit-remaining:   58 / 60 RPS</pre>
 /* Generated-audio player (text→speech turns). */
 .aud-out { max-width: 420px; }
 .aud-out audio { display: block; width: 100%; }
+/* Vision (screen share): hidden capture surface + the share toolbar. */
+.screen-hidden { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.vision-bar { display: flex; align-items: center; gap: 10px; padding: 10px 12px 0; }
 
 /* Composer */
 .composer {

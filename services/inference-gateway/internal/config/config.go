@@ -76,6 +76,7 @@ var defaultMediaMap = map[string]string{
 	"gpt-image-1.5":        "stable-diffusion-3.5-large", // openai-gpt-image is tier-gated on DO base
 	"stable-diffusion-3.5": "stable-diffusion-3.5-large",
 	"flux-schnell":         "stable-diffusion-3.5-large", // DO has no Flux
+	"nemotron-vision":      "nemotron-nano-12b-v2-vl",    // VLM for /v1/chat/vision
 	"wan-t2v":              "wan2-2-t2v-a14b",
 	"qwen3-tts":            "qwen3-tts-voicedesign",
 	"elevenlabs-tts":       "qwen3-tts-voicedesign",

@@ -59,6 +59,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 	s.mux.HandleFunc("GET /v1/models", s.listModels)
 	s.mux.HandleFunc("POST /v1/chat/completions", s.chatCompletions)
+	s.mux.HandleFunc("POST /v1/chat/vision", s.visionChat) // VLM: prompt + image → text (bills text)
 	s.mux.HandleFunc("POST /v1/images/generations", s.imageGenerations)
 	s.mux.HandleFunc("POST /v1/audio/speech", s.audioSpeech)
 	s.mux.HandleFunc("POST /v1/videos", s.submitVideo)            // async text-to-video: submit
@@ -379,6 +380,76 @@ func (s *Server) audioSpeech(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", ctype)
 	w.WriteHeader(http.StatusOK)
 	_, _ = io.Copy(w, body)
+}
+
+// visionRequest is the vision (image-understanding) request body.
+type visionRequest struct {
+	Model     string `json:"model"`
+	Prompt    string `json:"prompt"`
+	ImageURL  string `json:"image_url"`
+	MaxTokens int    `json:"max_tokens"`
+}
+
+// visionChat serves POST /v1/chat/vision — authenticate → resolve the vision model → text-credit
+// pre-flight → run the VLM (prompt + image) → return the text answer → meter in `text` credits.
+func (s *Server) visionChat(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+	var req visionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Model == "" || strings.TrimSpace(req.ImageURL) == "" {
+		writeErr(w, http.StatusBadRequest, "bad_request", "model and image_url are required")
+		return
+	}
+	if strings.TrimSpace(req.Prompt) == "" {
+		req.Prompt = "Describe what is shown."
+	}
+	m, found := catalog.Lookup(req.Model)
+	if !found {
+		writeErr(w, http.StatusNotFound, "model_not_found", "unknown model: "+req.Model)
+		return
+	}
+	if m.Exascale.Modality != "vision" {
+		writeErr(w, http.StatusNotFound, "model_not_found", req.Model+" is not a vision model")
+		return
+	}
+	if s.credit != nil {
+		okBal, bal, err := s.credit.Sufficient(r.Context(), p.TenantID, p.IsPaper, m.Exascale.CreditType)
+		if err != nil {
+			slog.Warn("pre-flight balance check failed; serving anyway", "tenant_id", p.TenantID, "err", err)
+		} else if !okBal {
+			writeJSON(w, http.StatusPaymentRequired, map[string]any{
+				"code": "INSUFFICIENT_CREDIT", "message": "Not enough " + m.Exascale.CreditType + " credits.",
+				"details": map[string]any{"credit_type": m.Exascale.CreditType, "balance": bal, "required": m.Exascale.Price, "buy_credits_url": buyCreditsURL},
+			})
+			return
+		}
+	}
+	vb, ok := s.backend.(model.VisionBackend)
+	if !ok {
+		writeErr(w, http.StatusNotImplemented, "unsupported", "vision is not available on this deployment (no vision provider configured)")
+		return
+	}
+	start := time.Now()
+	res, err := vb.Vision(r.Context(), model.VisionRequest{Model: req.Model, Prompt: req.Prompt, ImageURL: req.ImageURL, MaxTokens: req.MaxTokens})
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	total := res.PromptTokens + res.CompletionTokens
+	units, err := pricing.UnitsForTokens(m.Exascale.Price, total)
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	requestID := "visreq_" + uuid.NewString()
+	writeJSON(w, http.StatusOK, map[string]any{
+		"model": req.Model, "text": res.Text,
+		"usage": map[string]any{"prompt_tokens": res.PromptTokens, "completion_tokens": res.CompletionTokens, "total_tokens": total},
+	})
+	// Token-based billing; modality=vision / credit_type=text come from the catalog entry.
+	s.meter(p, m, req.Model, model.ChatResult{PromptTokens: res.PromptTokens, CompletionTokens: res.CompletionTokens}, units, int(time.Since(start).Milliseconds()), requestID)
 }
 
 // videoRequest is the text-to-video submit body.
