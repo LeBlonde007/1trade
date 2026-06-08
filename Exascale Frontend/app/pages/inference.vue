@@ -441,13 +441,24 @@ function toggleMic() {
   const SR = (window as unknown as { SpeechRecognition?: new () => unknown; webkitSpeechRecognition?: new () => unknown })
   const Ctor = SR.SpeechRecognition || SR.webkitSpeechRecognition
   if (!Ctor) return
+  const base = draft.value.trim() // preserve anything already typed before dictation starts
   const r = new Ctor() as {
     lang: string; interimResults: boolean; continuous: boolean
-    onresult: (e: { results: { 0: { 0: { transcript: string } } } }) => void
+    onresult: (e: { results: { length: number;[i: number]: { isFinal?: boolean;[j: number]: { transcript: string } } } }) => void
     onend: () => void; onerror: () => void; start: () => void; stop: () => void
   }
   r.lang = 'en-US'; r.interimResults = false; r.continuous = false
-  r.onresult = (ev) => { draft.value = (draft.value + ' ' + ev.results[0][0].transcript).trim() }
+  // `results` is cumulative and onresult fires repeatedly as the engine refines the utterance, so
+  // rebuild the whole final transcript each event rather than appending deltas — appending re-adds
+  // already-captured words and duplicates them ("hello" → "Hello Hello hello Hello hello hello…").
+  r.onresult = (ev) => {
+    let phrase = ''
+    for (let i = 0; i < ev.results.length; i++) {
+      const res = ev.results[i]
+      if (res && res.isFinal !== false) phrase += res[0]?.transcript ?? ''
+    }
+    draft.value = (base ? base + ' ' : '') + phrase.trim()
+  }
   r.onend = () => { listening.value = false }
   r.onerror = () => { listening.value = false }
   recog = r
