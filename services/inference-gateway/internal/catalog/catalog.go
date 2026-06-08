@@ -12,11 +12,12 @@ type Pricing struct {
 	Price      string `json:"price"`
 }
 
-// Model is one catalog entry, OpenAI-shaped (`id`/`object`/`owned_by`) plus the Exascale pricing
-// extension. `Created` is a fixed catalog-epoch timestamp (catalog entries are not per-request).
+// Model is one catalog entry, OpenAI-shaped (`id`/`object`/`owned_by`) plus a human display `name` and
+// the Exascale pricing extension. `Created` is a fixed catalog-epoch timestamp (not per-request).
 type Model struct {
 	ID       string  `json:"id"`
 	Object   string  `json:"object"`
+	Name     string  `json:"name"`
 	Created  int64   `json:"created"`
 	OwnedBy  string  `json:"owned_by"`
 	Exascale Pricing `json:"exascale"`
@@ -25,20 +26,42 @@ type Model struct {
 // catalogEpoch is a stable `created` value for catalog entries (2026-01-01T00:00:00Z).
 const catalogEpoch int64 = 1767225600
 
-// models is the curated catalog. M2 launches the first three (Llama-70B/8B + Whisper) per F09;
-// more register here behind the same shape with no API change.
+// models is the curated catalog — the customer-facing menu. Every entry is served on Exascale infra
+// (owned_by=exascale); the upstream that physically runs it is an implementation detail mapped at the
+// gateway (INFERENCE_MODEL_MAP). All are chat/text and bill in `text` credits. Add a row here + its
+// provider-slug to the model map and it just works — no API change.
 var models = []Model{
 	{
-		ID: "llama-3.1-70b", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
+		ID: "llama-3.1-70b", Name: "Llama 3.1 70B", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
 		Exascale: Pricing{Modality: "text", CreditType: "text", Unit: "1K tokens", Price: "25.000000"},
 	},
 	{
-		ID: "llama-3.1-8b", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
+		ID: "llama-3.1-8b", Name: "Llama 3.1 8B", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
 		Exascale: Pricing{Modality: "text", CreditType: "text", Unit: "1K tokens", Price: "5.000000"},
 	},
 	{
-		ID: "whisper-large-v3", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
-		Exascale: Pricing{Modality: "speech", CreditType: "speech", Unit: "1 minute", Price: "10.000000"},
+		ID: "claude-opus-4.8", Name: "Claude Opus 4.8", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
+		Exascale: Pricing{Modality: "text", CreditType: "text", Unit: "1K tokens", Price: "80.000000"},
+	},
+	{
+		ID: "claude-sonnet-4.5", Name: "Claude Sonnet 4.5", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
+		Exascale: Pricing{Modality: "text", CreditType: "text", Unit: "1K tokens", Price: "30.000000"},
+	},
+	{
+		ID: "gpt-5", Name: "GPT-5", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
+		Exascale: Pricing{Modality: "text", CreditType: "text", Unit: "1K tokens", Price: "40.000000"},
+	},
+	{
+		ID: "gpt-4o", Name: "GPT-4o", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
+		Exascale: Pricing{Modality: "text", CreditType: "text", Unit: "1K tokens", Price: "25.000000"},
+	},
+	{
+		ID: "deepseek-v3.2", Name: "DeepSeek V3.2", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
+		Exascale: Pricing{Modality: "text", CreditType: "text", Unit: "1K tokens", Price: "8.000000"},
+	},
+	{
+		ID: "qwen3-32b", Name: "Qwen3 32B", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
+		Exascale: Pricing{Modality: "text", CreditType: "text", Unit: "1K tokens", Price: "6.000000"},
 	},
 }
 

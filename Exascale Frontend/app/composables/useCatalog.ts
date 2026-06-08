@@ -5,6 +5,7 @@
 export interface CatalogModel {
   id: string
   object: string
+  name?: string
   owned_by: string
   exascale: { modality: string; credit_type: string; unit: string; price: string }
 }
