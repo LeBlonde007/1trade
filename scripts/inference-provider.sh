@@ -48,7 +48,11 @@ else
   # var is set (doubling the closing brace → invalid JSON → the gateway loads zero entries). When the
   # provider is DigitalOcean, default to its serverless slugs so the whole catalog works zero-config.
   case "$PROVIDER_URL" in
-    *do-ai.run*) DEFAULT_MAP='{"llama-3.1-8b":"llama-4-maverick","llama-3.1-70b":"llama3.3-70b-instruct","claude-opus-4.8":"anthropic-claude-opus-4.8","claude-sonnet-4.5":"anthropic-claude-4.5-sonnet","gpt-5":"openai-gpt-5","gpt-4o":"openai-gpt-4o","deepseek-v3.2":"deepseek-3.2","qwen3-32b":"alibaba-qwen3-32b","stable-diffusion-3.5":"stable-diffusion-3.5-large","flux-schnell":"fal-ai/flux/schnell","gpt-image-1.5":"openai-gpt-image-1.5","elevenlabs-tts":"fal-ai/elevenlabs/tts/multilingual-v2","qwen3-tts":"qwen3-tts-voicedesign","wan-t2v":"wan2-2-t2v-a14b","bge-m3":"bge-m3","e5-large":"e5-large-v2"}' ;;
+    # Media slugs target DigitalOcean's *base* serverless tier: only stable-diffusion-3.5-large (image),
+    # qwen3-tts-voicedesign (speech), wan2-2-t2v-a14b (video) and the open text models are available
+    # there. Flux / ElevenLabs aren't on DO, and openai-gpt-image is tier-gated (403), so those catalog
+    # ids route to the available equivalents. On a higher DO tier, override via INFERENCE_MODEL_MAP.
+    *do-ai.run*) DEFAULT_MAP='{"llama-3.1-8b":"llama-4-maverick","llama-3.1-70b":"llama3.3-70b-instruct","claude-opus-4.8":"anthropic-claude-opus-4.8","claude-sonnet-4.5":"anthropic-claude-4.5-sonnet","gpt-5":"openai-gpt-5","gpt-4o":"openai-gpt-4o","deepseek-v3.2":"deepseek-3.2","qwen3-32b":"alibaba-qwen3-32b","stable-diffusion-3.5":"stable-diffusion-3.5-large","flux-schnell":"stable-diffusion-3.5-large","gpt-image-1.5":"stable-diffusion-3.5-large","elevenlabs-tts":"qwen3-tts-voicedesign","qwen3-tts":"qwen3-tts-voicedesign","wan-t2v":"wan2-2-t2v-a14b","bge-m3":"bge-m3","e5-large":"e5-large-v2"}' ;;
     *)           DEFAULT_MAP='{"llama-3.1-70b":"meta-llama/llama-3.1-70b-instruct","llama-3.1-8b":"meta-llama/llama-3.1-8b-instruct"}' ;;
   esac
   MODEL_MAP="${INFERENCE_MODEL_MAP:-$DEFAULT_MAP}"
