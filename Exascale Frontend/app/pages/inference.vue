@@ -743,8 +743,8 @@ async function copyText(text: string, label: string) {
                 </div>
               </div>
 
-              <!-- Composer -->
-              <form class="composer" @submit.prevent="send">
+              <!-- Composer — chat is text-only; non-text models run via the API/SDK (see below) -->
+              <form v-if="selected.category === 'text'" class="composer" @submit.prevent="send">
                 <div class="composer-box">
                   <textarea
                     v-model="draft"
@@ -785,6 +785,18 @@ async function copyText(text: string, label: string) {
                   </div>
                 </div>
               </form>
+
+              <!-- Non-text models (image / speech / video / embeddings): the inline chat playground is
+                   text-only, so point to the API/CLI. The catalog + pricing are fully live. -->
+              <div v-else class="api-only">
+                <div class="api-only-icon">{{ CATEGORY_META[selected.category].label }}</div>
+                <h4>{{ selected.name }} runs via the API</h4>
+                <p>{{ CATEGORY_META[selected.category].label.toLowerCase() }} generation isn't in the inline
+                  playground yet — call it from the API or CLI with the same OpenAI-compatible interface.</p>
+                <button type="button" class="api-only-copy" @click="copyText('exascale infer ' + selected.id, 'api-' + selected.id)">
+                  {{ copied === ('api-' + selected.id) ? '✓ Copied' : 'Copy CLI command' }}
+                </button>
+              </div>
             </template>
 
             <!-- ===== CODE ===== -->
@@ -1687,6 +1699,21 @@ ratelimit-remaining:   58 / 60 RPS</pre>
   line-height: 1.55;
 }
 .composer-input::placeholder { color: var(--text-3); }
+
+/* Non-text model panel (image/speech/video/embeddings) — chat playground is text-only. */
+.api-only { padding: 40px 32px; text-align: center; color: var(--text-2); }
+.api-only-icon {
+  display: inline-block; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em;
+  color: var(--text-2); border: 1px solid var(--border); border-radius: 2px; padding: 3px 9px; margin-bottom: 16px;
+}
+.api-only h4 { font-family: var(--font-display); font-size: 18px; color: var(--text); margin: 0 0 8px; font-weight: 600; }
+.api-only p { font-size: 13px; line-height: 1.6; max-width: 440px; margin: 0 auto 18px; }
+.api-only-copy {
+  background: none; border: 1px solid var(--border-strong); border-radius: 2px; padding: 6px 14px;
+  font-size: 13px; color: var(--text); cursor: pointer;
+}
+.api-only-copy:hover { background: rgba(0, 0, 0, 0.03); }
+
 .composer-foot {
   display: flex;
   justify-content: space-between;
