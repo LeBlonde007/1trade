@@ -73,9 +73,9 @@ func jsonMap(s string) map[string]string {
 // ElevenLabs aren't carried by DO, so they're substituted with the nearest available model — set
 // INFERENCE_MODEL_MAP (which overrides these) or another provider for exact parity.
 var defaultMediaMap = map[string]string{
-	"gpt-image-1.5":        "openai-gpt-image-1.5",
+	"gpt-image-1.5":        "stable-diffusion-3.5-large", // openai-gpt-image is tier-gated on DO base
 	"stable-diffusion-3.5": "stable-diffusion-3.5-large",
-	"flux-schnell":         "stable-diffusion-3.5-large",
+	"flux-schnell":         "stable-diffusion-3.5-large", // DO has no Flux
 	"wan-t2v":              "wan2-2-t2v-a14b",
 	"qwen3-tts":            "qwen3-tts-voicedesign",
 	"elevenlabs-tts":       "qwen3-tts-voicedesign",
