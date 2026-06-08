@@ -33,7 +33,8 @@ Credits:
 
 Inference:
   catalog                                 List available models
-  infer chat -m MODEL "prompt"            Run a chat completion
+  infer chat -m MODEL "prompt"            Run a chat completion (streams; --json for the object)
+  chat [-m MODEL]                         Interactive multi-turn chat (slash commands, live cost)
 
 GPU instances:
   gpu types                               List GPU types + price + availability
@@ -83,6 +84,8 @@ func main() {
 		err = cmdCatalog(cfg, args)
 	case "infer":
 		err = cmdInfer(cfg, args)
+	case "chat":
+		err = cmdChat(cfg, args)
 	case "gpu":
 		err = cmdGPU(cfg, args)
 	case "keys":

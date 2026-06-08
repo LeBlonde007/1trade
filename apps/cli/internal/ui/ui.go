@@ -42,6 +42,9 @@ func Delta(n float64) string {
 	return Green(fmt.Sprintf("▲ %s", trim(n)))
 }
 
+// Num formats a number without trailing zeros (e.g. 12.50 → "12.5", 982 → "982") for compact display.
+func Num(n float64) string { return trim(n) }
+
 // trim formats a float without trailing zeros (e.g. 12.50 → "12.5", 5 → "5").
 func trim(n float64) string {
 	s := strings.TrimRight(strings.TrimRight(fmt.Sprintf("%.6f", n), "0"), ".")
