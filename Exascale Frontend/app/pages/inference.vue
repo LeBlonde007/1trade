@@ -104,6 +104,14 @@ const EMPTY_MODEL: ModelDef = { id: '', name: '—', provider: '', category: 'te
 const selectedId = ref('')
 const selected = computed(() => models.value.find(m => m.id === selectedId.value) ?? models.value[0] ?? EMPTY_MODEL)
 
+// turnModelName resolves the display name for the model that produced a given turn, so each reply keeps
+// its own model label even after the picker changes (falls back to the live selection for older turns).
+function turnModelName(t: Turn): string {
+  const id = t.model || t.backend
+  if (!id) return selected.value.name
+  return models.value.find(m => m.id === id)?.name ?? humanizeId(id)
+}
+
 // Real signed-in identity for the chat transcript (no hardcoded demo user). We only have the email,
 // so the label is its local-part and the avatar is up to two initials derived from it.
 const { user } = useAuth()
@@ -426,7 +434,7 @@ async function generateImage() {
   generating.value = true
   const startedAt = Date.now()
   const modelId = selectedId.value
-  turns.push({ id: nextId(), role: 'assistant', text: '', streaming: true, backend: modelId })
+  turns.push({ id: nextId(), role: 'assistant', text: '', streaming: true, backend: modelId, model: modelId })
   const aTurn = turns[turns.length - 1]!
   await nextTick(); scrollToBottom()
   try {
@@ -469,7 +477,7 @@ async function generateVideo() {
   generating.value = true
   const startedAt = Date.now()
   const modelId = selectedId.value
-  turns.push({ id: nextId(), role: 'assistant', text: 'Submitting video…', streaming: true, backend: modelId })
+  turns.push({ id: nextId(), role: 'assistant', text: 'Submitting video…', streaming: true, backend: modelId, model: modelId })
   const aTurn = turns[turns.length - 1]!
   await nextTick(); scrollToBottom()
   try {
@@ -524,7 +532,7 @@ async function generateSpeech() {
   generating.value = true
   const startedAt = Date.now()
   const modelId = selectedId.value
-  turns.push({ id: nextId(), role: 'assistant', text: '', streaming: true, backend: modelId })
+  turns.push({ id: nextId(), role: 'assistant', text: '', streaming: true, backend: modelId, model: modelId })
   const aTurn = turns[turns.length - 1]!
   await nextTick(); scrollToBottom()
   try {
@@ -603,7 +611,7 @@ async function askVision() {
   generating.value = true
   const startedAt = Date.now()
   const modelId = selectedId.value
-  turns.push({ id: nextId(), role: 'assistant', text: '', streaming: true, backend: modelId })
+  turns.push({ id: nextId(), role: 'assistant', text: '', streaming: true, backend: modelId, model: modelId })
   const aTurn = turns[turns.length - 1]!
   await nextTick(); scrollToBottom()
   try {
@@ -1154,7 +1162,7 @@ async function copyText(text: string, label: string) {
                       <template v-else>AI</template>
                     </span>
                     <span class="turn-who">
-                      {{ t.role === 'user' ? userLabel : selected.name }}
+                      {{ t.role === 'user' ? userLabel : turnModelName(t) }}
                     </span>
                     <span v-if="t.role === 'assistant' && t.latencyMs" class="turn-meta mono">
                       {{ t.latencyMs }}ms · {{ t.tokens?.out ?? 0 }} tok out<template v-if="t.creditCost !== undefined"> · {{ fmtCredits(t.creditCost) }} {{ t.creditType }} credits</template>
