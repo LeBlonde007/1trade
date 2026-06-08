@@ -63,6 +63,12 @@ var models = []Model{
 		ID: "qwen3-32b", Name: "Qwen3 32B", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
 		Exascale: Pricing{Modality: "text", CreditType: "text", Unit: "1K tokens", Price: "6.000000"},
 	},
+	// Vision (image/screen understanding → text). Bills in `text` credits — the output is text. Served
+	// via POST /v1/chat/vision with an image_url content part.
+	{
+		ID: "nemotron-vision", Name: "Nemotron Vision", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
+		Exascale: Pricing{Modality: "vision", CreditType: "text", Unit: "1K tokens", Price: "10.000000"},
+	},
 	// Image generation (billed in `image` credits, per image). Inline playground is chat-only — these
 	// run via the image API/SDK; the catalog surfaces them so the marketplace reads as multi-modal.
 	{
