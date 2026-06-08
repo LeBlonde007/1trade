@@ -12,6 +12,8 @@ const email = ref('')
 const password = ref('')
 const authError = ref('')
 const submitting = ref(false)
+// Shown after the user confirms their email and is redirected here (verify.vue → /login?verified=1).
+const justVerified = computed(() => useRoute().query.verified === '1')
 const showPw = ref(false)
 const code = ref('428')
 const rememberDevice = ref(false)
@@ -143,6 +145,8 @@ onBeforeUnmount(() => {
           <div class="lf-eyebrow">Account · sign in</div>
           <h1 class="lf-title">Sign in</h1>
           <p class="lf-sub">Access your paper or real-money account on the Exascale venue.</p>
+
+          <p v-if="justVerified" class="form-ok" role="status">Email verified — sign in to continue.</p>
 
           <form @submit="onCreds">
             <div class="field">
@@ -499,6 +503,17 @@ onBeforeUnmount(() => {
   font-size: 14px;
   margin: 0 0 28px;
   line-height: 1.5;
+}
+
+/* Positive note after email verification — sharp, mono, positive semantic. */
+.form-ok {
+  margin: 0 0 18px;
+  padding: 10px 12px;
+  border: 1px solid var(--pos);
+  border-radius: 2px;
+  color: var(--pos);
+  font-size: 13px;
+  font-family: var(--font-mono);
 }
 
 .field { margin-bottom: 16px; position: relative; }

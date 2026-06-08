@@ -37,7 +37,7 @@ func New(cfg config.Config, st *store.Store) *Server {
 // NewWithBilling builds the handler with explicit billing collaborators (tests inject fakes). The
 // mailer comes from config (Mailpit locally; a no-op when no SMTP server is set).
 func NewWithBilling(cfg config.Config, st *store.Store, stripe billing.StripeClient, booker billing.PurchaseBooker) *Server {
-	s := &Server{cfg: cfg, st: st, stripe: stripe, booker: booker, mailer: email.New(cfg.SMTPAddr, cfg.EmailFrom), mux: http.NewServeMux()}
+	s := &Server{cfg: cfg, st: st, stripe: stripe, booker: booker, mailer: email.New(cfg.SMTPAddr, cfg.EmailFrom, cfg.SMTPUser, cfg.SMTPPass, cfg.SMTPTLS), mux: http.NewServeMux()}
 	s.routes()
 	return s
 }
@@ -73,8 +73,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /v1/account/orgs/{id}/users", s.listOrgUsers)
 	s.mux.HandleFunc("PUT /v1/account/users/{id}/roles", s.assignRoles)
 	s.mux.HandleFunc("GET /v1/account/tenants/{id}", s.getTenant)
-	s.mux.HandleFunc("POST /v1/auth/verify", s.verifyEmail)          // token is the credential (no bearer)
-	s.mux.HandleFunc("POST /v1/auth/verify/resend", s.resendVerify)  // authed; dev returns the token
+	s.mux.HandleFunc("POST /v1/auth/verify", s.verifyEmail)         // token is the credential (no bearer)
+	s.mux.HandleFunc("POST /v1/auth/verify/resend", s.resendVerify) // authed; dev returns the token
 	s.mux.HandleFunc("GET /v1/billing/budget", s.getBudget)
 	s.mux.HandleFunc("PUT /v1/billing/budget", s.setBudget)
 	s.mux.HandleFunc("GET /v1/account/kyc", s.getKYC)                          // F22 — caller's tenant KYC status
@@ -141,6 +141,12 @@ func (s *Server) signup(w http.ResponseWriter, r *http.Request) {
 			slog.Info("dev: email verification token (no SMTP configured)", "user_id", u.ID, "token", raw)
 		}
 	}
+	// When email verification gates login (sandbox/prod), do NOT auto-issue a session — the account is
+	// unusable until the emailed link is clicked. The web app shows a "check your inbox" screen.
+	if s.cfg.RequireEmailVerification {
+		writeJSON(w, http.StatusCreated, map[string]any{"status": "verification_required", "email": b.Email})
+		return
+	}
 	s.issue(w, http.StatusCreated, u.ID, domain.Claims{TenantID: u.TenantID, Roles: u.Roles, IsPaper: u.IsPaper})
 }
 
@@ -166,6 +172,13 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	}
 	if !domain.VerifyPassword(au.PasswordHash, b.Password) {
 		writeErr(w, http.StatusUnauthorized, "invalid_credentials", "invalid email or password")
+		return
+	}
+	// Email-verification gate (sandbox/prod): a correct password is not enough until the email is
+	// confirmed. 403 (not 401) so the client can tell "verify your inbox" apart from "wrong password"
+	// and offer a resend, without leaking whether the password was right (we only reach here on a match).
+	if s.cfg.RequireEmailVerification && !au.EmailVerified {
+		writeErr(w, http.StatusForbidden, "email_unverified", "verify your email to sign in — check your inbox")
 		return
 	}
 	s.issue(w, http.StatusOK, au.UserID, domain.Claims{

@@ -23,10 +23,21 @@ export function useAuth() {
     return user.value
   }
 
-  /** signup creates a tenant + admin user and loads the identity. */
+  /**
+   * signup creates a tenant + admin user. When the deployment gates login on email verification the
+   * backend returns no session — signup yields `{ status: 'verification_required', email }` and the
+   * caller shows a "check your inbox" screen. Otherwise it loads the identity (immediate login).
+   */
   async function signup(email: string, password: string, tenant_name?: string) {
-    user.value = await $fetch<Identity>('/api/auth/signup', { method: 'POST', body: { email, password, tenant_name } })
-    return user.value
+    const res = await $fetch<Identity | { status: string; email: string }>('/api/auth/signup', {
+      method: 'POST', body: { email, password, tenant_name },
+    })
+    if (res && 'status' in res && res.status === 'verification_required') {
+      user.value = null
+      return res
+    }
+    user.value = res as Identity
+    return res
   }
 
   /** refresh loads the current identity from the session cookie (null when logged out). */

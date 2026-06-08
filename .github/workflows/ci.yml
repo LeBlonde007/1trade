@@ -23,7 +23,11 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: '3.12' }
       - name: pre-commit
-        run: pipx install pre-commit && pre-commit run --all-files --show-diff-on-failure
+        # golangci-lint is a HARD gate in the `go` job below (pinned v2.12.2 + Go 1.25). Skip it here:
+        # this job sets up only Python, so the hook would fall back to the runner's *bundled, unpinned*
+        # golangci-lint — a version skew that fails nondeterministically against the pinned gate. The
+        # remaining hooks (whitespace, secrets, yaml/json, ruff, eslint, the pygrep guards) still run.
+        run: pipx install pre-commit && SKIP=golangci-lint pre-commit run --all-files --show-diff-on-failure
 
   contracts:
     name: contract check (OpenAPI + event schemas)
