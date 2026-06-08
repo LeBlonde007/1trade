@@ -60,6 +60,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /v1/models", s.listModels)
 	s.mux.HandleFunc("POST /v1/chat/completions", s.chatCompletions)
 	s.mux.HandleFunc("POST /v1/images/generations", s.imageGenerations)
+	s.mux.HandleFunc("POST /v1/audio/speech", s.audioSpeech)
 	s.mux.HandleFunc("POST /v1/videos", s.submitVideo)            // async text-to-video: submit
 	s.mux.HandleFunc("GET /v1/videos/{id}", s.getVideo)           // poll job status
 	s.mux.HandleFunc("GET /v1/videos/{id}/content", s.getVideoContent) // stream the finished mp4
@@ -306,6 +307,78 @@ func (s *Server) meterImage(p auth.Principal, m catalog.Model, modelID string, c
 		slog.Error("publish inference.usage.v1 (image) failed", "request_id", requestID, "err", err)
 	}
 	_ = count // count is reflected in `units`; kept for symmetry with meter()'s signature
+}
+
+// speechRequest is the OpenAI-compatible text-to-speech request body.
+type speechRequest struct {
+	Model        string `json:"model"`
+	Input        string `json:"input"`
+	Voice        string `json:"voice"`
+	Instructions string `json:"instructions"`
+	Format       string `json:"response_format"`
+}
+
+// audioSpeech serves POST /v1/audio/speech (OpenAI-compatible): authenticate → resolve the speech model
+// → speech-credit pre-flight → generate via the backend → stream the audio bytes back → emit one
+// inference.usage.v1 event (units = input chars / 1K) for the ledger to debit in `speech` credits.
+func (s *Server) audioSpeech(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+	var req speechRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Model == "" || strings.TrimSpace(req.Input) == "" {
+		writeErr(w, http.StatusBadRequest, "bad_request", "model and input are required")
+		return
+	}
+	m, found := catalog.Lookup(req.Model)
+	if !found {
+		writeErr(w, http.StatusNotFound, "model_not_found", "unknown model: "+req.Model)
+		return
+	}
+	if m.Exascale.Modality != "speech" {
+		writeErr(w, http.StatusNotFound, "model_not_found", req.Model+" is not a speech model")
+		return
+	}
+	if s.credit != nil {
+		okBal, bal, err := s.credit.Sufficient(r.Context(), p.TenantID, p.IsPaper, m.Exascale.CreditType)
+		if err != nil {
+			slog.Warn("pre-flight balance check failed; serving anyway", "tenant_id", p.TenantID, "err", err)
+		} else if !okBal {
+			writeJSON(w, http.StatusPaymentRequired, map[string]any{
+				"code": "INSUFFICIENT_CREDIT", "message": "Not enough " + m.Exascale.CreditType + " credits to generate speech.",
+				"details": map[string]any{"credit_type": m.Exascale.CreditType, "balance": bal, "required": m.Exascale.Price, "buy_credits_url": buyCreditsURL},
+			})
+			return
+		}
+	}
+	sb, ok := s.backend.(model.SpeechBackend)
+	if !ok {
+		writeErr(w, http.StatusNotImplemented, "unsupported", "speech generation is not available on this deployment (no speech provider configured)")
+		return
+	}
+	body, ctype, status, err := sb.Speech(r.Context(), model.SpeechRequest{
+		Model: req.Model, Input: req.Input, Voice: req.Voice, Instructions: req.Instructions, Format: req.Format,
+	})
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	defer body.Close()
+	if status != http.StatusOK {
+		excerpt, _ := io.ReadAll(io.LimitReader(body, 1024))
+		writeErr(w, http.StatusBadGateway, "speech_failed", "speech provider error: "+strings.TrimSpace(string(excerpt)))
+		return
+	}
+	// Bill speech credits = price × chars / 1K (UnitsForTokens computes price × n / 1000).
+	units, _ := pricing.UnitsForTokens(m.Exascale.Price, len(req.Input))
+	s.meterImage(p, m, req.Model, len(req.Input), units, 0, "ttsreq_"+uuid.NewString())
+	if ctype == "" {
+		ctype = "audio/wav"
+	}
+	w.Header().Set("Content-Type", ctype)
+	w.WriteHeader(http.StatusOK)
+	_, _ = io.Copy(w, body)
 }
 
 // videoRequest is the text-to-video submit body.

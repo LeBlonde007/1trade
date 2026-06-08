@@ -277,3 +277,38 @@ func (b *VLLMBackend) GetVideoContent(ctx context.Context, id string) (io.ReadCl
 	}
 	return resp.Body, resp.Header.Get("Content-Type"), resp.StatusCode, nil
 }
+
+// Speech generates speech audio (DO POST /v1/audio/speech) and returns the raw audio body stream + its
+// content-type + the upstream status. The caller copies it through and closes it. DO's Qwen3 TTS needs
+// a non-empty voice plus a voice-design `instructions` string, and returns WAV. Satisfies SpeechBackend.
+func (b *VLLMBackend) Speech(ctx context.Context, req SpeechRequest) (io.ReadCloser, string, int, error) {
+	voice := req.Voice
+	if voice == "" {
+		voice = "default"
+	}
+	instructions := req.Instructions
+	if instructions == "" {
+		instructions = "a clear, natural, friendly voice"
+	}
+	format := req.Format
+	if format == "" {
+		format = "wav"
+	}
+	body, _ := json.Marshal(map[string]any{
+		"model": b.providerModel(req.Model), "input": req.Input,
+		"voice": voice, "instructions": instructions, "response_format": format,
+	})
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, b.baseURL+"/v1/audio/speech", bytes.NewReader(body))
+	if err != nil {
+		return nil, "", 0, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	if b.apiKey != "" {
+		httpReq.Header.Set("Authorization", "Bearer "+b.apiKey)
+	}
+	resp, err := b.http.Do(httpReq)
+	if err != nil {
+		return nil, "", 0, fmt.Errorf("speech provider call: %w", err)
+	}
+	return resp.Body, resp.Header.Get("Content-Type"), resp.StatusCode, nil
+}
