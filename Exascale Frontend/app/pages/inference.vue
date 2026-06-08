@@ -48,13 +48,21 @@ function toCategory(modality: string): Category {
   if (modality === 'speech' || modality === 'image' || modality === 'video') return modality
   return 'text'
 }
+/**
+ * providerLabel frames the model as Exascale's own infrastructure. Exascale-owned catalog entries are
+ * served on Exascale GPUs (the upstream that physically runs them is an implementation detail the
+ * customer never sees) → "Self-hosted". Anything else shows its owner.
+ */
+function providerLabel(ownedBy: string): string {
+  return !ownedBy || ownedBy.toLowerCase() === 'exascale' ? 'Self-hosted' : ownedBy
+}
 /** toModelDef maps a live CatalogModel into the card display shape — real price, in credits. */
 function toModelDef(m: CatalogModel): ModelDef {
   const x = m.exascale
   return {
     id: m.id,
     name: humanizeId(m.id),
-    provider: m.owned_by || 'Exascale',
+    provider: providerLabel(m.owned_by),
     category: toCategory(x.modality),
     priceLabel: `${Number(x.price).toLocaleString('en-US')} ${x.credit_type} / ${x.unit}`,
     sub: `${x.unit} · billed in ${x.credit_type} credits`,
