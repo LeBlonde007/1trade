@@ -33,3 +33,14 @@ func TestObjectKey(t *testing.T) {
 		t.Fatal("keys must be unique per call (uuid)")
 	}
 }
+
+// TestPublicHost checks the object host: bucket subdomain of the endpoint, swapped to the CDN edge
+// when requested.
+func TestPublicHost(t *testing.T) {
+	if got := publicHost("media", "nyc3.digitaloceanspaces.com", false); got != "media.nyc3.digitaloceanspaces.com" {
+		t.Errorf("origin host = %q", got)
+	}
+	if got := publicHost("media", "nyc3.digitaloceanspaces.com", true); got != "media.nyc3.cdn.digitaloceanspaces.com" {
+		t.Errorf("cdn host = %q", got)
+	}
+}

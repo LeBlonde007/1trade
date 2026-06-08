@@ -30,7 +30,9 @@ type Config struct {
 	StorageBucket            string        // bucket name
 	StorageAccessKey         string        // S3 access key (from a Secret)
 	StorageSecretKey         string        // S3 secret key (from a Secret)
-	StoragePublicBase        string        // public object URL base (default https://<bucket>.<endpoint>); set to a CDN URL if used
+	StoragePublicBase        string        // explicit public object URL base; overrides the derived origin/CDN base
+	StorageUseCDN            bool          // serve uploaded objects via the DigitalOcean Spaces CDN edge (STORAGE_CDN)
+	StoragePublicRead        bool          // sign uploads public-read so public/CDN links load (STORAGE_PUBLIC_READ, default on)
 	EmailFrom                string        // From address for platform email
 	AppBaseURL               string        // public base URL of the web app, for links in emails
 	RequireEmailVerification bool          // gate login on a verified email; opt-in (default off), enabled by the deploy only when real SMTP is wired
@@ -72,6 +74,8 @@ func Load() Config {
 		StorageAccessKey:  os.Getenv("STORAGE_ACCESS_KEY"),
 		StorageSecretKey:  os.Getenv("STORAGE_SECRET_KEY"),
 		StoragePublicBase: os.Getenv("STORAGE_PUBLIC_BASE"),
+		StorageUseCDN:     envBool("STORAGE_CDN", false),
+		StoragePublicRead: envBool("STORAGE_PUBLIC_READ", true),
 		EmailFrom:         envOr("EMAIL_FROM", "noreply@exascale.local"),
 		AppBaseURL:        envOr("APP_BASE_URL", "http://localhost:3000"),
 		// Gate login on a verified email. OPT-IN (default off) and coupled to a working mailer: the deploy
