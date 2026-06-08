@@ -32,7 +32,8 @@
 #                             uploads to DigitalOcean Spaces (S3-compatible). STORAGE_ENDPOINT (default
 #                             nyc3.digitaloceanspaces.com), STORAGE_REGION (nyc3). STORAGE_CDN=true serves
 #                             file URLs via the Space's CDN edge (enable the CDN on the Space first);
-#                             STORAGE_PUBLIC_BASE overrides the URL base (e.g. a custom CDN subdomain).
+#                             STORAGE_PUBLIC_BASE overrides the URL base (e.g. a custom CDN subdomain);
+#                             STORAGE_PREFIX namespaces keys under a bucket directory (e.g. sandbox/uploads/…).
 #                             Keys → platform-auth Secret. The Space needs CORS to allow PUT from the web
 #                             origin ($SANDBOX_HOST), and objects must be public-read for the link to load.
 #   SMTP_PASS                 OPTIONAL (SMTP fallback; many VPS block 25/465/587). With it: SMTP_ADDR
@@ -242,6 +243,7 @@ data:
   STORAGE_BUCKET: "$STORAGE_BUCKET"
   STORAGE_PUBLIC_BASE: "${STORAGE_PUBLIC_BASE:-}"
   STORAGE_CDN: "${STORAGE_CDN:-false}"
+  STORAGE_PREFIX: "${STORAGE_PREFIX:-}"
 EOF
 )"
   kubectl rollout restart deploy/platform-core

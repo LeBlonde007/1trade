@@ -30,6 +30,7 @@ type Config struct {
 	PublicBase string // explicit public URL base for objects; overrides the derived origin/CDN base
 	UseCDN     bool   // serve objects via the DigitalOcean Spaces CDN edge (must be enabled on the Space)
 	PublicRead bool   // sign uploads public-read so the public/CDN FileURL actually loads (default on)
+	Prefix     string // optional key prefix — a "directory" within the bucket (e.g. "sandbox") to namespace uploads
 }
 
 // Store signs presigned upload URLs and resolves public object URLs.
@@ -38,6 +39,7 @@ type Store struct {
 	bucket     string
 	publicBase string
 	publicRead bool
+	prefix     string
 }
 
 // New builds a Store from config. Returns a disabled Store (Enabled()==false, no error) when the
@@ -58,7 +60,10 @@ func New(c Config) (*Store, error) {
 	if base == "" {
 		base = "https://" + publicHost(c.Bucket, c.Endpoint, c.UseCDN)
 	}
-	return &Store{client: cl, bucket: c.Bucket, publicBase: base, publicRead: c.PublicRead}, nil
+	return &Store{
+		client: cl, bucket: c.Bucket, publicBase: base,
+		publicRead: c.PublicRead, prefix: strings.Trim(c.Prefix, "/"),
+	}, nil
 }
 
 // publicHost builds the object host: the bucket subdomain of the endpoint, swapped to the CDN edge
@@ -78,14 +83,19 @@ func (s *Store) Enabled() bool { return s != nil && s.client != nil }
 // nonWord matches characters that don't belong in a clean object key segment.
 var nonWord = regexp.MustCompile(`[^A-Za-z0-9._-]+`)
 
-// objectKey builds a tenant-scoped, collision-resistant key (uploads/<tenant>/<uuid>-<safe name>).
-func objectKey(tenantID, filename string) string {
+// objectKey builds a tenant-scoped, collision-resistant key
+// (<prefix>/uploads/<tenant>/<uuid>-<safe name>); prefix is the optional bucket "directory".
+func objectKey(prefix, tenantID, filename string) string {
 	clean := nonWord.ReplaceAllString(path.Base(filename), "-")
 	clean = strings.Trim(clean, "-.")
 	if clean == "" {
 		clean = "file"
 	}
-	return fmt.Sprintf("uploads/%s/%s-%s", tenantID, uuid.NewString(), clean)
+	key := fmt.Sprintf("uploads/%s/%s-%s", tenantID, uuid.NewString(), clean)
+	if prefix != "" {
+		key = prefix + "/" + key
+	}
+	return key
 }
 
 // Presigned is the result of signing an upload: where the browser PUTs the bytes, the headers it MUST
@@ -105,7 +115,7 @@ func (s *Store) PresignUpload(ctx context.Context, tenantID, filename string, tt
 	if !s.Enabled() {
 		return Presigned{}, fmt.Errorf("storage not configured")
 	}
-	key := objectKey(tenantID, filename)
+	key := objectKey(s.prefix, tenantID, filename)
 	if !s.publicRead {
 		u, err := s.client.PresignedPutObject(ctx, s.bucket, key, ttl)
 		if err != nil {
