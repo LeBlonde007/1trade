@@ -9,6 +9,7 @@
 
 import { Paperclip, Mic, Volume2 } from 'lucide-vue-next'
 import type { CatalogModel } from '~/composables/useCatalog'
+import type { ChatUsage } from '~/composables/useInference'
 
 definePageMeta({ layout: 'app' })
 useHead({ title: 'Inference Playground — Exascale' })
@@ -146,6 +147,8 @@ interface Turn {
   creditType?: string
   reqId?: string
   backend?: string
+  /** True while this assistant turn is still receiving streamed tokens (drives the live indicator). */
+  streaming?: boolean
   /** Names of files attached to this user turn (their content is sent as context, not shown inline). */
   files?: string[]
 }
@@ -291,9 +294,19 @@ function fmtPrice(m: ModelDef) {
 
 function nextId() { return Math.max(0, ...turns.map(t => t.id)) + 1 }
 
-// send runs the prompt through the real inference gateway (BFF) and appends the completion with its
-// true token usage + credit cost. The selected model is routed to one the gateway serves; a 402
-// surfaces as a buy-credits hint.
+// The scroll container + the in-flight stream controller. scrollToBottom keeps the latest turn (and
+// the live token stream) pinned to view; stopGenerating lets the user abort mid-response.
+const chatStream = ref<HTMLElement | null>(null)
+let streamAbort: AbortController | null = null
+function scrollToBottom() { const el = chatStream.value; if (el) el.scrollTop = el.scrollHeight }
+function stopGenerating() { streamAbort?.abort() }
+// Keep the newest turn in view when the transcript grows (new send, streamed reply, restored session).
+watch(() => turns.length, () => nextTick(scrollToBottom))
+
+// send streams the prompt through the real inference gateway (BFF SSE) and renders the completion
+// token-by-token. The selected model is routed to one the gateway serves; a 402 surfaces as a
+// buy-credits hint. A placeholder assistant turn shows a live "thinking" indicator until the first
+// token lands, so the user always has immediate feedback.
 async function send() {
   const text = draft.value.trim()
   if (!text || sending.value) return
@@ -310,35 +323,79 @@ async function send() {
   sending.value = true
   const startedAt = Date.now()
   const liveModel = liveServedId.value
+  // Push a streaming placeholder and grab the reactive element (not the raw object) so token mutations
+  // re-render live.
+  turns.push({ id: nextId(), role: 'assistant', text: '', streaming: true })
+  const aTurn = turns[turns.length - 1]!
+  await nextTick(); scrollToBottom()
+  streamAbort = new AbortController()
+  let lastScroll = 0
+  const onToken = (delta: string) => {
+    aTurn.text += delta
+    aTurn.html = renderMarkdownLite(aTurn.text)
+    const now = Date.now()
+    if (now - lastScroll > 80) { lastScroll = now; scrollToBottom() } // throttle reflow while streaming
+  }
   try {
-    const res = await useInference().run(liveModel, payload, params.maxTokens)
-    const cc = liveCreditCost(liveModel, res.usage.total_tokens)
-    turns.push({
-      id: nextId(), role: 'assistant',
-      text: res.content,
-      html: renderMarkdownLite(res.content),
-      tokens: { in: res.usage.prompt_tokens, out: res.usage.completion_tokens },
-      latencyMs: Date.now() - startedAt,
-      creditCost: cc?.cost,
-      creditType: cc?.creditType,
-      reqId: 'req_' + Math.random().toString(36).slice(2, 12),
-      backend: liveModel,
+    const { content, usage, aborted } = await useInference().runStream(liveModel, payload, params.maxTokens, {
+      onToken, signal: streamAbort.signal,
     })
-    void refreshBalance() // the debit settles async via the ledger; pull the new balance shortly after
+    finalizeAssistant(aTurn, content || aTurn.text, usage, liveModel, startedAt, aborted)
   } catch (e: unknown) {
-    const ex = e as { data?: { code?: string; message?: string } }
-    const msg = ex?.data?.code === 'INSUFFICIENT_CREDIT'
-      ? 'Insufficient credit — buy credits in the wallet to run this model.'
-      : (ex?.data?.message || 'Inference failed.')
-    turns.push({ id: nextId(), role: 'assistant', text: msg, html: `<p>${msg}</p>` })
+    const ex = e as { statusCode?: number; data?: { code?: string; message?: string }; message?: string }
+    if (ex?.statusCode === 404 && !aTurn.text) {
+      // Streaming route unavailable (older build) and nothing streamed yet → run once non-streamed so
+      // the model still answers. No double-charge: the stream never reached a running model.
+      try {
+        const res = await useInference().run(liveModel, payload, params.maxTokens)
+        finalizeAssistant(aTurn, res.content, res.usage, liveModel, startedAt, false)
+      } catch (e2: unknown) { renderAssistantError(aTurn, e2) }
+    } else if (aTurn.text) {
+      // Mid-stream failure after partial output — keep what arrived, mark it finished.
+      finalizeAssistant(aTurn, aTurn.text, undefined, liveModel, startedAt, true)
+    } else {
+      renderAssistantError(aTurn, e)
+    }
   } finally {
     sending.value = false
+    streamAbort = null
+    await nextTick(); scrollToBottom()
   }
+}
+
+// finalizeAssistant stamps a completed assistant turn with usage, latency, and the real credit cost
+// (estimating token counts when the gateway omits a usage chunk). The server-side ledger debit is the
+// source of truth; this is the visible mirror.
+function finalizeAssistant(t: Turn, content: string, usage: ChatUsage | undefined, model: string, startedAt: number, aborted: boolean) {
+  t.text = content
+  t.html = renderMarkdownLite(content + (aborted ? '\n\n_(stopped)_' : ''))
+  t.streaming = false
+  const out = usage?.completion_tokens ?? Math.max(1, Math.ceil(content.length / 4))
+  const total = usage?.total_tokens ?? (estimateInputTokens.value + out)
+  t.tokens = { in: usage?.prompt_tokens, out }
+  t.latencyMs = Date.now() - startedAt
+  const cc = liveCreditCost(model, total)
+  t.creditCost = cc?.cost
+  t.creditType = cc?.creditType
+  t.reqId = 'req_' + Math.random().toString(36).slice(2, 12)
+  t.backend = model
+  void refreshBalance() // the debit settles async via the ledger; pull the new balance shortly after
+}
+
+// renderAssistantError replaces a failed assistant turn with a friendly, actionable message.
+function renderAssistantError(t: Turn, e: unknown) {
+  const ex = e as { data?: { code?: string; message?: string }; message?: string }
+  const msg = ex?.data?.code === 'INSUFFICIENT_CREDIT'
+    ? 'Insufficient credit — buy credits in the wallet to run this model.'
+    : (ex?.data?.message || ex?.message || 'Inference failed.')
+  t.text = msg
+  t.html = `<p>${msg}</p>`
+  t.streaming = false
 }
 
 // ── Attachments — text/code file content is sent as model context; every file is also uploaded to
 // object storage (DigitalOcean Spaces) via a presigned PUT (best-effort) so it persists + gets a URL.
-interface Attachment { name: string; content: string; url?: string; uploading?: boolean }
+interface Attachment { name: string; content: string; url?: string; uploading?: boolean; failed?: boolean }
 const attachments = ref<Attachment[]>([])
 const fileInput = ref<HTMLInputElement | null>(null)
 const attachError = ref('')
@@ -363,9 +420,10 @@ async function onFiles(e: Event) {
       })
       // Echo any headers the presign signed (e.g. x-amz-acl: public-read) — the signature covers them,
       // so the PUT 403s if they're missing.
-      await fetch(sig.upload_url, { method: 'PUT', body: f, headers: sig.headers ?? {} })
+      const put = await fetch(sig.upload_url, { method: 'PUT', body: f, headers: sig.headers ?? {} })
+      if (!put.ok) throw new Error(`upload ${put.status}`)
       att.url = sig.file_url
-    } catch { /* storage unavailable — attachment still works as context */ }
+    } catch { att.failed = true /* storage unavailable / CORS — the file still works as context */ }
     att.uploading = false
   }
   input.value = '' // let the same file be re-picked
@@ -783,7 +841,7 @@ async function copyText(text: string, label: string) {
           <div class="pg-main">
             <!-- ===== CHAT ===== -->
             <template v-if="view === 'chat'">
-              <div class="chat-stream">
+              <div ref="chatStream" class="chat-stream">
                 <div
                   v-for="t in turns"
                   :key="t.id"
@@ -801,11 +859,11 @@ async function copyText(text: string, label: string) {
                     <span v-if="t.role === 'assistant' && t.latencyMs" class="turn-meta mono">
                       {{ t.latencyMs }}ms · {{ t.tokens?.out ?? 0 }} tok out<template v-if="t.creditCost !== undefined"> · {{ fmtCredits(t.creditCost) }} {{ t.creditType }} credits</template>
                     </span>
-                    <span v-else-if="t.role === 'assistant'" class="turn-meta mono pulse-meta">
-                      <span class="pulse" /> Streaming…
+                    <span v-else-if="t.role === 'assistant' && t.streaming" class="turn-meta mono pulse-meta">
+                      <span class="pulse" /> {{ t.text ? 'Streaming…' : 'Thinking…' }}
                     </span>
                     <button
-                      v-if="t.role === 'assistant' && t.text"
+                      v-if="t.role === 'assistant' && t.text && !t.streaming"
                       type="button"
                       class="turn-copy"
                       title="Read aloud"
@@ -814,7 +872,7 @@ async function copyText(text: string, label: string) {
                       <Volume2 :size="13" />
                     </button>
                     <button
-                      v-if="t.role === 'assistant' && t.text"
+                      v-if="t.role === 'assistant' && t.text && !t.streaming"
                       type="button"
                       class="turn-copy"
                       @click="copyText(t.text, 'turn-' + t.id)"
@@ -828,7 +886,13 @@ async function copyText(text: string, label: string) {
                       <span v-for="f in t.files" :key="f" class="turn-file"><Paperclip :size="11" /> {{ f }}</span>
                     </div>
                   </div>
-                  <div class="turn-body assistant-body" v-else v-html="t.html ?? renderMarkdownLite(t.text)" />
+                  <!-- Assistant: animated dots until the first token, then live markdown with a blinking caret -->
+                  <div class="turn-body assistant-body" v-else>
+                    <div v-if="t.streaming && !t.text" class="thinking" aria-label="Thinking">
+                      <span class="thinking-dot" /><span class="thinking-dot" /><span class="thinking-dot" />
+                    </div>
+                    <div v-else class="md" :class="{ 'is-streaming': t.streaming }" v-html="t.html ?? renderMarkdownLite(t.text)" />
+                  </div>
                 </div>
               </div>
 
@@ -840,10 +904,14 @@ async function copyText(text: string, label: string) {
                     accept=".txt,.md,.markdown,.json,.csv,.tsv,.log,.py,.js,.ts,.tsx,.vue,.go,.java,.rb,.rs,.c,.h,.cpp,.html,.css,.yaml,.yml,.xml,.sh,.sql"
                   />
                   <div v-if="attachments.length || attachError" class="cmp-chips">
-                    <span v-for="(a, i) in attachments" :key="a.name + i" class="cmp-chip">
+                    <span
+                      v-for="(a, i) in attachments" :key="a.name + i"
+                      class="cmp-chip" :class="{ uploading: a.uploading, failed: a.failed }"
+                    >
                       <Paperclip :size="12" /> {{ a.name }}
                       <a v-if="a.url" :href="a.url" target="_blank" rel="noopener" class="cmp-chip-link" title="Stored in object storage">↗</a>
-                      <span v-else-if="a.uploading" class="cmp-chip-up" title="Uploading…">↑</span>
+                      <span v-else-if="a.uploading" class="cmp-chip-spin" title="Uploading…" />
+                      <span v-else-if="a.failed" class="cmp-chip-fail" title="Upload failed — the file is still sent as context">!</span>
                       <button type="button" class="cmp-chip-x" title="Remove" @click="removeAttachment(i)">×</button>
                     </span>
                     <span v-if="attachError" class="cmp-attach-err">{{ attachError }}</span>
@@ -877,21 +945,26 @@ async function copyText(text: string, label: string) {
                           ({{ fmtNum(estimateInputTokens) }} in · {{ fmtNum(params.maxTokens) }} max out)
                         </span>
                       </span>
+                      <!-- While generating, the action becomes a Stop button that aborts the stream. -->
                       <button
+                        v-if="sending"
+                        type="button"
+                        class="send-btn stop-btn"
+                        @click="stopGenerating"
+                      >
+                        <span class="stop-square" />
+                        Stop
+                      </button>
+                      <button
+                        v-else
                         type="submit"
                         class="send-btn"
-                        :disabled="!draft.trim() || sending"
+                        :disabled="!draft.trim()"
                       >
-                        <template v-if="sending">
-                          <span class="spinner" />
-                          Streaming
-                        </template>
-                        <template v-else>
-                          Send
-                          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square">
-                            <path d="M3 8h10M9 4l4 4-4 4" />
-                          </svg>
-                        </template>
+                        Send
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square">
+                          <path d="M3 8h10M9 4l4 4-4 4" />
+                        </svg>
                       </button>
                     </div>
                   </div>
@@ -1778,6 +1851,41 @@ ratelimit-remaining:   58 / 60 RPS</pre>
   50% { opacity: 0; }
 }
 
+/* Each turn eases in so new messages don't pop. */
+.turn { animation: turn-in 0.22s ease both; }
+@keyframes turn-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* "Thinking…" — three bouncing dots shown until the first streamed token arrives. */
+.thinking { display: inline-flex; align-items: center; gap: 5px; padding: 4px 2px; }
+.thinking-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-3);
+  animation: thinking-bounce 1.2s ease-in-out infinite;
+}
+.thinking-dot:nth-child(2) { animation-delay: 0.16s; }
+.thinking-dot:nth-child(3) { animation-delay: 0.32s; }
+@keyframes thinking-bounce {
+  0%, 80%, 100% { opacity: 0.35; transform: translateY(0); }
+  40%           { opacity: 1; transform: translateY(-4px); }
+}
+
+/* Blinking caret trailing the live response while tokens are still streaming in. */
+.assistant-body .md.is-streaming::after {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 14px;
+  margin-left: 2px;
+  vertical-align: -2px;
+  background: var(--brand);
+  animation: blink 1s steps(2) infinite;
+}
+
 /* Composer */
 .composer {
   padding: 16px 28px 20px;
@@ -1838,6 +1946,20 @@ ratelimit-remaining:   58 / 60 RPS</pre>
 .cmp-chip-x:hover { color: var(--neg); }
 .cmp-chip-link { color: var(--accent); text-decoration: none; font-weight: 600; }
 .cmp-chip-up { color: var(--text-3); animation: rec-pulse 1s ease-in-out infinite; }
+/* Upload states: a spinner while the file PUTs to object storage, a warning glyph if it failed. */
+.cmp-chip.uploading { border-color: var(--border-strong); }
+.cmp-chip.failed { border-color: var(--warn); color: var(--warn); }
+.cmp-chip-spin {
+  width: 10px; height: 10px; border-radius: 50%;
+  border: 1.5px solid var(--text-3); border-top-color: transparent;
+  animation: spin 0.7s linear infinite;
+}
+.cmp-chip-fail {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 13px; height: 13px; border-radius: 50%;
+  font-size: 9px; font-weight: 700; color: var(--canvas);
+  background: var(--warn);
+}
 .cmp-attach-err { font-size: 12px; color: var(--neg); align-self: center; }
 .composer-tools { display: inline-flex; align-items: center; gap: 6px; }
 .cmp-tool {
@@ -1907,6 +2029,10 @@ ratelimit-remaining:   58 / 60 RPS</pre>
   cursor: not-allowed;
 }
 .send-btn svg { width: 13px; height: 13px; }
+/* Stop button — replaces Send while a response streams; click aborts the in-flight generation. */
+.stop-btn { background: var(--elevated); color: var(--text); border: 1px solid var(--border-strong); }
+.stop-btn:hover { background: var(--hover); border-color: var(--neg); color: var(--neg); }
+.stop-square { width: 9px; height: 9px; border-radius: 1px; background: currentColor; }
 .spinner {
   width: 11px;
   height: 11px;
