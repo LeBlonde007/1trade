@@ -58,6 +58,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 	s.mux.HandleFunc("GET /v1/models", s.listModels)
 	s.mux.HandleFunc("POST /v1/chat/completions", s.chatCompletions)
+	s.mux.HandleFunc("POST /v1/images/generations", s.imageGenerations)
 }
 
 // listModels serves the curated catalog in the OpenAI list shape (auth required).
@@ -197,6 +198,110 @@ func (s *Server) meter(p auth.Principal, m catalog.Model, modelID string, res mo
 	if err := s.usage.PublishUsage(e); err != nil {
 		slog.Error("publish inference.usage.v1 failed", "request_id", requestID, "err", err)
 	}
+}
+
+// imageRequest is the OpenAI-compatible text-to-image request body.
+type imageRequest struct {
+	Model  string `json:"model"`
+	Prompt string `json:"prompt"`
+	N      int    `json:"n"`
+	Size   string `json:"size"`
+}
+
+// imageGenerations serves POST /v1/images/generations (OpenAI-compatible): authenticate → resolve the
+// image model from the catalog → generate via the backend → return base64 images → emit one
+// inference.usage.v1 event (units = image count) for the ledger to debit in `image` credits.
+func (s *Server) imageGenerations(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.requireAuth(w, r)
+	if !ok {
+		return
+	}
+	var req imageRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Model == "" || strings.TrimSpace(req.Prompt) == "" {
+		writeErr(w, http.StatusBadRequest, "bad_request", "model and prompt are required")
+		return
+	}
+	m, found := catalog.Lookup(req.Model)
+	if !found {
+		writeErr(w, http.StatusNotFound, "model_not_found", "unknown model: "+req.Model)
+		return
+	}
+	if m.Exascale.Modality != "image" { // refuse non-image models so we never bill the wrong sub-credit
+		writeErr(w, http.StatusNotFound, "model_not_found", req.Model+" is not an image model")
+		return
+	}
+	n := req.N
+	if n < 1 {
+		n = 1
+	}
+	if n > 4 {
+		n = 4 // cap fan-out per request
+	}
+	// Pre-flight credit check (image credits). Fail-open on a ledger blip, like chat.
+	if s.credit != nil {
+		okBal, bal, err := s.credit.Sufficient(r.Context(), p.TenantID, p.IsPaper, m.Exascale.CreditType)
+		if err != nil {
+			slog.Warn("pre-flight balance check failed; serving anyway", "tenant_id", p.TenantID, "err", err)
+		} else if !okBal {
+			writeJSON(w, http.StatusPaymentRequired, map[string]any{
+				"code":    "INSUFFICIENT_CREDIT",
+				"message": "Not enough " + m.Exascale.CreditType + " credits to generate this image.",
+				"details": map[string]any{
+					"credit_type": m.Exascale.CreditType, "balance": bal,
+					"required": m.Exascale.Price, "buy_credits_url": buyCreditsURL,
+				},
+			})
+			return
+		}
+	}
+	ib, ok := s.backend.(model.ImageBackend)
+	if !ok {
+		writeErr(w, http.StatusNotImplemented, "unsupported", "image generation is not available on this deployment (no image provider configured)")
+		return
+	}
+	start := time.Now()
+	res, err := ib.Image(r.Context(), model.ImageRequest{Model: req.Model, Prompt: req.Prompt, N: n, Size: req.Size})
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	latency := int(time.Since(start).Milliseconds())
+	count := len(res.B64)
+	units, err := pricing.UnitsForCount(m.Exascale.Price, count)
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	requestID := "imgreq_" + uuid.NewString()
+	data := make([]map[string]any, 0, count)
+	for _, b64 := range res.B64 {
+		data = append(data, map[string]any{"b64_json": b64})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"created": time.Now().Unix(), "model": req.Model, "data": data,
+	})
+	// Emit AFTER the response (exactly once). request_id is the ledger's debit idempotency key.
+	s.meterImage(p, m, req.Model, count, units, latency, requestID)
+}
+
+// meterImage emits one inference.usage.v1 event for an image-generation request (units = image count),
+// billed in `image` credits. Best-effort, like meter — a publish failure never fails the customer.
+func (s *Server) meterImage(p auth.Principal, m catalog.Model, modelID string, count int, units string, latencyMS int, requestID string) {
+	lat := latencyMS
+	metrics.RecordInference(modelID, m.Exascale.Modality, 0, 0)
+	e := events.UsageEvent{
+		RequestID: requestID, TenantID: p.TenantID, Model: modelID,
+		Modality: m.Exascale.Modality, CreditType: m.Exascale.CreditType,
+		Units: units, LatencyMS: &lat,
+		IsPaper: p.IsPaper, TS: time.Now().UTC().Format(time.RFC3339),
+	}
+	if p.SubAccountID != "" {
+		e.SubAccountID = &p.SubAccountID
+	}
+	if err := s.usage.PublishUsage(e); err != nil {
+		slog.Error("publish inference.usage.v1 (image) failed", "request_id", requestID, "err", err)
+	}
+	_ = count // count is reflected in `units`; kept for symmetry with meter()'s signature
 }
 
 // streamChat sends the completion as an SSE stream of OpenAI chat.completion.chunk objects: a role

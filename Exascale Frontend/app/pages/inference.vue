@@ -149,6 +149,8 @@ interface Turn {
   backend?: string
   /** True while this assistant turn is still receiving streamed tokens (drives the live indicator). */
   streaming?: boolean
+  /** Generated images (data URIs or URLs) for an image-model turn — rendered as a grid. */
+  images?: string[]
   /** Names of files attached to this user turn (their content is sent as context, not shown inline). */
   files?: string[]
 }
@@ -186,7 +188,11 @@ function loadChat(): PersistedChat | null {
 function saveChat() {
   if (typeof localStorage === 'undefined') return
   try {
-    const payload: PersistedChat = { turns: turns.slice(-100), params, selectedId: selectedId.value }
+    // Drop generated image data (multi-MB base64) from the persisted copy — it would blow the
+    // localStorage quota. Image results are session-only; a restored turn shows a small placeholder.
+    const persisted = turns.slice(-100).map((t) =>
+      t.images?.length ? { ...t, images: undefined, html: undefined, text: t.text || '🖼 generated image (not retained)' } : t)
+    const payload: PersistedChat = { turns: persisted, params, selectedId: selectedId.value }
     localStorage.setItem(chatStoreKey.value, JSON.stringify(payload))
   } catch { /* quota / serialization — keep the in-memory session */ }
 }
@@ -391,6 +397,51 @@ function renderAssistantError(t: Turn, e: unknown) {
   t.text = msg
   t.html = `<p>${msg}</p>`
   t.streaming = false
+}
+
+// ── Image generation — text→image for image-modality models, via the BFF → gateway → DO multimodal.
+const generating = ref(false)
+/** imageCost is the catalog price for one image of the selected model (image credits). */
+const imageCost = computed(() => catalogPrice.value[selectedId.value]?.price ?? 0)
+
+// generateImage runs a text→image request and appends the result as an image turn. A placeholder
+// assistant turn shows the thinking indicator until the image arrives; a 402 surfaces the buy hint.
+async function generateImage() {
+  const prompt = draft.value.trim()
+  if (!prompt || generating.value) return
+  turns.push({ id: nextId(), role: 'user', text: prompt })
+  draft.value = ''
+  generating.value = true
+  const startedAt = Date.now()
+  const modelId = selectedId.value
+  turns.push({ id: nextId(), role: 'assistant', text: '', streaming: true, backend: modelId })
+  const aTurn = turns[turns.length - 1]!
+  await nextTick(); scrollToBottom()
+  try {
+    const res = await $fetch<{ data: Array<{ b64_json?: string; url?: string }> }>('/api/inference/image', {
+      method: 'POST', body: { model: modelId, prompt, n: 1, size: '1024x1024' },
+    })
+    const imgs = (res.data || [])
+      .map((d) => d.url || (d.b64_json ? 'data:image/png;base64,' + d.b64_json : ''))
+      .filter(Boolean)
+    aTurn.streaming = false
+    aTurn.latencyMs = Date.now() - startedAt
+    aTurn.backend = modelId
+    if (imgs.length) {
+      aTurn.images = imgs
+      const p = catalogPrice.value[modelId]
+      if (p) { aTurn.creditCost = p.price * imgs.length; aTurn.creditType = p.creditType }
+      void refreshBalance()
+    } else {
+      aTurn.text = 'No image was returned.'
+      aTurn.html = '<p>No image was returned.</p>'
+    }
+  } catch (e: unknown) {
+    renderAssistantError(aTurn, e)
+  } finally {
+    generating.value = false
+    await nextTick(); scrollToBottom()
+  }
 }
 
 // ── Attachments — text/code file content is sent as model context; every file is also uploaded to
@@ -955,7 +1006,12 @@ async function copyText(text: string, label: string) {
                   </div>
                   <!-- Assistant: animated dots until the first token, then live markdown with a blinking caret -->
                   <div class="turn-body assistant-body" v-else>
-                    <div v-if="t.streaming && !t.text" class="thinking" aria-label="Thinking">
+                    <div v-if="t.images && t.images.length" class="img-grid">
+                      <a v-for="(src, idx) in t.images" :key="idx" :href="src" target="_blank" rel="noopener" class="img-out" title="Open full size">
+                        <img :src="src" :alt="'generated image ' + (idx + 1)" loading="lazy" />
+                      </a>
+                    </div>
+                    <div v-else-if="t.streaming && !t.text" class="thinking" aria-label="Thinking">
                       <span class="thinking-dot" /><span class="thinking-dot" /><span class="thinking-dot" />
                     </div>
                     <div v-else class="md" :class="{ 'is-streaming': t.streaming }" v-html="t.html ?? renderMarkdownLite(t.text)" />
@@ -1046,8 +1102,35 @@ async function copyText(text: string, label: string) {
                 </div>
               </form>
 
-              <!-- Non-text models (image / speech / video / embeddings): the inline chat playground is
-                   text-only, so point to the API/CLI. The catalog + pricing are fully live. -->
+              <!-- Image models: text→image runs inline (via the BFF → gateway → DO multimodal). -->
+              <form v-else-if="selected.category === 'image'" class="composer" @submit.prevent="generateImage">
+                <div class="composer-box">
+                  <textarea
+                    v-model="draft"
+                    class="composer-input"
+                    placeholder="Describe the image to generate…"
+                    rows="3"
+                    @keydown.enter.exact.prevent="generateImage"
+                  />
+                  <div class="composer-foot">
+                    <span class="composer-hint mono">{{ selected.name }} · {{ selected.priceLabel }}</span>
+                    <div class="composer-actions">
+                      <span class="cost-preview mono">Cost: <strong>{{ fmtCredits(imageCost) }} image credits</strong></span>
+                      <button v-if="generating" type="button" class="send-btn stop-btn" disabled>
+                        <span class="spinner" /> Generating…
+                      </button>
+                      <button v-else type="submit" class="send-btn" :disabled="!draft.trim()">
+                        Generate
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square">
+                          <path d="M3 8h10M9 4l4 4-4 4" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </form>
+
+              <!-- Speech / video / embeddings: not inline yet — point to the API/CLI. Catalog + pricing live. -->
               <div v-else class="api-only">
                 <div class="api-only-icon">{{ CATEGORY_META[selected.category].label }}</div>
                 <h4>{{ selected.name }} runs via the API</h4>
@@ -1960,6 +2043,15 @@ ratelimit-remaining:   58 / 60 RPS</pre>
   background: var(--brand);
   animation: blink 1s steps(2) infinite;
 }
+
+/* Generated-image output grid (text→image turns). */
+.img-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+.img-out {
+  display: block; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden;
+  background: var(--elevated); transition: border-color 120ms;
+}
+.img-out:hover { border-color: var(--brand); }
+.img-out img { display: block; width: 100%; height: auto; }
 
 /* Composer */
 .composer {

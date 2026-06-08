@@ -37,7 +37,7 @@ func Load() Config {
 		InferenceBackend:  envOr("INFERENCE_BACKEND", "mock"),
 		VLLMBaseURL:       envOr("VLLM_BASE_URL", "http://inference-runtime:8000"),
 		InferenceAPIKey:   os.Getenv("INFERENCE_API_KEY"),
-		InferenceModelMap: jsonMap(os.Getenv("INFERENCE_MODEL_MAP")),
+		InferenceModelMap: mediaModelMap(os.Getenv("INFERENCE_MODEL_MAP")),
 		InferenceTimeout:  120 * time.Second,
 		HTTPTimeout:       5 * time.Second,
 	}
@@ -66,4 +66,30 @@ func jsonMap(s string) map[string]string {
 		return nil
 	}
 	return m
+}
+
+// defaultMediaMap maps the catalog's media model ids to the upstream provider's slugs so image / video
+// / speech generation works out of the box against DigitalOcean's multimodal inference. Flux and
+// ElevenLabs aren't carried by DO, so they're substituted with the nearest available model — set
+// INFERENCE_MODEL_MAP (which overrides these) or another provider for exact parity.
+var defaultMediaMap = map[string]string{
+	"gpt-image-1.5":        "openai-gpt-image-1.5",
+	"stable-diffusion-3.5": "stable-diffusion-3.5-large",
+	"flux-schnell":         "stable-diffusion-3.5-large",
+	"wan-t2v":              "wan2-2-t2v-a14b",
+	"qwen3-tts":            "qwen3-tts-voicedesign",
+	"elevenlabs-tts":       "qwen3-tts-voicedesign",
+}
+
+// mediaModelMap merges the built-in media defaults with the operator's INFERENCE_MODEL_MAP, with the
+// env map taking precedence so any mapping can be overridden per deployment.
+func mediaModelMap(env string) map[string]string {
+	merged := make(map[string]string, len(defaultMediaMap)+8)
+	for k, v := range defaultMediaMap {
+		merged[k] = v
+	}
+	for k, v := range jsonMap(env) {
+		merged[k] = v
+	}
+	return merged
 }
