@@ -38,12 +38,14 @@ data:
 EOF
 )"
 else
-  [ -n "${INFERENCE_API_KEY:-}" ] || { echo "ERROR: set INFERENCE_API_KEY=sk-... (or PROVIDER=stub to revert)"; exit 2; }
-  PROVIDER_URL="${VLLM_BASE_URL:-https://openrouter.ai/api/v1}"
+  [ -n "${INFERENCE_API_KEY:-}" ] || { echo "ERROR: set INFERENCE_API_KEY=... (or PROVIDER=stub to revert)"; exit 2; }
+  # VLLM_BASE_URL is the part BEFORE /v1/chat/completions — the gateway appends that path itself. So it
+  # must NOT already end in /v1 (that doubles to /v1/v1/... → 404). OpenRouter → https://openrouter.ai/api
+  # DigitalOcean serverless inference → https://inference.do-ai.run · local vLLM runtime → http://host:8000
+  PROVIDER_URL="${VLLM_BASE_URL:-https://openrouter.ai/api}"
   # JSON catalog-id→provider-slug map; YAML-single-quoted below so its double quotes need no escaping.
-  # OpenRouter retired the ":free" Llama slugs (now 404 "use the paid slug"), so these are the PAID
-  # models — the key needs a little credit (openrouter.ai → Credits; 8B is ~$0.02/M tokens, so a few $
-  # lasts a whole demo). Override INFERENCE_MODEL_MAP to point at any currently-free model if preferred.
+  # Defaults are OpenRouter's PAID Llama slugs (the ":free" ones were retired → 404). For another
+  # provider set VLLM_BASE_URL + INFERENCE_MODEL_MAP to its slugs (run GET <base>/v1/models to list them).
   MODEL_MAP="${INFERENCE_MODEL_MAP:-{\"llama-3.1-70b\":\"meta-llama/llama-3.1-70b-instruct\",\"llama-3.1-8b\":\"meta-llama/llama-3.1-8b-instruct\"}}"
   say "inference-gateway → hosted provider $PROVIDER_URL (real model output; stub bypassed)"
   kubectl patch secret platform-auth $NS_ARG --type merge -p "$(cat <<EOF
