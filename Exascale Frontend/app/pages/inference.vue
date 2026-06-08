@@ -7,6 +7,7 @@
  * sidebar inside the playground area.
  */
 
+import { Paperclip, Mic, Volume2 } from 'lucide-vue-next'
 import type { CatalogModel } from '~/composables/useCatalog'
 
 definePageMeta({ layout: 'app' })
@@ -145,6 +146,8 @@ interface Turn {
   creditType?: string
   reqId?: string
   backend?: string
+  /** Names of files attached to this user turn (their content is sent as context, not shown inline). */
+  files?: string[]
 }
 
 // Live-only: the conversation starts empty — real turns are appended as the user runs inference.
@@ -294,13 +297,21 @@ function nextId() { return Math.max(0, ...turns.map(t => t.id)) + 1 }
 async function send() {
   const text = draft.value.trim()
   if (!text || sending.value) return
-  turns.push({ id: nextId(), role: 'user', text })
+  // Attached files are sent to the model as context, but the chat bubble shows only the user's text
+  // (with a 📎 chip), so a 50-line file doesn't drown the conversation.
+  let payload = text
+  const fileNames = attachments.value.map(a => a.name)
+  if (attachments.value.length) {
+    payload = attachments.value.map(a => `--- file: ${a.name} ---\n${a.content}`).join('\n\n') + '\n\n' + text
+  }
+  turns.push({ id: nextId(), role: 'user', text, files: fileNames.length ? fileNames : undefined })
   draft.value = ''
+  attachments.value = []
   sending.value = true
   const startedAt = Date.now()
   const liveModel = liveServedId.value
   try {
-    const res = await useInference().run(liveModel, text, params.maxTokens)
+    const res = await useInference().run(liveModel, payload, params.maxTokens)
     const cc = liveCreditCost(liveModel, res.usage.total_tokens)
     turns.push({
       id: nextId(), role: 'assistant',
@@ -323,6 +334,55 @@ async function send() {
   } finally {
     sending.value = false
   }
+}
+
+// ── Attachments — read text/code files client-side and send their content as context (no backend
+// change; works with any text model). Binary/oversized files are rejected. ─────────────────────────
+interface Attachment { name: string; content: string }
+const attachments = ref<Attachment[]>([])
+const fileInput = ref<HTMLInputElement | null>(null)
+const attachError = ref('')
+function pickFiles() { fileInput.value?.click() }
+async function onFiles(e: Event) {
+  const input = e.target as HTMLInputElement
+  attachError.value = ''
+  for (const f of Array.from(input.files ?? [])) {
+    if (f.size > 200_000) { attachError.value = `${f.name} is too large (max 200 KB)`; continue }
+    try { attachments.value.push({ name: f.name, content: await f.text() }) }
+    catch { attachError.value = `couldn't read ${f.name}` }
+  }
+  input.value = '' // let the same file be re-picked
+}
+function removeAttachment(i: number) { attachments.value.splice(i, 1) }
+
+// ── Voice: dictation (speech→text) into the composer, and read-aloud (text→speech) of replies. Both
+// use the browser's Web Speech API — Chrome/Edge; degrade gracefully elsewhere. ─────────────────────
+const listening = ref(false)
+const speechSupported = computed(() => import.meta.client && ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window))
+let recog: { stop: () => void; start: () => void } | null = null
+function toggleMic() {
+  if (!speechSupported.value) { attachError.value = 'voice input needs Chrome/Edge'; return }
+  if (listening.value) { recog?.stop(); return }
+  const SR = (window as unknown as { SpeechRecognition?: new () => unknown; webkitSpeechRecognition?: new () => unknown })
+  const Ctor = SR.SpeechRecognition || SR.webkitSpeechRecognition
+  if (!Ctor) return
+  const r = new Ctor() as {
+    lang: string; interimResults: boolean; continuous: boolean
+    onresult: (e: { results: { 0: { 0: { transcript: string } } } }) => void
+    onend: () => void; onerror: () => void; start: () => void; stop: () => void
+  }
+  r.lang = 'en-US'; r.interimResults = false; r.continuous = false
+  r.onresult = (ev) => { draft.value = (draft.value + ' ' + ev.results[0][0].transcript).trim() }
+  r.onend = () => { listening.value = false }
+  r.onerror = () => { listening.value = false }
+  recog = r
+  listening.value = true
+  r.start()
+}
+function speak(text: string) {
+  if (!import.meta.client || !('speechSynthesis' in window)) return
+  window.speechSynthesis.cancel()
+  window.speechSynthesis.speak(new SpeechSynthesisUtterance(text))
 }
 
 function renderMarkdownLite(src: string): string {
@@ -731,6 +791,15 @@ async function copyText(text: string, label: string) {
                       v-if="t.role === 'assistant' && t.text"
                       type="button"
                       class="turn-copy"
+                      title="Read aloud"
+                      @click="speak(t.text)"
+                    >
+                      <Volume2 :size="13" />
+                    </button>
+                    <button
+                      v-if="t.role === 'assistant' && t.text"
+                      type="button"
+                      class="turn-copy"
                       @click="copyText(t.text, 'turn-' + t.id)"
                     >
                       {{ copied === ('turn-' + t.id) ? '✓ Copied' : 'Copy' }}
@@ -738,6 +807,9 @@ async function copyText(text: string, label: string) {
                   </div>
                   <div class="turn-body" v-if="t.role === 'user'">
                     <p>{{ t.text }}</p>
+                    <div v-if="t.files?.length" class="turn-files">
+                      <span v-for="f in t.files" :key="f" class="turn-file"><Paperclip :size="11" /> {{ f }}</span>
+                    </div>
                   </div>
                   <div class="turn-body assistant-body" v-else v-html="t.html ?? renderMarkdownLite(t.text)" />
                 </div>
@@ -746,17 +818,38 @@ async function copyText(text: string, label: string) {
               <!-- Composer — chat is text-only; non-text models run via the API/SDK (see below) -->
               <form v-if="selected.category === 'text'" class="composer" @submit.prevent="send">
                 <div class="composer-box">
+                  <input
+                    ref="fileInput" type="file" multiple class="cmp-file" @change="onFiles"
+                    accept=".txt,.md,.markdown,.json,.csv,.tsv,.log,.py,.js,.ts,.tsx,.vue,.go,.java,.rb,.rs,.c,.h,.cpp,.html,.css,.yaml,.yml,.xml,.sh,.sql"
+                  />
+                  <div v-if="attachments.length || attachError" class="cmp-chips">
+                    <span v-for="(a, i) in attachments" :key="a.name + i" class="cmp-chip">
+                      <Paperclip :size="12" /> {{ a.name }}
+                      <button type="button" class="cmp-chip-x" title="Remove" @click="removeAttachment(i)">×</button>
+                    </span>
+                    <span v-if="attachError" class="cmp-attach-err">{{ attachError }}</span>
+                  </div>
                   <textarea
                     v-model="draft"
                     class="composer-input"
-                    placeholder="Send a message…"
+                    placeholder="Send a message…  (attach a file or use the mic)"
                     rows="3"
                     @keydown.enter.exact.prevent="send"
                   />
                   <div class="composer-foot">
-                    <span class="composer-hint mono">
-                      <kbd>⏎</kbd> send · <kbd>⇧</kbd><kbd>⏎</kbd> newline · scoped key required
-                    </span>
+                    <div class="composer-tools">
+                      <button type="button" class="cmp-tool" title="Attach a text or code file" @click="pickFiles">
+                        <Paperclip :size="14" />
+                      </button>
+                      <button
+                        type="button" class="cmp-tool" :class="{ rec: listening }"
+                        :title="speechSupported ? 'Dictate with your voice' : 'Voice input needs Chrome/Edge'"
+                        @click="toggleMic"
+                      >
+                        <Mic :size="14" />
+                      </button>
+                      <span class="composer-hint mono">{{ listening ? 'Listening…' : 'scoped key required' }}</span>
+                    </div>
                     <div class="composer-actions">
                       <span class="cost-preview mono">
                         Estimated cost:
@@ -1713,6 +1806,32 @@ ratelimit-remaining:   58 / 60 RPS</pre>
   font-size: 13px; color: var(--text); cursor: pointer;
 }
 .api-only-copy:hover { background: rgba(0, 0, 0, 0.03); }
+
+/* Composer: attachments + voice tools */
+.cmp-file { display: none; }
+.cmp-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 2px 0; }
+.cmp-chip {
+  display: inline-flex; align-items: center; gap: 5px; font-size: 12px;
+  background: var(--canvas); border: 1px solid var(--border); border-radius: 2px; padding: 2px 6px;
+  color: var(--text-2); font-family: var(--font-mono);
+}
+.cmp-chip-x { background: none; border: none; color: var(--text-3); cursor: pointer; font-size: 14px; line-height: 1; padding: 0 0 0 2px; }
+.cmp-chip-x:hover { color: var(--neg); }
+.cmp-attach-err { font-size: 12px; color: var(--neg); align-self: center; }
+.composer-tools { display: inline-flex; align-items: center; gap: 6px; }
+.cmp-tool {
+  display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px;
+  background: none; border: 1px solid var(--border-strong); border-radius: 2px; color: var(--text-2); cursor: pointer;
+  transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease;
+}
+.cmp-tool:hover { color: var(--text); background: rgba(0, 0, 0, 0.03); }
+.cmp-tool.rec { color: var(--neg); border-color: var(--neg); animation: rec-pulse 1.2s ease-in-out infinite; }
+@keyframes rec-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+.turn-files { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.turn-file {
+  display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-3);
+  font-family: var(--font-mono); border: 1px solid var(--border); border-radius: 2px; padding: 1px 6px;
+}
 
 .composer-foot {
   display: flex;
