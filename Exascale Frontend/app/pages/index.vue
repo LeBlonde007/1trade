@@ -275,7 +275,7 @@ const obBids = [
         </div>
 
         <div class="cta-row">
-          <BaseButton as="a" href="#cta" variant="primary" size="lg">Open account</BaseButton>
+          <BaseButton as="a" :href="'/signup'" variant="primary" size="lg">Open account</BaseButton>
           <a href="#markets" class="btn-text">View markets →</a>
         </div>
       </div>

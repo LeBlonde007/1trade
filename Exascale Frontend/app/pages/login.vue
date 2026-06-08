@@ -129,10 +129,10 @@ onBeforeUnmount(() => {
     <!-- ============ LEFT: form ============ -->
     <section class="lf-pane">
       <div class="lf-top">
-        <a class="lf-brand" href="#">
+        <NuxtLink class="lf-brand" to="/">
           <span class="brand-mark" />
           EXASCALE
-        </a>
+        </NuxtLink>
         <span class="lf-status">
           <span class="status-dot" />
           All systems operational
@@ -147,6 +147,7 @@ onBeforeUnmount(() => {
           <p class="lf-sub">Access your paper or real-money account on the Exascale venue.</p>
 
           <p v-if="justVerified" class="form-ok" role="status">Email verified — sign in to continue.</p>
+          <p v-if="authError" class="form-error" role="alert">{{ authError }}</p>
 
           <form @submit="onCreds">
             <div class="field">
@@ -186,11 +187,17 @@ onBeforeUnmount(() => {
               </div>
             </div>
 
-            <button class="btn" type="submit">
-              Sign in
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square">
-                <path d="M3 8h10M9 4l4 4-4 4" />
-              </svg>
+            <button class="btn" type="submit" :disabled="submitting">
+              <template v-if="submitting">
+                <span class="btn-spinner" aria-hidden="true" />
+                Signing in…
+              </template>
+              <template v-else>
+                Sign in
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square">
+                  <path d="M3 8h10M9 4l4 4-4 4" />
+                </svg>
+              </template>
             </button>
           </form>
 
@@ -515,6 +522,15 @@ onBeforeUnmount(() => {
   font-size: 13px;
   font-family: var(--font-mono);
 }
+.form-error {
+  margin: 0 0 18px;
+  padding: 10px 12px;
+  border: 1px solid var(--neg);
+  border-radius: 2px;
+  color: var(--neg);
+  font-size: 13px;
+  font-family: var(--font-mono);
+}
 
 .field { margin-bottom: 16px; position: relative; }
 .field-label {
@@ -604,7 +620,18 @@ onBeforeUnmount(() => {
   transition: background 120ms, border-color 120ms;
 }
 .btn:hover { background: #222; border-color: #222; }
+.btn:disabled { opacity: 0.6; cursor: default; }
+.btn:disabled:hover { background: var(--text); border-color: var(--text); }
 .btn svg { width: 14px; height: 14px; }
+.btn-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: btn-spin 700ms linear infinite;
+}
+@keyframes btn-spin { to { transform: rotate(360deg); } }
 
 .divider-or {
   display: grid;
