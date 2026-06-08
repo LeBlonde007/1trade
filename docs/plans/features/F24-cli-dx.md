@@ -43,13 +43,14 @@ plain tables, blocking requests, no streaming, terse errors. F24 is the **DX lay
 - [x] **Confirm destructive ops** — `gpu delete`, `keys revoke` → `[y/N]` (skippable with `--yes`; non-TTY aborts).
 - Tests: SSE parser (`stream_test.go`) + formatter/hint (`ui_test.go`). golangci-lint clean.
 
-### Phase 2 — the interactive chat REPL (the headline Claude-Code-like feature)
-- [ ] `exascale chat` — a persistent, multi-turn, **streaming** session.
-- [ ] Status prompt with context: `llama-3.1-8b · 982 text ▸`.
-- [ ] **Slash commands**: `/model`, `/balance`, `/cost`, `/clear`, `/save`, `/exit`.
-- [ ] Per-turn live cost meter (`+12.5 text · 982 left`); light markdown rendering of model output.
-- [ ] Built on **charm `bubbletea` + `lipgloss` + `bubbles`** (restrained styling) — *or* stdlib-only
-      (decision below). Single static binary either way.
+### Phase 2 — the interactive chat REPL (the headline Claude-Code-like feature) — **shipped (v0.3.x)**
+- [x] `exascale chat` — a persistent, multi-turn, **streaming** session (`cmd/exascale/chat.go`).
+- [x] Status prompt with context: `llama-3.1-8b · 982 text ▸` (model cyan, balance dim).
+- [x] **Slash commands**: `/model`, `/balance`, `/cost`, `/clear`, `/save`, `/exit` (+ `/help`).
+- [x] Per-turn live cost meter (`▼ 12.5 text · 982 left · N tok`), balance tracked locally + reconciled by `/balance`.
+- [ ] Light markdown rendering of model output. *(deferred — raw streamed text for now)*
+- [x] **Decision: stdlib-only** (no charm dep) — `bufio` input + the F24 streaming client; single static binary.
+      Tests: slash-parser + price parser.
 
 ### Phase 3 — polish & productivity
 - [ ] **Shell completion** — `exascale completion {bash|zsh|fish}`.
@@ -59,8 +60,9 @@ plain tables, blocking requests, no streaming, terse errors. F24 is the **DX lay
 
 ## Open decisions
 
-- **TUI library:** charm (`bubbletea`/`lipgloss`) for the Phase-2 REPL (heavier dep, polished) **vs.**
-  stdlib-only (lighter binary, plainer). Ships as one binary regardless.
+- **TUI library:** ✅ **resolved → stdlib-only** for the Phase-2 REPL — no charm/bubbletea dep, lighter
+  static binary, and the streaming SSE client already gives the live feel. Revisit only if Phase-3 needs
+  full-screen TUI (e.g. a model picker).
 - **Distribution** — ✅ **done early**: one-line install `curl -fsSL https://sandbox.exascale.ai/cli/install.sh | sh`.
   Cross-compiled static binaries (linux/darwin/windows × amd64/arm64, sandbox api URL baked in via ldflags)
   are built into the web image and served at `/cli/` (`scripts/build-cli-dist.sh` + `scripts/cli-install.sh`,
