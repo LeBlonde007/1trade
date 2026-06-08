@@ -148,6 +148,9 @@ interface Turn {
   creditType?: string
   reqId?: string
   backend?: string
+  /** Catalog id of the model that produced this turn (so the header label stays correct after the
+   *  picker changes — each reply keeps the model it was generated with). */
+  model?: string
   /** True while this assistant turn is still receiving streamed tokens (drives the live indicator). */
   streaming?: boolean
   /** Generated images (data URIs or URLs) for an image-model turn — rendered as a grid. */
@@ -340,7 +343,7 @@ async function send() {
   const liveModel = liveServedId.value
   // Push a streaming placeholder and grab the reactive element (not the raw object) so token mutations
   // re-render live.
-  turns.push({ id: nextId(), role: 'assistant', text: '', streaming: true })
+  turns.push({ id: nextId(), role: 'assistant', text: '', streaming: true, model: selectedId.value })
   const aTurn = turns[turns.length - 1]!
   await nextTick(); scrollToBottom()
   streamAbort = new AbortController()
