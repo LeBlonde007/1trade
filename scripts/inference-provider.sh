@@ -43,10 +43,15 @@ else
   # must NOT already end in /v1 (that doubles to /v1/v1/... → 404). OpenRouter → https://openrouter.ai/api
   # DigitalOcean serverless inference → https://inference.do-ai.run · local vLLM runtime → http://host:8000
   PROVIDER_URL="${VLLM_BASE_URL:-https://openrouter.ai/api}"
-  # JSON catalog-id→provider-slug map; YAML-single-quoted below so its double quotes need no escaping.
-  # Defaults are OpenRouter's PAID Llama slugs (the ":free" ones were retired → 404). For another
-  # provider set VLLM_BASE_URL + INFERENCE_MODEL_MAP to its slugs (run GET <base>/v1/models to list them).
-  MODEL_MAP="${INFERENCE_MODEL_MAP:-{\"llama-3.1-70b\":\"meta-llama/llama-3.1-70b-instruct\",\"llama-3.1-8b\":\"meta-llama/llama-3.1-8b-instruct\"}}"
+  # JSON catalog-id→provider-slug map. The default is assigned to a var FIRST: writing the default
+  # inline as ${INFERENCE_MODEL_MAP:-{...}} leaks a literal '}' past the parameter expansion when the
+  # var is set (doubling the closing brace → invalid JSON → the gateway loads zero entries). When the
+  # provider is DigitalOcean, default to its serverless slugs so the whole catalog works zero-config.
+  case "$PROVIDER_URL" in
+    *do-ai.run*) DEFAULT_MAP='{"llama-3.1-8b":"llama-4-maverick","llama-3.1-70b":"llama3.3-70b-instruct","claude-opus-4.8":"anthropic-claude-opus-4.8","claude-sonnet-4.5":"anthropic-claude-4.5-sonnet","gpt-5":"openai-gpt-5","gpt-4o":"openai-gpt-4o","deepseek-v3.2":"deepseek-3.2","qwen3-32b":"alibaba-qwen3-32b"}' ;;
+    *)           DEFAULT_MAP='{"llama-3.1-70b":"meta-llama/llama-3.1-70b-instruct","llama-3.1-8b":"meta-llama/llama-3.1-8b-instruct"}' ;;
+  esac
+  MODEL_MAP="${INFERENCE_MODEL_MAP:-$DEFAULT_MAP}"
   say "inference-gateway → hosted provider $PROVIDER_URL (real model output; stub bypassed)"
   kubectl patch secret platform-auth $NS_ARG --type merge -p "$(cat <<EOF
 stringData:

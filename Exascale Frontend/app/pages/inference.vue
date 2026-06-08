@@ -61,7 +61,7 @@ function toModelDef(m: CatalogModel): ModelDef {
   const x = m.exascale
   return {
     id: m.id,
-    name: humanizeId(m.id),
+    name: m.name || humanizeId(m.id),
     provider: providerLabel(m.owned_by),
     category: toCategory(x.modality),
     priceLabel: `${Number(x.price).toLocaleString('en-US')} ${x.credit_type} / ${x.unit}`,
