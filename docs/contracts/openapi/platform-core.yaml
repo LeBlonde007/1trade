@@ -414,6 +414,65 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '409': { description: "No pending submission for this tenant.", content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
 
+  /v1/conversations:
+    get:
+      summary: List the caller's chat conversations (metadata only) for the playground history sidebar.
+      security: [{ tenantJwt: [] }]
+      responses:
+        '200':
+          description: Conversations, newest activity first.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  conversations:
+                    type: array
+                    items: { $ref: '#/components/schemas/ConversationMeta' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      summary: Create a new conversation (transcript optional) and return it with its server id.
+      security: [{ tenantJwt: [] }]
+      requestBody:
+        required: false
+        content: { application/json: { schema: { $ref: '#/components/schemas/ConversationBody' } } }
+      responses:
+        '201':
+          description: Created.
+          content: { application/json: { schema: { $ref: '#/components/schemas/Conversation' } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /v1/conversations/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: Load one conversation (full transcript), scoped to the caller's tenant.
+      security: [{ tenantJwt: [] }]
+      responses:
+        '200':
+          description: The conversation.
+          content: { application/json: { schema: { $ref: '#/components/schemas/Conversation' } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { description: Not found, content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+    put:
+      summary: Replace a conversation's transcript (and optional title/model). Tenant-scoped.
+      security: [{ tenantJwt: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/ConversationBody' } } }
+      responses:
+        '200':
+          description: Updated.
+          content: { application/json: { schema: { $ref: '#/components/schemas/Conversation' } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { description: Not found, content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+    delete:
+      summary: Delete a conversation (tenant-scoped).
+      security: [{ tenantJwt: [] }]
+      responses:
+        '204': { description: Deleted. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { description: Not found, content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+
   /v1/billing/checkout:
     post:
       tags: [billing]
@@ -519,6 +578,32 @@ components:
       description: Required on mutating calls; repeats with the same key return the original result.
 
   schemas:
+    ConversationMeta:
+      type: object
+      description: Conversation list item (no transcript body) for the history sidebar.
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        model: { type: string, description: "Catalog id of the conversation's current model." }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    Conversation:
+      type: object
+      description: A full stored conversation. transcript is the opaque JSON of the playground turns.
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        model: { type: string }
+        transcript: { type: array, items: { type: object, additionalProperties: true } }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    ConversationBody:
+      type: object
+      description: Create/update payload. All fields optional on create; transcript replaces on update.
+      properties:
+        title: { type: string }
+        model: { type: string }
+        transcript: { type: array, items: { type: object, additionalProperties: true } }
     Role:
       type: string
       enum: [admin, billing, engineer, viewer, trader]   # trader is Phase 2 (unused in Phase 1)

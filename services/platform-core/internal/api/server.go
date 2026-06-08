@@ -82,6 +82,11 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("DELETE /v1/auth/keys/{id}", s.revokeKey)
 	s.mux.HandleFunc("POST /v1/auth/keys/introspect", s.introspectKey) // internal (service token)
 	s.mux.HandleFunc("POST /v1/files/presign", s.presignUpload)        // object storage (Spaces) — presigned upload
+	s.mux.HandleFunc("GET /v1/conversations", s.listConversations)     // chat history (playground) — list
+	s.mux.HandleFunc("POST /v1/conversations", s.createConversation)   // create
+	s.mux.HandleFunc("GET /v1/conversations/{id}", s.getConversation)  // load full transcript
+	s.mux.HandleFunc("PUT /v1/conversations/{id}", s.updateConversation)    // save transcript
+	s.mux.HandleFunc("DELETE /v1/conversations/{id}", s.deleteConversation) // delete
 	s.mux.HandleFunc("POST /v1/billing/checkout", s.createCheckout)
 	s.mux.HandleFunc("POST /v1/billing/webhook/stripe", s.stripeWebhook) // auth = Stripe signature
 	s.mux.HandleFunc("GET /v1/billing/purchases", s.listPurchases)
