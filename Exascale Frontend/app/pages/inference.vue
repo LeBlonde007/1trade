@@ -7,7 +7,7 @@
  * sidebar inside the playground area.
  */
 
-import { Paperclip, Mic, Volume2 } from 'lucide-vue-next'
+import { Paperclip, Mic, Volume2, Headphones } from 'lucide-vue-next'
 import type { CatalogModel } from '~/composables/useCatalog'
 import type { ChatUsage } from '~/composables/useInference'
 
@@ -433,11 +433,19 @@ function removeAttachment(i: number) { attachments.value.splice(i, 1) }
 // ── Voice: dictation (speech→text) into the composer, and read-aloud (text→speech) of replies. Both
 // use the browser's Web Speech API — Chrome/Edge; degrade gracefully elsewhere. ─────────────────────
 const listening = ref(false)
+const voiceMode = ref(false) // hands-free conversation loop: listen → send → speak → listen
+const speaking = ref(false)  // TTS is talking now (we never listen while speaking → no feedback echo)
 const speechSupported = computed(() => import.meta.client && ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window))
 let recog: { stop: () => void; start: () => void } | null = null
-function toggleMic() {
+
+/**
+ * startListening opens one speech-recognition turn, transcribing into the composer. In hands-free voice
+ * mode the end of the utterance auto-sends (see onend). Guarded so it never overlaps an active turn,
+ * an in-flight response, or the assistant speaking (which would feed TTS audio back into the mic).
+ */
+function startListening() {
   if (!speechSupported.value) { attachError.value = 'voice input needs Chrome/Edge'; return }
-  if (listening.value) { recog?.stop(); return }
+  if (listening.value || speaking.value || sending.value) return
   const SR = (window as unknown as { SpeechRecognition?: new () => unknown; webkitSpeechRecognition?: new () => unknown })
   const Ctor = SR.SpeechRecognition || SR.webkitSpeechRecognition
   if (!Ctor) return
@@ -459,17 +467,65 @@ function toggleMic() {
     }
     draft.value = (base ? base + ' ' : '') + phrase.trim()
   }
-  r.onend = () => { listening.value = false }
+  r.onend = () => {
+    listening.value = false
+    // Voice mode: a captured utterance auto-sends; silence just goes idle (tap the mic to resume).
+    if (voiceMode.value && draft.value.trim() && !sending.value) void runVoiceTurn()
+  }
   r.onerror = () => { listening.value = false }
   recog = r
   listening.value = true
   r.start()
 }
-function speak(text: string) {
-  if (!import.meta.client || !('speechSynthesis' in window)) return
-  window.speechSynthesis.cancel()
-  window.speechSynthesis.speak(new SpeechSynthesisUtterance(text))
+
+/** toggleMic — the manual dictation button (transcribe into the composer; independent of voice mode). */
+function toggleMic() {
+  if (listening.value) { recog?.stop(); return }
+  startListening()
 }
+
+/** speak reads text aloud via the browser, tracking `speaking` and firing onDone when it finishes. */
+function speak(text: string, onDone?: () => void) {
+  if (!import.meta.client || !('speechSynthesis' in window)) { onDone?.(); return }
+  window.speechSynthesis.cancel()
+  const u = new SpeechSynthesisUtterance(text)
+  speaking.value = true
+  u.onend = () => { speaking.value = false; onDone?.() }
+  u.onerror = () => { speaking.value = false; onDone?.() }
+  window.speechSynthesis.speak(u)
+}
+
+/** runVoiceTurn drives one hands-free round: send the dictated prompt, speak the reply, then re-open
+ *  the mic for the next turn — until voice mode is switched off. */
+async function runVoiceTurn() {
+  await send()
+  if (!voiceMode.value) return
+  const reply = lastAssistant.value
+  if (reply && reply.text && !reply.streaming) speak(reply.text, () => { if (voiceMode.value) startListening() })
+  else startListening()
+}
+
+/** toggleVoiceMode starts/stops the hands-free conversation loop. */
+function toggleVoiceMode() {
+  if (!speechSupported.value) { attachError.value = 'voice mode needs Chrome/Edge'; return }
+  voiceMode.value = !voiceMode.value
+  if (voiceMode.value) {
+    startListening()
+  } else {
+    recog?.stop()
+    if (import.meta.client && 'speechSynthesis' in window) window.speechSynthesis.cancel()
+    speaking.value = false
+  }
+}
+
+/** voiceStatus — the live phase shown while hands-free voice mode is active. */
+const voiceStatus = computed(() => {
+  if (!voiceMode.value) return ''
+  if (speaking.value) return 'Speaking…'
+  if (sending.value) return 'Thinking…'
+  if (listening.value) return 'Listening…'
+  return 'Tap mic to talk'
+})
 
 function renderMarkdownLite(src: string): string {
   // Tiny markdown-ish renderer: paragraphs, bullets, inline `code` and **bold**.
@@ -946,7 +1002,15 @@ async function copyText(text: string, label: string) {
                       >
                         <Mic :size="14" />
                       </button>
-                      <span class="composer-hint mono">{{ listening ? 'Listening…' : 'scoped key required' }}</span>
+                      <button
+                        type="button" class="cmp-tool" :class="{ active: voiceMode }"
+                        :title="speechSupported ? 'Voice mode — speak, hear the reply, repeat (hands-free)' : 'Voice mode needs Chrome/Edge'"
+                        @click="toggleVoiceMode"
+                      >
+                        <Headphones :size="14" />
+                      </button>
+                      <span v-if="voiceMode" class="composer-hint mono voice"><span class="voice-dot" /> Voice mode · {{ voiceStatus }}</span>
+                      <span v-else class="composer-hint mono">{{ listening ? 'Listening…' : 'scoped key required' }}</span>
                     </div>
                     <div class="composer-actions">
                       <span class="cost-preview mono">
@@ -1980,7 +2044,13 @@ ratelimit-remaining:   58 / 60 RPS</pre>
 }
 .cmp-tool:hover { color: var(--text); background: rgba(0, 0, 0, 0.03); }
 .cmp-tool.rec { color: var(--neg); border-color: var(--neg); animation: rec-pulse 1.2s ease-in-out infinite; }
+/* Voice mode active — the headset toggle goes solid brand. */
+.cmp-tool.active { color: var(--canvas); background: var(--brand); border-color: var(--brand); }
+.cmp-tool.active:hover { background: var(--brand-hov); color: var(--canvas); }
 @keyframes rec-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+/* Live voice-mode status with a pulsing dot. */
+.composer-hint.voice { color: var(--brand); display: inline-flex; align-items: center; gap: 6px; }
+.voice-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--brand); animation: rec-pulse 1.2s ease-in-out infinite; }
 .turn-files { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .turn-file {
   display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-3);
