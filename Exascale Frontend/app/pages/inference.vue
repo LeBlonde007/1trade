@@ -93,6 +93,16 @@ const EMPTY_MODEL: ModelDef = { id: '', name: '—', provider: '', category: 'te
 const selectedId = ref('')
 const selected = computed(() => models.value.find(m => m.id === selectedId.value) ?? models.value[0] ?? EMPTY_MODEL)
 
+// Real signed-in identity for the chat transcript (no hardcoded demo user). We only have the email,
+// so the label is its local-part and the avatar is up to two initials derived from it.
+const { user } = useAuth()
+const userLabel = computed(() => (user.value?.email?.split('@')[0]) || 'You')
+const userInitials = computed(() => {
+  const base = (user.value?.email?.split('@')[0]) || 'you'
+  const parts = base.split(/[._-]/).filter(Boolean)
+  return ((parts[0]?.[0] || base[0] || 'Y') + (parts[1]?.[0] || '')).toUpperCase()
+})
+
 function selectModel(id: string) {
   selectedId.value = id
 }
@@ -639,11 +649,11 @@ async function copyText(text: string, label: string) {
                 >
                   <div class="turn-head">
                     <span class="turn-avatar" :class="t.role">
-                      <template v-if="t.role === 'user'">MC</template>
+                      <template v-if="t.role === 'user'">{{ userInitials }}</template>
                       <template v-else>AI</template>
                     </span>
                     <span class="turn-who">
-                      {{ t.role === 'user' ? 'Marcus Chen' : selected.name }}
+                      {{ t.role === 'user' ? userLabel : selected.name }}
                     </span>
                     <span v-if="t.role === 'assistant' && t.latencyMs" class="turn-meta mono">
                       {{ t.latencyMs }}ms · {{ t.tokens?.out ?? 0 }} tok out<template v-if="t.creditCost !== undefined"> · {{ fmtCredits(t.creditCost) }} {{ t.creditType }} credits</template>

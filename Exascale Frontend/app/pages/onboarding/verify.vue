@@ -28,9 +28,15 @@ function startCooldown(secs: number) {
 const verified = ref(false)
 const verifyError = ref('')
 
-// After email verification everyone continues to the persona welcome + product tour (journey step 3).
-// KYC is a later, trading-only gate (handled after the tour) — not here.
-const nextStep = '/onboarding/welcome'
+// Where to go after the email is verified. If the deployment gated login on verification the user has
+// NO session yet (signup issued none) → send them to /login to sign in. Otherwise (dev/immediate-login)
+// they're already authed → continue onboarding to the persona welcome + tour (journey step 3). KYC is a
+// later, trading-only gate handled after the tour, not here.
+async function continueAfterVerify() {
+  const { user, refresh } = useAuth()
+  await refresh()
+  await navigateTo(user.value ? '/onboarding/welcome' : '/login?verified=1')
+}
 
 async function onResend() {
   if (remaining.value > 0) return
@@ -47,7 +53,7 @@ onMounted(async () => {
   try {
     await $fetch('/api/auth/verify', { method: 'POST', body: { token } })
     verified.value = true
-    setTimeout(() => navigateTo(nextStep), 800)
+    setTimeout(continueAfterVerify, 800)
   } catch {
     verifyError.value = 'This verification link is invalid or has already been used.'
   }
@@ -154,7 +160,7 @@ function commitChange() {
 
           <div class="below-actions">
             <button v-if="!showChange" type="button" class="link-btn" @click="openChange">Change email →</button>
-            <NuxtLink :to="nextStep" class="link-btn primary">I've verified my email →</NuxtLink>
+            <button type="button" class="link-btn primary" @click="continueAfterVerify">I've verified my email →</button>
           </div>
 
           <div v-if="showChange" class="change-form">

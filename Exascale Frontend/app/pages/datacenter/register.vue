@@ -17,6 +17,10 @@ useHead({
   htmlAttrs: { 'data-theme': 'light' },
 })
 
+// Supply-side onboarding (F16) isn't built — gate the form behind a "coming soon" screen so partners
+// can't sign up into an incomplete flow. Flip to true when the supply service ships.
+const datacenterSignupLive = false
+
 // =====================================================
 // Pre-populated partner draft — Helsinki DC
 // =====================================================
@@ -245,7 +249,25 @@ function interconnectLabel() {
 </script>
 
 <template>
-  <div class="reg-shell" data-theme="light">
+  <!-- Datacenter onboarding (supply side, F16) isn't built yet — gate the registration so partners
+       can't sign up into an incomplete flow. Flip `datacenterSignupLive` when the supply service ships. -->
+  <div v-if="!datacenterSignupLive" class="reg-shell soon-shell" data-theme="light">
+    <header class="topbar">
+      <NuxtLink to="/" class="brand"><span class="brand-mark" />EXASCALE</NuxtLink>
+    </header>
+    <main class="soon-main">
+      <div class="soon-card">
+        <span class="soon-pill">Coming soon</span>
+        <h1>Datacenter onboarding isn't open yet</h1>
+        <p>We're finishing the supply-side onboarding — capacity registration, GPU attestation, and
+          streamed payouts. Partner sign-up will open with that release.</p>
+        <p class="soon-contact">Want to supply GPUs early? <a href="mailto:partners@exascale.ai">partners@exascale.ai</a></p>
+        <NuxtLink to="/" class="soon-btn">← Back to Exascale</NuxtLink>
+      </div>
+    </main>
+  </div>
+
+  <div v-else class="reg-shell" data-theme="light">
     <!-- ============ Top chrome ============ -->
     <header class="topbar">
       <NuxtLink to="/datacenter" class="brand">
@@ -729,6 +751,19 @@ function interconnectLabel() {
 </template>
 
 <style scoped>
+/* Coming-soon gate (datacenter onboarding not yet open) */
+.soon-shell { min-height: 100vh; display: flex; flex-direction: column; background: var(--canvas); color: var(--text); font-family: var(--font-sans); }
+.soon-shell .topbar { display: flex; align-items: center; padding: 24px 40px; }
+.soon-shell .brand { display: inline-flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 700; letter-spacing: -0.02em; color: var(--text); text-decoration: none; }
+.soon-shell .brand-mark { width: 12px; height: 12px; background: var(--brand); display: inline-block; }
+.soon-main { flex: 1; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.soon-card { max-width: 480px; text-align: center; border: 1px solid var(--border); background: var(--elevated); border-radius: 2px; padding: 48px 40px; }
+.soon-pill { display: inline-block; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-2); border: 1px solid var(--border); border-radius: 2px; padding: 3px 8px; margin-bottom: 18px; }
+.soon-card h1 { font-family: var(--font-display); font-size: 24px; font-weight: 600; margin: 0 0 12px; letter-spacing: -0.01em; }
+.soon-card p { color: var(--text-2); font-size: 14px; line-height: 1.6; margin: 0 0 12px; }
+.soon-contact a { color: var(--text); }
+.soon-btn { display: inline-block; margin-top: 18px; color: var(--text); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; }
+
 .reg-shell {
   --bd-soft: rgba(14, 14, 14, 0.06);
   --t-4:     #B8B8B0;

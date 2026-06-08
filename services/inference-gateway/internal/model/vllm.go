@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -87,14 +88,18 @@ func (b *VLLMBackend) Chat(ctx context.Context, req ChatRequest) (ChatResult, er
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return ChatResult{}, fmt.Errorf("runtime returned %d", resp.StatusCode)
+		// Surface the provider's reason (truncated) — a hosted provider 402 (out of credits), 404
+		// (unknown model slug), or 401 (bad key) otherwise hides behind a blind 500. This lands in the
+		// gateway's error log and helps the operator fix the model map / top up the provider.
+		excerpt, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return ChatResult{}, fmt.Errorf("provider returned %d for model %q: %s", resp.StatusCode, b.providerModel(req.Model), bytes.TrimSpace(excerpt))
 	}
 	var out vllmChatResponse
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		return ChatResult{}, fmt.Errorf("decode runtime response: %w", err)
+		return ChatResult{}, fmt.Errorf("decode provider response: %w", err)
 	}
 	if len(out.Choices) == 0 {
-		return ChatResult{}, fmt.Errorf("runtime returned no choices")
+		return ChatResult{}, fmt.Errorf("provider returned no choices for model %q (check the model slug / availability)", b.providerModel(req.Model))
 	}
 
 	content := out.Choices[0].Message.Content

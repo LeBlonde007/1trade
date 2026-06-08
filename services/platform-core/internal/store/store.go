@@ -83,12 +83,13 @@ func (s *Store) Signup(ctx context.Context, email, passwordHash, tenantName stri
 
 // AuthUser is everything needed to authenticate a login and mint a JWT.
 type AuthUser struct {
-	UserID       string
-	TenantID     string
-	OrgID        string
-	PasswordHash string
-	Roles        []domain.Role
-	IsPaper      bool
+	UserID        string
+	TenantID      string
+	OrgID         string
+	PasswordHash  string
+	Roles         []domain.Role
+	IsPaper       bool
+	EmailVerified bool
 }
 
 // GetUserByEmail loads the login record (joined with the tenant for is_paper). ok=false if no such user.
@@ -98,9 +99,9 @@ func (s *Store) GetUserByEmail(ctx context.Context, email string) (AuthUser, boo
 	var org *string
 	var roles []string
 	err := s.pool.QueryRow(ctx,
-		`SELECT u.id, u.tenant_id, u.org_id, u.password_hash, u.roles, t.is_paper
+		`SELECT u.id, u.tenant_id, u.org_id, u.password_hash, u.roles, t.is_paper, u.email_verified
 		 FROM users u JOIN tenants t ON t.id = u.tenant_id WHERE u.email = $1`, email).
-		Scan(&u.UserID, &u.TenantID, &org, &u.PasswordHash, &roles, &u.IsPaper)
+		Scan(&u.UserID, &u.TenantID, &org, &u.PasswordHash, &roles, &u.IsPaper, &u.EmailVerified)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return AuthUser{}, false, nil
 	}

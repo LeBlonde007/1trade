@@ -41,7 +41,9 @@ else
   [ -n "${INFERENCE_API_KEY:-}" ] || { echo "ERROR: set INFERENCE_API_KEY=sk-... (or PROVIDER=stub to revert)"; exit 2; }
   PROVIDER_URL="${VLLM_BASE_URL:-https://openrouter.ai/api/v1}"
   # JSON catalog-id→provider-slug map; YAML-single-quoted below so its double quotes need no escaping.
-  MODEL_MAP="${INFERENCE_MODEL_MAP:-{\"llama-3.1-70b\":\"meta-llama/llama-3.1-70b-instruct\",\"llama-3.1-8b\":\"meta-llama/llama-3.1-8b-instruct\"}}"
+  # Default to OpenRouter's FREE variants so a $0 key works out of the box (paid slugs 402 → blind 500).
+  # 70B maps to Llama-3.3-70B:free (the reliable free 70B-class model; 3.1-70B has no stable free tier).
+  MODEL_MAP="${INFERENCE_MODEL_MAP:-{\"llama-3.1-70b\":\"meta-llama/llama-3.3-70b-instruct:free\",\"llama-3.1-8b\":\"meta-llama/llama-3.1-8b-instruct:free\"}}"
   say "inference-gateway → hosted provider $PROVIDER_URL (real model output; stub bypassed)"
   kubectl patch secret platform-auth $NS_ARG --type merge -p "$(cat <<EOF
 stringData:
