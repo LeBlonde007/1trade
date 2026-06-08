@@ -140,6 +140,17 @@ SED_ARGS=(-e "s|EXASCALE_SANDBOX_API_HOST|$SANDBOX_API_HOST|g" \
 kubectl kustomize deploy/k8s/overlays/sandbox \
   | sed "${SED_ARGS[@]}" \
   | kubectl apply -f -
+# No-source redeploys reuse the MOVING :sandbox tag, which k3s caches (pullPolicy defaults to
+# IfNotPresent for a non-:latest tag) — so a re-deploy would silently keep the OLD images. Force a
+# fresh pull: set imagePullPolicy=Always, then rollout restart so new pods pull the just-built images.
+if [ -n "$IMAGE_REGISTRY" ]; then
+  say "forcing image re-pull (moving :$TAG tag)"
+  for d in platform-core credit-ledger inference-gateway compute-control web; do
+    kubectl patch deploy "$d" --type=json \
+      -p '[{"op":"add","path":"/spec/template/spec/containers/0/imagePullPolicy","value":"Always"}]' >/dev/null 2>&1 || true
+    kubectl rollout restart "deploy/$d" >/dev/null 2>&1 || true
+  done
+fi
 for d in platform-core credit-ledger inference-gateway compute-control inference-runtime web; do
   kubectl rollout status "deploy/$d" --timeout=300s
 done
