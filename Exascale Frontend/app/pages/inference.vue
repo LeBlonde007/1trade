@@ -153,6 +153,8 @@ interface Turn {
   images?: string[]
   /** Generated video URL (the BFF content route) for a video-model turn — rendered in a player. */
   video?: string
+  /** Generated audio (object URL) for a speech-model turn — rendered in an <audio> player. */
+  audio?: string
   /** Names of files attached to this user turn (their content is sent as context, not shown inline). */
   files?: string[]
 }
@@ -190,10 +192,14 @@ function loadChat(): PersistedChat | null {
 function saveChat() {
   if (typeof localStorage === 'undefined') return
   try {
-    // Drop generated image data (multi-MB base64) from the persisted copy — it would blow the
-    // localStorage quota. Image results are session-only; a restored turn shows a small placeholder.
-    const persisted = turns.slice(-100).map((t) =>
-      t.images?.length ? { ...t, images: undefined, html: undefined, text: t.text || '🖼 generated image (not retained)' } : t)
+    // Drop ephemeral media from the persisted copy: image base64 (multi-MB → quota) and audio object
+    // URLs (invalid after a reload). These are session-only; a restored turn shows a small placeholder.
+    // Video is a real URL, so it's kept and replays after a refresh.
+    const persisted = turns.slice(-100).map((t) => {
+      if (t.images?.length) return { ...t, images: undefined, html: undefined, text: t.text || '🖼 generated image (not retained)' }
+      if (t.audio) return { ...t, audio: undefined, text: t.text || '🔊 generated audio (not retained)' }
+      return t
+    })
     const payload: PersistedChat = { turns: persisted, params, selectedId: selectedId.value }
     localStorage.setItem(chatStoreKey.value, JSON.stringify(payload))
   } catch { /* quota / serialization — keep the in-memory session */ }
@@ -490,6 +496,53 @@ async function generateVideo() {
       aTurn.text = 'Video is taking longer than expected — it keeps rendering on the server; try again shortly.'
       aTurn.html = '<p>Video is taking longer than expected — it keeps rendering on the server.</p>'
     }
+  } catch (e: unknown) {
+    renderAssistantError(aTurn, e)
+  } finally {
+    generating.value = false
+    await nextTick(); scrollToBottom()
+  }
+}
+
+// ── Speech generation (text→speech) — synchronous; the BFF streams WAV audio we play inline.
+const speechCost = computed(() => {
+  const p = catalogPrice.value[selectedId.value]
+  return p ? p.price * (Math.max(1, draftTokens.value * 4) / 1000) : 0 // ~chars/1K × price (rough preview)
+})
+
+// generateSpeech sends text to a TTS model and plays the returned audio inline. The result is fetched
+// as a blob → object URL (audio isn't kept across refresh — it's regenerated on demand).
+async function generateSpeech() {
+  const input = draft.value.trim()
+  if (!input || generating.value) return
+  turns.push({ id: nextId(), role: 'user', text: input })
+  draft.value = ''
+  generating.value = true
+  const startedAt = Date.now()
+  const modelId = selectedId.value
+  turns.push({ id: nextId(), role: 'assistant', text: '', streaming: true, backend: modelId })
+  const aTurn = turns[turns.length - 1]!
+  await nextTick(); scrollToBottom()
+  try {
+    const resp = await fetch('/api/inference/speech', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ model: modelId, input }),
+    })
+    if (!resp.ok) {
+      const env = await resp.json().catch(() => null)
+      const inner = (env && (env.data || env)) as { code?: string; message?: string } | null
+      const err = new Error(inner?.message || 'Speech failed') as Error & { statusCode?: number; data?: unknown }
+      err.statusCode = resp.status; err.data = inner
+      throw err
+    }
+    const blob = await resp.blob()
+    aTurn.streaming = false
+    aTurn.latencyMs = Date.now() - startedAt
+    aTurn.audio = URL.createObjectURL(blob)
+    aTurn.text = ''
+    const p = catalogPrice.value[modelId]
+    if (p) { aTurn.creditCost = p.price * (input.length / 1000); aTurn.creditType = p.creditType }
+    void refreshBalance()
   } catch (e: unknown) {
     renderAssistantError(aTurn, e)
   } finally {
@@ -1063,6 +1116,9 @@ async function copyText(text: string, label: string) {
                     <div v-if="t.video" class="vid-out">
                       <video :src="t.video" controls preload="metadata" playsinline />
                     </div>
+                    <div v-else-if="t.audio" class="aud-out">
+                      <audio :src="t.audio" controls preload="metadata" />
+                    </div>
                     <div v-else-if="t.images && t.images.length" class="img-grid">
                       <a v-for="(src, idx) in t.images" :key="idx" :href="src" target="_blank" rel="noopener" class="img-out" title="Open full size">
                         <img :src="src" :alt="'generated image ' + (idx + 1)" loading="lazy" />
@@ -1215,7 +1271,35 @@ async function copyText(text: string, label: string) {
                 </div>
               </form>
 
-              <!-- Speech / embeddings: not inline yet — point to the API/CLI. Catalog + pricing live. -->
+              <!-- Speech models: text→speech (synchronous), via the BFF → gateway → DO TTS. -->
+              <form v-else-if="selected.category === 'speech'" class="composer" @submit.prevent="generateSpeech">
+                <div class="composer-box">
+                  <textarea
+                    v-model="draft"
+                    class="composer-input"
+                    placeholder="Type the text to speak…"
+                    rows="3"
+                    @keydown.enter.exact.prevent="generateSpeech"
+                  />
+                  <div class="composer-foot">
+                    <span class="composer-hint mono">{{ selected.name }} · {{ selected.priceLabel }}</span>
+                    <div class="composer-actions">
+                      <span class="cost-preview mono">~{{ fmtCredits(speechCost) }} speech credits</span>
+                      <button v-if="generating" type="button" class="send-btn stop-btn" disabled>
+                        <span class="spinner" /> Generating…
+                      </button>
+                      <button v-else type="submit" class="send-btn" :disabled="!draft.trim()">
+                        Speak
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square">
+                          <path d="M3 8h10M9 4l4 4-4 4" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </form>
+
+              <!-- Embeddings: not inline (no UI) — point to the API/CLI. Catalog + pricing live. -->
               <div v-else class="api-only">
                 <div class="api-only-icon">{{ CATEGORY_META[selected.category].label }}</div>
                 <h4>{{ selected.name }} runs via the API</h4>
@@ -2140,6 +2224,9 @@ ratelimit-remaining:   58 / 60 RPS</pre>
 /* Generated-video player (text→video turns). */
 .vid-out { border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; background: var(--canvas); max-width: 640px; }
 .vid-out video { display: block; width: 100%; height: auto; }
+/* Generated-audio player (text→speech turns). */
+.aud-out { max-width: 420px; }
+.aud-out audio { display: block; width: 100%; }
 
 /* Composer */
 .composer {
