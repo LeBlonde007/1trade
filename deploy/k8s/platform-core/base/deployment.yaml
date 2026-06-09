@@ -15,7 +15,7 @@ spec:
       labels: { app: platform-core }
     spec:
       # Apply migrations before the service starts (idempotent: CREATE ... IF NOT EXISTS).
-      # SQL comes from the platform-core-migrations ConfigMap (0001_init.sql … 0005_kyc.sql).
+      # SQL comes from the platform-core-migrations ConfigMap (0001_init.sql … 0006_conversations.sql).
       initContainers:
         - name: migrate
           image: postgres:16-alpine
@@ -23,7 +23,7 @@ spec:
           args:
             - |
               set -e
-              for f in /migrations/0001_init.sql /migrations/0002_billing.sql /migrations/0003_accounts.sql /migrations/0004_gaps.sql /migrations/0005_kyc.sql; do
+              for f in /migrations/0001_init.sql /migrations/0002_billing.sql /migrations/0003_accounts.sql /migrations/0004_gaps.sql /migrations/0005_kyc.sql /migrations/0006_conversations.sql; do
                 echo "applying $f"; psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"
               done
           env:
