@@ -59,10 +59,14 @@ func NewWithBilling(cfg config.Config, st *store.Store, stripe billing.StripeCli
 	return s
 }
 
-// defaultStripe returns the real Stripe client when a secret key is configured, else the mock (local
-// dev / CI). The real-Stripe checkout-session client is an M3 follow-up; the mock exercises the full
-// booking loop today.
-func defaultStripe(_ config.Config) billing.StripeClient {
+// defaultStripe returns the real Stripe client when a secret key is configured (sandbox/prod →
+// hosted checkout + signed settlement webhook), else the mock (local dev / CI, which auto-settles so
+// the full booking loop runs without Stripe keys). A real key also flips BillingAutoSettle off in
+// config, so credits are minted only by the verified webhook.
+func defaultStripe(cfg config.Config) billing.StripeClient {
+	if cfg.StripeSecretKey != "" {
+		return billing.NewRealStripe(cfg.StripeSecretKey, cfg.AppBaseURL)
+	}
 	return billing.MockStripe{}
 }
 
