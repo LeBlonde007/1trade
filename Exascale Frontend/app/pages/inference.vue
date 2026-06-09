@@ -7,7 +7,7 @@
  * sidebar inside the playground area.
  */
 
-import { Paperclip, Mic, Volume2, Headphones, Monitor } from 'lucide-vue-next'
+import { Paperclip, Mic, Volume2, Headphones, Monitor, ChevronDown } from 'lucide-vue-next'
 import type { CatalogModel } from '~/composables/useCatalog'
 import type { ChatUsage } from '~/composables/useInference'
 
@@ -122,8 +122,11 @@ const userInitials = computed(() => {
   return ((parts[0]?.[0] || base[0] || 'Y') + (parts[1]?.[0] || '')).toUpperCase()
 })
 
+// On mobile the catalog is a collapsible picker; choosing a model closes it so the chat is in view.
+const catalogOpen = ref(false)
 function selectModel(id: string) {
   selectedId.value = id
+  catalogOpen.value = false
 }
 
 // =====================================================
@@ -1034,7 +1037,13 @@ async function copyText(text: string, label: string) {
 
     <main class="layout">
       <!-- ============ LEFT: Model catalog ============ -->
-      <aside class="catalog">
+      <aside class="catalog" :class="{ 'cat-open': catalogOpen }">
+        <!-- Mobile: a collapsed picker bar; the full list drops down when tapped. -->
+        <button type="button" class="catalog-toggle" @click="catalogOpen = !catalogOpen">
+          <span class="ct-label">Model</span>
+          <span class="ct-current">{{ selected.name }}</span>
+          <ChevronDown :size="16" class="ct-caret" :class="{ open: catalogOpen }" />
+        </button>
         <div class="catalog-head">
           <div class="search">
             <span class="search-ic" aria-hidden="true">
@@ -2977,10 +2986,46 @@ kbd {
   .pg-body { grid-template-columns: minmax(0, 1fr) 240px; }
   .params-grid { grid-template-columns: repeat(2, 1fr); }
 }
+/* Desktop: the full catalog is always shown, so the mobile picker bar is hidden. */
+.catalog-toggle { display: none; }
+
 @media (max-width: 900px) {
   .layout { grid-template-columns: 1fr; }
-  .catalog { max-height: 360px; border-right: 0; border-bottom: 1px solid var(--border); }
   .pg-body { grid-template-columns: 1fr; }
   .pg-meta { display: none; }
+
+  /* Catalog becomes a collapsible model picker (default closed → the chat is primary). */
+  .catalog { max-height: none; border-right: 0; border-bottom: 1px solid var(--border); }
+  .catalog-toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 12px 16px;
+    background: var(--elevated);
+    border: 0;
+    color: var(--text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .ct-label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); }
+  .ct-current { font-weight: 600; font-size: 14px; }
+  .ct-caret { margin-left: auto; color: var(--text-3); transition: transform 200ms var(--ease, ease); }
+  .ct-caret.open { transform: rotate(180deg); }
+
+  /* Hide the catalog body until the picker is opened. */
+  .catalog-head, .catalog-list { display: none; }
+  .catalog.cat-open .catalog-head { display: flex; }
+  .catalog.cat-open .catalog-list { display: flex; max-height: 60vh; }
+}
+
+@media (max-width: 640px) {
+  .layout, .playground, .pg-main { min-width: 0; }
+  .params-grid { grid-template-columns: 1fr; }
+  /* The composer footer wraps so the cost estimate + send button never overflow. */
+  .composer-foot { flex-wrap: wrap; gap: 8px; }
+  .composer-actions { width: 100%; justify-content: space-between; }
+  .cost-preview { font-size: 11px; }
 }
 </style>
