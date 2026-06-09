@@ -18,6 +18,11 @@ const resending = ref(false)
 const resent = ref(false)
 // Shown after the user confirms their email and is redirected here (verify.vue → /login?verified=1).
 const justVerified = computed(() => useRoute().query.verified === '1')
+// Initials for the 2FA email pill — derived from the signed-in address, never hardcoded.
+const emailInitials = computed(() => {
+  const local = (email.value.split('@')[0] || '').replace(/[^a-zA-Z]/g, '')
+  return (local.slice(0, 2) || 'EX').toUpperCase()
+})
 const showPw = ref(false)
 const code = ref('428')
 const rememberDevice = ref(false)
@@ -197,7 +202,7 @@ onBeforeUnmount(() => {
             <div class="field">
               <div class="field-label">
                 <span>— Password</span>
-                <a href="#">Forgot password?</a>
+                <a href="mailto:support@exascale.ai?subject=Password%20reset">Forgot password?</a>
               </div>
               <div class="field-pw">
                 <input
@@ -265,7 +270,7 @@ onBeforeUnmount(() => {
 
           <div class="lf-meta">
             <NuxtLink to="/signup" class="lf-link primary">New to Exascale? Open an account →</NuxtLink>
-            <a href="#" class="lf-link">Sign in with SSO (firm accounts)</a>
+            <NuxtLink to="/enterprise/sso" class="lf-link">Sign in with SSO (firm accounts)</NuxtLink>
           </div>
         </template>
 
@@ -276,7 +281,7 @@ onBeforeUnmount(() => {
           <p class="lf-sub">Enter the 6-digit code from your authenticator app to finish signing in.</p>
 
           <div class="email-pill">
-            <span class="email-avatar">MC</span>
+            <span class="email-avatar">{{ emailInitials }}</span>
             <span class="email-em">{{ email }}</span>
             <span class="email-switch" @click="step = 'creds'">Not you?</span>
           </div>
@@ -322,7 +327,7 @@ onBeforeUnmount(() => {
 
           <div class="lf-meta">
             <a href="#" class="lf-link" @click.prevent="step = 'creds'">← Back to sign in</a>
-            <a href="#" class="lf-link">Lost your authenticator? Contact support →</a>
+            <a href="mailto:support@exascale.ai?subject=Authenticator%20help" class="lf-link">Lost your authenticator? Contact support →</a>
           </div>
         </template>
       </div>
@@ -423,9 +428,9 @@ onBeforeUnmount(() => {
           <span class="rp-quote-name"><strong>R. Sato</strong> · Treasury · Frontier Lab</span>
         </div>
         <div class="rp-links">
-          <a href="#">Market data</a>
-          <a href="#">Documentation</a>
-          <a href="#">Status →</a>
+          <NuxtLink to="/markets">Market data</NuxtLink>
+          <NuxtLink to="/inference">Documentation</NuxtLink>
+          <NuxtLink to="/status">Status →</NuxtLink>
         </div>
       </div>
     </aside>
@@ -1132,5 +1137,37 @@ onBeforeUnmount(() => {
   .login-screen { grid-template-columns: 1fr; }
   .rp-pane { display: none; }
   .lf-pane { border-right: 0; max-width: 560px; margin: 0 auto; }
+}
+
+/* ============================================================
+   Interaction polish — entrance, keyboard focus rings, hover lift.
+   ============================================================ */
+
+/* The form column eases up on load. */
+.lf-body { animation: lf-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) both; }
+@keyframes lf-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Keyboard focus — a visible accent ring on every interactive element (token --accent #4A90E2). */
+:where(a, button):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+.input:focus-visible { outline: none; } /* inputs already render their own focus border */
+
+/* OAuth providers + the primary CTA get a small lift so they feel pressable. */
+.oauth-btn { transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease; }
+.oauth-btn:hover { transform: translateY(-1px); }
+.oauth-btn:active { transform: translateY(0); }
+.btn { transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease; }
+.btn:hover:enabled { transform: translateY(-1px); }
+.btn:active:enabled { transform: translateY(0); }
+
+@media (prefers-reduced-motion: reduce) {
+  .lf-body { animation: none; }
+  .oauth-btn:hover, .btn:hover:enabled { transform: none; }
 }
 </style>

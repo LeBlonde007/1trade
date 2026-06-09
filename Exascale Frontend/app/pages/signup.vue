@@ -1181,4 +1181,39 @@ const onSubmit = async () => {
   .form-side { padding: 24px 24px 64px; }
   .topbar { margin-bottom: 32px; }
 }
+
+/* ============================================================
+   Interaction polish — entrance, keyboard focus rings, hover lift.
+   ============================================================ */
+
+/* The form card eases up on load. */
+.form-card { animation: su-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) both; }
+@keyframes su-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Keyboard focus — a visible accent ring on every interactive element (token --accent #4A90E2). */
+:where(a, button):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Pressable lift on the account cards, the providers, and the primary CTA. */
+.acct { transition: border-color 160ms ease, background-color 160ms ease, transform 160ms ease; }
+.acct:hover:not(:disabled) { transform: translateY(-2px); }
+.acct:active:not(:disabled) { transform: translateY(0); }
+.oauth { transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease; }
+.oauth:hover:not(:disabled) { transform: translateY(-1px); }
+.submit { transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease; }
+.submit:hover:not(:disabled) { transform: translateY(-1px); }
+.submit:active:not(:disabled) { transform: translateY(0); }
+
+@media (prefers-reduced-motion: reduce) {
+  .form-card { animation: none; }
+  .acct:hover:not(:disabled),
+  .oauth:hover:not(:disabled),
+  .submit:hover:not(:disabled) { transform: none; }
+}
 </style>
