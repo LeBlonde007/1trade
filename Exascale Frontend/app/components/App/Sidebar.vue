@@ -24,6 +24,8 @@ import { type ActivePersona } from '~/composables/usePersona'
 
 const route = useRoute()
 const personaCx = usePersona()
+// On mobile the rail is an off-canvas drawer; tapping an item should close it.
+const sidebar = useSidebar()
 
 interface NavItem {
   icon: unknown
@@ -73,7 +75,7 @@ const isActive = (item: { to: string; match?: string }) => {
 </script>
 
 <template>
-  <aside class="sidebar" aria-label="App navigation">
+  <aside class="sidebar" :class="{ open: sidebar.open.value }" aria-label="App navigation">
     <ul class="nav">
       <li v-for="(item, idx) in visibleItems" :key="idx">
         <NuxtLink
@@ -82,6 +84,7 @@ const isActive = (item: { to: string; match?: string }) => {
           :class="{ active: isActive(item) }"
           :title="item.label"
           :aria-label="item.label"
+          @click="sidebar.close()"
         >
           <component :is="item.icon" :size="20" />
           <span class="tooltip">{{ item.label }}</span>
@@ -96,6 +99,7 @@ const isActive = (item: { to: string; match?: string }) => {
         :class="{ active: isActive({ to: '/settings' }) }"
         title="Settings"
         aria-label="Settings"
+        @click="sidebar.close()"
       >
         <Settings :size="20" />
         <span class="tooltip">Settings</span>
@@ -203,4 +207,44 @@ const isActive = (item: { to: string; match?: string }) => {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
 }
-</style>
+
+/* ── Mobile: the icon rail becomes an off-canvas drawer with inline labels. ── */
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    top: var(--topbar-h);
+    left: 0;
+    bottom: 0;
+    width: 240px;
+    z-index: 70;
+    padding: var(--sp-3) var(--sp-2);
+    transform: translateX(-100%);
+    transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 2px 0 24px rgba(0, 0, 0, 0.4);
+    overflow-y: auto;
+  }
+  .sidebar.open { transform: translateX(0); }
+
+  /* Labelled rows instead of centered icons + hover tooltips (no hover on touch). */
+  .nav, .bottom { gap: var(--sp-1); }
+  .bottom { align-items: stretch; }
+  .link {
+    width: 100%;
+    height: 44px;
+    margin: 0;
+    justify-content: flex-start;
+    gap: var(--sp-3);
+    padding: 0 var(--sp-3);
+  }
+  .tooltip {
+    position: static;
+    transform: none;
+    opacity: 1;
+    pointer-events: auto;
+    background: transparent;
+    border: 0;
+    padding: 0;
+    font-size: var(--fs-sm);
+    z-index: auto;
+  }
+}

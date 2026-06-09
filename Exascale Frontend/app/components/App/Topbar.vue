@@ -17,10 +17,12 @@ import {
   Building2,
   ExternalLink,
   Wallet,
+  Menu,
 } from 'lucide-vue-next'
 
 const palette = useCommandPalette()
 const notifications = useNotifications()
+const sidebar = useSidebar() // mobile drawer toggle (hamburger)
 const unreadCount = useState<number>('notif-unread', () => 2)
 
 // Persona drives the brand link + which chrome shows: the AI-Index market pill + USD trading balance
@@ -126,8 +128,11 @@ function orgTypeLabel(t: 'personal' | 'lab' | 'enterprise'): string {
 
 <template>
   <header class="topbar">
-    <!-- Left: brand + market selector -->
+    <!-- Left: hamburger (mobile) + brand + market selector -->
     <div class="left">
+      <button class="hamburger" aria-label="Menu" title="Menu" @click="sidebar.toggle()">
+        <Menu :size="20" />
+      </button>
       <NuxtLink :to="personaCx.home.value" class="brand-link">
         <BrandLogo variant="mark" size="sm" />
         <span class="brand-text">EXASCALE</span>
@@ -547,5 +552,32 @@ function orgTypeLabel(t: 'personal' | 'lab' | 'enterprise'): string {
 .menu-leave-to {
   opacity: 0;
   transform: scale(0.98) translateY(-2px);
+}
+
+/* Hamburger — drawer toggle, hidden on desktop. */
+.hamburger {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-2);
+  cursor: pointer;
+}
+.hamburger:hover { color: var(--text); background: var(--hover); }
+
+/* ── Mobile: show the hamburger, tighten spacing, drop the dense market pill. ── */
+@media (max-width: 768px) {
+  .hamburger { display: inline-flex; }
+  .topbar { padding: 0 var(--sp-2); }
+  .left, .right { gap: var(--sp-2); }
+  .market-pill { display: none; }
+  .brand-link { padding: var(--sp-2); }
+}
+@media (max-width: 420px) {
+  .brand-text { display: none; } /* keep just the mark on very small screens */
 }
 </style>

@@ -1445,4 +1445,19 @@ onBeforeUnmount(() => {
   color: var(--neg);
   border-color: var(--neg);
 }
+
+/* ── Mobile: unfreeze the fixed 2×2 trading board into a single scrolling column. Basic pass — the
+   board is a paused-exchange placeholder; a purpose-built mobile trade view is a later task. ── */
+@media (max-width: 768px) {
+  .trade-page { display: block; height: auto; min-height: 0; overflow: visible; }
+  .main-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+    grid-template-areas: "chart" "entry" "book" "tape";
+    overflow: visible;
+  }
+  .panel { border-right: 0; }
+  .chart-panel { min-height: 300px; }
+  .entry-panel, .book-panel, .tape-panel { min-height: 340px; }
+}
 </style>
