@@ -6,28 +6,54 @@
  * Scroll past 24px → semi-transparent canvas backdrop + blur + bottom border.
  */
 const scrolled = ref(false)
-
-onMounted(() => {
-  const onScroll = () => { scrolled.value = window.scrollY > 24 }
-  onScroll()
-  window.addEventListener('scroll', onScroll, { passive: true })
-  onUnmounted(() => window.removeEventListener('scroll', onScroll))
-})
+// The on-page section currently in view (e.g. "#markets") — drives the nav underline (scrollspy).
+const activeHash = ref('')
+let spy: IntersectionObserver | null = null
 
 const navLinks = [
   { label: 'Markets',     to: '/#markets' },
   { label: 'Methodology', to: '/benchmark' },
   { label: 'Index',       to: '/#index' },
   { label: 'Compute',     to: '/#products' },
-  { label: 'Docs',        to: '#' },
-  { label: 'About',       to: '#' },
+  { label: 'Docs',        to: '/inference' },
+  { label: 'About',       to: '/#problem' },
 ]
 
 const route = useRoute()
+// A hash link is active when its section is the one in view on the landing page; a route link is
+// active on an exact path match (works on every marketing page).
 const isActive = (to: string) => {
-  if (to.startsWith('/#') || to === '#') return false
+  if (to.startsWith('/#')) return route.path === '/' && activeHash.value === to.slice(1)
   return route.path === to
 }
+
+onMounted(() => {
+  const onScroll = () => { scrolled.value = window.scrollY > 24 }
+  onScroll()
+  window.addEventListener('scroll', onScroll, { passive: true })
+
+  // Scrollspy — only the landing page has the hash sections. Highlight whichever crosses the
+  // viewport's middle band.
+  if (route.path === '/' && 'IntersectionObserver' in window) {
+    const sections = ['markets', 'products', 'index', 'problem']
+      .map((id) => document.getElementById(id))
+      .filter((el): el is HTMLElement => el !== null)
+    if (sections.length) {
+      spy = new IntersectionObserver((entries) => {
+        const top = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0]
+        if (top) activeHash.value = '#' + top.target.id
+      }, { rootMargin: '-45% 0px -50% 0px', threshold: [0, 0.25, 0.5, 1] })
+      sections.forEach((s) => spy!.observe(s))
+    }
+  }
+
+  onUnmounted(() => {
+    window.removeEventListener('scroll', onScroll)
+    spy?.disconnect()
+  })
+})
 </script>
 
 <template>
