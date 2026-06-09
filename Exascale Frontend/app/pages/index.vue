@@ -199,6 +199,28 @@ const buildIndexChart = async () => {
   }
 }
 
+// ─── Scroll-reveal — sections ease in as they enter the viewport ───
+// JS-gated via `revealReady`: the hide-then-reveal CSS only applies once mounted, so a no-JS / crawler
+// load still shows the full page. Honors prefers-reduced-motion (CSS forces everything visible).
+const revealReady = ref(false)
+let revealObserver: IntersectionObserver | null = null
+
+const setupReveal = () => {
+  revealReady.value = true
+  nextTick(() => {
+    const els = Array.from(document.querySelectorAll<HTMLElement>('.reveal, .reveal-stagger'))
+    if (!('IntersectionObserver' in window)) { els.forEach((e) => e.classList.add('in-view')); return }
+    revealObserver = new IntersectionObserver((entries) => {
+      for (const en of entries) {
+        if (!en.isIntersecting) continue
+        en.target.classList.add('in-view')
+        revealObserver?.unobserve(en.target) // reveal once, then stop watching
+      }
+    }, { rootMargin: '0px 0px -8% 0px', threshold: 0.08 })
+    els.forEach((e) => revealObserver!.observe(e))
+  })
+}
+
 onMounted(() => {
   buildSparkline()
   doTick()  // initial paint with current value
@@ -210,12 +232,14 @@ onMounted(() => {
     tkNext.value = `${h}h ${String(m).padStart(2, '0')}m`
   }, 60_000)
   buildIndexChart()
+  setupReveal()
 })
 
 onUnmounted(() => {
   if (tickInterval) clearInterval(tickInterval)
   if (printInterval) clearInterval(printInterval)
   if (chartCleanup) { chartCleanup(); chartCleanup = null }
+  revealObserver?.disconnect()
 })
 
 // Mini order book preview rows (static)
@@ -236,7 +260,7 @@ const obBids = [
 </script>
 
 <template>
-  <article class="home">
+  <article class="home" :class="{ 'reveal-on': revealReady }">
     <!-- ═══════════════════════════════════════════════════════
          HERO
          ═══════════════════════════════════════════════════════ -->
@@ -285,13 +309,13 @@ const obBids = [
     <!-- ═══════════════════════════════════════════════════════
          THE PROBLEM
          ═══════════════════════════════════════════════════════ -->
-    <section class="band elevated">
+    <section class="band elevated" id="problem">
       <div class="container-x">
-        <div class="eyebrow center"><span class="dot" />The problem</div>
-        <p class="pullquote">There needs to be a market for compute. No solution yet.</p>
-        <p class="quote-attr">— <span class="name">Larry Fink</span> · CEO, BlackRock · 2026</p>
+        <div class="eyebrow center reveal"><span class="dot" />The problem</div>
+        <p class="pullquote reveal">There needs to be a market for compute. No solution yet.</p>
+        <p class="quote-attr reveal">— <span class="name">Larry Fink</span> · CEO, BlackRock · 2026</p>
 
-        <div class="stat-grid">
+        <div class="stat-grid reveal-stagger">
           <div>
             <div class="stat-num tnum"><span class="lime">$200B+</span></div>
             <p class="stat-desc">Annual global GPU compute spend, untraded.</p>
@@ -314,13 +338,13 @@ const obBids = [
          ═══════════════════════════════════════════════════════ -->
     <section class="band" id="markets">
       <div class="container-x">
-        <div class="center">
+        <div class="center reveal">
           <div class="eyebrow center"><span class="dot" />How it works</div>
           <h2 class="s-head">Three sides. One venue.</h2>
         </div>
 
         <!-- Diagram (SVG ported from design — exact geometry) -->
-        <div class="market-diagram">
+        <div class="market-diagram reveal">
           <svg viewBox="0 0 880 440" xmlns="http://www.w3.org/2000/svg">
             <defs>
               <marker id="arr" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
@@ -389,7 +413,7 @@ const obBids = [
         </div>
 
         <!-- Three role columns -->
-        <div class="role-grid">
+        <div class="role-grid reveal-stagger">
           <div>
             <div class="eyebrow pos"><span class="dot pos" />Supply</div>
             <h4 class="role-title">GPU datacenters</h4>
@@ -430,10 +454,10 @@ const obBids = [
          ═══════════════════════════════════════════════════════ -->
     <section class="band elevated" id="products">
       <div class="container-x">
-        <div class="eyebrow"><span class="dot" />The products</div>
-        <h2 class="s-head wide">One venue. Three<br />integrated layers.</h2>
+        <div class="eyebrow reveal"><span class="dot" />The products</div>
+        <h2 class="s-head wide reveal">One venue. Three<br />integrated layers.</h2>
 
-        <div class="products">
+        <div class="products reveal-stagger">
           <!-- Trading -->
           <div class="product-card">
             <div class="p-left">
@@ -442,7 +466,7 @@ const obBids = [
               <p class="p-text">
                 AI credits and GPU credits as tradeable instruments. Maker-taker fees, volume-tiered. Surveillance from day one.
               </p>
-              <a href="#" class="btn-text p-link">Explore the trading layer →</a>
+              <NuxtLink to="/trade" class="btn-text p-link">Explore the trading layer →</NuxtLink>
             </div>
             <div class="p-right inverse">
               <div class="ob-mini">
@@ -477,7 +501,7 @@ const obBids = [
               <p class="p-text">
                 Top 3–5 open models per category — text, speech, image, video, niche. Multi-tenant per GPU. Quarterly catalog refresh.
               </p>
-              <a href="#" class="btn-text p-link">Read the API docs →</a>
+              <NuxtLink to="/inference" class="btn-text p-link">Open the model catalog →</NuxtLink>
             </div>
             <div class="p-right inverse">
               <pre class="term"><span class="prompt">POST</span> https://api.exascale.com/v1/chat/completions
@@ -503,7 +527,7 @@ const obBids = [
               <p class="p-text">
                 Owned datacenter underlying for trade settlement. Per-second metering. Pay with credits or cash. No region lock-in.
               </p>
-              <a href="#" class="btn-text p-link">Browse instance types →</a>
+              <NuxtLink to="/compute" class="btn-text p-link">Browse instance types →</NuxtLink>
             </div>
             <div class="p-right inverse">
               <pre class="term"><span class="prompt">$</span> exascale instances launch \
@@ -529,14 +553,14 @@ const obBids = [
          ═══════════════════════════════════════════════════════ -->
     <section class="band" id="index">
       <div class="container-x">
-        <div class="eyebrow"><span class="dot" />The Exascale AI Index</div>
-        <h2 class="s-head wide">The price of AI compute,<br />published daily.</h2>
-        <p class="lede">
+        <div class="eyebrow reveal"><span class="dot" />The Exascale AI Index</div>
+        <h2 class="s-head wide reveal">The price of AI compute,<br />published daily.</h2>
+        <p class="lede reveal">
           An audited, methodology-public reference index. Trimmed mean across constituent venues
           with volume floors and ECP attestation.
         </p>
 
-        <div class="chart-wrap">
+        <div class="chart-wrap reveal">
           <div class="ch-head">
             <div>
               <div class="eyebrow"><span class="dot" />EXASCALE AI INDEX · 365D</div>
@@ -591,10 +615,10 @@ const obBids = [
          ═══════════════════════════════════════════════════════ -->
     <section class="band elevated">
       <div class="container-x">
-        <div class="eyebrow"><span class="dot" />Built for</div>
-        <h2 class="s-head wide">Three audiences.<br />One product.</h2>
+        <div class="eyebrow reveal"><span class="dot" />Built for</div>
+        <h2 class="s-head wide reveal">Three audiences.<br />One product.</h2>
 
-        <div class="aud-grid">
+        <div class="aud-grid reveal-stagger">
           <div class="aud-card">
             <h4>For traders</h4>
             <p>Maker-taker fees from 1% / 0.5% down to 0.10% / 0.00% above $1B notional. Paper trading from day one; real money in v1.5.</p>
@@ -604,7 +628,7 @@ const obBids = [
               <li>Level-2 market data, 25ms tick</li>
               <li>Cross-venue arbitrage routing</li>
             </ul>
-            <a href="#" class="aud-link">Fee schedule →</a>
+            <NuxtLink to="/trade" class="aud-link">Open the trading desk →</NuxtLink>
           </div>
           <div class="aud-card">
             <h4>For AI companies</h4>
@@ -615,7 +639,7 @@ const obBids = [
               <li>Free egress, no region lock-in</li>
               <li>Per-team spend caps + reporting</li>
             </ul>
-            <a href="#" class="aud-link">Talk to enterprise sales →</a>
+            <a href="mailto:sales@exascale.ai?subject=Enterprise%20inquiry" class="aud-link">Talk to enterprise sales →</a>
           </div>
           <div class="aud-card">
             <h4>For datacenter partners</h4>
@@ -626,7 +650,7 @@ const obBids = [
               <li>Custodial credit issuance</li>
               <li>Pay-outs USD, JPY, stablecoin (v2)</li>
             </ul>
-            <a href="#" class="aud-link">Partner program →</a>
+            <NuxtLink to="/datacenter/register" class="aud-link">Join the partner program →</NuxtLink>
           </div>
         </div>
       </div>
@@ -638,7 +662,7 @@ const obBids = [
          ═══════════════════════════════════════════════════════ -->
     <section class="trust-band">
       <div class="container-x">
-        <div class="trust-strip">
+        <div class="trust-strip reveal-stagger">
           <div>
             <span class="t-lbl">— Security</span>
             SOC 2 Type I path · Annual audits
@@ -665,15 +689,15 @@ const obBids = [
          ═══════════════════════════════════════════════════════ -->
     <section id="cta" class="band cta-band">
       <div class="container-x center">
-        <h2 class="cta-head">
+        <h2 class="cta-head reveal">
           Open an account<br />in <span class="hi">5 minutes</span>.
         </h2>
-        <p class="cta-sub">
+        <p class="cta-sub reveal">
           Paper trading available immediately. Real-money trading in v1.5 with full KYC. Bring your own custody at launch.
         </p>
         <div class="cta-actions">
           <BaseButton as="a" :href="'/signup'" variant="primary" size="lg">Open account</BaseButton>
-          <a href="#" class="btn-text">Talk to enterprise sales →</a>
+          <a href="mailto:sales@exascale.ai?subject=Enterprise%20inquiry" class="btn-text">Talk to enterprise sales →</a>
         </div>
       </div>
     </section>
@@ -1555,5 +1579,89 @@ const obBids = [
 @media (max-width: 540px) {
   .tour-fab { right: 16px; bottom: 16px; padding: 10px 14px 10px 12px; }
   .fab-title { font-size: 12px; }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Interaction layer — reveal-on-scroll, hover affordances, focus.
+   Restrained motion only (A3): no decorative animation, just feedback.
+   ───────────────────────────────────────────────────────────── */
+
+/* In-page anchor jumps land below the 72px sticky nav. */
+:is(#markets, #products, #index, #problem, #cta) { scroll-margin-top: 96px; }
+
+/* Scroll-reveal — gated on .reveal-on so a no-JS / crawler load shows everything. */
+.reveal-on .reveal,
+.reveal-on .reveal-stagger > * {
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+    opacity 600ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 600ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+.reveal-on .reveal.in-view,
+.reveal-on .reveal-stagger.in-view > * {
+  opacity: 1;
+  transform: none;
+}
+/* Stagger grid children as the row enters view. */
+.reveal-on .reveal-stagger.in-view > *:nth-child(2) { transition-delay: 70ms; }
+.reveal-on .reveal-stagger.in-view > *:nth-child(3) { transition-delay: 140ms; }
+.reveal-on .reveal-stagger.in-view > *:nth-child(4) { transition-delay: 210ms; }
+.reveal-on .reveal-stagger.in-view > *:nth-child(5) { transition-delay: 280ms; }
+
+/* Product + audience cards lift on hover; their CTA link takes the accent + a small nudge. */
+.product-card,
+.aud-card {
+  transition:
+    transform 200ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 200ms ease,
+    box-shadow 200ms ease;
+}
+.product-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--border-strong);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.08);
+}
+.aud-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--border-strong);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.06);
+}
+.product-card:hover .p-link,
+.aud-card:hover .aud-link { color: var(--accent); }
+
+/* Text links slide a hair on hover so the trailing → reads as motion. */
+.p-link,
+.aud-link,
+.btn-text { transition: color var(--dur) var(--ease), transform 200ms ease; }
+.p-link:hover,
+.aud-link:hover,
+.btn-text:hover { transform: translateX(3px); }
+
+/* Keyboard focus — a visible accent ring on every interactive element (token --accent #4A90E2). */
+:where(a, button):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
+}
+
+/* Respect reduced-motion: no reveal offset, no hover travel, no smooth scroll. */
+@media (prefers-reduced-motion: reduce) {
+  .reveal-on .reveal,
+  .reveal-on .reveal-stagger > * { opacity: 1; transform: none; transition: none; }
+  .product-card:hover,
+  .aud-card:hover,
+  .p-link:hover,
+  .aud-link:hover,
+  .btn-text:hover { transform: none; }
+}
+</style>
+
+<!-- Global: smooth in-page anchor scrolling (honours reduced-motion). Lives unscoped because it
+     targets the document scrolling element, which scoped styles can't reach. -->
+<style>
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
 }
 </style>
