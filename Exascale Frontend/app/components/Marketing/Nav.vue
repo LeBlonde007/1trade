@@ -6,6 +6,7 @@
  * Scroll past 24px → semi-transparent canvas backdrop + blur + bottom border.
  */
 const scrolled = ref(false)
+const mobileOpen = ref(false) // hamburger menu (≤768px)
 // The on-page section currently in view (e.g. "#markets") — drives the nav underline (scrollspy).
 const activeHash = ref('')
 let spy: IntersectionObserver | null = null
@@ -20,6 +21,8 @@ const navLinks = [
 ]
 
 const route = useRoute()
+// Close the mobile menu on any navigation.
+watch(() => route.fullPath, () => { mobileOpen.value = false })
 // A hash link is active when its section is the one in view on the landing page; a route link is
 // active on an exact path match (works on every marketing page).
 const isActive = (to: string) => {
@@ -76,10 +79,27 @@ onMounted(() => {
       </div>
 
       <div class="cta">
-        <NuxtLink to="/login" class="nav-link">Sign in</NuxtLink>
+        <NuxtLink to="/login" class="nav-link signin">Sign in</NuxtLink>
         <BaseButton as="a" :href="'/signup'" variant="primary" size="md">Open account</BaseButton>
+        <button
+          class="burger" :class="{ open: mobileOpen }" aria-label="Menu"
+          :aria-expanded="mobileOpen" @click="mobileOpen = !mobileOpen"
+        >
+          <span /><span /><span />
+        </button>
       </div>
     </div>
+
+    <!-- Mobile menu — the nav links + sign-in, revealed by the hamburger (≤768px). -->
+    <Transition name="sheet">
+      <div v-if="mobileOpen" class="mobile-menu">
+        <NuxtLink
+          v-for="l in navLinks" :key="l.label" :to="l.to"
+          class="m-link" :class="{ active: isActive(l.to) }" @click="mobileOpen = false"
+        >{{ l.label }}</NuxtLink>
+        <NuxtLink to="/login" class="m-link" @click="mobileOpen = false">Sign in</NuxtLink>
+      </div>
+    </Transition>
   </nav>
 </template>
 
@@ -170,8 +190,59 @@ onMounted(() => {
   background: var(--text);
 }
 
+/* Hamburger — three bars, hidden on desktop. */
+.burger {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  width: 36px;
+  height: 36px;
+  padding: 0 7px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.burger span {
+  display: block;
+  height: 2px;
+  background: var(--text);
+  border-radius: 1px;
+  transition: transform 200ms var(--ease), opacity 200ms var(--ease);
+}
+.burger.open span:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+.burger.open span:nth-child(2) { opacity: 0; }
+.burger.open span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
+
+/* Mobile dropdown sheet */
+.mobile-menu {
+  display: none;
+  flex-direction: column;
+  padding: var(--sp-3) var(--sp-6) var(--sp-5);
+  background: color-mix(in srgb, var(--canvas) 94%, transparent);
+  -webkit-backdrop-filter: saturate(140%) blur(14px);
+  backdrop-filter: saturate(140%) blur(14px);
+  border-bottom: 1px solid var(--border);
+}
+.m-link {
+  padding: var(--sp-3) 0;
+  color: var(--text-2);
+  text-decoration: none;
+  font-size: var(--fs-md);
+  border-bottom: 1px solid var(--border);
+}
+.m-link:last-child { border-bottom: 0; }
+.m-link.active, .m-link:hover { color: var(--text); }
+
+.sheet-enter-active, .sheet-leave-active { transition: opacity 180ms var(--ease), transform 180ms var(--ease); }
+.sheet-enter-from, .sheet-leave-to { opacity: 0; transform: translateY(-6px); }
+
 @media (max-width: 768px) {
   .links { display: none; }
-  .container-x { gap: var(--sp-4); padding: 0 var(--sp-4); }
+  .signin { display: none; } /* moves into the hamburger sheet */
+  .burger { display: inline-flex; }
+  .mobile-menu { display: flex; }
+  .container-x { gap: var(--sp-3); padding: 0 var(--sp-4); }
 }
 </style>
