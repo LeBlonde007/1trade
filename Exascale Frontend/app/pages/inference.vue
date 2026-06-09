@@ -682,32 +682,58 @@ async function shareScreen() {
   if (screenStream.value) { stopScreen(); return }
   if (!import.meta.client || !navigator.mediaDevices?.getDisplayMedia) { attachError.value = 'screen share needs a modern browser'; return }
   try {
-    const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false })
+    const stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 8 }, audio: false })
     screenStream.value = stream
     stream.getVideoTracks()[0]?.addEventListener('ended', stopScreen) // user stopped via the browser bar
     await nextTick()
-    if (screenVideoEl.value) { screenVideoEl.value.srcObject = stream; await screenVideoEl.value.play().catch(() => {}) }
+    const v = screenVideoEl.value
+    if (v) {
+      v.srcObject = stream
+      v.muted = true // a muted video is allowed to autoplay so frames actually decode for capture
+      await v.play().catch(() => {})
+    }
   } catch { attachError.value = 'screen share cancelled' }
 }
-/** captureFrame grabs the current screen frame as a downscaled JPEG data URI (null if not ready). */
+/** captureFrame grabs the current screen frame as a downscaled JPEG data URI. Returns null when the
+ *  frame isn't decoded yet or looks entirely black (the hidden <video> hasn't painted / protected content). */
 function captureFrame(): string | null {
   const v = screenVideoEl.value
-  if (!v || !screenStream.value || !v.videoWidth) return null
-  const maxW = 1280
+  if (!v || !screenStream.value || !v.videoWidth || v.readyState < 2) return null
+  const maxW = 1600
   const scale = Math.min(1, maxW / v.videoWidth)
   const canvas = document.createElement('canvas')
-  canvas.width = Math.round(v.videoWidth * scale)
-  canvas.height = Math.round(v.videoHeight * scale)
-  canvas.getContext('2d')?.drawImage(v, 0, 0, canvas.width, canvas.height)
-  return canvas.toDataURL('image/jpeg', 0.7)
+  canvas.width = Math.max(1, Math.round(v.videoWidth * scale))
+  canvas.height = Math.max(1, Math.round(v.videoHeight * scale))
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return null
+  ctx.drawImage(v, 0, 0, canvas.width, canvas.height)
+  // Reject an all-black frame: on the first ask the capture surface often hasn't decoded a frame yet, so
+  // we'd otherwise send a blank image and the VLM replies "I can't see your screen".
+  try {
+    const w = Math.min(48, canvas.width), h = Math.min(48, canvas.height)
+    const px = ctx.getImageData(0, 0, w, h).data
+    let lit = 0
+    for (let i = 0; i < px.length; i += 4) { if (px[i]! > 8 || px[i + 1]! > 8 || px[i + 2]! > 8) lit++ }
+    if (lit === 0) return null
+  } catch { /* same-origin screen capture — getImageData is permitted */ }
+  return canvas.toDataURL('image/jpeg', 0.75)
+}
+/** captureFrameReady captures, retrying briefly so the first decoded frame has time to paint. */
+async function captureFrameReady(): Promise<string | null> {
+  for (let i = 0; i < 8; i++) {
+    const f = captureFrame()
+    if (f) return f
+    await new Promise((r) => setTimeout(r, 200))
+  }
+  return null
 }
 
 // askVision captures a screen frame + the prompt, asks the VLM, then speaks the answer aloud.
 async function askVision() {
   if (generating.value) return
   if (!screenStream.value) { attachError.value = 'share your screen first'; return }
-  const img = captureFrame()
-  if (!img) { attachError.value = 'could not capture the screen — try again'; return }
+  const img = await captureFrameReady()
+  if (!img) { attachError.value = 'could not read the shared screen — re-share and pick a Screen or Window (a browser Tab works best)'; return }
   const prompt = draft.value.trim() || 'Describe what is on the screen, concisely.'
   turns.push({ id: nextId(), role: 'user', text: prompt + '  🖥️' })
   draft.value = ''
@@ -1518,7 +1544,7 @@ async function copyText(text: string, label: string) {
 
               <!-- Vision models: share your screen → a frame goes to the VLM → the answer is read aloud. -->
               <form v-else-if="selected.category === 'vision'" class="composer" @submit.prevent="askVision">
-                <video ref="screenVideoEl" class="screen-hidden" muted playsinline />
+                <video ref="screenVideoEl" class="screen-hidden" autoplay muted playsinline />
                 <div class="composer-box">
                   <div class="vision-bar">
                     <button
@@ -2516,7 +2542,9 @@ ratelimit-remaining:   58 / 60 RPS</pre>
 .aud-out { max-width: 420px; }
 .aud-out audio { display: block; width: 100%; }
 /* Vision (screen share): hidden capture surface + the share toolbar. */
-.screen-hidden { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+/* Capture surface for screen share: kept off-screen at a real size (NOT display:none / 1px / opacity:0)
+ * so the browser actually decodes + paints frames — otherwise drawImage() captures an all-black frame. */
+.screen-hidden { position: fixed; left: -10000px; top: 0; width: 480px; height: 270px; pointer-events: none; }
 .vision-bar { display: flex; align-items: center; gap: 10px; padding: 10px 12px 0; }
 
 /* Composer */
