@@ -36,6 +36,11 @@
 #                             STORAGE_PREFIX namespaces keys under a bucket directory (e.g. sandbox/uploads/…).
 #                             Keys → platform-auth Secret. The Space needs CORS to allow PUT from the web
 #                             origin ($SANDBOX_HOST), and objects must be public-read for the link to load.
+#   STRIPE_SECRET_KEY         OPTIONAL. Set it (sk_test_… / sk_live_…) to take payments via REAL Stripe
+#                             hosted checkout instead of the mock. Auto-settle turns off — credits are
+#                             minted only by the signed checkout.session.completed webhook. Also set
+#                             STRIPE_WEBHOOK_SECRET (whsec_…) from the webhook endpoint you register at
+#                             $API_URL/v1/billing/webhook/stripe. Both → platform-auth Secret; never committed.
 #   SMTP_PASS                 OPTIONAL (SMTP fallback; many VPS block 25/465/587). With it: SMTP_ADDR
 #                             (default mail.privateemail.com:465), SMTP_TLS (implicit|starttls), EMAIL_FROM
 #                             + SMTP_USER (default hello@exascale.ai). Neither set → no gate (paper demo).
@@ -248,6 +253,24 @@ EOF
 )"
   kubectl rollout restart deploy/platform-core
   kubectl rollout status deploy/platform-core --timeout=120s
+fi
+
+# 7e. (optional) real Stripe (test mode) — opt-in when STRIPE_SECRET_KEY is set. Replaces MockStripe:
+# the buy-credits flow returns a real hosted-checkout URL and credits are minted only by the signed
+# checkout.session.completed webhook (auto-settle turns OFF whenever a secret key is present). Keys go
+# into the platform-auth Secret. The webhook endpoint must be registered in Stripe pointing at
+# $API_URL/v1/billing/webhook/stripe; STRIPE_WEBHOOK_SECRET is the whsec_… signing secret it returns.
+if [ -n "${STRIPE_SECRET_KEY:-}" ]; then
+  say "stripe payments — real hosted checkout + signed webhook (mode: ${STRIPE_SECRET_KEY%%_*}_…)"
+  kubectl patch secret platform-auth --type merge -p "$(cat <<EOF
+stringData:
+  STRIPE_SECRET_KEY: '$STRIPE_SECRET_KEY'
+  STRIPE_WEBHOOK_SECRET: '${STRIPE_WEBHOOK_SECRET:-}'
+EOF
+)"
+  kubectl rollout restart deploy/platform-core
+  kubectl rollout status deploy/platform-core --timeout=120s
+  [ -z "${STRIPE_WEBHOOK_SECRET:-}" ] && echo "   • NOTE: STRIPE_WEBHOOK_SECRET unset — checkout works, but settlement webhooks will be rejected until you register the endpoint ($API_URL/v1/billing/webhook/stripe) and set whsec_…"
 fi
 
 say "sandbox up → web $URL · api $API_URL"
