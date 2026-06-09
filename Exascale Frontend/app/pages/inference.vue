@@ -190,7 +190,7 @@ const lastAssistant = computed(() => {
 // hydration mismatch, matching the useGuidedTour idiom.
 const CHAT_STORE_VERSION = 'v1'
 const chatStoreKey = computed(() => `exa:inference:chat:${CHAT_STORE_VERSION}:${user.value?.user_id ?? 'anon'}`)
-interface PersistedChat { turns?: Turn[]; params?: Partial<typeof params>; selectedId?: string }
+interface PersistedChat { turns?: Turn[]; params?: Partial<typeof params>; selectedId?: string; convId?: string | null }
 
 /** loadChat reads the saved session for the current user (client-only; safe on SSR + malformed JSON). */
 function loadChat(): PersistedChat | null {
@@ -200,29 +200,128 @@ function loadChat(): PersistedChat | null {
     return raw ? (JSON.parse(raw) as PersistedChat) : null
   } catch { return null }
 }
-/** saveChat mirrors the live session to localStorage, capping the transcript so it can't grow unbounded. */
+// Durable, cross-device history lives server-side (platform-core conversations); localStorage is just
+// the instant per-browser restore. currentConvId is the open conversation (null = a fresh, unsaved chat).
+const convs = useConversations()
+const convList = convs.list // top-level ref so the template auto-unwraps it
+const currentConvId = ref<string | null>(null)
+const historyOpen = ref(false)
+let serverSaveTimer: ReturnType<typeof setTimeout> | null = null
+
+/** serializeTranscript is the persisted form of the transcript: in-flight turns dropped, volatile fields
+ *  (html/streaming) removed, and media kept only when it's a durable URL — base64/blob media is uploaded
+ *  to object storage (Spaces) separately and swapped in, so neither store carries fat inline bytes. */
+function serializeTranscript(): Turn[] {
+  return turns
+    .filter((t) => !t.streaming)
+    .slice(-200)
+    .map((t) => {
+      const o: Turn = { id: t.id, role: t.role, text: t.text }
+      if (t.model) o.model = t.model
+      if (t.backend) o.backend = t.backend
+      if (t.files?.length) o.files = t.files
+      if (t.creditCost) { o.creditCost = t.creditCost; o.creditType = t.creditType }
+      if (t.latencyMs) o.latencyMs = t.latencyMs
+      if (t.tokens) o.tokens = t.tokens
+      const imgs = (t.images ?? []).filter((u) => /^https?:\/\//.test(u))
+      if (imgs.length) o.images = imgs
+      if (t.video) o.video = t.video
+      if (t.audio && /^https?:\/\//.test(t.audio)) o.audio = t.audio
+      return o
+    })
+}
+/** saveChat mirrors the live session to localStorage (instant per-browser restore on refresh). */
 function saveChat() {
   if (typeof localStorage === 'undefined') return
   try {
-    // Drop ephemeral media from the persisted copy: image base64 (multi-MB → quota) and audio object
-    // URLs (invalid after a reload). These are session-only; a restored turn shows a small placeholder.
-    // Video is a real URL, so it's kept and replays after a refresh.
-    const persisted = turns.slice(-100).map((t) => {
-      if (t.images?.length) return { ...t, images: undefined, html: undefined, text: t.text || '🖼 generated image (not retained)' }
-      if (t.audio) return { ...t, audio: undefined, text: t.text || '🔊 generated audio (not retained)' }
-      return t
-    })
-    const payload: PersistedChat = { turns: persisted, params, selectedId: selectedId.value }
+    const payload: PersistedChat = { turns: serializeTranscript(), params, selectedId: selectedId.value, convId: currentConvId.value }
     localStorage.setItem(chatStoreKey.value, JSON.stringify(payload))
   } catch { /* quota / serialization — keep the in-memory session */ }
 }
-/** clearChat empties the transcript and forgets the saved session (the "Clear chat" affordance). */
+/** convTitle derives a short human title from the first user message. */
+function convTitle(): string {
+  const first = turns.find((t) => t.role === 'user' && t.text?.trim())
+  const s = (first?.text ?? '').replace(/\s+/g, ' ').trim()
+  return s ? (s.length > 48 ? s.slice(0, 48) + '…' : s) : 'New chat'
+}
+/** scheduleServerSave debounces persisting the conversation server-side after edits settle. */
+function scheduleServerSave() {
+  if (serverSaveTimer) clearTimeout(serverSaveTimer)
+  serverSaveTimer = setTimeout(() => { void persistConversation() }, 1500)
+}
+/** persistConversation creates or updates the server-side conversation from the current transcript. */
+async function persistConversation() {
+  const transcript = serializeTranscript()
+  if (!transcript.length) return
+  const title = convTitle()
+  if (!currentConvId.value) {
+    const c = await convs.create(title, selectedId.value, transcript)
+    if (c) { currentConvId.value = c.id; saveChat(); await convs.refresh() }
+  } else {
+    await convs.save(currentConvId.value, title, selectedId.value, transcript)
+    const it = convs.list.value.find((x) => x.id === currentConvId.value)
+    if (it) { it.title = title; it.model = selectedId.value; it.updated_at = new Date().toISOString() }
+  }
+}
+/** openConversation loads a saved conversation into the playground. */
+async function openConversation(id: string) {
+  if (id === currentConvId.value) return
+  const c = await convs.load(id)
+  if (!c) return
+  turns.splice(0, turns.length, ...((c.transcript as Turn[]) ?? []))
+  currentConvId.value = c.id
+  if (c.model && models.value.some((m) => m.id === c.model)) selectedId.value = c.model
+  saveChat()
+  await nextTick(); scrollToBottom()
+}
+/** deleteConversation removes a saved conversation; resets to a new chat if it was the open one. */
+async function deleteConversation(id: string) {
+  await convs.remove(id)
+  if (id === currentConvId.value) clearChat()
+}
+/** uploadMedia stores a generated media blob in object storage (Spaces) and returns its public URL, so
+ *  the transcript references a durable URL rather than fat base64 / a transient blob. Best-effort. */
+async function uploadMedia(blob: Blob, filename: string): Promise<string | null> {
+  try {
+    const sig = await $fetch<{ upload_url: string; file_url: string; headers?: Record<string, string> }>('/api/files/presign', {
+      method: 'POST', body: { filename, content_type: blob.type || 'application/octet-stream' },
+    })
+    const put = await fetch(sig.upload_url, { method: 'PUT', body: blob, headers: { 'content-type': blob.type || 'application/octet-stream', ...(sig.headers ?? {}) } })
+    return put.ok ? sig.file_url : null
+  } catch { return null }
+}
+/** persistGeneratedImages uploads inline (data:) generated images to object storage and swaps the turn
+ *  to durable URLs, so the saved conversation keeps them. Best-effort — failures keep the session copy. */
+async function persistGeneratedImages(turn: Turn, dataURIs: string[]) {
+  const urls = await Promise.all(dataURIs.map(async (uri, i) => {
+    if (/^https?:\/\//.test(uri)) return uri
+    try {
+      const blob = await (await fetch(uri)).blob()
+      return (await uploadMedia(blob, `image-${Date.now()}-${i}.png`)) ?? uri
+    } catch { return uri }
+  }))
+  turn.images = urls
+  scheduleServerSave()
+}
+/** clearChat starts a fresh, unsaved chat (the saved ones stay in the sidebar). */
 function clearChat() {
   turns.splice(0, turns.length)
+  currentConvId.value = null
   if (typeof localStorage !== 'undefined') {
     try { localStorage.removeItem(chatStoreKey.value) } catch { /* ignore */ }
   }
 }
+/** toggleHistory opens/closes the history panel, refreshing the list when it opens. */
+function toggleHistory() {
+  historyOpen.value = !historyOpen.value
+  if (historyOpen.value) void convs.refresh()
+}
+/** newChatFromHistory starts a fresh chat from the history panel. */
+function newChatFromHistory() { clearChat(); draft.value = ''; historyOpen.value = false }
+/** openFromHistory loads a saved conversation and closes the panel. */
+async function openFromHistory(id: string) { await openConversation(id); historyOpen.value = false }
+/** modelLabel resolves a catalog id to its display name for the history list. */
+function modelLabel(id: string): string { return models.value.find((m) => m.id === id)?.name ?? humanizeId(id) }
 
 // =====================================================
 // Input + cost preview + send
@@ -259,7 +358,9 @@ onMounted(async () => {
   if (saved) {
     if (Array.isArray(saved.turns)) turns.splice(0, turns.length, ...saved.turns)
     if (saved.params && typeof saved.params === 'object') Object.assign(params, saved.params)
+    if (saved.convId) currentConvId.value = saved.convId
   }
+  void convs.refresh() // load the history sidebar (durable, cross-device)
   try {
     const list = await catalog.load()
     const map: Record<string, { price: number; creditType: string; unit: string }> = {}
@@ -270,8 +371,8 @@ onMounted(async () => {
     else if (!selectedId.value && list.length) selectedId.value = list[0]!.id
   } catch { /* meter falls back to estimates only */ }
   await refreshBalance()
-  // From here on, mirror every change to localStorage (set up after restore so we don't overwrite it).
-  watch([turns, params, selectedId], saveChat, { deep: true })
+  // From here on, mirror every change to localStorage (instant) + the server (durable, debounced).
+  watch([turns, params, selectedId], () => { saveChat(); scheduleServerSave() }, { deep: true })
 })
 
 // The gateway serves the 8B/70B Llamas; any other showcase pick routes to 8B for the live call.
@@ -448,10 +549,11 @@ async function generateImage() {
     aTurn.latencyMs = Date.now() - startedAt
     aTurn.backend = modelId
     if (imgs.length) {
-      aTurn.images = imgs
+      aTurn.images = imgs // show instantly (data URIs); then persist to object storage in the background
       const p = catalogPrice.value[modelId]
       if (p) { aTurn.creditCost = p.price * imgs.length; aTurn.creditType = p.creditType }
       void refreshBalance()
+      void persistGeneratedImages(aTurn, imgs)
     } else {
       aTurn.text = 'No image was returned.'
       aTurn.html = '<p>No image was returned.</p>'
@@ -550,11 +652,12 @@ async function generateSpeech() {
     const blob = await resp.blob()
     aTurn.streaming = false
     aTurn.latencyMs = Date.now() - startedAt
-    aTurn.audio = URL.createObjectURL(blob)
+    aTurn.audio = URL.createObjectURL(blob) // play instantly; persist to object storage in the background
     aTurn.text = ''
     const p = catalogPrice.value[modelId]
     if (p) { aTurn.creditCost = p.price * (input.length / 1000); aTurn.creditType = p.creditType }
     void refreshBalance()
+    void uploadMedia(blob, `speech-${Date.now()}.wav`).then((url) => { if (url) { aTurn.audio = url; scheduleServerSave() } })
   } catch (e: unknown) {
     renderAssistantError(aTurn, e)
   } finally {
@@ -1033,6 +1136,19 @@ async function copyText(text: string, label: string) {
             <button
               type="button"
               class="icon-btn"
+              :class="{ active: historyOpen }"
+              :aria-pressed="historyOpen"
+              title="Chat history"
+              @click="toggleHistory"
+            >
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="square">
+                <circle cx="8" cy="8" r="6" />
+                <path d="M8 4.5V8l2.4 1.4" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              class="icon-btn"
               :class="{ active: paramsOpen }"
               :aria-pressed="paramsOpen"
               :title="paramsOpen ? 'Hide parameters' : 'Show parameters'"
@@ -1066,6 +1182,24 @@ async function copyText(text: string, label: string) {
                 <path d="M3 4.5h10M6 4.5V3h4v1.5M4.5 4.5l.6 8.5h5.8l.6-8.5" />
               </svg>
             </button>
+          </div>
+
+          <!-- Chat history (durable, cross-device — platform-core conversations). -->
+          <div v-if="historyOpen" class="history-panel">
+            <div class="history-head">
+              <span class="history-title mono">Chat history</span>
+              <button type="button" class="history-new" @click="newChatFromHistory">+ New chat</button>
+            </div>
+            <ul v-if="convList.length" class="history-list">
+              <li v-for="c in convList" :key="c.id" :class="{ active: c.id === currentConvId }">
+                <button type="button" class="history-open" @click="openFromHistory(c.id)">
+                  <span class="history-name">{{ c.title || 'Untitled chat' }}</span>
+                  <span v-if="c.model" class="history-model mono">{{ modelLabel(c.model) }}</span>
+                </button>
+                <button type="button" class="history-del" title="Delete conversation" @click.stop="deleteConversation(c.id)">×</button>
+              </li>
+            </ul>
+            <p v-else class="history-empty">No saved chats yet — start typing and it'll appear here.</p>
           </div>
         </header>
 
@@ -1928,7 +2062,41 @@ ratelimit-remaining:   58 / 60 RPS</pre>
   border-bottom: 1px solid var(--border);
   gap: 16px;
   flex-shrink: 0;
+  position: relative;
 }
+/* Chat history dropdown (durable, cross-device conversations). */
+.history-panel {
+  position: absolute; top: calc(100% + 6px); right: 20px; z-index: 30;
+  width: 320px; max-height: 60vh; overflow-y: auto;
+  background: var(--surface, var(--canvas)); border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.history-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 12px; border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; background: var(--surface, var(--canvas));
+}
+.history-title { font-size: 11px; letter-spacing: 0.04em; color: var(--muted, var(--text)); }
+.history-new {
+  background: none; border: 1px solid var(--border); color: var(--text);
+  border-radius: var(--radius-sm); padding: 3px 8px; font-size: 12px; cursor: pointer;
+}
+.history-new:hover { border-color: var(--accent, var(--text)); color: var(--accent, var(--text)); }
+.history-list { list-style: none; margin: 0; padding: 4px; }
+.history-list li { display: flex; align-items: center; gap: 4px; border-radius: var(--radius-sm); }
+.history-list li:hover, .history-list li.active { background: var(--elevated, var(--canvas)); }
+.history-open {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  background: none; border: none; color: var(--text); padding: 7px 8px; cursor: pointer; text-align: left;
+}
+.history-name { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.history-model { font-size: 10px; color: var(--muted, var(--text)); }
+.history-del {
+  background: none; border: none; color: var(--muted, var(--text));
+  font-size: 16px; line-height: 1; padding: 4px 8px; cursor: pointer; border-radius: var(--radius-sm);
+}
+.history-del:hover { color: var(--warn); }
+.history-empty { padding: 16px 12px; font-size: 12px; color: var(--muted, var(--text)); text-align: center; }
 .pg-model-name {
   display: flex;
   align-items: center;
