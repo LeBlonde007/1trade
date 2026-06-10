@@ -156,10 +156,10 @@ function selectModel(id: string) {
 // =====================================================
 const params = reactive({
   temperature: 0.7,
-  maxTokens: 1000,
+  maxTokens: 4096,
   topP: 0.95,
   freqPenalty: 0,
-  systemPrompt: 'You are a precise technical assistant for the Exascale venue. Cite specific subsystems and code where relevant. Default to bullet-point answers under 200 words unless asked otherwise.',
+  systemPrompt: 'You are an expert assistant on the Exascale AI-compute platform. Write clear, well-structured, thorough answers — use short paragraphs, headings, lists, and fenced code blocks where helpful. When the user asks for an essay or long-form writing, write it in full and at length; otherwise match the depth to the question.',
 })
 
 const paramsOpen = ref(false)
@@ -400,8 +400,12 @@ onMounted(async () => {
   watch([turns, params, selectedId], () => { saveChat(); scheduleServerSave() }, { deep: true })
 })
 
-// The gateway serves the 8B/70B Llamas; any other showcase pick routes to 8B for the live call.
-const liveServedId = computed(() => (['llama-3.1-8b', 'llama-3.1-70b'].includes(selectedId.value) ? selectedId.value : 'llama-3.1-8b'))
+// The DO tier serves these open models directly (Llama-4 / Llama-3.3-70B / DeepSeek-V3.2 / Qwen3);
+// the premium-labelled picks (GPT/Claude) are tier-gated there, so they route to DeepSeek-V3.2 — the
+// strongest available — for a high-quality, long-form live answer. (Swaps to the real model once an
+// OpenAI/Anthropic key is wired.)
+const LIVE_TEXT_MODELS = ['llama-3.1-8b', 'llama-3.1-70b', 'deepseek-v3.2', 'qwen3-32b']
+const liveServedId = computed(() => (LIVE_TEXT_MODELS.includes(selectedId.value) ? selectedId.value : 'deepseek-v3.2'))
 
 // Session meter — only live turns (those carrying a real creditCost) count toward credit spend.
 const liveTurns = computed(() => turns.filter((t) => t.creditCost !== undefined))
@@ -665,7 +669,8 @@ async function generateSpeech() {
   try {
     const resp = await fetch('/api/inference/speech', {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ model: modelId, input }),
+      // Voice-design prompt → a professional, deeper female voice (Qwen3-TTS designs from this).
+      body: JSON.stringify({ model: modelId, input, instructions: 'A warm, professional female voice with a calm, lower-pitched tone, clear articulation, and a composed, confident newsreader delivery.' }),
     })
     if (!resp.ok) {
       const env = await resp.json().catch(() => null)
