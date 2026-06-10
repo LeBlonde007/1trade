@@ -764,7 +764,7 @@ async function askVision() {
   if (!screenStream.value) { attachError.value = 'share your screen first'; return }
   const img = await captureFrameReady()
   if (!img) { attachError.value = 'could not read the shared screen — re-share and pick a Screen or Window (a browser Tab works best)'; return }
-  const prompt = draft.value.trim() || 'Describe what is on the screen, concisely.'
+  const prompt = draft.value.trim() || "Describe what's on the screen in detail — the app/site, key UI, any visible text or code, and what the user appears to be doing."
   turns.push({ id: nextId(), role: 'user', text: prompt + '  🖥️' })
   draft.value = ''
   generating.value = true
@@ -775,7 +775,7 @@ async function askVision() {
   await nextTick(); scrollToBottom()
   try {
     const res = await $fetch<{ text: string; usage?: ChatUsage }>('/api/inference/vision', {
-      method: 'POST', body: { model: modelId, prompt, image_url: img, max_tokens: 400 },
+      method: 'POST', body: { model: modelId, prompt, image_url: img, max_tokens: 1024 },
     })
     aTurn.streaming = false
     aTurn.latencyMs = Date.now() - startedAt
