@@ -23,12 +23,15 @@ const normLang = computed(() => {
   return l || 'text'
 })
 const runnable = computed(() => normLang.value === 'python' || normLang.value === 'javascript')
+// HTML (with the tag, or a document/body) gets a live, sandboxed preview instead of a stdout run.
+const previewable = computed(() => normLang.value === 'html' || /^\s*<!doctype html|^\s*<html[\s>]|<body[\s>]/i.test(props.code))
 
 const running = ref(false)
 const pyLoading = ref(false)
 const output = ref<string | null>(null)
 const errored = ref(false)
 const copied = ref(false)
+const showPreview = ref(false)
 
 /** copy puts the snippet on the clipboard. */
 function copy() {
@@ -120,13 +123,17 @@ function runJS(code: string): Promise<string> {
       <span class="cr-lang mono">{{ normLang }}</span>
       <div class="cr-actions">
         <button type="button" class="cr-btn" @click="copy">{{ copied ? 'Copied' : 'Copy' }}</button>
+        <button v-if="previewable" type="button" class="cr-btn cr-run" :class="{ on: showPreview }" @click="showPreview = !showPreview">
+          {{ showPreview ? 'Hide preview' : '▶ Preview' }}
+        </button>
         <button v-if="runnable" type="button" class="cr-btn cr-run" :disabled="running" @click="run">
           <span v-if="running" class="cr-spin" />
           {{ running ? (pyLoading ? 'Loading runtime…' : 'Running…') : '▶ Run' }}
         </button>
       </div>
     </div>
-    <pre class="cr-code"><code>{{ code }}</code></pre>
+    <iframe v-if="previewable && showPreview" class="cr-preview" :srcdoc="code" sandbox="allow-scripts allow-modals" title="HTML preview" />
+    <pre v-show="!(previewable && showPreview)" class="cr-code"><code>{{ code }}</code></pre>
     <div v-if="output !== null" class="cr-out" :class="{ err: errored }">
       <div class="cr-out-label mono">{{ errored ? 'Error' : 'Output' }}</div>
       <pre>{{ output }}</pre>
@@ -136,6 +143,8 @@ function runJS(code: string): Promise<string> {
 
 <style scoped>
 .code-runner { border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; margin: 8px 0; background: var(--canvas); }
+.cr-preview { display: block; width: 100%; height: 420px; border: 0; background: white; }
+.cr-btn.on { color: var(--accent); border-color: var(--accent); }
 .cr-head { display: flex; align-items: center; justify-content: space-between; padding: 5px 10px; border-bottom: 1px solid var(--border); background: var(--surface, var(--canvas)); }
 .cr-lang { font-size: 11px; letter-spacing: 0.03em; color: var(--muted, var(--text)); text-transform: lowercase; }
 .cr-actions { display: flex; gap: 6px; }
