@@ -69,6 +69,12 @@ var models = []Model{
 		ID: "nemotron-vision", Name: "Nemotron Vision", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
 		Exascale: Pricing{Modality: "vision", CreditType: "text", Unit: "1K tokens", Price: "10.000000"},
 	},
+	// Document writer (text → Word / Excel / PowerPoint / PDF / Markdown). Generates the content over the
+	// chat path; the client renders + downloads the file. Bills in `text` credits — the output is text.
+	{
+		ID: "doc-writer", Name: "Document Writer", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
+		Exascale: Pricing{Modality: "docs", CreditType: "text", Unit: "1K tokens", Price: "6.000000"},
+	},
 	// Image generation (billed in `image` credits, per image). Inline playground is chat-only — these
 	// run via the image API/SDK; the catalog surfaces them so the marketplace reads as multi-modal.
 	{
