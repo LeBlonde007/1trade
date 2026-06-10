@@ -18,7 +18,7 @@ useHead({ title: 'Inference Playground — Exascale' })
 // =====================================================
 // Model catalog
 // =====================================================
-type Category = 'text' | 'speech' | 'image' | 'video' | 'embed' | 'vision' | 'docs'
+type Category = 'text' | 'speech' | 'image' | 'video' | 'embed' | 'vision' | 'docs' | 'agent'
 interface ModelDef {
   id: string
   name: string
@@ -48,7 +48,7 @@ function humanizeId(id: string): string {
 /** toCategory maps an Exascale modality to a catalog UI category. */
 function toCategory(modality: string): Category {
   if (modality === 'embeddings' || modality === 'embed') return 'embed'
-  if (modality === 'speech' || modality === 'image' || modality === 'video' || modality === 'vision' || modality === 'docs') return modality
+  if (modality === 'speech' || modality === 'image' || modality === 'video' || modality === 'vision' || modality === 'docs' || modality === 'agent') return modality
   return 'text'
 }
 /**
@@ -82,6 +82,7 @@ const CATEGORY_META: Record<Category, { label: string; cls: string }> = {
   embed:  { label: 'EMBED',    cls: 'cat-embed' },
   vision: { label: 'VISION',   cls: 'cat-speech' },
   docs:   { label: 'DOCS',     cls: 'cat-text' },
+  agent:  { label: 'AGENT',    cls: 'cat-video' },
 }
 
 // =====================================================
@@ -89,7 +90,7 @@ const CATEGORY_META: Record<Category, { label: string; cls: string }> = {
 // =====================================================
 const catalogQuery = ref('')
 type Filter = 'all' | Category
-const FILTERS: Filter[] = ['all', 'text', 'docs', 'vision', 'speech', 'image', 'video', 'embed']
+const FILTERS: Filter[] = ['all', 'text', 'docs', 'agent', 'vision', 'speech', 'image', 'video', 'embed']
 const filter = ref<Filter>('all')
 
 const filteredModels = computed(() => {
@@ -476,6 +477,10 @@ async function send() {
   const fileNames = attachments.value.map(a => a.name)
   if (attachments.value.length) {
     payload = attachments.value.map(a => `--- file: ${a.name} ---\n${a.content}`).join('\n\n') + '\n\n' + text
+  }
+  // Code view → ask for raw code only (one fenced block, no prose), so the ▶ Run block is clean.
+  if (view.value === 'code') {
+    payload = `Respond with ONLY the raw code for this request — a single fenced code block (HTML, CSS, JavaScript, or TypeScript as appropriate), with no explanation or prose before or after it.\n\n${payload}`
   }
   turns.push({ id: nextId(), role: 'user', text, files: fileNames.length ? fileNames : undefined })
   draft.value = ''
@@ -1715,6 +1720,23 @@ async function copyText(text: string, label: string) {
                 </div>
               </form>
 
+              <!-- Agent: autonomous computer-use — runner not live yet, so a polished coming-soon panel. -->
+              <div v-else-if="selected.category === 'agent'" class="agent-soon">
+                <div class="agent-badge mono">Coming soon</div>
+                <h3>{{ selected.name }} — autonomous computer use</h3>
+                <p>
+                  Give a plain-text instruction and the agent plans and executes it across a real browser and
+                  desktop — navigating, clicking, typing, and verifying — then reports back. Built on the same
+                  inference + credit rails as the rest of the platform, metered per task.
+                </p>
+                <ul class="agent-steps">
+                  <li><span class="mono">1</span> Describe a goal in natural language</li>
+                  <li><span class="mono">2</span> The agent drives a sandboxed browser/computer</li>
+                  <li><span class="mono">3</span> It returns the result + a replayable trace</li>
+                </ul>
+                <span class="agent-note">In private preview — talk to us for early access.</span>
+              </div>
+
               <!-- Embeddings: not inline (no UI) — point to the API/CLI. Catalog + pricing live. -->
               <div v-else class="api-only">
                 <div class="api-only-icon">{{ CATEGORY_META[selected.category].label }}</div>
@@ -2682,6 +2704,15 @@ ratelimit-remaining:   58 / 60 RPS</pre>
 .doc-label { font-size: 11px; color: var(--muted, var(--text)); text-transform: uppercase; letter-spacing: 0.04em; }
 .doc-dl { font-size: 12px; padding: 5px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: none; color: var(--text); cursor: pointer; }
 .doc-dl:hover { border-color: var(--accent); color: var(--accent); }
+/* Agent coming-soon panel. */
+.agent-soon { padding: 28px 24px; max-width: 560px; margin: 12px auto; }
+.agent-badge { display: inline-block; font-size: 10.5px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--warn); border: 1px solid var(--warn); border-radius: 999px; padding: 3px 10px; margin-bottom: 14px; }
+.agent-soon h3 { font-size: 17px; margin: 0 0 10px; color: var(--text); }
+.agent-soon p { font-size: 13px; color: var(--muted, var(--text)); line-height: 1.6; margin: 0 0 16px; }
+.agent-steps { list-style: none; margin: 0 0 16px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.agent-steps li { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text); }
+.agent-steps li span { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--border); font-size: 11px; color: var(--muted, var(--text)); }
+.agent-note { font-size: 12px; color: var(--muted, var(--text)); }
 /* Vision (screen share): hidden capture surface + the share toolbar. */
 /* Capture surface for screen share: kept off-screen at a real size (NOT display:none / 1px / opacity:0)
  * so the browser actually decodes + paints frames — otherwise drawImage() captures an all-black frame. */

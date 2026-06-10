@@ -75,6 +75,12 @@ var models = []Model{
 		ID: "doc-writer", Name: "Document Writer", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
 		Exascale: Pricing{Modality: "docs", CreditType: "text", Unit: "1K tokens", Price: "6.000000"},
 	},
+	// Autonomous computer-use agent (text instruction → browser/computer actions). Listed for the catalog;
+	// the runner is not live yet, so the console surfaces it as "coming soon".
+	{
+		ID: "agent-operator", Name: "Operator Agent", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
+		Exascale: Pricing{Modality: "agent", CreditType: "text", Unit: "task", Price: "20.000000"},
+	},
 	// Image generation (billed in `image` credits, per image). Inline playground is chat-only — these
 	// run via the image API/SDK; the catalog surfaces them so the marketplace reads as multi-modal.
 	{
