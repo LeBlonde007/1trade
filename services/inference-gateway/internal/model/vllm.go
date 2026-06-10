@@ -145,7 +145,11 @@ func (b *VLLMBackend) Image(ctx context.Context, req ImageRequest) (ImageResult,
 	}
 	reqBody := map[string]any{
 		"model": b.providerModel(req.Model), "prompt": req.Prompt,
-		"n": n, "size": size, "response_format": "b64_json",
+		"n": n, "size": size,
+	}
+	// OpenAI's gpt-image-* always returns base64 and 400s on response_format; SD / DALL-E need it for b64.
+	if !strings.HasPrefix(b.providerModel(req.Model), "gpt-image") {
+		reqBody["response_format"] = "b64_json"
 	}
 	body, _ := json.Marshal(reqBody)
 

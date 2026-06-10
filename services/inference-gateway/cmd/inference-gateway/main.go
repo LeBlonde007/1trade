@@ -36,8 +36,20 @@ func main() {
 	// Backend selection (F09): the real vLLM runtime or the GPU-free mock, behind one interface.
 	var backend model.Backend = model.MockBackend{}
 	if cfg.InferenceBackend == "vllm" {
-		backend = model.NewVLLMBackend(cfg.VLLMBaseURL, cfg.InferenceAPIKey, cfg.InferenceModelMap, cfg.InferenceTimeout)
+		do := model.NewVLLMBackend(cfg.VLLMBaseURL, cfg.InferenceAPIKey, cfg.InferenceModelMap, cfg.InferenceTimeout)
+		backend = do
 		slog.Info("inference backend: vllm", "runtime", cfg.VLLMBaseURL, "hosted", cfg.InferenceAPIKey != "", "model_map", len(cfg.InferenceModelMap))
+		// Optional OpenAI provider: the models in OpenAIModelMap (frontier image / vision / text) route
+		// to OpenAI; everything else stays on the DO runtime. Unset key → DO backend used directly.
+		if cfg.OpenAIAPIKey != "" {
+			oai := model.NewVLLMBackend(cfg.OpenAIBaseURL, cfg.OpenAIAPIKey, cfg.OpenAIModelMap, cfg.InferenceTimeout)
+			routed := make(map[string]bool, len(cfg.OpenAIModelMap))
+			for k := range cfg.OpenAIModelMap {
+				routed[k] = true
+			}
+			backend = &model.RoutedBackend{Default: do, OpenAI: oai, OpenAIModels: routed}
+			slog.Info("openai provider enabled", "base", cfg.OpenAIBaseURL, "routed_models", len(routed))
+		}
 	} else {
 		slog.Info("inference backend: mock")
 	}
