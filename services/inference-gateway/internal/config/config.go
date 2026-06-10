@@ -86,6 +86,7 @@ var defaultMediaMap = map[string]string{
 	"stable-diffusion-3.5": "stable-diffusion-3.5-large",
 	"flux-schnell":         "stable-diffusion-3.5-large", // DO has no Flux
 	"nemotron-vision":      "nemotron-nano-12b-v2-vl",    // VLM for /v1/chat/vision
+	"doc-writer":           "deepseek-3.2",               // document generation runs on a strong writer
 	"wan-t2v":              "wan2-2-t2v-a14b",
 	"qwen3-tts":            "qwen3-tts-voicedesign",
 	"elevenlabs-tts":       "qwen3-tts-voicedesign",

@@ -124,7 +124,7 @@ func (s *Server) chatCompletions(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "model_not_found", "unknown model: "+req.Model)
 		return
 	}
-	if m.Exascale.Modality != "text" { // chat is text-only; refuse so we never bill the wrong sub-credit
+	if m.Exascale.Modality != "text" && m.Exascale.Modality != "docs" { // chat path: text + doc-writer; refuse the rest so we never bill the wrong sub-credit
 		writeErr(w, http.StatusNotFound, "model_not_found", req.Model+" is not a chat model")
 		return
 	}

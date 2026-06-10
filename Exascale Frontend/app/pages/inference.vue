@@ -8,6 +8,7 @@
  */
 
 import { Paperclip, Mic, Volume2, Headphones, Monitor, ChevronDown } from 'lucide-vue-next'
+import { exportDoc, type DocFormat } from '~/utils/docExport'
 import type { CatalogModel } from '~/composables/useCatalog'
 import type { ChatUsage } from '~/composables/useInference'
 
@@ -17,7 +18,7 @@ useHead({ title: 'Inference Playground — Exascale' })
 // =====================================================
 // Model catalog
 // =====================================================
-type Category = 'text' | 'speech' | 'image' | 'video' | 'embed' | 'vision'
+type Category = 'text' | 'speech' | 'image' | 'video' | 'embed' | 'vision' | 'docs'
 interface ModelDef {
   id: string
   name: string
@@ -47,7 +48,7 @@ function humanizeId(id: string): string {
 /** toCategory maps an Exascale modality to a catalog UI category. */
 function toCategory(modality: string): Category {
   if (modality === 'embeddings' || modality === 'embed') return 'embed'
-  if (modality === 'speech' || modality === 'image' || modality === 'video' || modality === 'vision') return modality
+  if (modality === 'speech' || modality === 'image' || modality === 'video' || modality === 'vision' || modality === 'docs') return modality
   return 'text'
 }
 /**
@@ -80,6 +81,7 @@ const CATEGORY_META: Record<Category, { label: string; cls: string }> = {
   video:  { label: 'VIDEO',    cls: 'cat-video' },
   embed:  { label: 'EMBED',    cls: 'cat-embed' },
   vision: { label: 'VISION',   cls: 'cat-speech' },
+  docs:   { label: 'DOCS',     cls: 'cat-text' },
 }
 
 // =====================================================
@@ -87,7 +89,7 @@ const CATEGORY_META: Record<Category, { label: string; cls: string }> = {
 // =====================================================
 const catalogQuery = ref('')
 type Filter = 'all' | Category
-const FILTERS: Filter[] = ['all', 'text', 'vision', 'speech', 'image', 'video', 'embed']
+const FILTERS: Filter[] = ['all', 'text', 'docs', 'vision', 'speech', 'image', 'video', 'embed']
 const filter = ref<Filter>('all')
 
 const filteredModels = computed(() => {
@@ -192,6 +194,8 @@ interface Turn {
   video?: string
   /** Generated audio (object URL) for a speech-model turn — rendered in an <audio> player. */
   audio?: string
+  /** Generated document (Markdown source + title) for a docs turn — drives the download buttons. */
+  doc?: { markdown: string; title: string }
   /** Names of files attached to this user turn (their content is sent as context, not shown inline). */
   files?: string[]
 }
@@ -791,6 +795,65 @@ async function askVision() {
     generating.value = false
     await nextTick(); scrollToBottom()
   }
+}
+
+// ── Document generation (text → Markdown / Word / Excel / PowerPoint / PDF). The model writes Markdown;
+//    the browser renders it live and offers a download in every format. No key required.
+const DOC_SYS = 'Write a complete, professional document in GitHub-flavored Markdown for the request below. Use a single "# Title", clear "##" section headings, concise paragraphs, "-" bullet lists, and Markdown tables when presenting data. Output ONLY the Markdown document — no preamble, no commentary, and no code fences.'
+const DOC_FORMATS: Array<{ fmt: DocFormat; label: string }> = [
+  { fmt: 'pdf', label: 'PDF' },
+  { fmt: 'docx', label: 'Word' },
+  { fmt: 'pptx', label: 'PowerPoint' },
+  { fmt: 'xlsx', label: 'Excel' },
+  { fmt: 'markdown', label: 'Markdown' },
+]
+
+// generateDoc asks the doc-writer for a Markdown document (streamed live), then attaches the download
+// buttons. The same Markdown source exports to PDF / Word / PowerPoint / Excel in the browser.
+async function generateDoc() {
+  const ask = draft.value.trim()
+  if (!ask || generating.value) return
+  turns.push({ id: nextId(), role: 'user', text: ask })
+  draft.value = ''
+  generating.value = true
+  const startedAt = Date.now()
+  const modelId = selectedId.value
+  turns.push({ id: nextId(), role: 'assistant', text: '', streaming: true, backend: modelId, model: modelId })
+  const aTurn = turns[turns.length - 1]!
+  await nextTick(); scrollToBottom()
+  try {
+    let lastScroll = 0
+    const { content, usage } = await useInference().runStream(modelId, `${DOC_SYS}\n\nRequest: ${ask}`, 3500, {
+      onToken: (delta: string) => {
+        aTurn.text += delta
+        const now = Date.now()
+        if (now - lastScroll > 120) { lastScroll = now; void nextTick().then(scrollToBottom) }
+      },
+    })
+    aTurn.streaming = false
+    aTurn.latencyMs = Date.now() - startedAt
+    const md = content.replace(/^```(?:markdown|md)?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim()
+    aTurn.text = md
+    aTurn.doc = { markdown: md, title: /^#\s+(.+)$/m.exec(md)?.[1]?.trim() || ask.slice(0, 48) }
+    const p = catalogPrice.value[modelId]
+    if (p) {
+      const total = usage?.total_tokens || Math.ceil(md.length / 4)
+      aTurn.creditCost = p.price * (total / 1000)
+      aTurn.creditType = p.creditType
+    }
+    void refreshBalance()
+  } catch (e: unknown) {
+    renderAssistantError(aTurn, e)
+  } finally {
+    generating.value = false
+    await nextTick(); scrollToBottom()
+  }
+}
+
+// downloadDoc exports a generated document turn to the chosen format and triggers the browser download.
+async function downloadDoc(t: Turn, fmt: DocFormat) {
+  if (!t.doc) return
+  try { await exportDoc(t.doc.markdown, fmt, t.doc.title) } catch (e) { attachError.value = 'export failed — ' + String(e) }
 }
 
 // ── Attachments — text/code file content is sent as model context; every file is also uploaded to
@@ -1413,6 +1476,10 @@ async function copyText(text: string, label: string) {
                       </template>
                     </div>
                     <div v-else class="md" :class="{ 'is-streaming': t.streaming }" v-html="t.html ?? renderMarkdownLite(t.text)" />
+                    <div v-if="t.doc && !t.streaming" class="doc-actions">
+                      <span class="doc-label mono">Download as</span>
+                      <button v-for="f in DOC_FORMATS" :key="f.fmt" type="button" class="doc-dl" @click="downloadDoc(t, f.fmt)">{{ f.label }}</button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1612,6 +1679,33 @@ async function copyText(text: string, label: string) {
                       </button>
                       <button v-else type="submit" class="send-btn" :disabled="!sharingScreen">
                         Ask
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square">
+                          <path d="M3 8h10M9 4l4 4-4 4" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </form>
+
+              <!-- Docs: describe a document → the model writes Markdown → download as Word/Excel/PPT/PDF/MD. -->
+              <form v-else-if="selected.category === 'docs'" class="composer" @submit.prevent="generateDoc">
+                <div class="composer-box">
+                  <textarea
+                    v-model="draft"
+                    class="composer-input"
+                    placeholder="Describe the document — e.g. 'a one-page business plan for an AI-compute startup' or 'a Q3 budget table'…"
+                    rows="3"
+                    @keydown.enter.exact.prevent="generateDoc"
+                  />
+                  <div class="composer-foot">
+                    <span class="composer-hint mono">{{ selected.name }} · export to Word · Excel · PPT · PDF · Markdown</span>
+                    <div class="composer-actions">
+                      <button v-if="generating" type="button" class="send-btn stop-btn" disabled>
+                        <span class="spinner" /> Writing…
+                      </button>
+                      <button v-else type="submit" class="send-btn" :disabled="!draft.trim()">
+                        Generate
                         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square">
                           <path d="M3 8h10M9 4l4 4-4 4" />
                         </svg>
@@ -2583,6 +2677,11 @@ ratelimit-remaining:   58 / 60 RPS</pre>
 /* Generated-audio player (text→speech turns). */
 .aud-out { max-width: 420px; }
 .aud-out audio { display: block; width: 100%; }
+/* Generated-document download bar (docs turns). */
+.doc-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+.doc-label { font-size: 11px; color: var(--muted, var(--text)); text-transform: uppercase; letter-spacing: 0.04em; }
+.doc-dl { font-size: 12px; padding: 5px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: none; color: var(--text); cursor: pointer; }
+.doc-dl:hover { border-color: var(--accent); color: var(--accent); }
 /* Vision (screen share): hidden capture surface + the share toolbar. */
 /* Capture surface for screen share: kept off-screen at a real size (NOT display:none / 1px / opacity:0)
  * so the browser actually decodes + paints frames — otherwise drawImage() captures an all-black frame. */
