@@ -112,6 +112,28 @@ function turnModelName(t: Turn): string {
   return models.value.find(m => m.id === id)?.name ?? humanizeId(id)
 }
 
+// ── Runnable code blocks (Codex-style) — split a finished assistant message into prose + fenced code so
+//    each code block renders with a ▶ Run button (CodeRunner). Only for settled turns (not mid-stream).
+interface MsgSegment { type: 'md' | 'code'; content: string; lang?: string }
+const FENCE_RE = /```([\w+-]*)\n?([\s\S]*?)```/g
+/** hasCodeBlock reports whether a finished turn contains a fenced code block worth a runnable view. */
+function hasCodeBlock(t: Turn): boolean {
+  return !t.streaming && !t.html && typeof t.text === 'string' && t.text.includes('```')
+}
+/** messageSegments splits the text into ordered prose (md) and code segments for segmented rendering. */
+function messageSegments(text: string): MsgSegment[] {
+  const segs: MsgSegment[] = []
+  let last = 0
+  FENCE_RE.lastIndex = 0
+  for (let m = FENCE_RE.exec(text); m; m = FENCE_RE.exec(text)) {
+    if (m.index > last) segs.push({ type: 'md', content: text.slice(last, m.index) })
+    segs.push({ type: 'code', content: (m[2] ?? '').replace(/\n$/, ''), lang: (m[1] || 'text').toLowerCase() })
+    last = m.index + m[0].length
+  }
+  if (last < text.length) segs.push({ type: 'md', content: text.slice(last) })
+  return segs.length ? segs : [{ type: 'md', content: text }]
+}
+
 // Real signed-in identity for the chat transcript (no hardcoded demo user). We only have the email,
 // so the label is its local-part and the avatar is up to two initials derived from it.
 const { user } = useAuth()
@@ -1378,6 +1400,12 @@ async function copyText(text: string, label: string) {
                     </div>
                     <div v-else-if="t.streaming && !t.text" class="thinking" aria-label="Thinking">
                       <span class="thinking-dot" /><span class="thinking-dot" /><span class="thinking-dot" />
+                    </div>
+                    <div v-else-if="hasCodeBlock(t)" class="md-segmented">
+                      <template v-for="(seg, i) in messageSegments(t.text)" :key="i">
+                        <div v-if="seg.type === 'md'" class="md" v-html="renderMarkdownLite(seg.content)" />
+                        <CodeRunner v-else :code="seg.content" :lang="seg.lang" />
+                      </template>
                     </div>
                     <div v-else class="md" :class="{ 'is-streaming': t.streaming }" v-html="t.html ?? renderMarkdownLite(t.text)" />
                   </div>
