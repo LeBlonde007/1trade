@@ -353,4 +353,12 @@ function togglePin(sym: string) { pinned[sym] = !pinned[sym] }
 .spark { display: inline-block; vertical-align: middle; }
 .open-link { color: var(--text-2); text-decoration: none; font-size: 11.5px; }
 .open-link:hover { color: var(--text); }
+
+/* ── Mobile: the header + filters wrap; the market table scrolls horizontally (already wrapped). ── */
+@media (max-width: 640px) {
+  .markets-page, .mk-page { padding-left: 14px; padding-right: 14px; }
+  .mk-title-row { flex-wrap: wrap; gap: 8px; }
+  .mk-actions { flex-wrap: wrap; }
+  .mk-filters { flex-wrap: wrap; gap: 8px; }
+}
 </style>

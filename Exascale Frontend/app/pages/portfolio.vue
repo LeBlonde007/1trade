@@ -1779,4 +1779,13 @@ onBeforeUnmount(() => {
   font-size: 12px;
   letter-spacing: 0.04em;
 }
+
+/* ── Mobile: stack the expanded-holding detail grid; wide fill rows scroll within the panel. ── */
+@media (max-width: 640px) {
+  .expand-inner { grid-template-columns: 1fr 1fr; gap: 12px 18px; }
+  .fill-row { min-width: 520px; }
+}
+@media (max-width: 480px) {
+  .expand-inner { grid-template-columns: 1fr; }
+}
 </style>

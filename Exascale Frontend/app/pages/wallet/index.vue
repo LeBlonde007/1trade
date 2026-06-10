@@ -1194,4 +1194,7 @@ const todayPct = computed(() => startTotal.value === 0 ? 0 : todayPnl.value / st
   .main.drawer-open { padding-right: 0; }
   .drawer { width: 100%; }
 }
+@media (max-width: 560px) {
+  .balance-grid, .balance-grid.two-col { grid-template-columns: 1fr; }
+}
 </style>

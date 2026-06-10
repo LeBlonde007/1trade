@@ -733,4 +733,12 @@ function typeTone(t: RowType): string {
 }
 .pg-btn:disabled { color: var(--text-3); cursor: default; opacity: 0.5; }
 .pg-page { color: var(--text-2); }
+
+/* ── Mobile: 2-col stats, single-column detail, horizontally scrollable tables. ── */
+@media (max-width: 640px) {
+  .history-page { padding: 16px 14px 28px; }
+  .stats { grid-template-columns: repeat(2, 1fr); }
+  .detail { grid-template-columns: 1fr; }
+  .tbl-wrap { overflow-x: auto; }
+}
 </style>
