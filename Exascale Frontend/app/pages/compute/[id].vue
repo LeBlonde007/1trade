@@ -1233,4 +1233,8 @@ function copyText(t: string) {
 
 .fade-enter-from, .fade-leave-to { opacity: 0; }
 .fade-enter-active, .fade-leave-active { transition: opacity 120ms ease; }
+
+@media (max-width: 560px) {
+  .cost-grid { grid-template-columns: 1fr; }
+}
 </style>

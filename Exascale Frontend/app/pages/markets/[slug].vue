@@ -1561,4 +1561,8 @@ onBeforeUnmount(() => {
   .preview-body { grid-template-columns: 1fr; }
   .details { grid-template-columns: 1fr; gap: 32px; }
 }
+@media (max-width: 560px) {
+  .stats-grid { grid-template-columns: 1fr; }
+  .related-grid { grid-template-columns: 1fr; }
+}
 </style>
