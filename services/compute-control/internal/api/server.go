@@ -67,6 +67,7 @@ func (s *Server) listTypes(w http.ResponseWriter, _ *http.Request) {
 		types = append(types, map[string]any{
 			"id": t.ID, "name": t.Name, "gpu": t.GPU,
 			"credit_type": t.CreditType, "price_per_hour": t.PricePerHour, "available": t.Available,
+			"status": t.Status, "specs": t.Specs,
 		})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"types": types})

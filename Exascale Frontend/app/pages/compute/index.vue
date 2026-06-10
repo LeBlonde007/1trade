@@ -450,6 +450,9 @@ const RESERVATION = {
             <span class="cli-k">via CLI</span>
             <code>{{ cliInline }}</code>
           </span>
+          <NuxtLink to="/compute/catalog" class="btn">
+            Browse GPUs
+          </NuxtLink>
           <NuxtLink to="/compute/new" class="btn primary">
             Provision new
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square">

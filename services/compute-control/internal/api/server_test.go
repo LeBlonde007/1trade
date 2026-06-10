@@ -75,8 +75,18 @@ func TestTypes_Public(t *testing.T) {
 		Types []map[string]any `json:"types"`
 	}
 	_ = json.Unmarshal(w.Body.Bytes(), &resp)
-	if len(resp.Types) != 2 {
-		t.Fatalf("types = %d, want 2", len(resp.Types))
+	if len(resp.Types) != 8 {
+		t.Fatalf("types = %d, want 8 (full GPU rental lineup)", len(resp.Types))
+	}
+	// Every catalog entry carries a marketplace status + datasheet specs for the rental view.
+	for _, ty := range resp.Types {
+		st, _ := ty["status"].(string)
+		if st != "available" && st != "sold_out" && st != "coming_soon" {
+			t.Fatalf("type %v has invalid status %q", ty["id"], st)
+		}
+		if _, ok := ty["specs"].(map[string]any); !ok {
+			t.Fatalf("type %v missing specs", ty["id"])
+		}
 	}
 }
 

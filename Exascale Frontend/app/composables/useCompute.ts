@@ -3,6 +3,22 @@
  * same GPU pool the scheduler places jobs on; per-second GPU-hour usage debits the gpu_* credit while
  * an instance runs. Render IDs + counts mono + tabular-nums per the design system.
  */
+export interface GpuSpecs {
+  architecture: string
+  vram: string
+  mem_bandwidth: string
+  fp16_tflops: string
+  fp8_tflops: string
+  fp4_tflops?: string
+  nvlink: string
+  interconnect: string
+  tdp: string
+  form_factor: string
+  vcpus: number
+  host_ram: string
+  released: string
+}
+
 export interface GpuType {
   id: string
   name: string
@@ -10,6 +26,8 @@ export interface GpuType {
   credit_type: string
   price_per_hour: string
   available: number
+  status?: 'available' | 'sold_out' | 'coming_soon'
+  specs?: GpuSpecs
 }
 
 export interface Connect {
