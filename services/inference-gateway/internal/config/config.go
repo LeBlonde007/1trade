@@ -87,6 +87,7 @@ var defaultMediaMap = map[string]string{
 	"flux-schnell":         "stable-diffusion-3.5-large", // DO has no Flux
 	"nemotron-vision":      "nemotron-nano-12b-v2-vl",    // VLM for /v1/chat/vision
 	"doc-writer":           "deepseek-3.2",               // document generation runs on a strong writer
+	"code-writer":          "deepseek-3.2",               // code generation fallback (→ GPT-4o when OpenAI is set)
 	"wan-t2v":              "wan2-2-t2v-a14b",
 	"qwen3-tts":            "qwen3-tts-voicedesign",
 	"elevenlabs-tts":       "qwen3-tts-voicedesign",
@@ -112,6 +113,7 @@ func mediaModelMap(env string) map[string]string {
 var defaultOpenAIMap = map[string]string{
 	"gpt-image-1.5":   "gpt-image-1",
 	"nemotron-vision": "gpt-4o",
+	"code-writer":     "gpt-4o", // frontier code generation when an OpenAI key is configured
 }
 
 // openaiModelMap merges the built-in OpenAI routing with the operator's OPENAI_MODEL_MAP (env wins).

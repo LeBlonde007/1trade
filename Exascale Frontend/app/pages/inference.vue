@@ -18,7 +18,7 @@ useHead({ title: 'Inference Playground — Exascale' })
 // =====================================================
 // Model catalog
 // =====================================================
-type Category = 'text' | 'speech' | 'image' | 'video' | 'embed' | 'vision' | 'docs' | 'agent'
+type Category = 'text' | 'speech' | 'image' | 'video' | 'embed' | 'vision' | 'docs' | 'agent' | 'code'
 interface ModelDef {
   id: string
   name: string
@@ -48,7 +48,7 @@ function humanizeId(id: string): string {
 /** toCategory maps an Exascale modality to a catalog UI category. */
 function toCategory(modality: string): Category {
   if (modality === 'embeddings' || modality === 'embed') return 'embed'
-  if (modality === 'speech' || modality === 'image' || modality === 'video' || modality === 'vision' || modality === 'docs' || modality === 'agent') return modality
+  if (modality === 'speech' || modality === 'image' || modality === 'video' || modality === 'vision' || modality === 'docs' || modality === 'agent' || modality === 'code') return modality
   return 'text'
 }
 /**
@@ -83,6 +83,7 @@ const CATEGORY_META: Record<Category, { label: string; cls: string }> = {
   vision: { label: 'VISION',   cls: 'cat-speech' },
   docs:   { label: 'DOCS',     cls: 'cat-text' },
   agent:  { label: 'AGENT',    cls: 'cat-video' },
+  code:   { label: 'CODE',     cls: 'cat-text' },
 }
 
 // =====================================================
@@ -90,7 +91,7 @@ const CATEGORY_META: Record<Category, { label: string; cls: string }> = {
 // =====================================================
 const catalogQuery = ref('')
 type Filter = 'all' | Category
-const FILTERS: Filter[] = ['all', 'text', 'docs', 'agent', 'vision', 'speech', 'image', 'video', 'embed']
+const FILTERS: Filter[] = ['all', 'text', 'code', 'docs', 'agent', 'vision', 'speech', 'image', 'video', 'embed']
 const filter = ref<Filter>('all')
 
 const filteredModels = computed(() => {
@@ -861,6 +862,44 @@ async function downloadDoc(t: Turn, fmt: DocFormat) {
   try { await exportDoc(t.doc.markdown, fmt, t.doc.title) } catch (e) { attachError.value = 'export failed — ' + String(e) }
 }
 
+// ── Code generation (raw code only) — the model returns one fenced block; the CodeRunner renders it
+//    with ▶ Run and, for HTML, a live preview. For web requests we ask for one self-contained HTML file.
+const CODE_SYS = 'You are an expert programmer. Respond with ONLY the raw code that fulfils the request — a single fenced code block (with a language tag). For anything web or UI related, output ONE complete, self-contained HTML file with inline CSS and JavaScript so it runs and previews on its own. No explanation, no prose, no commentary before or after the code block.'
+
+async function generateCode() {
+  const ask = draft.value.trim()
+  if (!ask || generating.value) return
+  turns.push({ id: nextId(), role: 'user', text: ask })
+  draft.value = ''
+  generating.value = true
+  const startedAt = Date.now()
+  const modelId = selectedId.value
+  turns.push({ id: nextId(), role: 'assistant', text: '', streaming: true, backend: modelId, model: modelId })
+  const aTurn = turns[turns.length - 1]!
+  await nextTick(); scrollToBottom()
+  try {
+    let lastScroll = 0
+    const { content, usage } = await useInference().runStream(modelId, `${CODE_SYS}\n\nRequest: ${ask}`, 3500, {
+      onToken: (delta: string) => {
+        aTurn.text += delta
+        const n = Date.now()
+        if (n - lastScroll > 120) { lastScroll = n; void nextTick().then(scrollToBottom) }
+      },
+    })
+    aTurn.streaming = false
+    aTurn.latencyMs = Date.now() - startedAt
+    aTurn.text = content.trim() // a fenced block → hasCodeBlock() renders it via CodeRunner
+    const p = catalogPrice.value[modelId]
+    if (p) { aTurn.creditCost = p.price * ((usage?.total_tokens || Math.ceil(content.length / 4)) / 1000); aTurn.creditType = p.creditType }
+    void refreshBalance()
+  } catch (e: unknown) {
+    renderAssistantError(aTurn, e)
+  } finally {
+    generating.value = false
+    await nextTick(); scrollToBottom()
+  }
+}
+
 // ── Attachments — text/code file content is sent as model context; every file is also uploaded to
 // object storage (DigitalOcean Spaces) via a presigned PUT (best-effort) so it persists + gets a URL.
 interface Attachment { name: string; content: string; url?: string; uploading?: boolean; failed?: boolean }
@@ -1480,11 +1519,18 @@ async function copyText(text: string, label: string) {
                         <CodeRunner v-else :code="seg.content" :lang="seg.lang" />
                       </template>
                     </div>
-                    <div v-else class="md" :class="{ 'is-streaming': t.streaming }" v-html="t.html ?? renderMarkdownLite(t.text)" />
-                    <div v-if="t.doc && !t.streaming" class="doc-actions">
-                      <span class="doc-label mono">Download as</span>
-                      <button v-for="f in DOC_FORMATS" :key="f.fmt" type="button" class="doc-dl" @click="downloadDoc(t, f.fmt)">{{ f.label }}</button>
+                    <div v-else-if="t.doc && !t.streaming" class="doc-preview">
+                      <div class="doc-paper-head">
+                        <span class="doc-paper-title">{{ t.doc.title }}</span>
+                        <span class="doc-paper-badge mono">Document</span>
+                      </div>
+                      <div class="doc-paper md" v-html="renderMarkdownLite(t.doc.markdown)" />
+                      <div class="doc-actions">
+                        <span class="doc-label mono">Download as</span>
+                        <button v-for="f in DOC_FORMATS" :key="f.fmt" type="button" class="doc-dl" @click="downloadDoc(t, f.fmt)">{{ f.label }}</button>
+                      </div>
                     </div>
+                    <div v-else class="md" :class="{ 'is-streaming': t.streaming }" v-html="t.html ?? renderMarkdownLite(t.text)" />
                   </div>
                 </div>
               </div>
@@ -1708,6 +1754,33 @@ async function copyText(text: string, label: string) {
                     <div class="composer-actions">
                       <button v-if="generating" type="button" class="send-btn stop-btn" disabled>
                         <span class="spinner" /> Writing…
+                      </button>
+                      <button v-else type="submit" class="send-btn" :disabled="!draft.trim()">
+                        Generate
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square">
+                          <path d="M3 8h10M9 4l4 4-4 4" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </form>
+
+              <!-- Code: describe what to build → raw code (one block) with ▶ Run + live HTML preview. -->
+              <form v-else-if="selected.category === 'code'" class="composer" @submit.prevent="generateCode">
+                <div class="composer-box">
+                  <textarea
+                    v-model="draft"
+                    class="composer-input"
+                    placeholder="Describe what to build — e.g. 'a responsive pricing page in HTML/CSS' or 'a TypeScript debounce function'…"
+                    rows="3"
+                    @keydown.enter.exact.prevent="generateCode"
+                  />
+                  <div class="composer-foot">
+                    <span class="composer-hint mono">{{ selected.name }} · raw code · ▶ Run / live preview</span>
+                    <div class="composer-actions">
+                      <button v-if="generating" type="button" class="send-btn stop-btn" disabled>
+                        <span class="spinner" /> Coding…
                       </button>
                       <button v-else type="submit" class="send-btn" :disabled="!draft.trim()">
                         Generate
@@ -2700,7 +2773,19 @@ ratelimit-remaining:   58 / 60 RPS</pre>
 .aud-out { max-width: 420px; }
 .aud-out audio { display: block; width: 100%; }
 /* Generated-document download bar (docs turns). */
-.doc-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+/* Document preview artifact (Claude-style) — the generated doc rendered like paper, with downloads. */
+.doc-preview { border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; background: var(--surface, var(--canvas)); max-width: 760px; }
+.doc-paper-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; border-bottom: 1px solid var(--border); background: var(--elevated, var(--canvas)); }
+.doc-paper-title { font-size: 12.5px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.doc-paper-badge { font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted, var(--text)); border: 1px solid var(--border); border-radius: 4px; padding: 2px 7px; }
+.doc-paper { padding: 28px 32px; max-height: 520px; overflow-y: auto; line-height: 1.7; }
+.doc-paper :deep(h1) { font-size: 22px; margin: 0 0 14px; }
+.doc-paper :deep(h2) { font-size: 17px; margin: 20px 0 8px; }
+.doc-paper :deep(h3) { font-size: 14px; margin: 16px 0 6px; }
+.doc-paper :deep(p) { margin: 0 0 10px; }
+.doc-paper :deep(table) { border-collapse: collapse; width: 100%; margin: 10px 0; }
+.doc-paper :deep(th), .doc-paper :deep(td) { border: 1px solid var(--border); padding: 6px 10px; text-align: left; font-size: 13px; }
+.doc-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--border); }
 .doc-label { font-size: 11px; color: var(--muted, var(--text)); text-transform: uppercase; letter-spacing: 0.04em; }
 .doc-dl { font-size: 12px; padding: 5px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: none; color: var(--text); cursor: pointer; }
 .doc-dl:hover { border-color: var(--accent); color: var(--accent); }

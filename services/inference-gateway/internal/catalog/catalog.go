@@ -75,6 +75,12 @@ var models = []Model{
 		ID: "doc-writer", Name: "Document Writer", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
 		Exascale: Pricing{Modality: "docs", CreditType: "text", Unit: "1K tokens", Price: "6.000000"},
 	},
+	// Code generation (text → raw code: HTML/CSS/JS/TS/Python). Runs over the chat path, billed in text
+	// credits; the console renders it with a ▶ Run + live preview.
+	{
+		ID: "code-writer", Name: "Code Writer", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
+		Exascale: Pricing{Modality: "code", CreditType: "text", Unit: "1K tokens", Price: "8.000000"},
+	},
 	// Autonomous computer-use agent (text instruction → browser/computer actions). Listed for the catalog;
 	// the runner is not live yet, so the console surfaces it as "coming soon".
 	{
