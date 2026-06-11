@@ -15,7 +15,7 @@ const router = useRouter()
 // =====================================================
 // Catalog
 // =====================================================
-type GpuKey = 'h100' | 'h200' | 'b200'
+type GpuKey = string
 interface GpuOption {
   key: GpuKey
   name: string
@@ -23,13 +23,31 @@ interface GpuOption {
   ratePerHour: number   // USD per GPU-hour
   recommended?: string
   disabled?: boolean
+  status?: string
   tag?: string
 }
-const GPU_OPTIONS: GpuOption[] = [
-  { key: 'h100', name: 'H100',  spec: '80GB SXM5',  ratePerHour: 2.99, recommended: 'Recommended for training' },
-  { key: 'h200', name: 'H200',  spec: '141GB SXM5', ratePerHour: 3.49, recommended: 'Larger memory · newer architecture' },
-  { key: 'b200', name: 'B200',  spec: '192GB · v2', ratePerHour: 4.95, disabled: true, tag: 'Waitlist · v2' },
-]
+// The GPU-type list IS the live rental catalog (compute-control /v1/compute/types) — the full lineup
+// with datasheet specs + availability. Loaded in onMounted; available tiers are selectable, sold-out /
+// coming-soon ones show a waitlist CTA. Empty fallback keeps the derived numbers safe before load.
+const EMPTY_GPU: GpuOption = { key: '', name: '—', spec: '', ratePerHour: 0 }
+const gpuOptions = ref<GpuOption[]>([])
+
+/** mapToOption turns a catalog GpuType into the provision list's option shape. */
+function mapToOption(t: import('~/composables/useCompute').GpuType): GpuOption {
+  const status = t.status ?? 'available'
+  const arch = t.specs?.architecture ?? ''
+  const ff = t.specs?.form_factor ?? ''
+  return {
+    key: t.id,
+    name: t.name,
+    spec: [arch, ff].filter(Boolean).join(' · '),
+    ratePerHour: Number(t.price_per_hour),
+    status,
+    disabled: status !== 'available',
+    tag: status === 'coming_soon' ? 'Coming soon' : status === 'sold_out' ? 'Sold out' : undefined,
+    recommended: t.specs ? `${t.specs.vram} · ${t.specs.mem_bandwidth} · FP8 ${t.specs.fp8_tflops} TFLOPS` : '',
+  }
+}
 
 const REGIONS = [
   { value: 'us-east-1',      label: 'us-east-1 · N. Virginia',     latency: '12ms RTT · 32 GPU pool' },
@@ -58,7 +76,7 @@ const STORAGE_PER_GB_MONTH = 0.10
 // Form state — pre-populated for the demo
 // =====================================================
 const form = reactive({
-  gpu: 'h100' as GpuKey,
+  gpu: '' as GpuKey,
   count: 8,
   region: 'us-east-1',
   image: 'exa-ml',
@@ -80,7 +98,7 @@ watch(() => form.count, (c) => {
 // Derived numbers
 // =====================================================
 const selectedGpu = computed(() =>
-  GPU_OPTIONS.find(g => g.key === form.gpu) ?? GPU_OPTIONS[0]!,
+  gpuOptions.value.find(g => g.key === form.gpu) ?? gpuOptions.value[0] ?? EMPTY_GPU,
 )
 
 const hourlyGpuRate = computed(() => form.count * selectedGpu.value.ratePerHour)
@@ -167,6 +185,17 @@ watch(storageIdx, (i) => { form.storageGb = STORAGE_STOPS[i] ?? 1000 })
 // Provision action — fake transition
 // =====================================================
 const compute = useCompute()
+
+// Load the live GPU catalog into the type list; default the selection to the first available tier.
+onMounted(async () => {
+  try {
+    const types = await compute.loadTypes()
+    gpuOptions.value = types.map(mapToOption)
+    const firstAvailable = gpuOptions.value.find(g => !g.disabled) ?? gpuOptions.value[0]
+    if (firstAvailable) form.gpu = firstAvailable.key
+  } catch { /* keep the (empty) list; the form guards against it */ }
+})
+
 const provisioning = ref(false)
 const provisionError = ref('')
 async function provision() {
@@ -177,7 +206,7 @@ async function provision() {
     // Live create (F13). The ML-Stack image catalog ships 'stable'/'latest' this milestone; the page's
     // image presets all resolve to the maintained stable image. is_paper is server-derived.
     await compute.create({
-      type: form.gpu === 'h200' ? 'gpu_h200' : 'gpu_h100',
+      type: form.gpu || 'gpu_h100',
       count: form.count,
       image: 'stable',
       region: form.region,
@@ -247,7 +276,7 @@ const overBudget = computed(() => cost30d.value > budgetRemaining)
             </div>
             <div class="gpu-list">
               <label
-                v-for="g in GPU_OPTIONS"
+                v-for="g in gpuOptions"
                 :key="g.key"
                 class="gpu-card"
                 :class="{ active: form.gpu === g.key, disabled: g.disabled }"
