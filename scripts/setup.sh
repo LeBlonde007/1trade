@@ -6,7 +6,7 @@
 # running stack.
 #
 #   Debian / Ubuntu / WSL2  → delegates to scripts/install-toolchain.sh (apt + pinned installers)
-#   macOS                   → Homebrew (+ pinned curl installers for the CI-gated tools)
+#   macOS                   → auto-installs Homebrew if missing, then brew (+ pinned installers)
 #   Fedora / RHEL / Arch    → native package manager + pinned curl installers
 #
 # Usage:
@@ -136,9 +136,25 @@ install_debian() {
 install_macos() {
   step "macOS detected → Homebrew"
   if ! have brew; then
-    echo "  ! Homebrew not found. Install it, then re-run this script:"
-    echo '    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
-    exit 1
+    step "Homebrew not found → installing it (this may ask for your Mac password once)"
+    # NONINTERACTIVE skips Homebrew's RETURN prompt; sudo may still prompt for your password.
+    NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    # The installer does NOT put brew on PATH (esp. Apple Silicon /opt/homebrew) — do it for this
+    # run, and persist it to the login shell's profile so future shells + `make up` find it.
+    for b in /opt/homebrew/bin/brew /usr/local/bin/brew; do
+      if [ -x "$b" ]; then eval "$("$b" shellenv)"; break; fi
+    done
+    if ! have brew; then
+      echo "  ! Homebrew install did not complete — see the output above, then re-run 'make bootstrap'." >&2
+      exit 1
+    fi
+    local prof="$HOME/.zprofile"
+    case "$(basename "${SHELL:-/bin/zsh}")" in bash) prof="$HOME/.bash_profile" ;; esac
+    if ! grep -q 'brew shellenv' "$prof" 2>/dev/null; then
+      echo "eval \"\$($(command -v brew) shellenv)\"" >> "$prof"
+      echo "  ✓ added brew to $prof (open a new terminal later and it'll be on PATH)"
+    fi
+    echo "  ✓ $(brew --version | head -1)"
   fi
   check_docker
   # brew_install installs a formula only if it is not already present.
