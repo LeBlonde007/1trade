@@ -15,6 +15,16 @@ OBS     ?= 0          # set OBS=1 to also install Prometheus/Loki/Tempo/Grafana
 help:
 	@grep -E '^## ' $(MAKEFILE_LIST) | sed 's/^## //' | awk -F': ' '{printf "  \033[1m%-14s\033[0m %s\n", $$1, $$2}'
 
+## bootstrap: install every dependency for this OS (macOS/Debian/Fedora/Arch/WSL) then `make up`
+.PHONY: bootstrap
+bootstrap:
+	@bash scripts/setup.sh --up $(if $(filter 1,$(GPU)),--gpu,)
+
+## setup: install every dependency for this OS (no `make up`) — see scripts/setup.sh
+.PHONY: setup
+setup:
+	@bash scripts/setup.sh $(if $(filter 1,$(GPU)),--gpu,)
+
 ## up: create the k3d cluster + data plane, then start live-reload (Tilt)
 .PHONY: up
 up: cluster data-plane tilt
