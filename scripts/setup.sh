@@ -51,7 +51,7 @@ want() { if [ "$FORCE" = true ]; then return 0; fi; if have "$1"; then echo "  �
 # arch_tag prints the Go/k8s-style architecture tag (amd64 or arm64).
 arch_tag() { case "$(uname -m)" in x86_64|amd64) echo amd64 ;; aarch64|arm64) echo arm64 ;; *) echo "unsupported arch: $(uname -m)" >&2; exit 1 ;; esac; }
 ARCH="$(arch_tag)"
-SUDO=""; [ "$(id -u 2>/dev/null || echo 0)" -ne 0 ] && SUDO="sudo"
+SUDO=""; if [ "$(id -u 2>/dev/null || echo 0)" -ne 0 ]; then SUDO="sudo"; fi
 
 # ---- OS detection ---------------------------------------------------------------------------
 # detect_platform sets PLATFORM to one of: macos | debian | fedora | arch | linux-other | unknown.
@@ -69,7 +69,8 @@ detect_platform() {
       esac ;;
     *) PLATFORM=unknown ;;
   esac
-  IS_WSL=false; grep -qiE 'microsoft|wsl' /proc/version 2>/dev/null && IS_WSL=true
+  IS_WSL=false; if grep -qiE 'microsoft|wsl' /proc/version 2>/dev/null; then IS_WSL=true; fi
+  return 0   # never let the WSL probe's exit status leak out (grep returns 2 on macOS: no /proc/version)
 }
 detect_platform
 
@@ -149,7 +150,7 @@ install_macos() {
   step "golangci-lint (${GOLANGCI_VERSION}, pinned) + gitleaks (${GITLEAKS_VERSION}, pinned)"
   ct_golangci
   ct_gitleaks
-  [ "$WANT_GPU" = true ] && echo "  (note: --gpu is a no-op on macOS; local GPU inference is Linux/WSL2 only)"
+  if [ "$WANT_GPU" = true ]; then echo "  (note: --gpu is a no-op on macOS; local GPU inference is Linux/WSL2 only)"; fi
 }
 
 # --- Fedora/RHEL/Arch/other Linux: native base packages + pinned curl installers -------------
@@ -172,7 +173,7 @@ install_generic_linux() {
   step "sops (${SOPS_VERSION})";              ct_sops
   step "pre-commit"
   if want pre-commit; then have pipx && pipx install pre-commit >/dev/null || pip3 install --user pre-commit >/dev/null; fi
-  [ "$WANT_GPU" = true ] && echo "  (note: NVIDIA toolkit auto-install is wired for Debian/Ubuntu only — install manually on ${PLATFORM})"
+  if [ "$WANT_GPU" = true ]; then echo "  (note: NVIDIA toolkit auto-install is wired for Debian/Ubuntu only — install manually on ${PLATFORM})"; fi
 }
 
 case "$PLATFORM" in
