@@ -1,11 +1,11 @@
 <script setup lang="ts">
 /**
- * /login — Sign in to Exascale (split screen, light left + dark right).
+ * /login — Sign in to 1Trade (split screen, light left + dark right).
  * 2FA challenge state replaces the form when credentials advance.
  */
 
 definePageMeta({ layout: false })
-useHead({ title: 'Sign in — Exascale', htmlAttrs: { 'data-theme': 'light' } })
+useHead({ title: 'Sign in — 1Trade', htmlAttrs: { 'data-theme': 'light' } })
 
 const step = ref<'creds' | '2fa'>('creds')
 const email = ref('')
@@ -162,7 +162,7 @@ onBeforeUnmount(() => {
       <div class="lf-top">
         <NuxtLink class="lf-brand" to="/">
           <span class="brand-mark" />
-          EXASCALE
+          1TRADE
         </NuxtLink>
         <span class="lf-status">
           <span class="status-dot" />
@@ -175,7 +175,7 @@ onBeforeUnmount(() => {
         <template v-if="step === 'creds'">
           <div class="lf-eyebrow">Account · sign in</div>
           <h1 class="lf-title">Sign in</h1>
-          <p class="lf-sub">Access your paper or real-money account on the Exascale venue.</p>
+          <p class="lf-sub">Access your paper or real-money account on the 1Trade venue.</p>
 
           <p v-if="justVerified" class="form-ok" role="status">Email verified — sign in to continue.</p>
           <p v-if="authError" class="form-error" role="alert">{{ authError }}</p>
@@ -269,7 +269,7 @@ onBeforeUnmount(() => {
           </div>
 
           <div class="lf-meta">
-            <NuxtLink to="/signup" class="lf-link primary">New to Exascale? Open an account →</NuxtLink>
+            <NuxtLink to="/signup" class="lf-link primary">New to 1Trade? Open an account →</NuxtLink>
             <NuxtLink to="/enterprise/sso" class="lf-link">Sign in with SSO (firm accounts)</NuxtLink>
           </div>
         </template>
@@ -334,7 +334,7 @@ onBeforeUnmount(() => {
 
       <footer class="lf-foot">
         <div class="legal">
-          By signing in you agree to Exascale's <a href="#">Customer Agreement</a> and <a href="#">Risk Disclosure</a>.
+          By signing in you agree to 1Trade's <a href="#">Customer Agreement</a> and <a href="#">Risk Disclosure</a>.
           Paper accounts carry no monetary value.
         </div>
         <div class="lang">English (US)</div>
@@ -345,14 +345,14 @@ onBeforeUnmount(() => {
     <aside class="rp-pane">
       <div class="rp-top">
         <span class="rp-eyebrow">
-          <span>— EXASCALE</span>
+          <span>— 1TRADE</span>
           <span class="rp-live"><span class="pulse" />Live · NYSE {{ clock.slice(0, 5) }} ET</span>
         </span>
         <span class="rp-version">venue v2.4.1 · TLS 1.3 · region us-east-1</span>
       </div>
 
       <h2 class="rp-headline">
-        The <em>commodity market</em><br />for AI compute.
+        The <em>global exchange</em><br />for AI compute.
       </h2>
       <p class="rp-lede">
         AI credits and GPU credits trade on a single venue. Daily reference index,
@@ -489,10 +489,13 @@ onBeforeUnmount(() => {
   text-decoration: none;
 }
 .brand-mark {
-  width: 14px;
-  height: 14px;
-  background: var(--brand);
+  width: 10.4px;
+  height: 24.1px;
   display: inline-block;
+  flex: none;
+  background: var(--brand);
+  -webkit-mask: url('/brand/mark.svg') center / contain no-repeat;
+  mask: url('/brand/mark.svg') center / contain no-repeat;
 }
 .lf-status {
   font-family: var(--font-mono);
@@ -630,7 +633,7 @@ onBeforeUnmount(() => {
   transition: border-color 120ms, box-shadow 120ms;
   font-feature-settings: 'ss01';
 }
-.input::placeholder { color: #B8B8B0; }
+.input::placeholder { color: #B5AEA1; }
 .input:hover { border-color: rgba(14, 14, 14, 0.30); }
 .input:focus {
   border-color: var(--accent);
@@ -890,13 +893,13 @@ onBeforeUnmount(() => {
    RIGHT — dark reassurance panel
    ============================================================ */
 .rp-pane {
-  --ti-1: #E8E6E0;
-  --ti-2: #9A9A95;
-  --ti-3: #5F5F5C;
+  --ti-1: #E8E2D6;
+  --ti-2: #A8A196;
+  --ti-3: #7E786C;
   --bd-inv: rgba(255, 255, 255, 0.08);
   --bd-inv-s: rgba(255, 255, 255, 0.16);
   --inverse:    #0E0E0E;
-  --inverse-2:  #14161B;
+  --inverse-2:  #121212;
 
   background: var(--inverse);
   color: var(--ti-1);
@@ -1150,7 +1153,7 @@ onBeforeUnmount(() => {
   to   { opacity: 1; transform: none; }
 }
 
-/* Keyboard focus — a visible accent ring on every interactive element (token --accent #4A90E2). */
+/* Keyboard focus — a visible accent ring on every interactive element (token --accent). */
 :where(a, button):focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;

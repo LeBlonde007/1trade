@@ -17,7 +17,7 @@ import { Chart, type ChartDataset } from 'chart.js/auto'
 
 definePageMeta({ layout: false })
 useHead({
-  title: 'Czech DC1 · Partner Dashboard — Exascale',
+  title: 'Czech DC1 · Partner Dashboard — 1Trade',
   htmlAttrs: { 'data-theme': 'dark' },
 })
 
@@ -190,15 +190,15 @@ function initChart() {
       datasets: [{
         label: 'Utilization',
         data: utilization.value.map(p => p.pct),
-        borderColor: '#C8F25C',
+        borderColor: '#D4AF37',
         borderWidth: 1.6,
         backgroundColor: grad,
         fill: true,
         tension: 0.32,
         pointRadius: 0,
         pointHoverRadius: 4,
-        pointHoverBorderColor: '#C8F25C',
-        pointHoverBackgroundColor: '#14161B',
+        pointHoverBorderColor: '#D4AF37',
+        pointHoverBackgroundColor: '#121212',
         pointHoverBorderWidth: 1.5,
       } as ChartDataset<'line', number[]>],
     },
@@ -209,13 +209,13 @@ function initChart() {
       plugins: {
         legend: { display: false },
         tooltip: {
-          backgroundColor: '#1C1F26',
+          backgroundColor: '#1A1A1A',
           borderColor: 'rgba(255,255,255,0.16)',
           borderWidth: 1,
           padding: 10,
           cornerRadius: 2,
-          titleColor: '#9A9A95',
-          bodyColor: '#E8E6E0',
+          titleColor: '#A8A196',
+          bodyColor: '#E8E2D6',
           titleFont: { family: "'JetBrains Mono', monospace", size: 10, weight: 'bold' },
           bodyFont:  { family: "'JetBrains Mono', monospace", size: 12 },
           displayColors: false,
@@ -230,7 +230,7 @@ function initChart() {
           grid: { display: false },
           border: { display: false },
           ticks: {
-            color: '#5F5F5C',
+            color: '#7E786C',
             font: { family: "'JetBrains Mono', monospace", size: 10 },
             maxRotation: 0,
             autoSkip: true,
@@ -244,7 +244,7 @@ function initChart() {
           grid: { color: 'rgba(255,255,255,0.05)' },
           border: { display: false },
           ticks: {
-            color: '#5F5F5C',
+            color: '#7E786C',
             font: { family: "'JetBrains Mono', monospace", size: 10 },
             stepSize: 10,
             callback: v => v + '%',
@@ -314,7 +314,7 @@ const LEGEND: Array<{ key: CellState; label: string; color: string; count: () =>
     <header class="topbar">
       <a href="#" class="brand">
         <span class="brand-mark" />
-        EXASCALE
+        1TRADE
       </a>
       <div class="env-row">
         <span class="env-pill">PARTNER · INTERNAL</span>
@@ -447,7 +447,7 @@ const LEGEND: Array<{ key: CellState; label: string; color: string; count: () =>
               <div class="rev-bar-fill" :style="{ width: (PARTNER.share * 100) + '%' }" />
             </div>
             <div class="rev-row">
-              <span class="rev-k">Exascale fee · {{ (PARTNER.fee * 100).toFixed(0) }}%</span>
+              <span class="rev-k">1Trade fee · {{ (PARTNER.fee * 100).toFixed(0) }}%</span>
               <span class="rev-v">{{ fmtUsd(REVENUE_FEE) }}</span>
             </div>
           </div>
@@ -482,7 +482,7 @@ const LEGEND: Array<{ key: CellState; label: string; color: string; count: () =>
               <th class="left">Period</th>
               <th>Capacity sold</th>
               <th>Gross</th>
-              <th>Exascale fee</th>
+              <th>1Trade fee</th>
               <th>Your payout</th>
               <th class="left">Settlement</th>
               <th class="center">Status</th>
@@ -562,13 +562,13 @@ const LEGEND: Array<{ key: CellState; label: string; color: string; count: () =>
 
 <style scoped>
 .dc-shell {
-  --canvas:        #0A0B0E;
-  --elevated:      #14161B;
-  --overlay:       #1C1F26;
-  --hover:         #1F2229;
-  --text:          #E8E6E0;
-  --text-2:        #9A9A95;
-  --text-3:        #5F5F5C;
+  --canvas:        #0A0A0A;
+  --elevated:      #121212;
+  --overlay:       #1A1A1A;
+  --hover:         #232323;
+  --text:          #E8E2D6;
+  --text-2:        #A8A196;
+  --text-3:        #7E786C;
   --text-4:        rgba(255, 255, 255, 0.18);
   --border:        rgba(255, 255, 255, 0.08);
   --border-strong: rgba(255, 255, 255, 0.16);
@@ -619,10 +619,13 @@ const LEGEND: Array<{ key: CellState; label: string; color: string; count: () =>
   height: 32px;
 }
 .brand-mark {
-  width: 12px;
-  height: 12px;
-  background: var(--brand);
+  width: 8.89px;
+  height: 20.6px;
   display: inline-block;
+  flex: none;
+  background: var(--brand);
+  -webkit-mask: url('/brand/mark.svg') center / contain no-repeat;
+  mask: url('/brand/mark.svg') center / contain no-repeat;
 }
 .env-row {
   display: flex;

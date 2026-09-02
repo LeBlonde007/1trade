@@ -7,8 +7,8 @@
  */
 import type { GpuType } from '~/composables/useCompute'
 
-definePageMeta({ layout: 'app' })
-useHead({ title: 'Compute · GPU catalog — Exascale' })
+definePageMeta({ layout: 'app', middleware: 'auth' })
+useHead({ title: 'Compute · GPU catalog — 1Trade' })
 
 const compute = useCompute()
 const types = ref<GpuType[]>([])

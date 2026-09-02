@@ -329,7 +329,7 @@ const enterpriseTour: TourStep[] = [
       <p>Maya's IT lead handles this. Three steps with a sticky stepper:</p>
       <ol>
         <li><strong>Pick IdP</strong> — Okta · Microsoft Entra ID · Google Workspace · custom SAML 2.0.</li>
-        <li><strong>Exchange metadata</strong> — download Exascale SP XML, paste IdP metadata URL or XML.</li>
+        <li><strong>Exchange metadata</strong> — download 1Trade SP XML, paste IdP metadata URL or XML.</li>
         <li><strong>Test handshake</strong> — real sign-in against a sandbox user, attribute-mapping preview, signature verification.</li>
       </ol>
       <p>On enable: break-glass recovery code generated, SCIM provisioning toggle, nightly sync indicator.</p>

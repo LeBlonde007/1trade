@@ -6,8 +6,8 @@
  * page is for monitoring and quick actions. Dark, terminal-adjacent.
  */
 
-definePageMeta({ layout: 'app' })
-useHead({ title: 'Compute · Instances — Exascale' })
+definePageMeta({ layout: 'app', middleware: 'auth' })
+useHead({ title: 'Compute · Instances — 1Trade' })
 
 // =====================================================
 // Types

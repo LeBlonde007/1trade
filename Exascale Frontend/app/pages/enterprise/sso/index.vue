@@ -5,7 +5,7 @@
  * rather than a fake configuration wizard. No mock IdP connections.
  */
 definePageMeta({ layout: 'app', middleware: 'auth' })
-useHead({ title: 'Single sign-on — Exascale' })
+useHead({ title: 'Single sign-on — 1Trade' })
 
 const { user } = useAuth()
 

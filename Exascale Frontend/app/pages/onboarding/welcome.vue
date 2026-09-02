@@ -8,7 +8,7 @@
  * Brief warmth, no consumer-cheer. Trust-building via real numbers.
  */
 definePageMeta({ layout: false })
-useHead({ title: 'Welcome to Exascale — Exascale', htmlAttrs: { 'data-theme': 'light' } })
+useHead({ title: 'Welcome to 1Trade — 1Trade', htmlAttrs: { 'data-theme': 'light' } })
 
 const route = useRoute()
 const firstName = ref<string>(typeof route.query.name === 'string' ? route.query.name : 'Jane')
@@ -82,13 +82,13 @@ function fmtDelta(pct: number): string {
 <template>
   <div class="welcome" data-theme="light">
     <header class="chrome">
-      <NuxtLink to="/" class="brand"><span class="mark" />Exascale</NuxtLink>
+      <NuxtLink to="/" class="brand"><span class="mark" />1Trade</NuxtLink>
       <NuxtLink to="/login" class="chrome-link">Sign out</NuxtLink>
     </header>
 
     <div class="center">
       <div class="hero">
-        <h1>Welcome to Exascale, {{ firstName }}.</h1>
+        <h1>Welcome to 1Trade, {{ firstName }}.</h1>
         <p class="sub">{{ isTrader ? 'Your paper trading account is ready.' : 'Inference and GPU compute on prepaid credits. Here\'s where to start.' }}</p>
 
         <!-- AI company (the live product): three first actions, numbers-first -->
@@ -182,7 +182,7 @@ function fmtDelta(pct: number): string {
   font-family: var(--font-display); font-weight: 700; font-size: 18px;
   letter-spacing: -0.02em; color: var(--text); text-decoration: none;
 }
-.brand .mark { display: inline-block; width: 12px; height: 12px; background: var(--brand); }
+.brand .mark { display: inline-block; width: 8.6px; height: 20px; flex: none; background: var(--brand); -webkit-mask: url('/brand/mark.svg') center / contain no-repeat; mask: url('/brand/mark.svg') center / contain no-repeat; }
 .chrome-link {
   color: var(--text-2); text-decoration: none; font-size: 13px;
   transition: color 160ms ease;

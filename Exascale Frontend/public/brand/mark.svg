@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 431.54 1000" role="img" aria-label="1TRADE">
+  <title>1TRADE</title>
+  <!-- Single path, three subpaths, nonzero fill: the facets union without hairline seams.
+       Inherits colour from context so one file serves gold-on-dark and bronze-on-light. -->
+  <path fill="currentColor" fill-rule="nonzero" d="M3.49 1000L3.49 471.67C69 441.18 134.92 402.71 169.17 342.89L169.17 764.06L249.44 709.93L262.22 676.81L296.26 707.21L431.54 707.19ZM262.61 235.76L428.2 235.76L428.2 535.66C363.03 563.5 298.6 599.74 262.61 657.06ZM428.2 0L428.2 235.76L262.61 235.76L182.43 290.45L169.89 323.36L136.2 292.95L0 292.93Z"/>
+</svg>

@@ -13,7 +13,7 @@
 import { compact, full } from '~/utils/format'
 
 definePageMeta({ layout: false, middleware: 'auth' })
-useHead({ title: 'Buy credits — Exascale', htmlAttrs: { 'data-theme': 'dark' } })
+useHead({ title: 'Buy credits — 1Trade', htmlAttrs: { 'data-theme': 'dark' } })
 
 const route = useRoute()
 const { user, refresh } = useAuth()
@@ -127,7 +127,7 @@ onMounted(() => {
   <div class="buy-shell">
     <!-- Minimal focused chrome -->
     <header class="topbar">
-      <NuxtLink to="/console" class="brand"><span class="brand-mark" />EXASCALE</NuxtLink>
+      <NuxtLink to="/console" class="brand"><span class="brand-mark" />1TRADE</NuxtLink>
       <div class="topbar-right">
         <span class="env-pill" :class="{ live: realMoney }">{{ realMoney ? 'LIVE' : 'PAPER' }}</span>
         <NuxtLink to="/wallet" class="exit">Back to wallet</NuxtLink>
@@ -282,7 +282,7 @@ onMounted(() => {
 /* Top chrome */
 .topbar { height: 56px; background: var(--elevated); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 32px; justify-content: space-between; }
 .brand { display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 700; font-size: 15px; letter-spacing: -0.005em; color: var(--text); text-decoration: none; }
-.brand-mark { width: 12px; height: 12px; background: var(--brand); display: inline-block; }
+.brand-mark { width: 8.89px; height: 20.6px; display: inline-block; flex: none; background: var(--brand); -webkit-mask: url('/brand/mark.svg') center / contain no-repeat; mask: url('/brand/mark.svg') center / contain no-repeat; }
 .topbar-right { display: flex; align-items: center; gap: 18px; }
 .env-pill { padding: 4px 8px; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.18em; color: var(--accent); background: rgba(74,144,226,0.10); border: 1px solid rgba(74,144,226,0.25); border-radius: var(--radius-sm); text-transform: uppercase; font-weight: 600; }
 .env-pill.live { color: var(--pos); background: rgba(22,163,74,0.10); border-color: rgba(22,163,74,0.25); }

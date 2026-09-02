@@ -184,7 +184,7 @@ function hoverRating(n: number){ hoverStar.value = n }
         <div v-if="tour.phase.value === 'picker'" class="picker-shell">
           <div class="picker-card">
             <header class="pk-head">
-              <div class="pk-eyebrow">EXASCALE · GUIDED TOUR</div>
+              <div class="pk-eyebrow">1TRADE · GUIDED TOUR</div>
               <h2 class="pk-title">Pick the experience you want to see.</h2>
               <p class="pk-sub">Three pre-scripted journeys. The tour drives itself — sit back, watch, leave feedback at the end.</p>
               <button class="pk-close" aria-label="Close tour" type="button" @click="tour.close()">

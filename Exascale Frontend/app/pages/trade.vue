@@ -16,8 +16,8 @@
  */
 import { createChart, ColorType, CrosshairMode } from 'lightweight-charts'
 
-definePageMeta({ layout: 'app' })
-useHead({ title: 'Trade — EAI-IDX · Exascale' })
+definePageMeta({ layout: 'app', middleware: 'auth' })
+useHead({ title: 'Trade — EAI-IDX · 1Trade' })
 
 // =====================================================
 // Types + state
@@ -124,8 +124,8 @@ function initChart() {
   if (!chartContainer.value) return
   chart = createChart(chartContainer.value, {
     layout: {
-      background: { type: ColorType.Solid, color: '#0A0B0E' },
-      textColor: '#9A9A95',
+      background: { type: ColorType.Solid, color: '#0A0A0A' },
+      textColor: '#A8A196',
       fontFamily: 'JetBrains Mono, ui-monospace, monospace',
       fontSize: 10,
     },

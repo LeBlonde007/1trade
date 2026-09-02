@@ -1,0 +1,82 @@
+# Exascale event contract — trades.executed.v1
+# One event per executed trade, emitted by matching-engine at match time. Consumed by credit-ledger
+# (atomic two-sided settlement), index-service (live trade prints become constituent observations in
+# Phase 2), and surveillance (wash-trade / spoofing / marking-the-close detection).
+# Owned by matching-engine.
+#
+# PRE-PUBLISHED, NOT YET EMITTED. The exchange is paused (license-gated, F22) and Phase 1 ships only
+# the mock adapter, which accepts no orders and therefore produces no trades. This schema is frozen
+# now so credit-ledger, index-service, and surveillance can build their consumers against the final
+# shape before switch-on (KW03 cutover plan).
+
+subject: trades.executed.v1
+transport: NATS JetStream
+version: 1.0.0
+description: A matched trade. Settlement debits/credits both sides atomically, idempotent on trade_id.
+
+payload_schema:
+  $schema: "https://json-schema.org/draft/2020-12/schema"
+  title: TradesExecutedV1
+  type: object
+  additionalProperties: false
+  required: [trade_id, product_id, credit_type, price, quantity, buyer, seller, aggressor_side, is_paper, chain_hash, executed_at]
+  properties:
+    trade_id:       { type: string, format: uuid, description: "the ledger settlement idempotency key" }
+    product_id:     { type: string, description: "product traded, e.g. EAI-IDX" }
+    credit_type:
+      type: string
+      description: "the credit type this product trades (credit-types.md §1) — no new type at switch-on"
+      enum: [ai_index, text, speech, image, video, embeddings, gpu_h100, gpu_h200]
+    price:          { type: string, description: "execution price, fixed-point string" }
+    quantity:       { type: string, description: "executed quantity, fixed-point string" }
+    buyer:          { $ref: "#/definitions/Counterparty" }
+    seller:         { $ref: "#/definitions/Counterparty" }
+    aggressor_side: { type: string, enum: [buy, sell], description: "which side removed liquidity" }
+    is_paper:
+      type: boolean
+      description: >
+        Paper and real-money flow never mix. Both counterparties always share this value — the engine
+        refuses to match orders that disagree on it, and internal/market-maker accounts never trade
+        against customer paper accounts.
+    chain_hash:     { type: string, description: "hash(prev_chain_hash || canonical_json(row)) — trades are append-only" }
+    prev_chain_hash: { type: [string, "null"] }
+    executed_at:    { type: string, format: date-time }
+
+  definitions:
+    Counterparty:
+      type: object
+      additionalProperties: false
+      required: [tenant_id, order_id, fee, liquidity]
+      properties:
+        tenant_id:      { type: string, format: uuid }
+        sub_account_id: { type: [string, "null"], format: uuid }
+        order_id:       { type: string, format: uuid }
+        fee:            { type: string, description: "fee charged this side, fixed-point string" }
+        liquidity:      { type: string, enum: [maker, taker] }
+        is_internal:    { type: boolean, description: "true for the market-maker / internal account" }
+
+example:
+  trade_id: "7c2a1e64-0000-4000-8000-000000000001"
+  product_id: "EAI-IDX"
+  credit_type: ai_index
+  price: "0.001005"
+  quantity: "1000.000000"
+  buyer:
+    tenant_id: "1f2e0000-0000-4000-8000-000000000001"
+    sub_account_id: null
+    order_id: "a1b20000-0000-4000-8000-000000000001"
+    fee: "0.010050"
+    liquidity: taker
+    is_internal: false
+  seller:
+    tenant_id: "1f2e0000-0000-4000-8000-000000000002"
+    sub_account_id: null
+    order_id: "a1b20000-0000-4000-8000-000000000002"
+    fee: "0.005025"
+    liquidity: maker
+    is_internal: true
+  aggressor_side: buy
+  is_paper: true
+  chain_hash: "9f2c8b41d6e0a7b3c5d9e1f2a4b6c8d0e2f4a6b8c0d2e4f6a8b0c2d4e6f8a0b2"
+  prev_chain_hash: "3a1b5c7d9e0f2a4b6c8d0e2f4a6b8c0d2e4f6a8b0c2d4e6f8a0b2c4d6e8f0a2b"
+  executed_at: "2026-06-01T12:00:00Z"

@@ -9,12 +9,12 @@ import {
   AlertTriangle, ShieldCheck, Circle, Copy
 } from 'lucide-vue-next'
 
-definePageMeta({ layout: 'app' })
+definePageMeta({ layout: 'app', middleware: 'auth' })
 
 const route = useRoute()
 const instanceId = computed(() => String(route.params.id || 'inst_8c4f2a1e'))
 
-useHead({ title: () => `${instance.value.name} — Compute — Exascale` })
+useHead({ title: () => `${instance.value.name} — Compute — 1Trade` })
 
 interface Instance {
   id: string
@@ -337,7 +337,7 @@ function copyText(t: string) {
                 <circle cx="100" cy="100" r="86" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="14" />
                 <circle
                   cx="100" cy="100" r="86" fill="none"
-                  stroke="#4A90E2" stroke-width="14"
+                  stroke="var(--info)" stroke-width="14"
                   stroke-linecap="butt"
                   :stroke-dasharray="`${(ramUsedGB / instance.ramGB) * 540} 540`"
                   transform="rotate(-90 100 100)"
@@ -697,12 +697,12 @@ function copyText(t: string) {
 .pill-dot { width: 6px; height: 6px; border-radius: 50%; }
 .meta-pill.tone-pos  { background: rgba(25,195,125,0.12); color: #19C37D; }
 .meta-pill.tone-pos  .pill-dot { background: #19C37D; box-shadow: 0 0 0 3px rgba(25,195,125,0.25); animation: pulse 2.5s infinite; }
-.meta-pill.tone-warn { background: rgba(245,158,11,0.12); color: #F59E0B; }
-.meta-pill.tone-warn .pill-dot { background: #F59E0B; }
+.meta-pill.tone-warn { background: rgba(245,158,11,0.12); color: #F5A524; }
+.meta-pill.tone-warn .pill-dot { background: #F5A524; }
 .meta-pill.tone-neg  { background: rgba(239,68,68,0.12); color: #EF4444; }
 .meta-pill.tone-neg  .pill-dot { background: #EF4444; }
-.meta-pill.tone-info { background: rgba(74,144,226,0.12); color: #4A90E2; }
-.meta-pill.tone-info .pill-dot { background: #4A90E2; }
+.meta-pill.tone-info { background: rgba(74,144,226,0.12); color: var(--info); }
+.meta-pill.tone-info .pill-dot { background: var(--info); }
 
 @keyframes pulse {
   0%, 100% { box-shadow: 0 0 0 3px rgba(25,195,125,0.25); }
@@ -848,12 +848,12 @@ function copyText(t: string) {
 .gpu-bar { background: rgba(255,255,255,0.06); height: 6px; border-radius: 1px; overflow: hidden; }
 .gpu-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, #19C37D, #4A90E2);
+  background: linear-gradient(90deg, #19C37D, var(--info));
   transition: width 600ms ease;
 }
 .gpu-pct { font-size: 12px; font-weight: 500; text-align: right; }
 .gpu-aux { font-size: 11px; color: var(--text-secondary); text-align: right; }
-.gpu-aux.temp.hot { color: #F59E0B; }
+.gpu-aux.temp.hot { color: #F5A524; }
 
 /* RAM */
 .ram-gauge { display: flex; justify-content: center; padding: 4px 0 12px; }
@@ -881,7 +881,7 @@ function copyText(t: string) {
 .sparkline { width: 100%; height: 36px; }
 .sparkline path {
   fill: none;
-  stroke: #4A90E2;
+  stroke: var(--info);
   stroke-width: 1.5;
   stroke-linejoin: round;
   stroke-linecap: round;
@@ -979,7 +979,7 @@ function copyText(t: string) {
 .btn-sm:hover { background: rgba(255,255,255,0.08); }
 
 .log-pane {
-  background: #0A0B0E;
+  background: #0A0A0A;
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 4px;
   height: 540px;
@@ -999,7 +999,7 @@ function copyText(t: string) {
 }
 .log-ts { color: var(--text-tertiary); flex-shrink: 0; }
 .log-stream { color: var(--text-tertiary); flex-shrink: 0; width: 48px; }
-.log-line.stream-stderr .log-stream { color: #F59E0B; }
+.log-line.stream-stderr .log-stream { color: #F5A524; }
 .log-line.stream-stderr .log-body   { color: #F8D58F; }
 .log-body { color: var(--text-secondary); }
 
@@ -1062,7 +1062,7 @@ function copyText(t: string) {
   background: rgba(255,255,255,0.06);
   color: var(--text-secondary);
 }
-.origin-pill.auto { background: rgba(74,144,226,0.12); color: #4A90E2; }
+.origin-pill.auto { background: rgba(74,144,226,0.12); color: var(--info); }
 .action-cell { display: flex; gap: 8px; justify-content: flex-end; }
 .link-btn {
   display: inline-flex;
@@ -1086,11 +1086,11 @@ function copyText(t: string) {
   margin-top: 12px;
   padding: 10px 12px;
   background: rgba(74,144,226,0.08);
-  border-left: 2px solid #4A90E2;
+  border-left: 2px solid var(--info);
   font-size: 12px;
   color: var(--text-secondary);
 }
-.snap-policy svg { color: #4A90E2; flex-shrink: 0; }
+.snap-policy svg { color: var(--info); flex-shrink: 0; }
 
 /* Events ------------------------------------------- */
 .timeline {
@@ -1125,8 +1125,8 @@ function copyText(t: string) {
   border: 2px solid var(--text-tertiary);
 }
 .level-success .t-dot { border-color: #19C37D; background: rgba(25,195,125,0.15); }
-.level-warn    .t-dot { border-color: #F59E0B; background: rgba(245,158,11,0.15); }
-.level-info    .t-dot { border-color: #4A90E2; background: rgba(74,144,226,0.15); }
+.level-warn    .t-dot { border-color: #F5A524; background: rgba(245,158,11,0.15); }
+.level-info    .t-dot { border-color: var(--info); background: rgba(74,144,226,0.15); }
 .t-head { display: flex; gap: 12px; align-items: baseline; margin-bottom: 2px; }
 .t-type {
   font-size: 11px;
@@ -1162,7 +1162,7 @@ function copyText(t: string) {
 }
 .cost-bar {
   flex: 1;
-  background: #4A90E2;
+  background: var(--info);
   min-height: 4px;
   border-radius: 1px;
 }

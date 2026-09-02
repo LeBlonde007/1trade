@@ -10,8 +10,8 @@
 
 import { compact, full } from '~/utils/format'
 
-definePageMeta({ layout: 'app' })
-useHead({ title: 'Wallet — Exascale' })
+definePageMeta({ layout: 'app', middleware: 'auth' })
+useHead({ title: 'Wallet — 1Trade' })
 
 // =====================================================
 // Asset list — matches the design's ASSETS array
@@ -36,14 +36,14 @@ interface Asset {
 }
 
 const COLOR: Record<ColorKey, string> = {
-  cash:   '#9A9A95',
-  ai:     '#C8F25C',
+  cash:   '#A8A196',
+  ai:     '#D4AF37',
   text:   '#4A90E2',
   speech: '#6BA4E8',
   image:  '#8FB8E6',
   video:  '#5B9BE0',
   niche:  '#3A7FCC',
-  h100:   '#F5A623',
+  h100:   '#F5A524',
   h200:   '#E89818',
 }
 
@@ -120,7 +120,7 @@ const allocationGroups = computed<AllocGroup[]>(() => {
     { key: 'text',  name: 'Text',       color: COLOR.text,  usd: usdOf('text') },
     { key: 'image', name: 'Image',      color: COLOR.image, usd: usdOf('image') },
     { key: 'h100',  name: 'H100',       color: COLOR.h100,  usd: usdOf('h100') },
-    { key: 'other', name: 'Other',      color: '#5F5F5C',   usd: usdOf('speech') + usdOf('video') + usdOf('embed') },
+    { key: 'other', name: 'Other',      color: '#7E786C',   usd: usdOf('speech') + usdOf('video') + usdOf('embed') },
   ]
 })
 

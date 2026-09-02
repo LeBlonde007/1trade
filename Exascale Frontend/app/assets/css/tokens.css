@@ -1,10 +1,25 @@
 /* =====================================================
-   EXASCALE — Canonical Design Tokens
+   1TRADE — Canonical Design Tokens
    Single source of truth. Changing a value here propagates everywhere.
-   Reconciled from:
-     - brand-book.css (canonical for light surfaces, type, radii, brand)
-     - Exascale Trading Dashboard.html (canonical for dark trading surfaces)
-   See /DESIGN-DECISIONS.md for reconciliation notes.
+
+   Brand: the 1TRADE identity — Midnight Black + Sovereign Gold, institutional,
+   dark-first. Palette is taken verbatim from the brand guide:
+
+     Midnight Black  #0A0A0A     Desert Bronze   #B07A3B
+     Sovereign Gold  #D4AF37     Graphite        #232323
+     Sandstone       #D8C5A3
+
+   DARK-FIRST. Gold is the brand's voice and it only earns its contrast on dark
+   ground (#D4AF37 on #0A0A0A = 9.42:1, AAA). On light surfaces gold collapses to
+   1.98:1 — it FAILS as text or as a UI boundary there — so the light theme speaks
+   in Desert Bronze deepened to #8A5D28 (5.38:1 on cream, AA) and keeps literal
+   gold for large display/decorative use only. Every ratio in the comments below
+   was computed, not estimated.
+
+   Rule of thumb when adding tokens:
+     - gold  -> dark grounds only
+     - bronze-deep -> light grounds
+     - never white text on gold (2.10:1); gold fills always take black text
    ===================================================== */
 
 /* ─── Light theme (marketing / onboarding / methodology) ───
@@ -15,87 +30,189 @@
 :root,
 :root[data-theme="light"],
 [data-theme="light"] {
-  /* Surfaces */
-  --canvas:           #FAFAF7;   /* page background (warm cream) */
+  /* Surfaces — warm cream, tuned to sit with bronze/gold rather than fight it */
+  --canvas:           #FAF8F3;   /* page background (warm cream) */
   --elevated:         #FFFFFF;   /* cards, raised surfaces */
-  --sunken:           #F2EEE3;   /* subtle/recessed sections */
-  --inverse:          #0E0E0E;   /* dark inverse blocks within light pages */
+  --sunken:           #F1ECE1;   /* subtle/recessed sections */
+  --inverse:          #0A0A0A;   /* midnight inverse blocks within light pages */
 
   /* Text */
-  --text:             #0E0E0E;
-  --text-2:           #4A4A45;   /* secondary text */
-  --text-3:           #8A8A82;   /* tertiary, eyebrows, meta */
-  --text-inverse:     #EAE6DA;   /* text on dark inverse blocks */
-  --text-on-accent:   #0E0E0E;   /* text on lime brand accent */
-  --text-on-color:    #FFFFFF;   /* text on saturated semantic fills (pos/neg/info badges + buttons) */
+  --text:             #0E0E0E;   /* 18.19:1 on canvas — AAA */
+  --text-2:           #57534A;   /* secondary — 7.22:1 AAA (warm grey) */
+  --text-3:           #767269;   /* tertiary, eyebrows, meta — 4.52:1 AA */
+  --text-inverse:     #E8E2D6;   /* text on midnight inverse blocks */
+  --text-on-accent:   #FFFFFF;   /* on --brand (bronze-deep) fill — 5.71:1 AA */
+  --text-on-color:    #FFFFFF;   /* on saturated semantic fills */
+
+  /* Brand — light theme speaks bronze, because gold fails here (1.98:1) */
+  --brand:            #8A5D28;   /* Desert Bronze deepened — 5.38:1 AA */
+  --brand-hov:        #7A5122;   /* 6.54:1 */
+  --brand-soft:       rgba(138, 93, 40, 0.10);
+  --brand-display:    #B07A3B;   /* large display/decorative only — 3.48:1 */
+  --accent:           #8A5D28;   /* interactive accent == brand (see note in :root) */
 
   /* Borders */
-  --border:           #E4E0D6;
-  --border-strong:    #C9C5B8;
-  --border-on-dark:   rgba(234, 230, 218, 0.16);
-  --border-focus:     #C8F25C;   /* focus ring = brand lime */
+  --border:           #E6E0D2;
+  --border-strong:    #C9C1AE;
+  --border-on-dark:   rgba(216, 197, 163, 0.16);
+  --border-focus:     #8A5D28;   /* focus ring — 5.38:1 against cream */
 
-  /* Semantic — institutional financial */
-  --pos:              #16A34A;   /* gains / buy / long */
-  --pos-soft:         rgba(22, 163, 74, 0.12);
-  --neg:              #DC2626;   /* losses / sell / short */
-  --neg-soft:         rgba(220, 38, 38, 0.12);
-  --warn:             #D97706;
-  --info:             #0369A1;
+  /* Semantic — institutional financial, darkened to clear AA on cream */
+  --pos:              #15803D;   /* gains / buy / long — 4.73:1 AA */
+  --pos-soft:         rgba(21, 128, 61, 0.12);
+  --neg:              #B91C1C;   /* losses / sell / short — 6.10:1 AA */
+  --neg-soft:         rgba(185, 28, 28, 0.12);
+  --warn:             #A16207;   /* 4.64:1 AA */
+  --info:             #1D4ED8;   /* 6.31:1 AA */
+  --overlay:          #FFFFFF;   /* light-theme counterpart of the dark overlay */
+  --hover:            #F1ECE1;
+
+  /* Aliases — older components ask for these names with a hardcoded fallback,
+     which meant the fallback always won and the theme could not reach them.
+     Values are literal, not var(), for the same computed-value-time reason
+     documented under :root. Keep each in step with the token it mirrors. */
+  --text-primary:     #0E0E0E;   /* == --text   */
+  --text-secondary:   #57534A;   /* == --text-2 */
+  --text-tertiary:    #767269;   /* == --text-3 */
+  --text-4:           #8A857A;   /* faintest meta */
+  --muted:            #767269;   /* == --text-3 */
+  --surface:          #FFFFFF;   /* == --elevated */
+  --surface-canvas:   #FAF8F3;   /* == --canvas   */
+  --surface-overlay:  #FFFFFF;   /* == --overlay  */
+  --surface-elevated: #FFFFFF;   /* == --elevated */
+  --success:          #15803D;   /* == --pos      */
+
+  /* Short-name aliases used with NO fallback by older screens. Undefined, they
+     made the whole declaration invalid — so ~96 borders and colours simply did
+     not render. Defining them is what lets the rebrand reach those surfaces. */
+  --bd-soft:          #E6E0D2;   /* == --border */
+  --border-soft:      #E6E0D2;   /* == --border */
+  --border-2:         #C9C1AE;   /* == --border-strong */
+  --t-soft:           #767269;   /* dashed underlines == --text-3 */
+  --t-4:              #8A857A;   /* placeholders == --text-4 */
+  --brand-accent:     #8A5D28;   /* == --brand */
+  --pos-sub:          rgba(21, 128, 61, 0.12);
+  --neg-sub:          rgba(185, 28, 28, 0.12);
+  --pos-bar:          rgba(21, 128, 61, 0.16);   /* depth/volume bar fills */
+  --neg-bar:          rgba(185, 28, 28, 0.16);
+
+  /* "Inverse" = the dark panel inside a light page (e.g. the login split).
+     These flip with the theme, which is why they cannot live in :root. */
+  --inverse-2:        #121212;   /* raised inverse surface */
+  --bd-inv:           rgba(216, 197, 163, 0.16);
+  --bd-inv-s:         rgba(216, 197, 163, 0.28);
+  --ti-1:             #E8E2D6;   /* text on inverse, primary   */
+  --ti-2:             #A8A196;   /* text on inverse, secondary */
+  --ti-3:             #7E786C;   /* text on inverse, tertiary  */
 }
 
-/* ─── Dark theme (trading app: /trade, /markets/*, /wallet, /portfolio) ───
+/* ─── Dark theme (the brand's primary voice: trading app + any dark surface) ───
    Same dual-selector pattern as light — needed because the app layout sets
    data-theme="dark" on a wrapper div, not on :root. */
 :root[data-theme="dark"],
 [data-theme="dark"],
 .dark {
-  /* Surfaces (slightly cooler than brand-book inverse to match trading UI) */
-  --canvas:           #0A0B0E;
-  --elevated:         #14161B;
-  --overlay:          #1C1F26;
-  --hover:            #1F2229;
-  --inverse:          #FAFAF7;   /* light inverse for light blocks within dark pages */
+  /* Surfaces — Midnight Black -> Graphite, a warm neutral ramp (no blue cast) */
+  --canvas:           #0A0A0A;   /* Midnight Black */
+  --elevated:         #121212;
+  --overlay:          #1A1A1A;
+  --hover:            #232323;   /* Graphite */
+  --sunken:           #060606;   /* recessed sections — reads below the canvas */
+  --inverse:          #FAF8F3;   /* cream inverse blocks within dark pages */
 
-  /* Text */
-  --text:             #E8E6E0;
-  --text-2:           #9A9A95;
-  --text-3:           #5F5F5C;
+  /* Text — warm off-whites derived from Sandstone, never a cold grey */
+  --text:             #E8E2D6;   /* 15.35:1 on canvas — AAA */
+  --text-2:           #A8A196;   /* secondary — 7.73:1 AAA */
+  --text-3:           #7E786C;   /* tertiary, eyebrows, meta — 4.52:1 AA */
   --text-inverse:     #0E0E0E;
-  --text-on-accent:   #0E0E0E;
-  --text-on-color:    #FFFFFF;   /* text on saturated semantic fills (pos/neg/info badges + buttons) */
+  --text-on-accent:   #0A0A0A;   /* on gold fill — 9.42:1 AAA. Never white here. */
+  --text-on-color:    #FFFFFF;
 
-  /* Borders */
-  --border:           rgba(255, 255, 255, 0.08);
-  --border-strong:    rgba(255, 255, 255, 0.14);
-  --border-on-dark:   rgba(255, 255, 255, 0.08);
-  --border-focus:     #C8F25C;
+  /* Brand — Sovereign Gold, at full strength on midnight */
+  --brand:            #D4AF37;   /* 9.42:1 AAA */
+  --brand-hov:        #E0BF52;   /* 11.07:1 */
+  --brand-soft:       rgba(212, 175, 55, 0.12);
+  --brand-display:    #D4AF37;
+  --accent:           #D4AF37;   /* interactive accent == brand (see note in :root) */
 
-  /* Semantic — trading UI tuned (slightly brighter, reads on dark) */
-  --pos:              #19C37D;
+  /* Borders — warm, derived from Sandstone so edges read bronze not grey */
+  --border:           rgba(216, 197, 163, 0.12);
+  --border-strong:    rgba(216, 197, 163, 0.22);
+  --border-on-dark:   rgba(216, 197, 163, 0.12);
+  --border-focus:     #D4AF37;
+
+  /* Semantic — trading UI tuned (reads on midnight) */
+  --pos:              #19C37D;   /* 8.62:1 AAA */
   --pos-soft:         rgba(25, 195, 125, 0.12);
   --pos-bar:          rgba(25, 195, 125, 0.16);
-  --neg:              #EF4444;
+  --neg:              #EF4444;   /* 5.26:1 AA */
   --neg-soft:         rgba(239, 68, 68, 0.12);
   --neg-bar:          rgba(239, 68, 68, 0.16);
-  --warn:             #F59E0B;
-  --info:             #4A90E2;
+  --warn:             #F5A524;   /* 9.70:1 AAA */
+  --info:             #4A90E2;   /* 6.01:1 AA */
+
+  /* Aliases — see the note in the light block. */
+  --text-primary:     #E8E2D6;   /* == --text   */
+  --text-secondary:   #A8A196;   /* == --text-2 */
+  --text-tertiary:    #7E786C;   /* == --text-3 */
+  --text-4:           #6E6A62;   /* faintest meta — decorative only, 3.68:1 */
+  --muted:            #7E786C;   /* == --text-3 */
+  --surface:          #121212;   /* == --elevated */
+  --surface-canvas:   #0A0A0A;   /* == --canvas   */
+  --surface-overlay:  #1A1A1A;   /* == --overlay  */
+  --surface-elevated: #121212;   /* == --elevated */
+  --success:          #19C37D;   /* == --pos      */
+
+  /* Short-name aliases — see the note in the light block. */
+  --bd-soft:          rgba(216, 197, 163, 0.12);
+  --border-soft:      rgba(216, 197, 163, 0.12);
+  --border-2:         rgba(216, 197, 163, 0.22);
+  --t-soft:           #7E786C;
+  --t-4:              #6E6A62;
+  --brand-accent:     #D4AF37;
+  --pos-sub:          rgba(25, 195, 125, 0.16);
+  --neg-sub:          rgba(239, 68, 68, 0.16);
+
+  /* On a dark page the "inverse" panel is the LIGHT one, so these invert. */
+  --inverse-2:        #FFFFFF;
+  --bd-inv:           #E6E0D2;
+  --bd-inv-s:         #C9C1AE;
+  --ti-1:             #0E0E0E;
+  --ti-2:             #57534A;
+  --ti-3:             #767269;
 }
 
 /* ─── Cross-theme primitives — never change between themes ─── */
 :root {
-  /* Brand — locked across themes */
-  --brand:            #C8F25C;
-  --brand-hov:        #B8E548;
-  --brand-orange:     #F5A623;
-  --brand-blue:       #4A90E2;
-  --brand-yellow:     #F5D24B;
-  --accent:           #4A90E2;   /* alias for compatibility */
+  /* Brand palette, literal values from the guide. Use these ONLY where the
+     ground is known (e.g. gold on a midnight hero); prefer the themed
+     --brand / --brand-display above so contrast follows the surface. */
+  --midnight:         #0A0A0A;
+  --graphite:         #232323;
+  --gold:             #D4AF37;
+  --gold-hi:          #E0BF52;
+  --gold-lo:          #C29B29;
+  --bronze:           #B07A3B;
+  --bronze-deep:      #8A5D28;
+  --sandstone:        #D8C5A3;
+
+  /* NOTE on --accent: it is declared inside EACH theme block above, not here as
+     `var(--brand)`. A custom property whose value contains var() is resolved at
+     computed-value time on the element that declares it — so `--accent: var(--brand)`
+     on :root would freeze to the light-theme bronze and stay bronze inside a
+     [data-theme="dark"] wrapper. Declaring it per theme is what makes it follow. */
+
+  /* The mark's faceted gold, for gradient fills on dark ground */
+  --gold-grad:        linear-gradient(180deg, #E8CD75 0%, #C9A233 100%);
 
   /* Typography stacks */
   --font-display:     'Inter Tight', 'Inter', system-ui, -apple-system, sans-serif;
   --font-sans:        'Inter Tight', 'Inter', system-ui, -apple-system, sans-serif;
   --font-mono:        'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-brand:       'Inter Tight', 'Inter', system-ui, sans-serif;  /* wordmark */
+  /* Editorial serif for pull-quotes / methodology prose. System stack — no extra
+     webfont request, and every fallback here is a real book face. */
+  --font-serif:       'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, 'Times New Roman', serif;
 
   /* Spacing scale — 4px base. Use ONLY these. */
   --sp-1:  4px;
@@ -146,6 +263,7 @@
   --ls-tab:     0.06em;   /* uppercase meta */
   --ls-wide:    0.18em;   /* uppercase labels */
   --ls-extra:   0.24em;   /* hero eyebrow */
+  --ls-brand:   0.14em;   /* the 1TRADE wordmark, per the guide's lockup */
 
   /* Motion */
   --dur-fast:   120ms;
@@ -153,12 +271,14 @@
   --dur-slow:   320ms;
   --ease:       cubic-bezier(0.4, 0, 0.2, 1);
 
-  /* Shadows */
-  --shadow-1:   0 1px 2px rgba(0, 0, 0, 0.2);
-  --shadow-2:   0 4px 16px rgba(0, 0, 0, 0.3);
+  /* Shadows — deeper than a light-theme app needs, because midnight swallows
+     a 0.2-alpha shadow entirely */
+  --shadow-1:   0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2:   0 4px 16px rgba(0, 0, 0, 0.55);
+  --shadow-gold: 0 0 0 1px rgba(212, 175, 55, 0.30), 0 8px 32px rgba(212, 175, 55, 0.10);
 
   /* Layout */
-  --nav-w:      280px;       /* brand-book sidebar */
+  --nav-w:      280px;       /* marketing sidebar */
   --app-sb-w:   64px;        /* trading-app icon sidebar */
   --topbar-h:   56px;
   --content-max: 1280px;

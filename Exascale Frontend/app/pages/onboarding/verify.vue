@@ -7,7 +7,7 @@
  * verified=1 query param; for the demo we expose an "I've verified" link.
  */
 definePageMeta({ layout: false })
-useHead({ title: 'Verify your email — Exascale', htmlAttrs: { 'data-theme': 'light' } })
+useHead({ title: 'Verify your email — 1Trade', htmlAttrs: { 'data-theme': 'light' } })
 
 const route = useRoute()
 const email = ref<string>(typeof route.query.email === 'string' ? route.query.email : 'jane.doe@walmart.com')
@@ -124,7 +124,7 @@ function commitChange() {
 <template>
   <div class="verify" data-theme="light">
     <header class="chrome">
-      <NuxtLink to="/" class="brand"><span class="mark" />Exascale</NuxtLink>
+      <NuxtLink to="/" class="brand"><span class="mark" />1Trade</NuxtLink>
       <a href="mailto:support@exascale.com" class="chrome-link">Need help? Contact support →</a>
     </header>
 
@@ -224,7 +224,7 @@ function commitChange() {
   font-family: var(--font-display); font-weight: 700; font-size: 18px;
   letter-spacing: -0.02em; color: var(--text); text-decoration: none;
 }
-.brand .mark { display: inline-block; width: 12px; height: 12px; background: var(--brand); }
+.brand .mark { display: inline-block; width: 8.6px; height: 20px; flex: none; background: var(--brand); -webkit-mask: url('/brand/mark.svg') center / contain no-repeat; mask: url('/brand/mark.svg') center / contain no-repeat; }
 .chrome-link {
   color: var(--text-2); text-decoration: none; font-size: 13px;
   transition: color 160ms ease;

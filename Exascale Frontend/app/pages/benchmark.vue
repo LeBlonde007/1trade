@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * /benchmark — Exascale AI Index Methodology · v1.2
+ * /benchmark — 1Trade AI Index Methodology · v1.2
  *
  * Whitepaper-style "credibility document". Three-pane shell:
  * left section nav · 720px reading column · right TOC scroll-spy.
@@ -13,8 +13,8 @@ import { Chart, type ChartDataset } from 'chart.js/auto'
 
 definePageMeta({ layout: 'marketing' })
 useHead({
-  title: 'AI Index Methodology · v1.2 — Exascale',
-  meta: [{ name: 'description', content: 'Methodology document for the Exascale AI Index — the daily reference price for AI compute.' }],
+  title: 'AI Index Methodology · v1.2 — 1Trade',
+  meta: [{ name: 'description', content: 'Methodology document for the 1Trade AI Index — the daily reference price for AI compute.' }],
 })
 
 // =====================================================
@@ -106,10 +106,10 @@ const VERSIONS = [
 
 const COMMITTEE = [
   { name: 'Dr. Rina Halpern',    role: 'Chair · External',       bio: 'Formerly Head of Index Research, FTSE Russell. Independent appointment, three-year term commencing 2025-09-01.' },
-  { name: 'Marcus Kapoor',       role: 'Vice-chair · Internal',  bio: 'Chief Risk Officer, Exascale Markets. Non-voting on weight-schedule revisions per cooling-off rule.' },
+  { name: 'Marcus Kapoor',       role: 'Vice-chair · Internal',  bio: 'Chief Risk Officer, 1Trade Markets. Non-voting on weight-schedule revisions per cooling-off rule.' },
   { name: 'Yui Tanaka',          role: 'Member · External',      bio: 'Director, Quantitative Research, Nomura Holdings. Two-year term.' },
   { name: 'Léon Beaumont',       role: 'Member · External',      bio: 'Adjunct Professor of Market Microstructure, INSEAD; formerly Deutsche Börse Index.' },
-  { name: 'Priya Rao',           role: 'Member · Internal',      bio: 'Head of Market Data, Exascale Markets. Non-voting on revisions affecting data products.' },
+  { name: 'Priya Rao',           role: 'Member · Internal',      bio: 'Head of Market Data, 1Trade Markets. Non-voting on revisions affecting data products.' },
   { name: 'Dr. Aiden O\'Connell', role: 'Observer · External',   bio: 'Representative of the audit firm; observer capacity, no vote.' },
 ]
 
@@ -229,7 +229,7 @@ function initHistChart() {
           borderWidth: 1,
           padding: 10,
           cornerRadius: 2,
-          titleColor: '#4A4A45',
+          titleColor: '#57534A',
           bodyColor: '#0E0E0E',
           titleFont: { family: "'JetBrains Mono', monospace", size: 10, weight: 'bold' },
           bodyFont:  { family: "'JetBrains Mono', monospace", size: 12 },
@@ -249,7 +249,7 @@ function initHistChart() {
           grid: { display: false },
           border: { color: 'rgba(14,14,14,0.20)' },
           ticks: {
-            color: '#8A8A82',
+            color: '#767269',
             font: { family: "'JetBrains Mono', monospace", size: 10 },
             maxRotation: 0,
             autoSkip: true,
@@ -266,7 +266,7 @@ function initHistChart() {
           grid: { color: 'rgba(14,14,14,0.06)' },
           border: { display: false },
           ticks: {
-            color: '#8A8A82',
+            color: '#767269',
             font: { family: "'JetBrains Mono', monospace", size: 10 },
             callback: v => (v as number).toFixed(4),
             padding: 8,
@@ -341,7 +341,7 @@ onBeforeUnmount(() => {
         <!-- HEADER -->
         <header class="doc-head">
           <div class="doc-eyebrow">Methodology · benchmark document</div>
-          <h1 class="doc-title">Exascale AI Index Methodology</h1>
+          <h1 class="doc-title">1Trade AI Index Methodology</h1>
           <div class="doc-version">
             <span>Version <strong>1.2</strong></span>
             <span>Effective <strong>2026-04-01</strong></span>
@@ -400,7 +400,7 @@ onBeforeUnmount(() => {
           </div>
           <div class="sec-body">
             <p class="lede">
-              The <strong>Exascale AI Index</strong> is a daily reference price for AI inference, expressed
+              The <strong>1Trade AI Index</strong> is a daily reference price for AI inference, expressed
               as the number of <em>AI credits</em> redeemable per one United States dollar at print
               time. The index is computed from observed transactions across the venue's constituent
               sub-credit markets, weighted by inference category, with statistically robust filtering
@@ -408,7 +408,7 @@ onBeforeUnmount(() => {
             </p>
             <p>
               The index is intended as the canonical reference for cash- or physically-settled
-              derivatives on AI compute, including the Exascale AI-INDEX spot and forward contracts.
+              derivatives on AI compute, including the 1Trade AI-INDEX spot and forward contracts.
               Its design borrows from established commodity benchmarks (LBMA Gold Price, Brent Dated,
               CME Henry Hub) and from equity-index methodology (S&amp;P, MSCI) where applicable to a
               continuously-traded, multi-constituent underlying.
@@ -430,7 +430,7 @@ onBeforeUnmount(() => {
           <div class="sec-body">
             <p>
               The index draws on six observable input streams, each capturing a distinct inference
-              category. Five are spot prices on Exascale sub-credit markets; the sixth is a derived
+              category. Five are spot prices on 1Trade sub-credit markets; the sixth is a derived
               metric of weighted-average inference cost, computed from observed capacity utilisation
               across the GPU-credit underlying.
             </p>
@@ -554,18 +554,18 @@ onBeforeUnmount(() => {
               <div class="figure-body">
                 <svg class="hist-svg" viewBox="0 0 720 200" preserveAspectRatio="none" aria-hidden="true">
                   <line x1="20" y1="180" x2="700" y2="180" stroke="rgba(14,14,14,0.20)" stroke-width="1" />
-                  <path d="M 20,180 L 20,165 L 40,155 L 60,148 L 80,140 L 80,180 Z" fill="#F2EEE3" stroke="#0E0E0E" stroke-width="1" />
-                  <path d="M 640,180 L 640,140 L 660,148 L 680,160 L 700,170 L 700,180 Z" fill="#F2EEE3" stroke="#0E0E0E" stroke-width="1" />
+                  <path d="M 20,180 L 20,165 L 40,155 L 60,148 L 80,140 L 80,180 Z" fill="#F1ECE1" stroke="#0E0E0E" stroke-width="1" />
+                  <path d="M 640,180 L 640,140 L 660,148 L 680,160 L 700,170 L 700,180 Z" fill="#F1ECE1" stroke="#0E0E0E" stroke-width="1" />
                   <path d="M 80,140 L 100,128 L 130,110 L 160,90 L 190,72 L 220,56 L 260,40 L 300,30 L 340,26 L 360,25 L 380,26 L 420,30 L 460,40 L 500,56 L 540,72 L 580,90 L 610,110 L 640,140 L 640,180 L 80,180 Z" fill="#0E0E0E" fill-opacity="0.86" />
                   <line x1="80" y1="20" x2="80" y2="180" stroke="#0E0E0E" stroke-width="1" stroke-dasharray="3 3" />
                   <line x1="640" y1="20" x2="640" y2="180" stroke="#0E0E0E" stroke-width="1" stroke-dasharray="3 3" />
-                  <line x1="360" y1="20" x2="360" y2="180" stroke="#C8F25C" stroke-width="2" />
-                  <text x="80" y="14" text-anchor="middle" fill="#4A4A45" font-family="JetBrains Mono" font-size="10" font-weight="600" letter-spacing="0.06em">P₂.₅</text>
-                  <text x="640" y="14" text-anchor="middle" fill="#4A4A45" font-family="JetBrains Mono" font-size="10" font-weight="600" letter-spacing="0.06em">P₉₇.₅</text>
+                  <line x1="360" y1="20" x2="360" y2="180" stroke="#D4AF37" stroke-width="2" />
+                  <text x="80" y="14" text-anchor="middle" fill="#57534A" font-family="JetBrains Mono" font-size="10" font-weight="600" letter-spacing="0.06em">P₂.₅</text>
+                  <text x="640" y="14" text-anchor="middle" fill="#57534A" font-family="JetBrains Mono" font-size="10" font-weight="600" letter-spacing="0.06em">P₉₇.₅</text>
                   <text x="360" y="14" text-anchor="middle" fill="#0E0E0E" font-family="JetBrains Mono" font-size="10" font-weight="600" letter-spacing="0.06em">x̄ = V(t)</text>
-                  <text x="50" y="196" text-anchor="middle" fill="#8A8A82" font-family="JetBrains Mono" font-size="9">2.5%</text>
-                  <text x="360" y="196" text-anchor="middle" fill="#8A8A82" font-family="JetBrains Mono" font-size="9">Distribution of constituent-weighted observations · 120-min window</text>
-                  <text x="670" y="196" text-anchor="middle" fill="#8A8A82" font-family="JetBrains Mono" font-size="9">2.5%</text>
+                  <text x="50" y="196" text-anchor="middle" fill="#767269" font-family="JetBrains Mono" font-size="9">2.5%</text>
+                  <text x="360" y="196" text-anchor="middle" fill="#767269" font-family="JetBrains Mono" font-size="9">Distribution of constituent-weighted observations · 120-min window</text>
+                  <text x="670" y="196" text-anchor="middle" fill="#767269" font-family="JetBrains Mono" font-size="9">2.5%</text>
                 </svg>
               </div>
               <div class="figure-cap"><strong>Figure 1.</strong> Stylised distribution of constituent-weighted observations across the calculation window. The two shaded tails (2.5% each) are excluded before the volume-weighted mean is taken.</div>
@@ -638,7 +638,7 @@ onBeforeUnmount(() => {
           </div>
           <div class="sec-body">
             <p>
-              The Exascale AI Index is published once per ICE business day at <strong>17:00 UTC</strong>.
+              The 1Trade AI Index is published once per ICE business day at <strong>17:00 UTC</strong>.
               Publication latency is targeted at &lt; 60 seconds from the close of the calculation
               window; the observed median latency in 2026-Q1 was 14 seconds.
             </p>
@@ -700,7 +700,7 @@ onBeforeUnmount(() => {
           </div>
           <div class="sec-body">
             <p>
-              The methodology is reviewed quarterly by the Exascale Methodology Committee (§12)
+              The methodology is reviewed quarterly by the 1Trade Methodology Committee (§12)
               and audited annually by an independent third-party benchmark administrator. The
               audit covers (a) conformity of the operational implementation to this document,
               (b) integrity of the cryptographic audit chain, and (c) governance practices of the
@@ -862,7 +862,7 @@ onBeforeUnmount(() => {
               <a href="mailto:press@exascale.com">press@exascale.com</a>.
             </p>
             <p>
-              Exascale Markets · 200 Pine Street · San Francisco, CA 94104 · United States.
+              1Trade Markets · 200 Pine Street · San Francisco, CA 94104 · United States.
               For corporate registration and counterparty diligence, see
               <a href="#">exascale.com/legal/entity</a>.
             </p>
@@ -871,7 +871,7 @@ onBeforeUnmount(() => {
 
         <!-- FOOTNOTES -->
         <div class="footnote">
-          <p><sup>1</sup> The Exascale AI Index is a non-investible benchmark. Any reference to <em>"investing"</em> in the index refers to investment in derivatives whose settlement value is determined by reference to a print of the index.</p>
+          <p><sup>1</sup> The 1Trade AI Index is a non-investible benchmark. Any reference to <em>"investing"</em> in the index refers to investment in derivatives whose settlement value is determined by reference to a print of the index.</p>
           <p><sup>2</sup> The trimmed mean is the operator <em>x̄<sub>α,β</sub>(X) := mean({ x ∈ X : Q<sub>α</sub>(X) ≤ x ≤ Q<sub>β</sub>(X) })</em>, where Q is the empirical quantile function.</p>
           <p><sup>3</sup> Cloudflare Merkle Town is referenced for illustrative purposes; the production audit log provider will be confirmed in the next minor revision.</p>
         </div>
@@ -909,7 +909,7 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .methodology {
-  --t-4: #B8B8B0;
+  --t-4: #B5AEA1;
   --bd-soft: rgba(14, 14, 14, 0.06);
   --font-serif: 'Source Serif 4', 'Charter', Georgia, serif;
   background: var(--canvas);

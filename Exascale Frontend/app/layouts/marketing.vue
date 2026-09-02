@@ -1,14 +1,25 @@
 <script setup lang="ts">
 /**
- * Marketing layout — light theme, public pages.
- * Locks <html data-theme="light"> so body/scrollbar/html bg flip to the
- * light palette and we don't inherit dark from a prior page.
+ * Marketing layout — public pages (landing, index methodology, status, 404).
+ *
+ * Theme is per-page, not fixed by the layout. 1TRADE is a dark-first brand, but
+ * `benchmark` and `status` were built against light surfaces and carry light-specific
+ * styling, so flipping the whole layout would break them. A page opts in with:
+ *
+ *   definePageMeta({ layout: 'marketing', theme: 'dark' })
+ *
+ * Default stays 'light' so existing pages are untouched. We lock the choice on <html>
+ * as well as the shell so body/scrollbar/html background flip together and we never
+ * inherit the previous route's theme.
  */
-useHead({ htmlAttrs: { 'data-theme': 'light' } })
+const route = useRoute()
+const theme = computed(() => (route.meta.theme === 'dark' ? 'dark' : 'light'))
+
+useHead({ htmlAttrs: { 'data-theme': theme } })
 </script>
 
 <template>
-  <div class="m-shell" data-theme="light">
+  <div class="m-shell" :data-theme="theme">
     <MarketingNav />
     <main>
       <slot />

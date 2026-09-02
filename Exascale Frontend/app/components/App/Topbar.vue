@@ -135,7 +135,7 @@ function orgTypeLabel(t: 'personal' | 'lab' | 'enterprise'): string {
       </button>
       <NuxtLink :to="personaCx.home.value" class="brand-link">
         <BrandLogo variant="mark" size="sm" />
-        <span class="brand-text">EXASCALE</span>
+        <span class="brand-text">1TRADE</span>
       </NuxtLink>
 
       <!-- AI-Index market pill — trading only (paused exchange). Hidden for AI company / datacenter. -->

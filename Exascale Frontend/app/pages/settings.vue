@@ -8,8 +8,8 @@
  * have header stubs so the shell is complete-but-minimal.
  */
 
-definePageMeta({ layout: 'app' })
-useHead({ title: 'Settings · Profile — Exascale' })
+definePageMeta({ layout: 'app', middleware: 'auth' })
+useHead({ title: 'Settings · Profile — 1Trade' })
 
 type SectionKey =
   | 'profile'
@@ -568,7 +568,7 @@ onMounted(() => {
             <div>
               <div class="eyebrow"><span class="dot" /> Settings · Personal</div>
               <h2 class="section-title">API Keys</h2>
-              <p class="section-sub">Programmatic access to Exascale APIs. Scope each key to the minimum permissions it needs and rotate often.</p>
+              <p class="section-sub">Programmatic access to 1Trade APIs. Scope each key to the minimum permissions it needs and rotate often.</p>
             </div>
             <button type="button" class="btn primary" @click="openCreateKeyModal">
               <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square">

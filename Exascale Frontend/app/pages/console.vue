@@ -9,7 +9,7 @@
 import { compact, full } from '~/utils/format'
 
 definePageMeta({ layout: 'app', middleware: 'auth' })
-useHead({ title: 'Console — Exascale' })
+useHead({ title: 'Console — 1Trade' })
 
 const { user } = useAuth()
 const { models, load: loadCatalog } = useCatalog()

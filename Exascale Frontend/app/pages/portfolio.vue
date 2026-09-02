@@ -8,8 +8,8 @@
  */
 import { Chart, type ChartDataset } from 'chart.js/auto'
 
-definePageMeta({ layout: 'app' })
-useHead({ title: 'Portfolio — Exascale' })
+definePageMeta({ layout: 'app', middleware: 'auth' })
+useHead({ title: 'Portfolio — 1Trade' })
 
 // =====================================================
 // Mock data — mirrors /tmp design's portfolio-data.js
@@ -136,19 +136,19 @@ const POSITIONS = buildPositions()
 
 const ALLOCATION = [
   { key: 'cash',     label: 'Cash (USD)',          color: '#6B7280', value: ACCOUNT.cash },
-  { key: 'aiindex',  label: 'AI-INDEX',            color: '#C8F25C', value: 50.25 },
+  { key: 'aiindex',  label: 'AI-INDEX',            color: '#D4AF37', value: 50.25 },
   { key: 'textidx',  label: 'TEXT-INDEX',          color: '#4A90E2', value: 14.40 },
   { key: 'imageidx', label: 'IMAGE-INDEX (short)', color: '#7AAEEE', value: 39.90 },
-  { key: 'h100',     label: 'H100 GPU credits',    color: '#F5A623', value: 23.92 },
+  { key: 'h100',     label: 'H100 GPU credits',    color: '#F5A524', value: 23.92 },
   { key: 'h200',     label: 'H200 GPU credits',    color: '#F0C674', value: 0.90 },
 ]
 const ALLOC_TOTAL = ALLOCATION.reduce((s, x) => s + x.value, 0)
 
 const ASSET_BREAKDOWN = [
   { key: 'cash', label: 'Cash',        color: '#6B7280', value: ACCOUNT.cash },
-  { key: 'ai',   label: 'AI Index',    color: '#C8F25C', value: 50.25 },
+  { key: 'ai',   label: 'AI Index',    color: '#D4AF37', value: 50.25 },
   { key: 'sub',  label: 'Sub-indices', color: '#4A90E2', value: 54.30 },
-  { key: 'gpu',  label: 'GPU credits', color: '#F5A623', value: 24.82 },
+  { key: 'gpu',  label: 'GPU credits', color: '#F5A524', value: 24.82 },
 ]
 const ASSET_TOTAL = ASSET_BREAKDOWN.reduce((s, x) => s + x.value, 0)
 
@@ -366,8 +366,8 @@ function initPerfChart() {
   if (!perfCanvas.value) return
   const ctx = perfCanvas.value.getContext('2d')!
   const grad = ctx.createLinearGradient(0, 0, 0, 360)
-  grad.addColorStop(0, hexA('#C8F25C', 0.18))
-  grad.addColorStop(1, hexA('#C8F25C', 0))
+  grad.addColorStop(0, hexA('#D4AF37', 0.18))
+  grad.addColorStop(1, hexA('#D4AF37', 0))
   const s = SERIES[currentRange.value]
   perfChart = new Chart(ctx, {
     type: 'line',
@@ -377,15 +377,15 @@ function initPerfChart() {
         {
           label: 'Account value',
           data: s.portfolio.map(p => p.v),
-          borderColor: '#C8F25C',
+          borderColor: '#D4AF37',
           borderWidth: 1.6,
           backgroundColor: grad,
           fill: true,
           tension: 0.18,
           pointRadius: 0,
           pointHoverRadius: 4,
-          pointHoverBorderColor: '#C8F25C',
-          pointHoverBackgroundColor: '#14161B',
+          pointHoverBorderColor: '#D4AF37',
+          pointHoverBackgroundColor: '#121212',
           pointHoverBorderWidth: 1.5,
         } as ChartDataset<'line', number[]>,
         {
@@ -400,7 +400,7 @@ function initPerfChart() {
           pointRadius: 0,
           pointHoverRadius: 4,
           pointHoverBorderColor: '#4A90E2',
-          pointHoverBackgroundColor: '#14161B',
+          pointHoverBackgroundColor: '#121212',
           pointHoverBorderWidth: 1.5,
           yAxisID: 'yIndex',
           hidden: true,
@@ -414,14 +414,14 @@ function initPerfChart() {
       plugins: {
         legend: { display: false },
         tooltip: {
-          backgroundColor: '#1C1F26',
+          backgroundColor: '#1A1A1A',
           borderColor: 'rgba(255,255,255,0.16)',
           borderWidth: 1,
           padding: 10,
           cornerRadius: 2,
-          titleColor: '#9A9A95',
+          titleColor: '#A8A196',
           titleFont: { family: "'JetBrains Mono', monospace", size: 10, weight: 'bold' },
-          bodyColor: '#E8E6E0',
+          bodyColor: '#E8E2D6',
           bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
           displayColors: false,
           callbacks: {
@@ -446,7 +446,7 @@ function initPerfChart() {
           grid: { display: false },
           border: { display: false },
           ticks: {
-            color: '#5F5F5C',
+            color: '#7E786C',
             font: { family: "'JetBrains Mono', monospace", size: 10 },
             maxRotation: 0,
             autoSkip: true,
@@ -458,7 +458,7 @@ function initPerfChart() {
           grid: { color: 'rgba(255,255,255,0.05)' },
           border: { display: false },
           ticks: {
-            color: '#5F5F5C',
+            color: '#7E786C',
             font: { family: "'JetBrains Mono', monospace", size: 10 },
             callback: v => '$' + (v as number).toLocaleString('en-US', { maximumFractionDigits: 0 }),
             padding: 8,
@@ -485,9 +485,9 @@ function initDonut() {
       datasets: [{
         data: ALLOCATION.map(a => a.value),
         backgroundColor: ALLOCATION.map(a => a.color),
-        borderColor: '#14161B',
+        borderColor: '#121212',
         borderWidth: 2,
-        hoverBorderColor: '#14161B',
+        hoverBorderColor: '#121212',
         hoverBorderWidth: 2,
         spacing: 1,
       } as never],
@@ -1507,7 +1507,7 @@ onBeforeUnmount(() => {
 }
 .mkt .sym-square.lime   { background: var(--brand);  color: var(--canvas); border-color: var(--brand); }
 .mkt .sym-square.blue   { background: var(--info);   color: #fff;          border-color: var(--info); }
-.mkt .sym-square.orange { background: #F5A623;       color: var(--canvas); border-color: #F5A623; }
+.mkt .sym-square.orange { background: #F5A524;       color: var(--canvas); border-color: #F5A524; }
 .mkt .info { display: flex; flex-direction: column; line-height: 1.25; }
 .mkt .name {
   font-family: var(--font-mono);

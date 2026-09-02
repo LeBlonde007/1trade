@@ -1,0 +1,62 @@
+# Exascale event contract — orders.state.v1
+# One event per order state transition, emitted by matching-engine. Consumed by surveillance
+# (spoofing / layering / excessive-cancellation detection needs the full order lifecycle, not just
+# fills) and by the trading frontend's order-updates stream.
+# Owned by matching-engine.
+#
+# PRE-PUBLISHED, NOT YET EMITTED. The exchange is paused (license-gated, F22); the Phase 1 mock
+# adapter accepts no orders, so no transitions occur. Frozen now so surveillance can build its
+# detectors against the final shape before switch-on (KW03 cutover plan).
+
+subject: orders.state.v1
+transport: NATS JetStream
+version: 1.0.0
+description: An order lifecycle transition (accepted → partially_filled → filled / cancelled / rejected).
+
+payload_schema:
+  $schema: "https://json-schema.org/draft/2020-12/schema"
+  title: OrdersStateV1
+  type: object
+  additionalProperties: false
+  required: [event_id, order_id, tenant_id, product_id, side, order_type, state, quantity, filled_quantity, is_paper, sequence, ts]
+  properties:
+    event_id:   { type: string, description: "unique per transition; consumer idempotency key" }
+    order_id:   { type: string, format: uuid }
+    tenant_id:  { type: string, format: uuid }
+    sub_account_id: { type: [string, "null"], format: uuid }
+    product_id: { type: string }
+    side:       { type: string, enum: [buy, sell] }
+    order_type: { type: string, enum: [market, limit, ioc, fok] }
+    state:      { type: string, enum: [accepted, partially_filled, filled, cancelled, rejected] }
+    reason:
+      type: [string, "null"]
+      description: "why, for cancelled / rejected (e.g. insufficient_credit, position_limit, self_trade)"
+    quantity:        { type: string, description: "original order quantity, fixed-point string" }
+    filled_quantity: { type: string, description: "cumulative filled quantity, fixed-point string" }
+    limit_price:     { type: [string, "null"], description: "fixed-point string; null for market orders" }
+    is_paper:        { type: boolean }
+    is_internal:     { type: boolean, description: "true for market-maker / internal order flow" }
+    sequence:
+      type: integer
+      description: >
+        Per-product monotonic sequence number. Matching is single-threaded per product, so this
+        totally orders that product's transitions and lets a consumer detect gaps.
+    ts:         { type: string, format: date-time }
+
+example:
+  event_id: "oev_01Hf000000000000000000"
+  order_id: "a1b20000-0000-4000-8000-000000000001"
+  tenant_id: "1f2e0000-0000-4000-8000-000000000001"
+  sub_account_id: null
+  product_id: "EAI-IDX"
+  side: buy
+  order_type: limit
+  state: partially_filled
+  reason: null
+  quantity: "1000.000000"
+  filled_quantity: "400.000000"
+  limit_price: "0.001004"
+  is_paper: true
+  is_internal: false
+  sequence: 148223
+  ts: "2026-06-01T12:00:00Z"

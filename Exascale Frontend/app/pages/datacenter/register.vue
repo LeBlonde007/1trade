@@ -13,7 +13,7 @@
 
 definePageMeta({ layout: false })
 useHead({
-  title: 'Register partner · Datacenter — Exascale',
+  title: 'Register partner · Datacenter — 1Trade',
   htmlAttrs: { 'data-theme': 'light' },
 })
 
@@ -253,7 +253,7 @@ function interconnectLabel() {
        can't sign up into an incomplete flow. Flip `datacenterSignupLive` when the supply service ships. -->
   <div v-if="!datacenterSignupLive" class="reg-shell soon-shell" data-theme="light">
     <header class="topbar">
-      <NuxtLink to="/" class="brand"><span class="brand-mark" />EXASCALE</NuxtLink>
+      <NuxtLink to="/" class="brand"><span class="brand-mark" />1TRADE</NuxtLink>
     </header>
     <main class="soon-main">
       <div class="soon-card">
@@ -262,7 +262,7 @@ function interconnectLabel() {
         <p>We're finishing the supply-side onboarding — capacity registration, GPU attestation, and
           streamed payouts. Partner sign-up will open with that release.</p>
         <p class="soon-contact">Want to supply GPUs early? <a href="mailto:partners@exascale.ai">partners@exascale.ai</a></p>
-        <NuxtLink to="/" class="soon-btn">← Back to Exascale</NuxtLink>
+        <NuxtLink to="/" class="soon-btn">← Back to 1Trade</NuxtLink>
       </div>
     </main>
   </div>
@@ -272,7 +272,7 @@ function interconnectLabel() {
     <header class="topbar">
       <NuxtLink to="/datacenter" class="brand">
         <span class="brand-mark" />
-        EXASCALE
+        1TRADE
       </NuxtLink>
       <nav class="crumbs">
         <NuxtLink to="/datacenter">Datacenter</NuxtLink>
@@ -500,7 +500,7 @@ function interconnectLabel() {
                 <span class="affix-right">%</span>
               </div>
               <span class="field-hint">
-                Exascale fee:
+                1Trade fee:
                 <strong>{{ 100 - form.revenueShare }}%</strong>
                 · Standard band 60–75%
               </span>
@@ -675,7 +675,7 @@ function interconnectLabel() {
               <span class="sc-v pos">{{ fmtUsd(projectedPartnerShare) }}</span>
             </div>
             <div class="sc-row">
-              <span class="sc-k">Exascale fee · {{ 100 - form.revenueShare }}%</span>
+              <span class="sc-k">1Trade fee · {{ 100 - form.revenueShare }}%</span>
               <span class="sc-v">{{ fmtUsd(projectedExascaleFee) }}</span>
             </div>
             <div class="sc-foot">
@@ -731,7 +731,7 @@ function interconnectLabel() {
           </div>
 
           <div class="legal-note">
-            By activating, you confirm Exascale's
+            By activating, you confirm 1Trade's
             <a href="#">Partner Master Agreement</a>,
             <a href="#">Pricing Schedule v2.4</a>, and the
             <a href="#">Capacity Verification Report</a> generated above. Contract becomes
@@ -755,7 +755,7 @@ function interconnectLabel() {
 .soon-shell { min-height: 100vh; display: flex; flex-direction: column; background: var(--canvas); color: var(--text); font-family: var(--font-sans); }
 .soon-shell .topbar { display: flex; align-items: center; padding: 24px 40px; }
 .soon-shell .brand { display: inline-flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 700; letter-spacing: -0.02em; color: var(--text); text-decoration: none; }
-.soon-shell .brand-mark { width: 12px; height: 12px; background: var(--brand); display: inline-block; }
+.soon-shell .brand-mark { width: 8.89px; height: 20.6px; display: inline-block; flex: none; background: var(--brand); -webkit-mask: url('/brand/mark.svg') center / contain no-repeat; mask: url('/brand/mark.svg') center / contain no-repeat; }
 .soon-main { flex: 1; display: flex; align-items: center; justify-content: center; padding: 24px; }
 .soon-card { max-width: 480px; text-align: center; border: 1px solid var(--border); background: var(--elevated); border-radius: 2px; padding: 48px 40px; }
 .soon-pill { display: inline-block; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-2); border: 1px solid var(--border); border-radius: 2px; padding: 3px 8px; margin-bottom: 18px; }
@@ -766,7 +766,7 @@ function interconnectLabel() {
 
 .reg-shell {
   --bd-soft: rgba(14, 14, 14, 0.06);
-  --t-4:     #B8B8B0;
+  --t-4:     #B5AEA1;
 
   min-height: 100vh;
   background: var(--canvas);
@@ -814,10 +814,13 @@ function interconnectLabel() {
   height: 36px;
 }
 .brand-mark {
-  width: 12px;
-  height: 12px;
-  background: var(--brand);
+  width: 8.89px;
+  height: 20.6px;
   display: inline-block;
+  flex: none;
+  background: var(--brand);
+  -webkit-mask: url('/brand/mark.svg') center / contain no-repeat;
+  mask: url('/brand/mark.svg') center / contain no-repeat;
 }
 .crumbs {
   display: flex;

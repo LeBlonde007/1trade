@@ -1,5 +1,5 @@
 /**
- * Formatting utilities for the Exascale UI.
+ * Formatting utilities for the 1Trade UI.
  * All number formatting goes through these — never use toFixed/toLocaleString directly.
  * Auto-imported by Nuxt — call as fmt money(), formatCredits(), etc.
  */

@@ -4,8 +4,8 @@
  * Sortable live table of every credit market, grouped by family.
  * Dark, in-app.
  */
-definePageMeta({ layout: 'app' })
-useHead({ title: 'Markets — Exascale' })
+definePageMeta({ layout: 'app', middleware: 'auth' })
+useHead({ title: 'Markets — 1Trade' })
 
 interface Market {
   sym: string

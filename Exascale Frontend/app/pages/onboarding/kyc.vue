@@ -9,7 +9,7 @@
  * product UX.
  */
 definePageMeta({ layout: false })
-useHead({ title: 'Identity Verification — Exascale', htmlAttrs: { 'data-theme': 'light' } })
+useHead({ title: 'Identity Verification — 1Trade', htmlAttrs: { 'data-theme': 'light' } })
 
 // Persona-aware. KYC (identity verification) is a *trading* requirement — only the trader persona
 // goes through the Light-KYC flow below. AI companies don't trade (verified → straight to the
@@ -294,7 +294,7 @@ const intentionTitles = computed(() =>
     <header class="topbar">
       <div class="brand-lockup">
         <span class="brand-mark" />
-        EXASCALE
+        1TRADE
       </div>
       <div class="topbar-right">
         <span class="save-state">
@@ -345,7 +345,7 @@ const intentionTitles = computed(() =>
       <div class="page-header">
         <div class="eyebrow"><span class="dot" /> {{ personaName }} onboarding</div>
         <template v-if="personaCx.persona.value === 'enterprise'">
-          <h1 class="page-title">You're verified — welcome to Exascale.</h1>
+          <h1 class="page-title">You're verified — welcome to 1Trade.</h1>
           <p class="page-subtitle">
             Identity verification (KYC) is only required for real-money <em>trading</em>. As an AI
             company you run inference &amp; compute on prepaid credits — no KYC needed. You're ready to go.
@@ -354,7 +354,7 @@ const intentionTitles = computed(() =>
         <template v-else>
           <h1 class="page-title">Let's onboard your datacenter.</h1>
           <p class="page-subtitle">
-            Register your capacity to start supplying GPUs to the Exascale market. Next we'll collect
+            Register your capacity to start supplying GPUs to the 1Trade market. Next we'll collect
             your cluster details, location, and payout account — not personal identity.
           </p>
         </template>
@@ -784,7 +784,7 @@ const intentionTitles = computed(() =>
                 <div class="help-eyebrow">Why we ask</div>
                 <h4 class="help-title">Required by financial regulations, even for paper trading.</h4>
                 <p class="help-body">
-                  Exascale is a regulated venue. We collect identity to comply with KYC, sanctions
+                  1Trade is a regulated venue. We collect identity to comply with KYC, sanctions
                   screening, and tax-reporting obligations — for every account, regardless of whether
                   real money is at stake.
                 </p>
@@ -983,10 +983,13 @@ const intentionTitles = computed(() =>
   color: var(--text);
 }
 .brand-mark {
-  width: 12px;
-  height: 12px;
-  background: var(--brand);
+  width: 8.89px;
+  height: 20.6px;
   display: inline-block;
+  flex: none;
+  background: var(--brand);
+  -webkit-mask: url('/brand/mark.svg') center / contain no-repeat;
+  mask: url('/brand/mark.svg') center / contain no-repeat;
 }
 .topbar-right {
   display: flex;
@@ -1272,7 +1275,7 @@ const intentionTitles = computed(() =>
   appearance: none;
   font-variant-numeric: tabular-nums;
 }
-.input::placeholder { color: #B8B8B0; }
+.input::placeholder { color: #B5AEA1; }
 .input:hover,
 .select:hover { border-color: rgba(14, 14, 14, 0.32); }
 .input:focus,
@@ -1575,7 +1578,7 @@ const intentionTitles = computed(() =>
 .btn.primary:disabled,
 .btn.primary.accent:disabled {
   background: var(--sunken);
-  color: #B8B8B0;
+  color: #B5AEA1;
   border-color: var(--border);
   cursor: not-allowed;
   transform: none;

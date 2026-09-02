@@ -1,0 +1,75 @@
+# Exascale event contract — index.print.v1
+# One event per published index print, emitted by index-service at the 16:00 UTC publication.
+# Consumed by the trading frontend (methodology page + index displays), market-maker (fair-value
+# anchor for quoting in Phase 2), and any downstream audit tooling verifying the print chain.
+# Owned by index-service.
+#
+# PRE-PUBLISHED, NOT YET EMITTED. In Phase 1 the index is internal-only and mock-backed (KW01 goes
+# live internally at M5), and the mock adapter serves reads over HTTP without emitting events. Frozen
+# now so consumers build against the final shape.
+
+subject: index.print.v1
+transport: NATS JetStream
+version: 1.0.0
+description: A published index print. Immutable and hash-chained — corrections are new prints, never edits.
+
+payload_schema:
+  $schema: "https://json-schema.org/draft/2020-12/schema"
+  title: IndexPrintV1
+  type: object
+  additionalProperties: false
+  required: [print_id, value, methodology_version, observation_count, chain_hash, provisional, source, published_at]
+  properties:
+    print_id: { type: string, format: uuid, description: "consumer idempotency key" }
+    value:    { type: string, description: "the index value, fixed-point string" }
+    methodology_version:
+      type: string
+      description: "the methodology version this print was computed under (published + versioned from day one)"
+    observation_count: { type: integer, description: "constituent observations that survived filtering" }
+    excluded_count:
+      type: integer
+      description: "observations dropped by outlier filtering, the volume floor, or a surveillance taint flag"
+    constituents:
+      type: array
+      description: "the disclosed weight schedule in force for this print (constituent transparency)"
+      items:
+        type: object
+        additionalProperties: false
+        required: [credit_type, weight]
+        properties:
+          credit_type:
+            type: string
+            enum: [ai_index, text, speech, image, video, embeddings, gpu_h100, gpu_h200]
+          weight: { type: string, description: "fractional weight, fixed-point string; weights sum to 1" }
+    chain_hash:      { type: string, description: "hash(prev_chain_hash || canonical_json(row))" }
+    prev_chain_hash: { type: [string, "null"], description: "null only for the genesis print" }
+    provisional:
+      type: boolean
+      description: "true until reconciliation closes; a provisional print must never be shown as final"
+    source:
+      type: string
+      enum: [mock, computed]
+      description: "`mock` while the keep-warm adapter serves the index (Phase 1); `computed` from M5"
+    published_at:
+      type: string
+      format: date-time
+      description: "the 16:00 UTC publication instant"
+
+example:
+  print_id: "b4c60000-0000-4000-8000-000000000001"
+  value: "0.001005"
+  methodology_version: "1.2"
+  observation_count: 5842
+  excluded_count: 61
+  constituents:
+    - { credit_type: text,       weight: "0.420000" }
+    - { credit_type: image,      weight: "0.150000" }
+    - { credit_type: speech,     weight: "0.080000" }
+    - { credit_type: video,      weight: "0.050000" }
+    - { credit_type: embeddings, weight: "0.100000" }
+    - { credit_type: gpu_h100,   weight: "0.200000" }
+  chain_hash: "1d3f5a7b9c0e2f4a6b8d0c2e4f6a8b0d2c4e6f8a0b2d4c6e8f0a2b4d6c8e0f2a"
+  prev_chain_hash: "0c2e4f6a8b0d2c4e6f8a0b2d4c6e8f0a2b4d6c8e0f2a1d3f5a7b9c0e2f4a6b8d"
+  provisional: false
+  source: computed
+  published_at: "2026-06-01T16:00:00Z"

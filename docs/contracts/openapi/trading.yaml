@@ -1,0 +1,507 @@
+openapi: 3.0.3
+info:
+  title: Exascale Trading API (products, market data, orders, positions)
+  version: 1.0.0
+  description: >
+    **The Exascale exchange API.** Owned by `matching-engine`. This contract is published in full so
+    the trading surface (KW02) and the eventual real engine (KW03 Phase 2) build against one stable
+    interface — but in **Phase 1 only the read endpoints are implemented**, and they are served by the
+    service's **mock adapter**: believable simulated market data, deterministic per product, generated
+    in-process. There is no order book, no customer order flow, and no settlement.
+
+    **The exchange is paused (license-gated — see F22).** Every write endpoint
+    (`POST /v1/trading/orders`, `DELETE /v1/trading/orders/{id}`) returns **503** with error code
+    `EXCHANGE_PAUSED`. Clients must render that state honestly rather than faking a fill; the trading
+    UI carries a "Demo — exchange paused" ribbon on every route (KW02).
+
+    **Everything this API returns is paper.** `is_paper` is `true` on every object in Phase 1, with no
+    way to request otherwise: real-money trading requires both the license and a `tech-lead` contract
+    change flipping `is_real_money_enabled` per product. Market-data reads are public (they carry no
+    tenant data); `orders`, `positions`, and `fills` require a tenant JWT and are tenant-scoped.
+
+    All prices, quantities, and money amounts are **fixed-point decimal strings** (`NUMERIC(20,6)`),
+    never JSON numbers — see docs/contracts/schemas/types.sql and credit-types.md §4. Product ids map
+    onto the canonical credit-type enum; no new credit type is introduced for the exchange
+    (credit-types.md §5). See docs/plans/features/KW03-matching-engine-mock-and-spec.md.
+
+servers:
+  - { url: "https://api.exascale.io", description: prod }
+  - { url: "http://localhost:8087", description: "local (matching-engine)" }
+
+tags:
+  - { name: products, description: "The tradeable product catalog (read-only)." }
+  - { name: marketdata, description: "Quotes, order book, prints, candles (public reads; mock in Phase 1)." }
+  - { name: orders, description: "Order entry + cancel. PAUSED in Phase 1 — always 503 EXCHANGE_PAUSED." }
+  - { name: portfolio, description: "Tenant-scoped positions + fills (mock in Phase 1)." }
+
+paths:
+  /healthz:
+    get:
+      tags: [products]
+      summary: Liveness.
+      operationId: healthz
+      responses: { '200': { description: ok } }
+
+  /readyz:
+    get:
+      tags: [products]
+      summary: Readiness.
+      operationId: readyz
+      responses: { '200': { description: ready }, '503': { description: not ready } }
+
+  /v1/trading/products:
+    get:
+      tags: [products]
+      summary: List every product, tradeable or not.
+      description: >
+        Public read. The product set is fixed in Phase 1 and derived from the credit-type enum: an
+        index spot, one spot per sub-credit, one spot per GPU tier, plus dated forwards (v1.5, not
+        tradeable). `tradeable` reflects the product's own flag; the exchange-wide pause is separate
+        and applies regardless.
+      operationId: listProducts
+      responses:
+        '200':
+          description: Products.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [products, exchange_status]
+                properties:
+                  products: { type: array, items: { $ref: '#/components/schemas/Product' } }
+                  exchange_status: { $ref: '#/components/schemas/ExchangeStatus' }
+
+  /v1/trading/products/{productId}:
+    get:
+      tags: [products]
+      summary: One product with its current market summary.
+      operationId: getProduct
+      parameters:
+        - { name: productId, in: path, required: true, schema: { type: string }, example: EAI-IDX }
+      responses:
+        '200':
+          description: Product + summary.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [product, summary]
+                properties:
+                  product: { $ref: '#/components/schemas/Product' }
+                  summary: { $ref: '#/components/schemas/MarketSummary' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/trading/products/{productId}/quote:
+    get:
+      tags: [marketdata]
+      summary: Two-sided quote (best bid / best ask / mid / spread).
+      operationId: getQuote
+      parameters:
+        - { name: productId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Quote.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Quote' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/trading/products/{productId}/orderbook:
+    get:
+      tags: [marketdata]
+      summary: Aggregated order book to the requested depth.
+      description: >
+        Bids descend by price, asks ascend, and the book never crosses. In Phase 1 depth is
+        simulated with a power-law size profile around the mock mid.
+      operationId: getOrderBook
+      parameters:
+        - { name: productId, in: path, required: true, schema: { type: string } }
+        - { name: depth, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 50, default: 10 } }
+      responses:
+        '200':
+          description: Order book.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrderBook' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/trading/products/{productId}/trades:
+    get:
+      tags: [marketdata]
+      summary: Recent prints (the tape), newest first.
+      operationId: listTrades
+      parameters:
+        - { name: productId, in: path, required: true, schema: { type: string } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200, default: 40 } }
+      responses:
+        '200':
+          description: Prints.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [trades]
+                properties:
+                  trades: { type: array, items: { $ref: '#/components/schemas/Print' } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/trading/products/{productId}/candles:
+    get:
+      tags: [marketdata]
+      summary: OHLCV candles for one interval, oldest first.
+      operationId: listCandles
+      parameters:
+        - { name: productId, in: path, required: true, schema: { type: string } }
+        - name: interval
+          in: query
+          required: false
+          schema: { type: string, enum: ['1m', '5m', '15m', '1h', '4h', '1d'], default: '1m' }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 500, default: 200 } }
+      responses:
+        '200':
+          description: Candles.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [interval, candles]
+                properties:
+                  interval: { type: string, example: '5m' }
+                  candles: { type: array, items: { $ref: '#/components/schemas/Candle' } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/InvalidRequest' }
+
+  /v1/trading/orders:
+    get:
+      tags: [orders]
+      summary: The tenant's orders, newest first (tenant JWT).
+      description: >
+        Implemented as a read in Phase 1 and always empty — no customer order flow exists while the
+        exchange is paused. Present so the client can build the real list view now.
+      operationId: listOrders
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: state, in: query, required: false, schema: { type: string, enum: [open, filled, cancelled, rejected] } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        '200':
+          description: Orders.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [orders]
+                properties:
+                  orders: { type: array, items: { $ref: '#/components/schemas/Order' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [orders]
+      summary: Place an order — PAUSED, always 503.
+      description: >
+        The order-entry contract for Phase 2. In Phase 1 this endpoint validates nothing and accepts
+        nothing: it returns 503 `EXCHANGE_PAUSED` with a link to the published methodology. `is_paper`
+        is never read from the body — at switch-on it is derived from the authenticated principal.
+      operationId: placeOrder
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: Caller-generated key making a retried placement safe at switch-on.
+          schema: { type: string, maxLength: 128 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OrderRequest' }
+      responses:
+        '503':
+          description: The exchange is paused (license-gated). The only response in Phase 1.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExchangePausedError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/trading/orders/{orderId}:
+    delete:
+      tags: [orders]
+      summary: Cancel an order — PAUSED, always 503.
+      operationId: cancelOrder
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: orderId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '503':
+          description: The exchange is paused (license-gated). The only response in Phase 1.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExchangePausedError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/trading/positions:
+    get:
+      tags: [portfolio]
+      summary: The tenant's open positions, marked to the current mock mid (tenant JWT).
+      operationId: listPositions
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Positions.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [positions, is_paper]
+                properties:
+                  positions: { type: array, items: { $ref: '#/components/schemas/Position' } }
+                  is_paper: { type: boolean, enum: [true] }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/trading/fills:
+    get:
+      tags: [portfolio]
+      summary: The tenant's fill history, newest first (tenant JWT).
+      operationId: listFills
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: productId, in: query, required: false, schema: { type: string } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        '200':
+          description: Fills.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [fills]
+                properties:
+                  fills: { type: array, items: { $ref: '#/components/schemas/Fill' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: First-party tenant JWT (HS256), verified locally against the shared platform secret.
+
+  responses:
+    NotFound:
+      description: No such product.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+    Unauthorized:
+      description: Missing or invalid tenant token.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+    InvalidRequest:
+      description: The request was understood but a parameter is unusable.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+
+  schemas:
+    Decimal:
+      type: string
+      description: Fixed-point decimal, 6dp (NUMERIC(20,6)). Never a JSON number.
+      pattern: '^-?[0-9]+\.[0-9]{6}$'
+      example: "0.001005"
+
+    ExchangeStatus:
+      type: object
+      description: Why order entry is unavailable, and where the methodology lives.
+      required: [state, reason, methodology_url]
+      properties:
+        state: { type: string, enum: [paused, live], example: paused }
+        reason:
+          type: string
+          example: "Order entry is paused pending exchange licensing. Market data shown is simulated."
+        methodology_url: { type: string, example: "/methodology" }
+
+    Product:
+      type: object
+      required: [product_id, product_type, credit_type, name, description, family, tick_size, quote_precision, tradeable, is_real_money_enabled, is_paper]
+      properties:
+        product_id: { type: string, example: EAI-IDX }
+        product_type: { type: string, enum: [spot, forward] }
+        credit_type:
+          type: string
+          description: The canonical credit type this product trades (credit-types.md §1).
+          enum: [ai_index, text, speech, image, video, embeddings, gpu_h100, gpu_h200]
+        name: { type: string, example: "AI Index" }
+        description: { type: string, example: "AI Index · spot" }
+        family:
+          type: string
+          description: Display grouping for the markets table.
+          enum: [Index, Text, Speech, Image, Video, Embeddings, GPU]
+        underlying_asset: { type: string, nullable: true, example: "gpu_h100" }
+        delivery_date: { type: string, format: date, nullable: true, description: "Set on forwards only." }
+        contract_size: { allOf: [{ $ref: '#/components/schemas/Decimal' }], nullable: true }
+        tick_size: { $ref: '#/components/schemas/Decimal' }
+        quote_precision: { type: integer, description: "Decimal places to display for this product's price.", example: 6 }
+        tradeable: { type: boolean, description: "The product's own flag. Forwards are false until v1.5." }
+        is_real_money_enabled: { type: boolean, enum: [false], description: "Always false until licensed." }
+        is_paper: { type: boolean, enum: [true] }
+
+    MarketSummary:
+      type: object
+      description: 24h rollup for one product, from the mock generator in Phase 1.
+      required: [product_id, last, open_24h, high_24h, low_24h, change_pct_24h, volume_24h, spread_bps, is_paper]
+      properties:
+        product_id: { type: string }
+        last: { $ref: '#/components/schemas/Decimal' }
+        open_24h: { $ref: '#/components/schemas/Decimal' }
+        high_24h: { $ref: '#/components/schemas/Decimal' }
+        low_24h: { $ref: '#/components/schemas/Decimal' }
+        change_pct_24h: { type: string, description: "Signed percent, 2dp.", example: "0.18" }
+        volume_24h: { $ref: '#/components/schemas/Decimal' }
+        spread_bps: { type: string, description: "Quoted spread in basis points, 1dp.", example: "4.0" }
+        is_paper: { type: boolean, enum: [true] }
+
+    Quote:
+      type: object
+      required: [product_id, bid, ask, mid, spread, spread_bps, as_of, is_paper]
+      properties:
+        product_id: { type: string }
+        bid: { $ref: '#/components/schemas/Decimal' }
+        ask: { $ref: '#/components/schemas/Decimal' }
+        bid_size: { $ref: '#/components/schemas/Decimal' }
+        ask_size: { $ref: '#/components/schemas/Decimal' }
+        mid: { $ref: '#/components/schemas/Decimal' }
+        spread: { $ref: '#/components/schemas/Decimal' }
+        spread_bps: { type: string, example: "4.0" }
+        as_of: { type: string, format: date-time }
+        is_paper: { type: boolean, enum: [true] }
+
+    BookLevel:
+      type: object
+      required: [price, size, cumulative]
+      properties:
+        price: { $ref: '#/components/schemas/Decimal' }
+        size: { $ref: '#/components/schemas/Decimal' }
+        cumulative: { allOf: [{ $ref: '#/components/schemas/Decimal' }], description: "Running size from the touch." }
+
+    OrderBook:
+      type: object
+      required: [product_id, bids, asks, as_of, is_paper]
+      properties:
+        product_id: { type: string }
+        bids:
+          type: array
+          description: Descending by price; index 0 is the best bid.
+          items: { $ref: '#/components/schemas/BookLevel' }
+        asks:
+          type: array
+          description: Ascending by price; index 0 is the best ask.
+          items: { $ref: '#/components/schemas/BookLevel' }
+        as_of: { type: string, format: date-time }
+        is_paper: { type: boolean, enum: [true] }
+
+    Print:
+      type: object
+      description: One tape print. Counterparty tenants are never exposed.
+      required: [trade_id, product_id, price, quantity, aggressor_side, executed_at, is_paper]
+      properties:
+        trade_id: { type: string, format: uuid }
+        product_id: { type: string }
+        price: { $ref: '#/components/schemas/Decimal' }
+        quantity: { $ref: '#/components/schemas/Decimal' }
+        aggressor_side: { type: string, enum: [buy, sell] }
+        block: { type: boolean, description: "True for outsized prints (tape highlighting)." }
+        executed_at: { type: string, format: date-time }
+        is_paper: { type: boolean, enum: [true] }
+
+    Candle:
+      type: object
+      required: [time, open, high, low, close, volume]
+      properties:
+        time: { type: integer, format: int64, description: "Bar open, Unix seconds UTC." }
+        open: { $ref: '#/components/schemas/Decimal' }
+        high: { $ref: '#/components/schemas/Decimal' }
+        low: { $ref: '#/components/schemas/Decimal' }
+        close: { $ref: '#/components/schemas/Decimal' }
+        volume: { $ref: '#/components/schemas/Decimal' }
+
+    OrderRequest:
+      type: object
+      required: [product_id, side, order_type, quantity]
+      properties:
+        product_id: { type: string, example: EAI-IDX }
+        side: { type: string, enum: [buy, sell] }
+        order_type: { type: string, enum: [market, limit, ioc, fok] }
+        quantity: { $ref: '#/components/schemas/Decimal' }
+        limit_price:
+          allOf: [{ $ref: '#/components/schemas/Decimal' }]
+          nullable: true
+          description: Required for limit / ioc / fok; ignored for market.
+        time_in_force: { type: string, enum: [gtc, day, ioc, fok], default: gtc }
+
+    Order:
+      type: object
+      required: [order_id, product_id, side, order_type, quantity, filled_quantity, state, is_paper, created_at]
+      properties:
+        order_id: { type: string, format: uuid }
+        product_id: { type: string }
+        side: { type: string, enum: [buy, sell] }
+        order_type: { type: string, enum: [market, limit, ioc, fok] }
+        quantity: { $ref: '#/components/schemas/Decimal' }
+        limit_price: { allOf: [{ $ref: '#/components/schemas/Decimal' }], nullable: true }
+        time_in_force: { type: string, enum: [gtc, day, ioc, fok] }
+        state: { type: string, enum: [open, partially_filled, filled, cancelled, rejected] }
+        filled_quantity: { $ref: '#/components/schemas/Decimal' }
+        avg_fill_price: { allOf: [{ $ref: '#/components/schemas/Decimal' }], nullable: true }
+        is_paper: { type: boolean, enum: [true] }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    Position:
+      type: object
+      required: [product_id, side, net_quantity, avg_entry_price, mark_price, unrealized_pnl, unrealized_pnl_pct, is_paper]
+      properties:
+        product_id: { type: string }
+        side: { type: string, enum: [long, short] }
+        net_quantity: { $ref: '#/components/schemas/Decimal' }
+        avg_entry_price: { $ref: '#/components/schemas/Decimal' }
+        mark_price: { $ref: '#/components/schemas/Decimal' }
+        notional: { $ref: '#/components/schemas/Decimal' }
+        unrealized_pnl: { $ref: '#/components/schemas/Decimal' }
+        unrealized_pnl_pct: { type: string, example: "2.55" }
+        realized_pnl_total: { $ref: '#/components/schemas/Decimal' }
+        is_paper: { type: boolean, enum: [true] }
+
+    Fill:
+      type: object
+      required: [fill_id, product_id, side, price, quantity, fee, executed_at, is_paper]
+      properties:
+        fill_id: { type: string, format: uuid }
+        order_id: { type: string, format: uuid }
+        product_id: { type: string }
+        side: { type: string, enum: [buy, sell] }
+        price: { $ref: '#/components/schemas/Decimal' }
+        quantity: { $ref: '#/components/schemas/Decimal' }
+        notional: { $ref: '#/components/schemas/Decimal' }
+        fee: { $ref: '#/components/schemas/Decimal' }
+        liquidity: { type: string, enum: [maker, taker] }
+        executed_at: { type: string, format: date-time }
+        is_paper: { type: boolean, enum: [true] }
+
+    ExchangePausedError:
+      type: object
+      description: The paused-write body. `code` is always EXCHANGE_PAUSED.
+      required: [code, message, methodology_url]
+      properties:
+        code: { type: string, enum: [EXCHANGE_PAUSED] }
+        message:
+          type: string
+          example: "Order entry is paused pending exchange licensing. No orders are accepted."
+        methodology_url: { type: string, example: "/methodology" }
+
+    ApiError:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string, example: not_found }
+        message: { type: string, example: "no such product" }

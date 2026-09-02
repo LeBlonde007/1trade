@@ -1,28 +1,35 @@
 <script setup lang="ts">
 /**
- * / — Exascale Homepage
+ * / — 1TRADE landing page.
  *
- * Faithful port of uploads/Exascale Homepage.html from the design bundle.
- * All hardcoded values replaced with token references; behavior preserved:
- *   - sticky nav comes from the marketing layout
- *   - live AI Index ticker (Brownian motion + mean reversion, 5s tick)
- *   - 30-day sparkline (draw-on animation)
- *   - 365-day chart.js index chart with custom crosshair tooltip
- *   - "next print" countdown
+ * PLATFORM-FIRST. The page leads with what a visitor can buy today — models, GPU
+ * instances and prepaid credits — and treats the exchange as the closing thesis rather
+ * than the opening claim, because the trading layer is paused pending a license (see
+ * CLAUDE.md § current direction). The previous version led with "AI compute, but
+ * tradeable" and CTA'd into /markets, i.e. it sold the one product you cannot buy.
  *
- * Layout: light marketing shell. Dark "inverse" sections via .inverse class.
+ * It also made the three-sided-market argument twice ("Three sides. One venue." and
+ * "Three audiences. One product.") plus a third section reusing the same headline
+ * construction; that is now one audience section.
+ *
+ * Dark by intent — gold is 1.98:1 on cream and cannot carry the brand on a light ground.
+ * The layout honours `theme` from page meta, so /benchmark and /status stay light.
+ *
+ * Live behaviour preserved from the original: index ticker (Brownian motion + mean
+ * reversion, 5s), 30-day sparkline, 365-day chart.js index chart with crosshair tooltip,
+ * next-print countdown, scroll reveal.
  */
-definePageMeta({ layout: 'marketing' })
-useHead({ title: 'Exascale — The Commodity Market for AI Compute' })
+definePageMeta({ layout: 'marketing', theme: 'dark' })
+useHead({ title: '1TRADE — Buy compute once. Spend it anywhere.' })
 
-// ─── Live AI Index ticker ───────────────────────────────────
+// ─── Live index ticker ──────────────────────────────────────
 const tkNum = ref('1,002.4')
 const tkDelta = ref('▲ 0.18% (24h)')
 const tkDeltaNeg = ref(false)
 const tkFlash = ref<'' | 'flash-up' | 'flash-down'>('')
 const tkNext = ref('3h 24m')
 
-const obMidLabel = ref('1,002.4')   // shared with order book preview
+const obMidLabel = ref('1,002.4')
 const footerIdx = ref('1,002.4')
 
 let indexValue = 1.0024
@@ -30,44 +37,37 @@ const target = 1.00
 let nextPrintSec = 3 * 3600 + 24 * 60
 let tickInterval: ReturnType<typeof setInterval> | null = null
 let printInterval: ReturnType<typeof setInterval> | null = null
-// Lifted out of buildIndexChart() so it can be cleaned up from a top-level
-// onUnmounted — registering lifecycle hooks after `await` is invalid.
 let chartCleanup: (() => void) | null = null
 
 const fmt = (n: number) =>
   n.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 
 const doTick = () => {
-  // Brownian motion with weak mean reversion
   const drift = (target - indexValue) * 0.05
   const noise = (Math.random() - 0.5) * 0.0008
   const change = drift + noise
   indexValue = Math.max(0.985, Math.min(1.018, indexValue + change))
   const dayChange = (indexValue - 1.0006) / 1.0006
 
-  const display = indexValue * 1000   // "1 USD = N credits"
-  const text = fmt(display)
+  const text = fmt(indexValue * 1000)
   tkNum.value = text
   obMidLabel.value = text
   footerIdx.value = text
 
   const dpct = (dayChange * 100).toFixed(2)
-  const sign = dayChange >= 0 ? '▲' : '▼'
-  tkDelta.value = `${sign} ${Math.abs(parseFloat(dpct))}% (24h)`
+  tkDelta.value = `${dayChange >= 0 ? '▲' : '▼'} ${Math.abs(parseFloat(dpct))}% (24h)`
   tkDeltaNeg.value = dayChange < 0
 
-  // Flash color briefly on change
   tkFlash.value = change > 0 ? 'flash-up' : 'flash-down'
   setTimeout(() => { tkFlash.value = '' }, 700)
 }
 
-// ─── Sparkline path (built once on mount) ────────────────────
+// ─── Sparkline ──────────────────────────────────────────────
 const sparkLineD = ref('')
 const sparkFillD = ref('')
 
 const buildSparkline = () => {
-  const W = 240, H = 64
-  const days = 30
+  const W = 240, H = 64, days = 30
   let v = 0.987
   const pts: number[] = []
   for (let i = 0; i < days; i++) {
@@ -89,9 +89,8 @@ const buildSparkline = () => {
   sparkFillD.value = `${d} L ${W} ${H} L 0 ${H} Z`
 }
 
-// ─── Index chart (chart.js, 365 days) — client only ─────────
+// ─── 365-day index chart (client only) ──────────────────────
 const indexCanvas = ref<HTMLCanvasElement>()
-const chartTip = ref<HTMLDivElement>()
 const chartTipVal = ref('1.0024')
 const chartTipDate = ref('19 May 2026')
 const chartTipPos = ref({ x: 0, y: 0, opacity: 0 })
@@ -100,8 +99,14 @@ const buildIndexChart = async () => {
   const { Chart, registerables } = await import('chart.js')
   await import('chartjs-adapter-date-fns')
   Chart.register(...registerables)
-
   if (!indexCanvas.value) return
+
+  const root = getComputedStyle(document.documentElement)
+  const brandHex = root.getPropertyValue('--brand').trim() || '#D4AF37'
+  const t3Hex = root.getPropertyValue('--text-3').trim() || '#7E786C'
+  // The original hardcoded a black 4%-alpha grid, which is invisible on midnight.
+  // Derive it from the theme's own hairline instead.
+  const gridCol = root.getPropertyValue('--border').trim() || 'rgba(216,197,163,0.12)'
 
   const days = 365
   let v = 0.962
@@ -110,25 +115,20 @@ const buildIndexChart = async () => {
   const now = new Date('2026-05-19')
   for (let i = 0; i < days; i++) {
     const drawdown = Math.random() < 0.018 ? -(0.005 + Math.random() * 0.01) : 0
-    const drift = 0.0002
     const noise = (Math.random() - 0.48) * 0.0035
-    v = Math.max(0.94, Math.min(1.05, v + drift + noise + drawdown))
+    v = Math.max(0.94, Math.min(1.05, v + 0.0002 + noise + drawdown))
     data.push(+v.toFixed(4))
     const d = new Date(now)
     d.setDate(d.getDate() - (days - 1 - i))
     labels.push(d)
   }
-  data[data.length - 1] = 1.0024
-
-  const root = getComputedStyle(document.documentElement)
-  const brandHex = root.getPropertyValue('--brand').trim()
-  const textHex  = root.getPropertyValue('--text').trim()
-  const t3Hex    = root.getPropertyValue('--text-3').trim()
 
   const ctx = indexCanvas.value
-  const grad = ctx.getContext('2d')!.createLinearGradient(0, 0, 0, 320)
-  grad.addColorStop(0, `${brandHex}4D`) // ~30% alpha
-  grad.addColorStop(1, `${brandHex}00`) // 0%
+  const g = ctx.getContext('2d')
+  if (!g) return
+  const grad = g.createLinearGradient(0, 0, 0, ctx.clientHeight || 320)
+  grad.addColorStop(0, `${brandHex}4D`)
+  grad.addColorStop(1, `${brandHex}00`)
 
   const chart = new Chart(ctx, {
     type: 'line',
@@ -136,57 +136,46 @@ const buildIndexChart = async () => {
       labels,
       datasets: [{
         data,
-        borderColor: textHex,
+        borderColor: brandHex,
         borderWidth: 1.5,
         backgroundColor: grad,
         fill: true,
         pointRadius: 0,
-        pointHoverRadius: 0,
-        tension: 0.3,
+        pointHoverRadius: 3,
+        pointHoverBackgroundColor: brandHex,
+        tension: 0.15,
       }],
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      animation: { duration: 900, easing: 'easeOutCubic' },
       interaction: { mode: 'index', intersect: false },
       plugins: { legend: { display: false }, tooltip: { enabled: false } },
       scales: {
         x: {
           type: 'time',
-          time: { unit: 'month', displayFormats: { month: 'MMM' } },
-          grid: { display: false },
+          time: { unit: 'month' },
           border: { display: false },
+          grid: { display: false },
           ticks: { color: t3Hex, font: { family: 'JetBrains Mono', size: 10 }, maxTicksLimit: 8, maxRotation: 0 },
         },
         y: {
           position: 'right',
-          grid: { color: 'rgba(0,0,0,0.04)' },
           border: { display: false },
-          ticks: { color: t3Hex, font: { family: 'JetBrains Mono', size: 10 }, callback: (v) => Number(v).toFixed(3) },
+          grid: { color: gridCol },
+          ticks: { color: t3Hex, font: { family: 'JetBrains Mono', size: 10 }, callback: (val) => Number(val).toFixed(3) },
         },
       },
     },
   })
 
-  // Custom crosshair tooltip
   const onMove = (e: MouseEvent) => {
-    const rect = ctx.getBoundingClientRect()
-    const x = e.clientX - rect.left
-    const xScale = (chart.scales as any).x
-    const yScale = (chart.scales as any).y
-    const xValue = xScale.getValueForPixel(x)
-    let nearest = 0
-    let best = Infinity
-    for (let i = 0; i < labels.length; i++) {
-      const dist = Math.abs(labels[i].getTime() - xValue)
-      if (dist < best) { best = dist; nearest = i }
-    }
-    const px = xScale.getPixelForValue(labels[nearest])
-    const py = yScale.getPixelForValue(data[nearest])
-    chartTipPos.value = { x: px, y: py, opacity: 1 }
-    chartTipVal.value = data[nearest].toFixed(4)
-    chartTipDate.value = labels[nearest].toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+    const pts = chart.getElementsAtEventForMode(e, 'index', { intersect: false }, false)
+    if (!pts.length) return
+    const i = pts[0]!.index
+    chartTipVal.value = (data[i] ?? 0).toFixed(4)
+    chartTipDate.value = (labels[i] ?? new Date()).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+    chartTipPos.value = { x: pts[0]!.element.x, y: pts[0]!.element.y, opacity: 1 }
   }
   const onLeave = () => { chartTipPos.value = { ...chartTipPos.value, opacity: 0 } }
   ctx.addEventListener('mousemove', onMove)
@@ -199,22 +188,22 @@ const buildIndexChart = async () => {
   }
 }
 
-// ─── Scroll-reveal — sections ease in as they enter the viewport ───
-// JS-gated via `revealReady`: the hide-then-reveal CSS only applies once mounted, so a no-JS / crawler
-// load still shows the full page. Honors prefers-reduced-motion (CSS forces everything visible).
+// ─── Scroll reveal ──────────────────────────────────────────
+// JS-gated so a no-JS / crawler load still shows everything; CSS forces all
+// sections visible under prefers-reduced-motion.
 const revealReady = ref(false)
 let revealObserver: IntersectionObserver | null = null
 
 const setupReveal = () => {
   revealReady.value = true
   nextTick(() => {
-    const els = Array.from(document.querySelectorAll<HTMLElement>('.reveal, .reveal-stagger'))
+    const els = Array.from(document.querySelectorAll<HTMLElement>('.reveal'))
     if (!('IntersectionObserver' in window)) { els.forEach((e) => e.classList.add('in-view')); return }
     revealObserver = new IntersectionObserver((entries) => {
       for (const en of entries) {
         if (!en.isIntersecting) continue
         en.target.classList.add('in-view')
-        revealObserver?.unobserve(en.target) // reveal once, then stop watching
+        revealObserver?.unobserve(en.target)
       }
     }, { rootMargin: '0px 0px -8% 0px', threshold: 0.08 })
     els.forEach((e) => revealObserver!.observe(e))
@@ -223,7 +212,7 @@ const setupReveal = () => {
 
 onMounted(() => {
   buildSparkline()
-  doTick()  // initial paint with current value
+  doTick()
   tickInterval = setInterval(doTick, 5000)
   printInterval = setInterval(() => {
     nextPrintSec = Math.max(0, nextPrintSec - 60)
@@ -242,1426 +231,753 @@ onUnmounted(() => {
   revealObserver?.disconnect()
 })
 
-// Mini order book preview rows (static)
+// ─── Content ────────────────────────────────────────────────
+// Counts are the live catalogue as served by inference-gateway + compute-control.
+const MODEL_COUNT = 20
+const MODALITY_COUNT = 9
+
+/** What you can actually buy today, with the numbers behind each claim. */
+const layers = [
+  {
+    id: 'models',
+    kicker: 'Inference',
+    title: 'Models',
+    stat: MODEL_COUNT,
+    statLabel: `models · ${MODALITY_COUNT} modalities`,
+    body: 'Curated open and frontier models behind one OpenAI-compatible endpoint. Metered per thousand tokens, per image, per video — you see the credit cost of a call before you make it.',
+    items: ['llama-3.1-70b', 'claude-opus-4.8', 'gpt-5', 'deepseek-v3.2', 'flux-schnell', 'bge-m3'],
+    to: '/signup',
+    cta: 'Browse the catalogue',
+  },
+  {
+    id: 'compute',
+    kicker: 'Compute',
+    title: 'GPU instances',
+    stat: 8,
+    statLabel: 'tiers · L40S → GB300',
+    body: 'Rent by the hour or reserve a dated block. Multi-GPU jobs are gang-scheduled, so a job either gets every GPU it asked for or waits — it never half-starts and burns your balance.',
+    items: ['L40S 48GB', 'A100 80GB', 'H100 80GB', 'H200 141GB', 'B200 192GB', 'GB300 NVL72'],
+    to: '/signup',
+    cta: 'See instance types',
+  },
+  {
+    id: 'credits',
+    kicker: 'Settlement',
+    title: 'Prepaid credits',
+    stat: 1,
+    statLabel: 'balance · every product',
+    body: 'Buy AI credits once. They convert into whichever specific credit a job needs — text, speech, image, video, embeddings, or a GPU-hour on a given tier. No per-product wallets to top up.',
+    items: ['ai_index', 'text', 'speech', 'image', 'video', 'gpu_h100'],
+    to: '/signup',
+    cta: 'How credits work',
+  },
+]
+
+/** The credit mechanic, which the previous page never explained.
+ *  `codes` renders as chips rather than inline markup, so no step needs v-html. */
+const flow = [
+  {
+    step: 'Buy',
+    body: 'Card, ACH or wire buys the umbrella credit, priced off the published index rather than a private rate card.',
+    codes: ['ai_index'],
+  },
+  {
+    step: 'Convert',
+    body: 'Convert it into whatever a job actually consumes — chat and code, media, embeddings, or an hour on a named GPU tier.',
+    codes: ['text', 'image', 'video', 'speech', 'embeddings', 'gpu_h100'],
+  },
+  {
+    step: 'Spend',
+    body: 'Every call and every GPU-hour debits the matching credit. The gateway meters usage; the ledger settles it about a second later.',
+    codes: [],
+  },
+  {
+    step: 'Audit',
+    body: 'Each movement appends to a hash-chained ledger, so any balance can be replayed from the chain and proven rather than trusted.',
+    codes: ['hash(prev ‖ row)'],
+  },
+]
+
+/** Who the platform serves. One section, not three. */
+const audiences = [
+  {
+    who: 'AI companies',
+    live: true,
+    body: 'Ship on 20 models without negotiating GPU contracts. Prepay, budget per team, and see exactly what each feature costs to run.',
+    to: '/signup',
+    cta: 'Start building',
+  },
+  {
+    who: 'Datacenters',
+    live: true,
+    body: 'Put idle capacity to work. Attested GPUs, escrowed payouts streamed as your hardware serves real jobs.',
+    to: '/datacenter/register',
+    cta: 'Register capacity',
+  },
+  {
+    who: 'Traders',
+    live: false,
+    body: 'Price, hedge and speculate on compute as a commodity. Order book, market maker and dated contracts are designed and built in mock; the venue opens once licensed.',
+    to: '/benchmark',
+    cta: 'Read the methodology',
+  },
+]
+
+/** Mini order-book preview — illustrative, shown in the exchange section only. */
 const obAsks = [
-  { px: '1010.4', sz: '128.4', tot: '128.4', bar: 18 },
-  { px: '1009.2', sz: '186.0', tot: '314.4', bar: 26 },
-  { px: '1008.0', sz: '298.7', tot: '613.1', bar: 42 },
-  { px: '1006.5', sz: '421.3', tot: '1,034.4', bar: 60 },
-  { px: '1004.8', sz: '529.1', tot: '1,563.5', bar: 74 },
+  { px: '1010.4', sz: '128.4', bar: 18 },
+  { px: '1009.2', sz: '186.0', bar: 26 },
+  { px: '1008.0', sz: '298.7', bar: 42 },
+  { px: '1006.5', sz: '421.3', bar: 60 },
 ]
 const obBids = [
-  { px: '1000.4', sz: '498.2', tot: '498.2', bar: 70 },
-  { px: '999.8',  sz: '412.8', tot: '911.0', bar: 58 },
-  { px: '998.1',  sz: '285.5', tot: '1,196.5', bar: 40 },
-  { px: '996.7',  sz: '170.1', tot: '1,366.6', bar: 24 },
-  { px: '994.2',  sz: '114.0', tot: '1,480.6', bar: 16 },
+  { px: '1000.4', sz: '498.2', bar: 70 },
+  { px: '999.8', sz: '412.8', bar: 58 },
+  { px: '998.1', sz: '285.5', bar: 40 },
+  { px: '996.7', sz: '170.1', bar: 24 },
 ]
+
+// ─── API snippet + copy ─────────────────────────────────────
+// Env-var placeholders rather than a literal host: the production domain is still
+// being settled, and a wrong hostname in a quickstart is worse than none.
+const SNIPPET = `curl "$ONETRADE_BASE/v1/chat/completions" \\
+  -H "Authorization: Bearer $ONETRADE_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "llama-3.1-8b",
+    "messages": [{"role": "user", "content": "Say hi in three words"}]
+  }'`
+
+const RESPONSE = `{
+  "model": "llama-3.1-8b",
+  "choices": [{ "message": { "content": "Hi there friend" } }],
+  "usage": { "prompt_tokens": 14, "completion_tokens": 4, "total_tokens": 18 },
+  "x_1trade": { "credit_type": "text", "credits_debited": "0.090000" }
+}`
+
+const copied = ref(false)
+/** Copy the quickstart to the clipboard, with a short confirmation. */
+const copySnippet = async () => {
+  try {
+    await navigator.clipboard.writeText(SNIPPET)
+    copied.value = true
+    setTimeout(() => { copied.value = false }, 1800)
+  } catch { /* clipboard blocked — the snippet is selectable anyway */ }
+}
 </script>
 
 <template>
-  <article class="home" :class="{ 'reveal-on': revealReady }">
-    <!-- ═══════════════════════════════════════════════════════
-         HERO
-         ═══════════════════════════════════════════════════════ -->
-    <section class="hero grid-bg">
-      <div class="container-x">
-        <div class="eyebrow"><span class="dot" />The commodity market for AI compute</div>
+  <article class="hm" :class="{ 'reveal-on': revealReady }">
 
-        <h1 class="hero-display tnum">
-          AI compute,<br />but <span class="hi">tradeable</span>.
-        </h1>
-
-        <p class="hero-lede">
-          Tradeable credits connecting GPU datacenters, traders, and AI companies.
-          Owned underlying for credibility. Partner-supplied scale.
-        </p>
-
-        <!-- Live ticker + sparkline -->
-        <div class="ticker-row">
-          <div class="ticker">
-            <span class="live-dot" />
-            <div>
-              <div class="t-label">Exascale AI Index</div>
-              <div class="t-line">
-                <span class="t-value" :class="tkFlash">$1 = <span>{{ tkNum }}</span> AI credits</span>
-                <span class="t-delta" :class="{ neg: tkDeltaNeg }">{{ tkDelta }}</span>
-              </div>
-            </div>
-            <span class="t-sep" />
-            <span class="t-meta">Last print 16:00 UTC · Next in <span>{{ tkNext }}</span></span>
+    <!-- ══════════════ HERO — what you can buy today ══════════════ -->
+    <section class="hm-hero">
+      <div class="hm-wrap hm-hero-grid">
+        <div class="hm-hero-copy">
+          <p class="hm-eyebrow"><span class="hm-live" />Inference · GPUs · prepaid credits — live now</p>
+          <h1 class="hm-h1">Buy compute once.<br>Spend it <span class="hm-gold">anywhere</span>.</h1>
+          <p class="hm-lede">
+            {{ MODEL_COUNT }} models across {{ MODALITY_COUNT }} modalities, GPU instances from L40S
+            to GB300, and an OpenAI-compatible API — all drawn from a single prepaid balance,
+            metered to six decimal places.
+          </p>
+          <div class="hm-cta-row">
+            <BaseButton as="a" :href="'/signup'" variant="primary" size="lg">Start building</BaseButton>
+            <a href="#api" class="hm-link-cta">Read the API →</a>
           </div>
-
-          <svg class="sparkline" viewBox="0 0 240 64" preserveAspectRatio="none" aria-hidden="true">
-            <path class="fill" :d="sparkFillD" />
-            <path class="line" :d="sparkLineD" />
-          </svg>
+          <p class="hm-hero-note">No minimum. Credits never expire. Paper mode by default.</p>
         </div>
 
-        <div class="cta-row">
-          <BaseButton as="a" :href="'/signup'" variant="primary" size="lg">Open account</BaseButton>
-          <a href="#markets" class="btn-text">View markets →</a>
+        <!-- The characteristic artefact of this product: a metered API call. -->
+        <div class="hm-term" aria-label="Example API request and response">
+          <div class="hm-term-bar">
+            <span class="hm-term-dot" /><span class="hm-term-t">chat/completions</span>
+            <button class="hm-copy" type="button" @click="copySnippet">
+              {{ copied ? 'Copied' : 'Copy' }}
+            </button>
+          </div>
+          <pre class="hm-term-body"><code>{{ SNIPPET }}</code></pre>
+          <div class="hm-term-split">response</div>
+          <pre class="hm-term-body hm-term-res"><code>{{ RESPONSE }}</code></pre>
         </div>
       </div>
     </section>
 
+    <!-- ══════════════ PLATFORM — the three things you buy ══════════════ -->
+    <section id="platform" class="hm-band">
+      <div class="hm-wrap">
+        <header class="hm-shead reveal">
+          <p class="hm-kicker">The platform</p>
+          <h2 class="hm-h2">Three products. One balance.</h2>
+        </header>
 
-    <!-- ═══════════════════════════════════════════════════════
-         THE PROBLEM
-         ═══════════════════════════════════════════════════════ -->
-    <section class="band elevated" id="problem">
-      <div class="container-x">
-        <div class="eyebrow center reveal"><span class="dot" />The problem</div>
-        <p class="pullquote reveal">There needs to be a market for compute. No solution yet.</p>
-        <p class="quote-attr reveal">— <span class="name">Larry Fink</span> · CEO, BlackRock · 2026</p>
-
-        <div class="stat-grid reveal-stagger">
-          <div>
-            <div class="stat-num tnum"><span class="lime">$200B+</span></div>
-            <p class="stat-desc">Annual global GPU compute spend, untraded.</p>
-          </div>
-          <div>
-            <div class="stat-num tnum"><span class="lime">5–10×</span></div>
-            <p class="stat-desc">Spread between reserved and spot pricing.</p>
-          </div>
-          <div>
-            <div class="stat-num tnum"><span class="lime">0</span></div>
-            <p class="stat-desc">Functioning venues for AI compute as an asset class.</p>
-          </div>
+        <div class="hm-layers">
+          <article v-for="l in layers" :key="l.id" class="hm-layer reveal">
+            <p class="hm-kicker hm-kicker-sm">{{ l.kicker }}</p>
+            <h3 class="hm-layer-t">{{ l.title }}</h3>
+            <p class="hm-stat"><span class="hm-stat-n">{{ l.stat }}</span><span class="hm-stat-l">{{ l.statLabel }}</span></p>
+            <p class="hm-layer-b">{{ l.body }}</p>
+            <ul class="hm-chips">
+              <li v-for="i in l.items" :key="i">{{ i }}</li>
+            </ul>
+            <NuxtLink :to="l.to" class="hm-link-cta hm-link-sm">{{ l.cta }} →</NuxtLink>
+          </article>
         </div>
       </div>
     </section>
 
+    <!-- ══════════════ CREDITS — the mechanic ══════════════ -->
+    <section id="credits" class="hm-band hm-band-alt">
+      <div class="hm-wrap">
+        <header class="hm-shead reveal">
+          <p class="hm-kicker">Credits</p>
+          <h2 class="hm-h2">Prepay in one unit.<br>Spend it as any other.</h2>
+          <p class="hm-sub">
+            An <code>ai_index</code> credit is the umbrella unit. It converts into whatever a job
+            actually consumes, so you fund the account rather than each product.
+          </p>
+        </header>
 
-    <!-- ═══════════════════════════════════════════════════════
-         HOW IT WORKS — three-sided market
-         ═══════════════════════════════════════════════════════ -->
-    <section class="band" id="markets">
-      <div class="container-x">
-        <div class="center reveal">
-          <div class="eyebrow center"><span class="dot" />How it works</div>
-          <h2 class="s-head">Three sides. One venue.</h2>
+        <ol class="hm-flow">
+          <li v-for="(f, i) in flow" :key="f.step" class="hm-flow-i reveal">
+            <span class="hm-flow-n">{{ String(i + 1).padStart(2, '0') }}</span>
+            <h3 class="hm-flow-t">{{ f.step }}</h3>
+            <p class="hm-flow-b">{{ f.body }}</p>
+            <ul v-if="f.codes.length" class="hm-chips hm-chips-tight">
+              <li v-for="c in f.codes" :key="c">{{ c }}</li>
+            </ul>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ══════════════ API ══════════════ -->
+    <section id="api" class="hm-band">
+      <div class="hm-wrap hm-api-grid">
+        <div class="reveal">
+          <p class="hm-kicker">The API</p>
+          <h2 class="hm-h2">If you can call OpenAI,<br>you can call this.</h2>
+          <p class="hm-sub">
+            Same request shape, same response shape. Change the base URL and the key, keep your
+            client library. Every response carries what it cost you, so metering is not a
+            month-end surprise.
+          </p>
+          <ul class="hm-ticks">
+            <li>Drop-in <code>/v1/chat/completions</code>, streaming supported</li>
+            <li>Per-call credit cost returned inline on every response</li>
+            <li>Scoped API keys, revocable per environment</li>
+            <li>Paper mode by default — real and paper balances never mix</li>
+          </ul>
         </div>
-
-        <!-- Diagram (SVG ported from design — exact geometry) -->
-        <div class="market-diagram reveal">
-          <svg viewBox="0 0 880 440" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <marker id="arr" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
-                <path d="M0,0 L8,3 L0,6 Z" fill="var(--text-3)" />
-              </marker>
-            </defs>
-
-            <!-- Central venue (dark) -->
-            <rect x="330" y="170" width="220" height="100" rx="2" fill="var(--inverse)" />
-            <text x="440" y="206" text-anchor="middle" font-family="JetBrains Mono" font-size="11" letter-spacing="3" fill="var(--text-3)">— EXASCALE</text>
-            <text x="440" y="236" text-anchor="middle" font-family="Inter Tight" font-weight="700" font-size="24" fill="var(--text-inverse)" letter-spacing="-0.5">Trading venue</text>
-
-            <!-- Supply -->
-            <g>
-              <rect x="40" y="40" width="220" height="92" rx="2" fill="var(--elevated)" stroke="var(--border)" />
-              <rect x="40" y="40" width="4" height="92" fill="var(--pos)" />
-              <text x="60" y="68" font-family="JetBrains Mono" font-size="10" letter-spacing="2.5" fill="var(--text-3)">— SUPPLY</text>
-              <text x="60" y="98" font-family="Inter Tight" font-weight="600" font-size="20" fill="var(--text)" letter-spacing="-0.4">GPU datacenters</text>
-              <text x="60" y="118" font-family="Inter" font-size="11" fill="var(--text-3)">Owned + partner capacity</text>
-            </g>
-
-            <!-- Liquidity -->
-            <g>
-              <rect x="330" y="0" width="220" height="92" rx="2" fill="var(--elevated)" stroke="var(--border)" />
-              <rect x="330" y="0" width="4" height="92" fill="var(--warn)" />
-              <text x="350" y="28" font-family="JetBrains Mono" font-size="10" letter-spacing="2.5" fill="var(--text-3)">— LIQUIDITY</text>
-              <text x="350" y="58" font-family="Inter Tight" font-weight="600" font-size="20" fill="var(--text)" letter-spacing="-0.4">Traders</text>
-              <text x="350" y="78" font-family="Inter" font-size="11" fill="var(--text-3)">Prop firms · hedge funds · MMs</text>
-            </g>
-
-            <!-- Demand -->
-            <g>
-              <rect x="620" y="40" width="220" height="92" rx="2" fill="var(--elevated)" stroke="var(--border)" />
-              <rect x="620" y="40" width="4" height="92" fill="var(--accent)" />
-              <text x="640" y="68" font-family="JetBrains Mono" font-size="10" letter-spacing="2.5" fill="var(--text-3)">— DEMAND</text>
-              <text x="640" y="98" font-family="Inter Tight" font-weight="600" font-size="20" fill="var(--text)" letter-spacing="-0.4">AI companies</text>
-              <text x="640" y="118" font-family="Inter" font-size="11" fill="var(--text-3)">Frontier labs · enterprises</text>
-            </g>
-
-            <!-- Arrows in -->
-            <path d="M 195 132 L 360 175" stroke="var(--text-3)" stroke-width="1" fill="none" marker-end="url(#arr)" opacity="0.55" />
-            <path d="M 440 92  L 440 165" stroke="var(--text-3)" stroke-width="1" fill="none" marker-end="url(#arr)" opacity="0.55" />
-            <path d="M 685 132 L 520 175" stroke="var(--text-3)" stroke-width="1" fill="none" marker-end="url(#arr)" opacity="0.55" />
-
-            <!-- Arrows out -->
-            <path d="M 360 265 L 195 305" stroke="var(--text-3)" stroke-width="1" fill="none" marker-end="url(#arr)" opacity="0.35" stroke-dasharray="4 4" />
-            <path d="M 520 265 L 685 305" stroke="var(--text-3)" stroke-width="1" fill="none" marker-end="url(#arr)" opacity="0.35" stroke-dasharray="4 4" />
-
-            <!-- Verb cards -->
-            <g>
-              <rect x="40" y="290" width="220" height="64" rx="2" fill="var(--canvas)" />
-              <text x="150" y="318" text-anchor="middle" font-family="Inter" font-size="13" fill="var(--text-3)">List idle credits</text>
-              <text x="150" y="338" text-anchor="middle" font-family="Inter" font-size="13" fill="var(--text-3)">Receive payment</text>
-            </g>
-            <g>
-              <rect x="620" y="290" width="220" height="64" rx="2" fill="var(--canvas)" />
-              <text x="730" y="318" text-anchor="middle" font-family="Inter" font-size="13" fill="var(--text-3)">Buy credits ahead</text>
-              <text x="730" y="338" text-anchor="middle" font-family="Inter" font-size="13" fill="var(--text-3)">Redeem for compute</text>
-            </g>
-            <g>
-              <rect x="330" y="380" width="220" height="50" rx="2" fill="var(--canvas)" />
-              <text x="440" y="403" text-anchor="middle" font-family="Inter" font-size="13" fill="var(--text-3)">Provide liquidity</text>
-              <text x="440" y="421" text-anchor="middle" font-family="Inter" font-size="13" fill="var(--text-3)">Earn spread + maker rebates</text>
-            </g>
-          </svg>
-        </div>
-
-        <!-- Three role columns -->
-        <div class="role-grid reveal-stagger">
-          <div>
-            <div class="eyebrow pos"><span class="dot pos" />Supply</div>
-            <h4 class="role-title">GPU datacenters</h4>
-            <p class="role-text">List unused capacity for sale as standardized credits. Cryptographic SLA receipts on every listing.</p>
-            <ul class="role-list">
-              <li>Owned datacenter (H100 / H200)</li>
-              <li>Partner neoclouds at scale</li>
-              <li>Per-second metering</li>
-            </ul>
+        <div class="hm-api-side reveal">
+          <div class="hm-kv">
+            <div class="hm-kv-i"><span class="hm-kv-k">Endpoint</span><span class="hm-kv-v">/v1/chat/completions</span></div>
+            <div class="hm-kv-i"><span class="hm-kv-k">Auth</span><span class="hm-kv-v">Bearer key</span></div>
+            <div class="hm-kv-i"><span class="hm-kv-k">Metering</span><span class="hm-kv-v">NUMERIC(20,6)</span></div>
+            <div class="hm-kv-i"><span class="hm-kv-k">Settlement</span><span class="hm-kv-v">async, ~1s</span></div>
           </div>
-          <div>
-            <div class="eyebrow warn"><span class="dot warn" />Liquidity</div>
-            <h4 class="role-title">Traders</h4>
-            <p class="role-text">Prop firms, commodity hedge funds, and quant desks bring price discovery to an asset class that hasn't had any.</p>
-            <ul class="role-list">
-              <li>Maker-taker fee schedule</li>
-              <li>Paper trading from day one</li>
-              <li>Surveillance + market integrity</li>
-            </ul>
-          </div>
-          <div>
-            <div class="eyebrow info"><span class="dot info" />Demand</div>
-            <h4 class="role-title">AI companies</h4>
-            <p class="role-text">Frontier labs, mid-market AI, and financial-services teams hedge spend ahead of need. Redeem for real compute.</p>
-            <ul class="role-list">
-              <li>Lock in cost months ahead</li>
-              <li>OpenAI-compatible inference</li>
-              <li>Treasury-grade reporting</li>
-            </ul>
-          </div>
+          <p class="hm-note">
+            Usage is published on <code>inference.usage.v1</code> and settled by the ledger a
+            moment after the call returns — balances move on their own, without a reconciliation job.
+          </p>
         </div>
       </div>
     </section>
 
+    <!-- ══════════════ INDEX ══════════════ -->
+    <section class="hm-band hm-band-alt">
+      <div class="hm-wrap">
+        <header class="hm-shead reveal">
+          <p class="hm-kicker">The index</p>
+          <h2 class="hm-h2">One published price<br>for AI compute.</h2>
+          <p class="hm-sub">
+            Credits are priced off a daily index rather than a private rate card. The methodology
+            is public and every print is hash-chained, so a historical value can be re-derived
+            instead of taken on trust.
+          </p>
+        </header>
 
-    <!-- ═══════════════════════════════════════════════════════
-         THE PRODUCTS — three stacked cards
-         ═══════════════════════════════════════════════════════ -->
-    <section class="band elevated" id="products">
-      <div class="container-x">
-        <div class="eyebrow reveal"><span class="dot" />The products</div>
-        <h2 class="s-head wide reveal">One venue. Three<br />integrated layers.</h2>
-
-        <div class="products reveal-stagger">
-          <!-- Trading -->
-          <div class="product-card">
-            <div class="p-left">
-              <div class="eyebrow pos"><span class="dot pos" />Trading layer</div>
-              <h3 class="p-head">Order book.<br />Market maker.<br />Daily index.</h3>
-              <p class="p-text">
-                AI credits and GPU credits as tradeable instruments. Maker-taker fees, volume-tiered. Surveillance from day one.
-              </p>
-              <NuxtLink to="/trade" class="btn-text p-link">Explore the trading layer →</NuxtLink>
-            </div>
-            <div class="p-right inverse">
-              <div class="ob-mini">
-                <div class="ob-head">
-                  <span>Price</span><span class="right">Size</span><span class="right">Total</span>
-                </div>
-                <div v-for="(r, i) in obAsks" :key="`a-${i}`" class="ob-row ask">
-                  <div class="bar" :style="{ width: `${r.bar}%` }" />
-                  <span class="px">{{ r.px }}</span>
-                  <span class="right">{{ r.sz }}</span>
-                  <span class="right">{{ r.tot }}</span>
-                </div>
-                <div class="ob-mid tnum">
-                  {{ obMidLabel }}
-                  <span class="ob-spread">spread 0.20%</span>
-                </div>
-                <div v-for="(r, i) in obBids" :key="`b-${i}`" class="ob-row bid">
-                  <div class="bar" :style="{ width: `${r.bar}%` }" />
-                  <span class="px">{{ r.px }}</span>
-                  <span class="right">{{ r.sz }}</span>
-                  <span class="right">{{ r.tot }}</span>
+        <div class="hm-idx reveal">
+          <div class="hm-idx-head">
+            <div class="hm-ticker">
+              <span class="hm-live" />
+              <div>
+                <div class="hm-t-label">1TRADE AI Index</div>
+                <div class="hm-t-line">
+                  <span class="hm-t-val" :class="tkFlash">$1 = <span>{{ tkNum }}</span> credits</span>
+                  <span class="hm-t-delta" :class="{ neg: tkDeltaNeg }">{{ tkDelta }}</span>
                 </div>
               </div>
             </div>
-          </div>
-
-          <!-- Inference -->
-          <div class="product-card">
-            <div class="p-left">
-              <div class="eyebrow warn"><span class="dot warn" />Inference layer</div>
-              <h3 class="p-head">Curated SoTA models.<br />OpenAI-compatible API.</h3>
-              <p class="p-text">
-                Top 3–5 open models per category — text, speech, image, video, niche. Multi-tenant per GPU. Quarterly catalog refresh.
-              </p>
-              <NuxtLink to="/inference" class="btn-text p-link">Open the model catalog →</NuxtLink>
-            </div>
-            <div class="p-right inverse">
-              <pre class="term"><span class="prompt">POST</span> https://api.exascale.com/v1/chat/completions
-<span class="dim">Authorization: Bearer ex_live_...</span>
-<span class="dim">Content-Type: application/json</span>
-
-{
-  <span class="ok">"model"</span>: <span class="ok">"meta/llama-3.3-70b"</span>,
-  <span class="ok">"messages"</span>: [
-    { <span class="ok">"role"</span>: <span class="ok">"user"</span>, <span class="ok">"content"</span>: <span class="ok">"Summarize..."</span> }
-  ]
-}
-
-<span class="dim">→ 200 OK · 412 ms · 1,284 tokens · 1.55 text credits</span></pre>
+            <div class="hm-idx-meta">
+              <svg class="hm-spark" viewBox="0 0 240 64" preserveAspectRatio="none" aria-hidden="true">
+                <path class="hm-spark-f" :d="sparkFillD" />
+                <path class="hm-spark-l" :d="sparkLineD" />
+              </svg>
+              <span class="hm-note-sm">Next print in {{ tkNext }} · 16:00 UTC</span>
             </div>
           </div>
 
-          <!-- Compute -->
-          <div class="product-card">
-            <div class="p-left">
-              <div class="eyebrow info"><span class="dot info" />Compute layer</div>
-              <h3 class="p-head">H100 / H200 capacity.<br />CLI-first. Free egress.</h3>
-              <p class="p-text">
-                Owned datacenter underlying for trade settlement. Per-second metering. Pay with credits or cash. No region lock-in.
-              </p>
-              <NuxtLink to="/compute" class="btn-text p-link">Browse instance types →</NuxtLink>
-            </div>
-            <div class="p-right inverse">
-              <pre class="term"><span class="prompt">$</span> exascale instances launch \
-    --type   h100.8x \
-    --hours  24 \
-    --pay-with credits
-
-<span class="ok">✓</span> Reserved · 8 × H100 80GB · TYO-1
-  Hourly         <span class="dim">$2.99 / GPU-hr</span>
-  Estimated cost <span class="dim">$574.08 → 5,710 H100 credits</span>
-  SSH ready in   <span class="dim">~ 90s</span>
-
-<span class="ok">✓</span> Connected   <span class="dim">ssh ubuntu@ex-h100-tyo1-04.exascale.com</span></pre>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-
-    <!-- ═══════════════════════════════════════════════════════
-         THE EXASCALE AI INDEX
-         ═══════════════════════════════════════════════════════ -->
-    <section class="band" id="index">
-      <div class="container-x">
-        <div class="eyebrow reveal"><span class="dot" />The Exascale AI Index</div>
-        <h2 class="s-head wide reveal">The price of AI compute,<br />published daily.</h2>
-        <p class="lede reveal">
-          An audited, methodology-public reference index. Trimmed mean across constituent venues
-          with volume floors and ECP attestation.
-        </p>
-
-        <div class="chart-wrap reveal">
-          <div class="ch-head">
-            <div>
-              <div class="eyebrow"><span class="dot" />EXASCALE AI INDEX · 365D</div>
-              <div class="ch-val tnum">
-                1.0024 <span class="pos">▲ 0.18%</span>
-              </div>
-            </div>
-            <NuxtLink to="/benchmark" class="btn-text small">View methodology →</NuxtLink>
-          </div>
-
-          <div class="ch-canvas-wrap">
-            <canvas ref="indexCanvas" />
+          <div class="hm-chart-wrap">
+            <canvas ref="indexCanvas" class="hm-chart" aria-label="1TRADE AI Index, trailing 365 days" />
             <div
-              class="chart-tip"
-              :style="{ left: `${chartTipPos.x}px`, top: `${chartTipPos.y}px`, opacity: chartTipPos.opacity }"
+              class="hm-tip"
+              :style="{ left: chartTipPos.x + 'px', top: chartTipPos.y + 'px', opacity: chartTipPos.opacity }"
             >
-              <div class="tip-lbl">— Index</div>
-              <div class="tip-val tnum">{{ chartTipVal }}</div>
-              <div class="tip-date">{{ chartTipDate }}</div>
+              <strong>{{ chartTipVal }}</strong><span>{{ chartTipDate }}</span>
             </div>
           </div>
 
-          <div class="ch-stats">
-            <div>
-              <div class="eyebrow">— Current</div>
-              <div class="ch-stat tnum">1.0024</div>
-            </div>
-            <div>
-              <div class="eyebrow">— Yesterday</div>
-              <div class="ch-stat tnum">1.0006</div>
-            </div>
-            <div>
-              <div class="eyebrow">— 7d</div>
-              <div class="ch-stat tnum neg">−0.42%</div>
-            </div>
-            <div>
-              <div class="eyebrow">— 30d</div>
-              <div class="ch-stat tnum pos">+2.31%</div>
-            </div>
-            <div>
-              <div class="eyebrow">— YTD</div>
-              <div class="ch-stat tnum pos">+4.18%</div>
-            </div>
-          </div>
+          <p class="hm-disclaimer">
+            <strong>Illustrative.</strong> The index service is not yet in production — the series
+            above is simulated for demonstration. Live prints begin with the index launch; the
+            methodology is published at
+            <NuxtLink to="/benchmark">/benchmark</NuxtLink>.
+          </p>
         </div>
       </div>
     </section>
 
+    <!-- ══════════════ EXCHANGE — the thesis, honestly staged ══════════════ -->
+    <section id="exchange" class="hm-band hm-exch">
+      <div class="hm-wrap hm-exch-grid">
+        <div class="reveal">
+          <p class="hm-kicker">Where this goes</p>
+          <h2 class="hm-h2 hm-h2-lg">Compute is the new oil.<br><span class="hm-gold">1TRADE is the exchange.</span></h2>
+          <p class="hm-sub">
+            Every commodity that mattered eventually got a market: a public price, someone willing
+            to quote both sides, and instruments to hedge with. Compute has none of that yet — it
+            has bilateral contracts and waiting lists.
+          </p>
+          <p class="hm-sub">
+            The platform above is the foundation: real capacity, a real unit of account, a real
+            audit trail. The venue is designed and built against a mock matching engine today.
+          </p>
+          <p class="hm-status">
+            <span class="hm-status-pill">In design</span>
+            Order book, market maker and dated contracts are specified and running in paper mode.
+            The venue opens when the licence does — we are not taking trading accounts before then.
+          </p>
+        </div>
 
-    <!-- ═══════════════════════════════════════════════════════
-         FOR DIFFERENT AUDIENCES
-         ═══════════════════════════════════════════════════════ -->
-    <section class="band elevated">
-      <div class="container-x">
-        <div class="eyebrow reveal"><span class="dot" />Built for</div>
-        <h2 class="s-head wide reveal">Three audiences.<br />One product.</h2>
+        <!-- Illustrative depth preview. Labelled, so it is not mistaken for a live book. -->
+        <aside class="hm-ob reveal" aria-label="Illustrative order book">
+          <div class="hm-ob-head"><span>Order book</span><span class="hm-ob-tag">Illustrative</span></div>
+          <div class="hm-ob-rows">
+            <div v-for="a in obAsks" :key="'a' + a.px" class="hm-ob-r">
+              <span class="hm-ob-bar hm-ob-bar-a" :style="{ width: a.bar + '%' }" />
+              <span class="hm-ob-px hm-neg">{{ a.px }}</span><span class="hm-ob-sz">{{ a.sz }}</span>
+            </div>
+            <div class="hm-ob-mid"><span>{{ obMidLabel }}</span><span class="hm-ob-mid-l">mid</span></div>
+            <div v-for="b in obBids" :key="'b' + b.px" class="hm-ob-r">
+              <span class="hm-ob-bar hm-ob-bar-b" :style="{ width: b.bar + '%' }" />
+              <span class="hm-ob-px hm-pos">{{ b.px }}</span><span class="hm-ob-sz">{{ b.sz }}</span>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
 
-        <div class="aud-grid reveal-stagger">
-          <div class="aud-card">
-            <h4>For traders</h4>
-            <p>Maker-taker fees from 1% / 0.5% down to 0.10% / 0.00% above $1B notional. Paper trading from day one; real money in v1.5.</p>
-            <ul>
-              <li>Maker rebates on volume tiers</li>
-              <li>FIX gateway (Q3 2026)</li>
-              <li>Level-2 market data, 25ms tick</li>
-              <li>Cross-venue arbitrage routing</li>
-            </ul>
-            <NuxtLink to="/trade" class="aud-link">Open the trading desk →</NuxtLink>
-          </div>
-          <div class="aud-card">
-            <h4>For AI companies</h4>
-            <p>Buy credits ahead, redeem for actual compute or inference. Multi-currency (USD, JPY). Bulk procurement with treasury controls.</p>
-            <ul>
-              <li>Bulk credit purchase with NET-30</li>
-              <li>OpenAI-compatible API, drop-in</li>
-              <li>Free egress, no region lock-in</li>
-              <li>Per-team spend caps + reporting</li>
-            </ul>
-            <a href="mailto:sales@exascale.ai?subject=Enterprise%20inquiry" class="aud-link">Talk to enterprise sales →</a>
-          </div>
-          <div class="aud-card">
-            <h4>For datacenter partners</h4>
-            <p>Monetize idle reserved capacity. Standardized credit issuance with cryptographic receipts. Settlement via existing payment rails.</p>
-            <ul>
-              <li>Market access on day one</li>
-              <li>Per-instance utilization API</li>
-              <li>Custodial credit issuance</li>
-              <li>Pay-outs USD, JPY, stablecoin (v2)</li>
-            </ul>
-            <NuxtLink to="/datacenter/register" class="aud-link">Join the partner program →</NuxtLink>
-          </div>
+    <!-- ══════════════ AUDIENCES — one section, not three ══════════════ -->
+    <section class="hm-band hm-band-alt">
+      <div class="hm-wrap">
+        <header class="hm-shead reveal">
+          <p class="hm-kicker">Who it's for</p>
+          <h2 class="hm-h2">Three sides of one market.</h2>
+        </header>
+        <div class="hm-aud">
+          <article v-for="a in audiences" :key="a.who" class="hm-aud-i reveal">
+            <div class="hm-aud-top">
+              <h3 class="hm-aud-t">{{ a.who }}</h3>
+              <span class="hm-badge" :class="a.live ? 'is-live' : 'is-soon'">{{ a.live ? 'Live' : 'Paused' }}</span>
+            </div>
+            <p class="hm-aud-b">{{ a.body }}</p>
+            <NuxtLink :to="a.to" class="hm-link-cta hm-link-sm">{{ a.cta }} →</NuxtLink>
+          </article>
         </div>
       </div>
     </section>
 
-
-    <!-- ═══════════════════════════════════════════════════════
-         TRUST STRIP
-         ═══════════════════════════════════════════════════════ -->
-    <section class="trust-band">
-      <div class="container-x">
-        <div class="trust-strip reveal-stagger">
-          <div>
-            <span class="t-lbl">— Security</span>
-            SOC 2 Type I path · Annual audits
-          </div>
-          <div>
-            <span class="t-lbl">— Index</span>
-            Methodology audited externally
-          </div>
-          <div>
-            <span class="t-lbl">— Market integrity</span>
-            Surveillance from day one
-          </div>
-          <div>
-            <span class="t-lbl">— Anchor partner</span>
-            UBS Japan · Financial services
-          </div>
-        </div>
+    <!-- ══════════════ TRUST ══════════════ -->
+    <section class="hm-trust">
+      <div class="hm-wrap hm-trust-grid">
+        <div class="hm-trust-i"><span class="hm-trust-k">Ledger</span><span class="hm-trust-v">Append-only, hash-chained</span></div>
+        <div class="hm-trust-i"><span class="hm-trust-k">Money math</span><span class="hm-trust-v">Fixed-point, 6 dp</span></div>
+        <div class="hm-trust-i"><span class="hm-trust-k">Isolation</span><span class="hm-trust-v">Paper never touches real</span></div>
+        <div class="hm-trust-i"><span class="hm-trust-k">Index</span><span class="hm-trust-v">Public methodology</span></div>
+        <div class="hm-trust-i"><span class="hm-trust-k">Status</span><span class="hm-trust-v"><NuxtLink to="/status">Live uptime →</NuxtLink></span></div>
       </div>
     </section>
 
-
-    <!-- ═══════════════════════════════════════════════════════
-         FOOTER CTA
-         ═══════════════════════════════════════════════════════ -->
-    <section id="cta" class="band cta-band">
-      <div class="container-x center">
-        <h2 class="cta-head reveal">
-          Open an account<br />in <span class="hi">5 minutes</span>.
-        </h2>
-        <p class="cta-sub reveal">
-          Paper trading available immediately. Real-money trading in v1.5 with full KYC. Bring your own custody at launch.
+    <!-- ══════════════ CTA ══════════════ -->
+    <section class="hm-cta">
+      <div class="hm-wrap hm-cta-in reveal">
+        <h2 class="hm-h2 hm-h2-lg">Start with a test key<br>and $0 committed.</h2>
+        <p class="hm-sub hm-sub-c">
+          Sign up, mint paper credits, and make a metered call in under five minutes. Move to real
+          money when you're ready — the API doesn't change.
         </p>
-        <div class="cta-actions">
-          <BaseButton as="a" :href="'/signup'" variant="primary" size="lg">Open account</BaseButton>
-          <a href="mailto:sales@exascale.ai?subject=Enterprise%20inquiry" class="btn-text">Talk to enterprise sales →</a>
+        <div class="hm-cta-row hm-cta-row-c">
+          <BaseButton as="a" :href="'/signup'" variant="primary" size="lg">Open an account</BaseButton>
+          <a href="#platform" class="hm-link-cta">See what's included →</a>
         </div>
+        <p class="hm-note-sm hm-note-c">Index now: $1 = {{ footerIdx }} credits</p>
       </div>
     </section>
-
-    <!-- Fixed floating CTA — opens the persona picker / guided tour -->
-    <NuxtLink to="/onboarding/tour" class="tour-fab" aria-label="Take the guided product tour">
-      <span class="fab-dot" aria-hidden="true" />
-      <span class="fab-eyebrow">GUIDED TOUR</span>
-      <span class="fab-title">See the venue your way</span>
-      <span class="fab-arrow" aria-hidden="true">→</span>
-    </NuxtLink>
   </article>
 </template>
 
 <style scoped>
-/* ─── Layout primitives ─── */
-.container-x {
-  max-width: 1280px;
+/* All landing styles are `hm-` prefixed so they cannot collide with the global
+   marketing classes the previous version shared with other pages. */
+.hm {
+  --hm-gutter: clamp(20px, 5vw, 64px);
+  --hm-max: 1240px;
+  background: var(--canvas);
+  color: var(--text);
+  overflow-x: clip;
+}
+
+.hm-wrap {
+  max-width: var(--hm-max);
   margin: 0 auto;
-  padding: 0 var(--sp-6);
+  padding: 0 var(--hm-gutter);
 }
 
-.band { padding: var(--sp-10) 0; }
-
-.band.elevated {
-  background: var(--elevated);
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
-}
-
-.center { text-align: center; }
-
-
-/* ─── Eyebrow label ─── */
-.eyebrow {
-  display: inline-flex;
+/* ── shared type ── */
+.hm-eyebrow,
+.hm-kicker {
+  display: flex;
   align-items: center;
-  gap: var(--sp-3);
+  gap: var(--sp-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-tiny);
+  letter-spacing: var(--ls-wide);
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin: 0 0 var(--sp-4);
+}
+.hm-kicker { color: var(--brand); }
+.hm-kicker-sm { margin-bottom: var(--sp-2); }
+
+.hm-h1 {
+  font-family: var(--font-display);
+  font-size: clamp(40px, 6.4vw, 74px);
+  font-weight: 700;
+  line-height: var(--lh-tight);
+  letter-spacing: var(--ls-tight);
+  margin: 0 0 var(--sp-5);
+  text-wrap: balance;
+}
+.hm-h2 {
+  font-family: var(--font-display);
+  font-size: clamp(27px, 3.4vw, 40px);
+  font-weight: 600;
+  line-height: var(--lh-snug);
+  letter-spacing: var(--ls-snug);
+  margin: 0 0 var(--sp-4);
+  text-wrap: balance;
+}
+.hm-h2-lg { font-size: clamp(31px, 4.4vw, 52px); }
+.hm-gold { color: var(--brand); }
+
+.hm-lede {
+  font-size: var(--fs-lg);
+  line-height: var(--lh-relax);
+  color: var(--text-2);
+  max-width: 56ch;
+  margin: 0 0 var(--sp-6);
+}
+.hm-sub {
+  font-size: var(--fs-md);
+  line-height: var(--lh-relax);
+  color: var(--text-2);
+  max-width: 62ch;
+  margin: 0 0 var(--sp-4);
+}
+.hm-sub-c { margin-left: auto; margin-right: auto; }
+
+.hm-live {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--pos); flex: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--pos) 22%, transparent);
+  animation: hm-pulse 2.4s ease-in-out infinite;
+}
+@keyframes hm-pulse { 50% { opacity: 0.45; } }
+
+/* ── hero ── */
+.hm-hero {
+  padding: clamp(64px, 11vh, 132px) 0 clamp(48px, 8vh, 96px);
+  border-bottom: 1px solid var(--border);
+  /* faint gold wash from the top-right, the only ambient flourish on the page */
+  background:
+    radial-gradient(120% 90% at 88% -20%, color-mix(in srgb, var(--brand) 11%, transparent), transparent 62%);
+}
+.hm-hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  gap: clamp(32px, 5vw, 72px);
+  align-items: center;
+}
+.hm-hero-note {
   font-family: var(--font-mono);
   font-size: var(--fs-xs);
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  font-weight: 500;
   color: var(--text-3);
+  margin: var(--sp-5) 0 0;
 }
+.hm-cta-row { display: flex; align-items: center; gap: var(--sp-5); flex-wrap: wrap; }
+.hm-cta-row-c { justify-content: center; }
 
-.eyebrow.center { justify-content: center; display: flex; }
-
-.eyebrow .dot {
-  width: 6px;
-  height: 6px;
-  background: var(--brand);
-  display: inline-block;
-  border-radius: 0;
-}
-
-.eyebrow.pos  { color: var(--pos); }
-.eyebrow.pos  .dot { background: var(--pos); }
-.eyebrow.warn { color: var(--warn); }
-.eyebrow.warn .dot { background: var(--warn); }
-.eyebrow.info { color: var(--accent); }
-.eyebrow.info .dot { background: var(--accent); }
-
-
-/* ─── Buttons (text link variant; primary uses BaseButton) ─── */
-.btn-text {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-2);
-  font-family: var(--font-sans);
-  font-size: 15px;
-  font-weight: 500;
-  letter-spacing: -0.005em;
-  color: var(--text);
-  text-decoration: none;
-  transition: color var(--dur) var(--ease);
-}
-
-.btn-text:hover { color: var(--accent); }
-.btn-text.small { font-size: var(--fs-sm); }
-
-
-/* ─── HERO ─── */
-.hero {
-  padding: 80px 0 128px;
-  position: relative;
-}
-
-.grid-bg {
-  background-image:
-    linear-gradient(rgba(0, 0, 0, 0.022) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 0, 0, 0.022) 1px, transparent 1px);
-  background-size: 56px 56px;
-}
-
-.hero-display {
-  font-family: var(--font-display);
-  font-size: 128px;
-  font-weight: 700;
-  line-height: 0.92;
-  letter-spacing: -0.045em;
-  margin-top: var(--sp-6);
-  margin-bottom: var(--sp-6);
-  max-width: 1180px;
-  color: var(--text);
-}
-
-.hero-display .hi,
-.cta-head .hi {
-  background: var(--brand);
-  padding: 0 0.04em;
-  line-height: 0.65;
-}
-
-.hero-lede {
-  font-size: 22px;
-  line-height: 1.5;
-  max-width: 720px;
-  color: var(--text-2);
-  margin: 0 0 var(--sp-7);
-  letter-spacing: -0.005em;
-}
-
-
-/* Ticker row (ticker + sparkline) */
-.ticker-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-5);
-  align-items: center;
-  margin-bottom: var(--sp-7);
-}
-
-/* Ticker */
-.ticker {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-4);
-  padding: 10px 18px;
-  background: var(--elevated);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  font-family: var(--font-mono);
-  font-size: var(--fs-sm);
-  font-variant-numeric: tabular-nums;
-}
-
-.live-dot {
-  width: 7px;
-  height: 7px;
-  background: var(--pos);
-  border-radius: 50%;
-  position: relative;
-  flex-shrink: 0;
-}
-
-.live-dot::after {
-  content: '';
-  position: absolute;
-  inset: -4px;
-  border-radius: 50%;
-  border: 1px solid var(--pos);
-  opacity: 0.5;
-  animation: ping 2s ease-out infinite;
-}
-
-@keyframes ping {
-  0%   { transform: scale(0.9); opacity: 0.6; }
-  100% { transform: scale(1.8); opacity: 0; }
-}
-
-.t-label {
-  color: var(--text-3);
-  font-size: 10px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-}
-
-.t-line {
-  display: flex;
-  align-items: baseline;
-  gap: 14px;
-  margin-top: 2px;
-}
-
-.t-value {
-  color: var(--text);
-  font-weight: 500;
-  transition: color 600ms ease-out;
-}
-
-.t-value.flash-up { color: var(--pos); }
-.t-value.flash-down { color: var(--neg); }
-
-.t-delta {
-  color: var(--pos);
-  font-weight: 500;
-}
-
-.t-delta.neg { color: var(--neg); }
-
-.t-sep {
-  height: 22px;
-  width: 1px;
-  background: var(--border);
-  margin: 0 4px;
-}
-
-.t-meta {
-  color: var(--text-3);
-  font-size: 11px;
-}
-
-
-/* Sparkline */
-.sparkline {
-  width: 240px;
-  height: 64px;
-  overflow: visible;
-}
-
-.sparkline path.line {
-  fill: none;
-  stroke: var(--text);
-  stroke-width: 1.5;
-  stroke-dasharray: 1200;
-  stroke-dashoffset: 1200;
-  animation: draw 1.6s cubic-bezier(0.2, 0, 0, 1) 0.3s forwards;
-}
-
-.sparkline path.fill {
-  fill: var(--brand);
-  fill-opacity: 0.15;
-  opacity: 0;
-  animation: fadein 1.4s ease-out 0.9s forwards;
-}
-
-@keyframes draw  { to { stroke-dashoffset: 0; } }
-@keyframes fadein{ to { opacity: 1; } }
-
-.cta-row {
-  display: flex;
-  gap: var(--sp-5);
-  align-items: center;
-}
-
-
-/* ─── Section headers ─── */
-.s-head {
-  font-family: var(--font-display);
-  font-size: 56px;
-  font-weight: 700;
-  line-height: 1.02;
-  letter-spacing: -0.035em;
-  color: var(--text);
-  margin: var(--sp-3) 0 0;
-}
-
-.s-head.wide { max-width: 800px; }
-
-.lede {
-  margin-top: var(--sp-5);
-  font-size: 18px;
-  color: var(--text-2);
-  max-width: 640px;
-  line-height: 1.55;
-}
-
-
-/* ─── Pull quote (problem) ─── */
-.pullquote {
-  font-family: var(--font-display);
-  font-size: 56px;
-  font-weight: 500;
-  line-height: 1.1;
-  letter-spacing: -0.025em;
-  color: var(--text);
-  font-style: italic;
-  text-align: center;
-  max-width: 1000px;
-  margin: var(--sp-7) auto 0;
-  position: relative;
-}
-
-.pullquote::before {
-  content: '"';
-  color: var(--brand);
-  font-style: normal;
-  font-weight: 700;
-  font-size: 96px;
-  line-height: 0;
-  margin-right: 6px;
-  vertical-align: -8px;
-}
-
-.quote-attr {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--text-3);
-  text-align: center;
-  margin: var(--sp-7) 0 0;
-}
-
-.quote-attr .name { color: var(--text); }
-
-.stat-grid {
-  margin-top: 112px;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--sp-8);
-}
-
-.stat-num {
-  font-family: var(--font-display);
-  font-size: 96px;
-  font-weight: 700;
-  line-height: 0.9;
-  letter-spacing: -0.04em;
-  color: var(--text);
-}
-
-.stat-num .lime {
-  background: var(--brand);
-  padding: 0 0.04em;
-}
-
-.stat-desc {
-  margin-top: var(--sp-4);
+.hm-link-cta {
   font-size: var(--fs-base);
-  color: var(--text-2);
-  line-height: 1.5;
-  max-width: 28ch;
-}
-
-
-/* ─── How it works diagram + roles ─── */
-.market-diagram {
-  width: 100%;
-  max-width: 880px;
-  margin: 80px auto 0;
-}
-
-.market-diagram svg {
-  width: 100%;
-  height: auto;
-}
-
-.role-grid {
-  margin-top: 72px;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 56px;
-}
-
-.role-title {
-  font-family: var(--font-display);
-  font-size: var(--fs-2xl);
   font-weight: 600;
-  letter-spacing: -0.02em;
-  margin: 12px 0 14px;
-  color: var(--text);
+  color: var(--brand);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color var(--dur) var(--ease);
 }
+.hm-link-cta:hover { border-bottom-color: var(--brand); }
+.hm-link-sm { font-size: var(--fs-sm); }
 
-.role-text {
-  font-size: 15px;
-  color: var(--text-2);
-  line-height: 1.6;
-  margin: 0 0 18px;
-}
-
-.role-list {
-  list-style: none;
-  padding-left: 18px;
-  font-size: var(--fs-base);
-  color: var(--text-2);
-  line-height: 1.55;
-  margin: 0;
-}
-
-.role-list li {
-  position: relative;
-  margin-bottom: 6px;
-}
-
-.role-list li::before {
-  content: '·';
-  position: absolute;
-  left: -18px;
-  opacity: 0.4;
-}
-
-
-/* ─── Product cards ─── */
-.products {
-  margin-top: 72px;
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-6);
-}
-
-.product-card {
-  display: grid;
-  grid-template-columns: 1fr 1.2fr;
-  gap: var(--sp-8);
-  align-items: stretch;
-  border: 1px solid var(--border);
+/* ── hero terminal ── */
+.hm-term {
   background: var(--elevated);
-  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-2);
   overflow: hidden;
+  min-width: 0;
 }
-
-.p-left {
-  padding: 56px 56px 56px 64px;
-  display: flex;
-  flex-direction: column;
+.hm-term-bar {
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--border);
+  background: var(--overlay);
 }
-
-.p-right {
-  padding: var(--sp-7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.hm-term-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--brand); flex: none; }
+.hm-term-t {
+  font-family: var(--font-mono); font-size: var(--fs-xs);
+  letter-spacing: var(--ls-tab); color: var(--text-3); flex: 1;
 }
-
-.p-right.inverse {
-  background: var(--inverse);
-  color: var(--text-inverse);
+.hm-copy {
+  font-family: var(--font-mono); font-size: var(--fs-tiny);
+  letter-spacing: var(--ls-tab); text-transform: uppercase;
+  color: var(--text-2); background: transparent;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 3px 8px; cursor: pointer;
+  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease);
 }
-
-.p-head {
-  font-family: var(--font-display);
-  font-size: 40px;
-  font-weight: 700;
-  line-height: 1.02;
-  letter-spacing: -0.03em;
-  margin: var(--sp-4) 0 18px;
-  color: var(--text);
-}
-
-.p-text {
-  font-size: var(--fs-md);
-  color: var(--text-2);
-  line-height: 1.55;
-  max-width: 44ch;
-  margin: 0;
-}
-
-.p-link {
-  margin-top: auto;
-  padding-top: var(--sp-5);
-}
-
-
-/* Mini order book in the trading card */
-.ob-mini {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  width: 100%;
-  max-width: 360px;
-}
-
-.ob-mini .ob-head {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  font-size: 9px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: rgba(232, 230, 224, 0.5);
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--border-on-dark);
-}
-
-.ob-mini .ob-head .right { text-align: right; }
-
-.ob-mini .ob-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  padding: 3px 0;
-  position: relative;
-}
-
-.ob-mini .ob-row .bar {
-  position: absolute;
-  right: 0;
-  top: 0;
-  bottom: 0;
-}
-
-.ob-mini .ob-row.ask { color: var(--text-inverse); }
-.ob-mini .ob-row.ask .px  { color: var(--neg); }
-.ob-mini .ob-row.ask .bar { background: rgba(239, 68, 68, 0.10); }
-.ob-mini .ob-row.bid .px  { color: var(--pos); }
-.ob-mini .ob-row.bid .bar { background: rgba(25, 195, 125, 0.10); }
-.ob-mini .ob-row > * { position: relative; text-align: right; }
-.ob-mini .ob-row > .px  { text-align: left; }
-.ob-mini .ob-row > .right { text-align: right; }
-
-.ob-mini .ob-mid {
-  text-align: center;
-  padding: 6px 0;
-  font-family: var(--font-display);
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  border-top: 1px solid var(--border-on-dark);
-  border-bottom: 1px solid var(--border-on-dark);
-  margin: 4px 0;
-  color: var(--text-inverse);
-}
-
-.ob-mini .ob-spread {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  opacity: 0.5;
-  margin-left: 8px;
-  font-weight: 400;
-}
-
-
-/* Terminal blocks */
-.term {
+.hm-copy:hover { color: var(--brand); border-color: var(--brand); }
+.hm-term-body {
+  margin: 0; padding: var(--sp-4);
+  overflow-x: auto;
   font-family: var(--font-mono);
   font-size: 12px;
-  line-height: 1.65;
-  color: var(--text-inverse);
-  width: 100%;
-  max-width: 420px;
-  margin: 0;
-  white-space: pre-wrap;
-}
-
-.term .prompt { color: rgba(232, 230, 224, 0.5); }
-.term .ok     { color: var(--brand); }
-.term .dim    { color: rgba(232, 230, 224, 0.55); }
-
-
-/* ─── Index chart ─── */
-.chart-wrap {
-  position: relative;
-  margin-top: 56px;
-  background: var(--elevated);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: var(--sp-6);
-}
-
-.ch-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin-bottom: var(--sp-5);
-}
-
-.ch-val {
-  font-family: var(--font-display);
-  font-size: 36px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  margin-top: 6px;
+  line-height: 1.7;
   color: var(--text);
+  tab-size: 2;
 }
-
-.ch-val .pos {
-  font-size: 18px;
-  font-weight: 500;
-}
-
-.ch-canvas-wrap {
-  position: relative;
-  height: 320px;
-}
-
-.ch-canvas-wrap canvas {
-  width: 100% !important;
-  height: 100% !important;
-}
-
-.chart-tip {
-  position: absolute;
-  pointer-events: none;
-  background: var(--inverse);
-  color: var(--text-inverse);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  padding: 8px 12px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-on-dark);
-  transform: translate(-50%, -120%);
-  transition: opacity 100ms;
-  white-space: nowrap;
-  z-index: 5;
-}
-
-.tip-lbl {
-  color: rgba(232, 230, 224, 0.55);
-  font-size: 9px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-}
-
-.tip-val { color: var(--text-inverse); font-size: 14px; }
-
-.tip-date {
-  font-size: 10px;
-  opacity: 0.6;
-}
-
-.ch-stats {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 0;
-  margin-top: var(--sp-6);
-  padding-top: var(--sp-5);
-  border-top: 1px solid var(--border);
-}
-
-.ch-stat {
-  font-family: var(--font-mono);
-  font-size: 22px;
-  font-weight: 500;
-  color: var(--text);
-  margin-top: 8px;
-}
-
-.ch-stat.pos { color: var(--pos); }
-.ch-stat.neg { color: var(--neg); }
-
-.pos { color: var(--pos); }
-.neg { color: var(--neg); }
-
-
-/* ─── Audience cards ─── */
-.aud-grid {
-  margin-top: 72px;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 56px;
-}
-
-.aud-card {
-  border-top: 1px solid var(--border);
-  padding-top: var(--sp-6);
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-.aud-card h4 {
-  font-family: var(--font-display);
-  font-size: 28px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1.1;
-  margin-bottom: var(--sp-4);
-  color: var(--text);
-}
-
-.aud-card p {
-  color: var(--text-2);
-  font-size: 15px;
-  line-height: 1.55;
-  margin-bottom: 20px;
-}
-
-.aud-card ul {
-  list-style: none;
-  padding: 0;
-  margin: 0 0 var(--sp-5);
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-2);
-}
-
-.aud-card li {
-  font-size: var(--fs-base);
-  color: var(--text-2);
-  padding-left: 18px;
-  position: relative;
-  line-height: 1.5;
-}
-
-.aud-card li::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 8px;
-  width: 8px;
-  height: 1px;
-  background: var(--text-3);
-}
-
-.aud-link {
-  color: var(--text);
-  font-weight: 500;
-  font-size: var(--fs-base);
-  margin-top: auto;
-  text-decoration: none;
-  border-bottom: 1px solid var(--text);
-  align-self: flex-start;
-  padding-bottom: 1px;
-}
-
-
-/* ─── Trust strip ─── */
-.trust-band {
-  padding: 64px 0;
-  background: var(--canvas);
-}
-
-.trust-strip {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 0;
-  background: var(--elevated);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-}
-
-.trust-strip > * {
-  padding: var(--sp-5) var(--sp-6);
-  border-right: 1px solid var(--border);
-  font-size: var(--fs-sm);
-  line-height: 1.5;
-  color: var(--text-2);
-}
-
-.trust-strip > *:last-child { border-right: none; }
-
-.t-lbl {
-  display: block;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
+.hm-term-split {
+  font-family: var(--font-mono); font-size: var(--fs-tiny);
+  letter-spacing: var(--ls-wide); text-transform: uppercase;
   color: var(--text-3);
-  margin-bottom: 6px;
+  padding: var(--sp-2) var(--sp-4);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: var(--overlay);
+}
+.hm-term-res { color: var(--text-2); }
+
+/* ── bands ── */
+.hm-band { padding: clamp(56px, 9vh, 108px) 0; border-bottom: 1px solid var(--border); }
+.hm-band-alt { background: var(--elevated); }
+.hm-shead { max-width: 62ch; margin-bottom: clamp(32px, 4vw, 56px); }
+
+/* ── layers ── */
+.hm-layers { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); }
+.hm-layer { background: var(--canvas); padding: clamp(20px, 2.4vw, 32px); display: flex; flex-direction: column; }
+.hm-band-alt .hm-layer { background: var(--elevated); }
+.hm-layer-t { font-size: var(--fs-xl); font-weight: 600; letter-spacing: var(--ls-near); margin: 0 0 var(--sp-3); }
+.hm-stat { display: flex; align-items: baseline; gap: var(--sp-2); margin: 0 0 var(--sp-4); padding-bottom: var(--sp-4); border-bottom: 1px solid var(--border); }
+.hm-stat-n { font-family: var(--font-mono); font-size: 34px; font-weight: 600; color: var(--brand); font-variant-numeric: tabular-nums; line-height: 1; }
+.hm-stat-l { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-3); }
+.hm-layer-b { font-size: var(--fs-sm); line-height: var(--lh-relax); color: var(--text-2); margin: 0 0 var(--sp-4); }
+.hm-chips { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; padding: 0; margin: 0 0 var(--sp-5); }
+.hm-chips-tight { margin-top: var(--sp-3); margin-bottom: 0; }
+.hm-chips li {
+  font-family: var(--font-mono); font-size: 10.5px;
+  color: var(--text-2); background: var(--overlay);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 3px 7px;
+}
+.hm-layer .hm-link-cta { margin-top: auto; align-self: flex-start; }
+
+/* ── credit flow ── */
+.hm-flow { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: clamp(20px, 2.6vw, 36px); }
+.hm-flow-i { border-top: 2px solid var(--brand); padding-top: var(--sp-4); }
+.hm-flow-n { font-family: var(--font-mono); font-size: var(--fs-tiny); letter-spacing: var(--ls-wide); color: var(--text-3); }
+.hm-flow-t { font-size: var(--fs-lg); font-weight: 600; letter-spacing: var(--ls-near); margin: var(--sp-2) 0 var(--sp-2); }
+.hm-flow-b { font-size: var(--fs-sm); line-height: var(--lh-relax); color: var(--text-2); margin: 0; }
+.hm-sub code,
+.hm-ticks code,
+.hm-note code {
+  font-family: var(--font-mono); font-size: 0.9em;
+  background: var(--overlay); border: 1px solid var(--border);
+  border-radius: 2px; padding: 1px 4px; color: var(--text);
 }
 
+/* ── api ── */
+.hm-api-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr); gap: clamp(32px, 5vw, 72px); align-items: start; }
+.hm-ticks { list-style: none; padding: 0; margin: var(--sp-5) 0 0; display: grid; gap: var(--sp-3); }
+.hm-ticks li {
+  position: relative; padding-left: 26px;
+  font-size: var(--fs-sm); color: var(--text-2); line-height: var(--lh-relax);
+}
+.hm-ticks li::before {
+  content: ""; position: absolute; left: 0; top: 9px;
+  width: 12px; height: 1px; background: var(--brand);
+}
+.hm-kv { display: grid; gap: 1px; background: var(--border); border: 1px solid var(--border); }
+.hm-kv-i { background: var(--canvas); padding: var(--sp-4); display: flex; justify-content: space-between; align-items: baseline; gap: var(--sp-3); }
+.hm-kv-k { font-family: var(--font-mono); font-size: var(--fs-tiny); letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--text-3); }
+.hm-kv-v { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text); text-align: right; }
+.hm-note { font-size: var(--fs-sm); line-height: var(--lh-relax); color: var(--text-2); margin: var(--sp-4) 0 0; }
+.hm-note-sm { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-3); }
+.hm-note-c { display: block; text-align: center; margin-top: var(--sp-5); }
 
-/* ─── CTA band ─── */
-.cta-band {
-  background: var(--canvas);
-  padding-top: 128px;
-  padding-bottom: 128px;
+/* ── index ── */
+.hm-idx { border: 1px solid var(--border); background: var(--canvas); }
+.hm-idx-head {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: var(--sp-5); flex-wrap: wrap;
+  padding: var(--sp-5); border-bottom: 1px solid var(--border);
 }
+.hm-ticker { display: flex; align-items: center; gap: var(--sp-3); }
+.hm-t-label { font-family: var(--font-mono); font-size: var(--fs-tiny); letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--text-3); }
+.hm-t-line { display: flex; align-items: baseline; gap: var(--sp-3); margin-top: 3px; }
+.hm-t-val { font-family: var(--font-mono); font-size: var(--fs-xl); font-variant-numeric: tabular-nums; transition: color 240ms var(--ease); }
+.hm-t-val.flash-up { color: var(--pos); }
+.hm-t-val.flash-down { color: var(--neg); }
+.hm-t-delta { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--pos); font-variant-numeric: tabular-nums; }
+.hm-t-delta.neg { color: var(--neg); }
+.hm-idx-meta { display: flex; align-items: center; gap: var(--sp-4); flex-wrap: wrap; }
+.hm-spark { width: 180px; height: 44px; display: block; }
+.hm-spark-l { fill: none; stroke: var(--brand); stroke-width: 1.5; }
+.hm-spark-f { fill: color-mix(in srgb, var(--brand) 16%, transparent); stroke: none; }
+.hm-chart-wrap { position: relative; padding: var(--sp-5); height: 320px; }
+.hm-chart { width: 100%; height: 100%; }
+.hm-tip {
+  position: absolute; transform: translate(-50%, -140%);
+  pointer-events: none; background: var(--overlay);
+  border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  padding: 5px 9px; display: grid; gap: 1px;
+  transition: opacity 120ms linear;
+}
+.hm-tip strong { font-family: var(--font-mono); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+.hm-tip span { font-family: var(--font-mono); font-size: 10px; color: var(--text-3); }
+.hm-disclaimer {
+  margin: 0; padding: var(--sp-4) var(--sp-5);
+  border-top: 1px solid var(--border);
+  font-size: var(--fs-xs); line-height: var(--lh-relax); color: var(--text-3);
+}
+.hm-disclaimer strong { color: var(--text-2); }
+.hm-disclaimer a { color: var(--brand); }
 
-.cta-head {
-  font-family: var(--font-display);
-  font-size: 88px;
-  font-weight: 700;
-  line-height: 0.96;
-  letter-spacing: -0.04em;
-  max-width: 1100px;
-  margin: 0 auto;
-  color: var(--text);
+/* ── exchange ── */
+.hm-exch {
+  background:
+    radial-gradient(90% 120% at 100% 50%, color-mix(in srgb, var(--brand) 9%, transparent), transparent 60%),
+    var(--canvas);
 }
-
-.cta-sub {
-  margin: var(--sp-6) auto 0;
-  font-size: 19px;
-  color: var(--text-2);
-  max-width: 640px;
-  line-height: 1.5;
+.hm-exch-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr); gap: clamp(32px, 5vw, 72px); align-items: center; }
+.hm-status {
+  display: grid; gap: var(--sp-2);
+  font-size: var(--fs-sm); line-height: var(--lh-relax); color: var(--text-2);
+  border-left: 2px solid var(--brand); padding: 0 0 0 var(--sp-4);
+  margin: var(--sp-5) 0 0;
 }
-
-.cta-actions {
-  margin-top: var(--sp-7);
-  display: flex;
-  gap: var(--sp-5);
-  justify-content: center;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-
-/* ─── Responsive shim ─── */
-@media (max-width: 1024px) {
-  .hero-display { font-size: 96px; }
-  .cta-head { font-size: 72px; }
-}
-
-@media (max-width: 900px) {
-  .hero-display { font-size: 64px; line-height: 0.96; }
-  .cta-head { font-size: 56px; }
-  .stat-num { font-size: 64px; }
-  .s-head { font-size: 40px; }
-  .pullquote { font-size: 32px; }
-  .stat-grid { grid-template-columns: 1fr; gap: var(--sp-7); }
-  .role-grid,
-  .aud-grid { grid-template-columns: 1fr; gap: var(--sp-7); }
-  .product-card { grid-template-columns: 1fr; }
-  .p-left { padding: 40px; }
-  .trust-strip { grid-template-columns: repeat(2, 1fr); }
-  .trust-strip > *:nth-child(2n) { border-right: 0; }
-  .ch-stats { grid-template-columns: repeat(2, 1fr); }
-}
-
-@media (max-width: 600px) {
-  .ticker-row { flex-direction: column; align-items: flex-start; }
-  .cta-row { flex-direction: column; align-items: flex-start; }
-  .container-x { padding: 0 var(--sp-5); }
-}
-
-/* ============================================================
-   Floating "guided tour" CTA (fixed bottom-right on /)
-   ============================================================ */
-.tour-fab {
-  position: fixed;
-  right: 24px;
-  bottom: 24px;
-  z-index: 60;
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 18px 12px 16px;
-  background: var(--inverse);
-  color: var(--text-inverse);
-  border-radius: var(--radius-sm);
-  text-decoration: none;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.20);
-  border: 1px solid var(--inverse);
-  font-family: var(--font-sans);
-  transition: transform 140ms var(--ease, ease), box-shadow 140ms var(--ease, ease), background-color 140ms var(--ease, ease);
-  animation: fab-in 420ms cubic-bezier(0.16, 1, 0.3, 1) 600ms backwards;
-}
-.tour-fab:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
-}
-.tour-fab:active { transform: translateY(0); }
-
-.fab-dot {
-  width: 8px; height: 8px;
-  border-radius: 50%;
-  background: var(--brand);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand) 24%, transparent);
-  animation: fab-pulse 2.4s ease-in-out infinite;
-  flex-shrink: 0;
-}
-.fab-eyebrow {
-  font-family: var(--font-mono);
-  font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  color: color-mix(in srgb, var(--text-inverse) 55%, transparent);
-  text-transform: uppercase;
-  display: none;
-}
-.fab-title {
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: -0.005em;
-}
-.fab-arrow {
-  font-family: var(--font-mono);
-  font-size: 14px;
-  color: var(--brand);
-  font-weight: 700;
+.hm-status-pill {
+  justify-self: start;
+  font-family: var(--font-mono); font-size: var(--fs-tiny);
+  letter-spacing: var(--ls-wide); text-transform: uppercase;
+  color: var(--brand); border: 1px solid color-mix(in srgb, var(--brand) 42%, transparent);
+  border-radius: var(--radius-sm); padding: 2px 7px;
 }
 
-@keyframes fab-in {
-  from { opacity: 0; transform: translateY(16px); }
-  to   { opacity: 1; transform: translateY(0); }
+/* ── order book preview ── */
+.hm-ob { border: 1px solid var(--border); background: var(--elevated); }
+.hm-ob-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono); font-size: var(--fs-tiny);
+  letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--text-3);
 }
-@keyframes fab-pulse {
-  0%, 100% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand) 24%, transparent); }
-  50%      { box-shadow: 0 0 0 8px color-mix(in srgb, var(--brand) 10%, transparent); }
+.hm-ob-tag { color: var(--warn); border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent); border-radius: 2px; padding: 1px 5px; }
+.hm-ob-rows { padding: var(--sp-2) 0; }
+.hm-ob-r { position: relative; display: flex; justify-content: space-between; padding: 4px var(--sp-4); font-family: var(--font-mono); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+.hm-ob-bar { position: absolute; inset: 0 auto 0 0; }
+.hm-ob-bar-a { background: var(--neg-bar); }
+.hm-ob-bar-b { background: var(--pos-bar); }
+.hm-ob-px, .hm-ob-sz { position: relative; }
+.hm-ob-sz { color: var(--text-3); }
+.hm-pos { color: var(--pos); }
+.hm-neg { color: var(--neg); }
+.hm-ob-mid {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding: var(--sp-2) var(--sp-4); margin: var(--sp-2) 0;
+  border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono); font-size: var(--fs-sm); font-variant-numeric: tabular-nums;
 }
+.hm-ob-mid-l { font-size: var(--fs-tiny); letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--text-3); }
 
-@media (min-width: 1024px) {
-  .tour-fab { gap: 14px; padding: 14px 22px 14px 18px; }
-  .fab-eyebrow { display: inline-block; margin-right: 2px; }
-  .fab-title { font-size: 14px; }
+/* ── audiences ── */
+.hm-aud { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: clamp(20px, 2.6vw, 32px); }
+.hm-aud-i { border-top: 1px solid var(--border-strong); padding-top: var(--sp-4); display: flex; flex-direction: column; }
+.hm-aud-top { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); margin-bottom: var(--sp-3); }
+.hm-aud-t { font-size: var(--fs-lg); font-weight: 600; letter-spacing: var(--ls-near); margin: 0; }
+.hm-badge {
+  font-family: var(--font-mono); font-size: var(--fs-tiny);
+  letter-spacing: var(--ls-tab); text-transform: uppercase;
+  border-radius: var(--radius-sm); padding: 2px 7px; border: 1px solid;
 }
+.hm-badge.is-live { color: var(--pos); border-color: color-mix(in srgb, var(--pos) 40%, transparent); }
+.hm-badge.is-soon { color: var(--text-3); border-color: var(--border-strong); }
+.hm-aud-b { font-size: var(--fs-sm); line-height: var(--lh-relax); color: var(--text-2); margin: 0 0 var(--sp-4); }
+.hm-aud-i .hm-link-cta { margin-top: auto; align-self: flex-start; }
 
-@media (max-width: 540px) {
-  .tour-fab { right: 16px; bottom: 16px; padding: 10px 14px 10px 12px; }
-  .fab-title { font-size: 12px; }
+/* ── trust strip ── */
+.hm-trust { background: var(--elevated); border-bottom: 1px solid var(--border); padding: var(--sp-6) 0; }
+.hm-trust-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: var(--sp-5); }
+.hm-trust-i { display: grid; gap: 3px; }
+.hm-trust-k { font-family: var(--font-mono); font-size: var(--fs-tiny); letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--text-3); }
+.hm-trust-v { font-size: var(--fs-sm); color: var(--text); }
+.hm-trust-v a { color: var(--brand); }
+
+/* ── closing cta ── */
+.hm-cta { padding: clamp(64px, 11vh, 128px) 0; }
+.hm-cta-in { text-align: center; display: flex; flex-direction: column; align-items: center; }
+
+/* ── scroll reveal (opt-in via .reveal-on, so no-JS shows everything) ── */
+.hm.reveal-on .reveal { opacity: 0; transform: translateY(14px); }
+.hm.reveal-on .reveal.in-view {
+  opacity: 1; transform: none;
+  transition: opacity 620ms var(--ease), transform 620ms var(--ease);
 }
-
-/* ─────────────────────────────────────────────────────────────
-   Interaction layer — reveal-on-scroll, hover affordances, focus.
-   Restrained motion only (A3): no decorative animation, just feedback.
-   ───────────────────────────────────────────────────────────── */
-
-/* In-page anchor jumps land below the 72px sticky nav. */
-:is(#markets, #products, #index, #problem, #cta) { scroll-margin-top: 96px; }
-
-/* Scroll-reveal — gated on .reveal-on so a no-JS / crawler load shows everything. */
-.reveal-on .reveal,
-.reveal-on .reveal-stagger > * {
-  opacity: 0;
-  transform: translateY(16px);
-  transition:
-    opacity 600ms cubic-bezier(0.16, 1, 0.3, 1),
-    transform 600ms cubic-bezier(0.16, 1, 0.3, 1);
-  will-change: opacity, transform;
-}
-.reveal-on .reveal.in-view,
-.reveal-on .reveal-stagger.in-view > * {
-  opacity: 1;
-  transform: none;
-}
-/* Stagger grid children as the row enters view. */
-.reveal-on .reveal-stagger.in-view > *:nth-child(2) { transition-delay: 70ms; }
-.reveal-on .reveal-stagger.in-view > *:nth-child(3) { transition-delay: 140ms; }
-.reveal-on .reveal-stagger.in-view > *:nth-child(4) { transition-delay: 210ms; }
-.reveal-on .reveal-stagger.in-view > *:nth-child(5) { transition-delay: 280ms; }
-
-/* Product + audience cards lift on hover; their CTA link takes the accent + a small nudge. */
-.product-card,
-.aud-card {
-  transition:
-    transform 200ms cubic-bezier(0.16, 1, 0.3, 1),
-    border-color 200ms ease,
-    box-shadow 200ms ease;
-}
-.product-card:hover {
-  transform: translateY(-3px);
-  border-color: var(--border-strong);
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.08);
-}
-.aud-card:hover {
-  transform: translateY(-3px);
-  border-color: var(--border-strong);
-  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.06);
-}
-.product-card:hover .p-link,
-.aud-card:hover .aud-link { color: var(--accent); }
-
-/* Text links slide a hair on hover so the trailing → reads as motion. */
-.p-link,
-.aud-link,
-.btn-text { transition: color var(--dur) var(--ease), transform 200ms ease; }
-.p-link:hover,
-.aud-link:hover,
-.btn-text:hover { transform: translateX(3px); }
-
-/* Keyboard focus — a visible accent ring on every interactive element (token --accent #4A90E2). */
-:where(a, button):focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
-  border-radius: var(--radius-sm);
-}
-
-/* Respect reduced-motion: no reveal offset, no hover travel, no smooth scroll. */
 @media (prefers-reduced-motion: reduce) {
-  .reveal-on .reveal,
-  .reveal-on .reveal-stagger > * { opacity: 1; transform: none; transition: none; }
-  .product-card:hover,
-  .aud-card:hover,
-  .p-link:hover,
-  .aud-link:hover,
-  .btn-text:hover { transform: none; }
+  .hm.reveal-on .reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
+  .hm-live { animation: none; }
 }
-</style>
 
-<!-- Global: smooth in-page anchor scrolling (honours reduced-motion). Lives unscoped because it
-     targets the document scrolling element, which scoped styles can't reach. -->
-<style>
-@media (prefers-reduced-motion: no-preference) {
-  html { scroll-behavior: smooth; }
+/* ── responsive ── */
+@media (max-width: 900px) {
+  .hm-hero-grid,
+  .hm-api-grid,
+  .hm-exch-grid { grid-template-columns: minmax(0, 1fr); }
+  .hm-hero { padding-top: clamp(44px, 8vh, 72px); }
+  .hm-chart-wrap { height: 240px; }
+}
+@media (max-width: 560px) {
+  .hm-idx-head { padding: var(--sp-4); }
+  .hm-spark { width: 120px; }
+  .hm-term-body { font-size: 11px; }
 }
 </style>

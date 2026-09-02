@@ -12,7 +12,7 @@
 
 definePageMeta({ layout: false })
 useHead({
-  title: 'States · patterns reference — Exascale',
+  title: 'States · patterns reference — 1Trade',
   htmlAttrs: { 'data-theme': 'dark' },
 })
 
@@ -61,7 +61,7 @@ const BOOK_VARIANTS: BookEmpty[] = ['no-orders', 'thin']
     <header class="topbar">
       <NuxtLink to="/" class="brand">
         <span class="brand-mark" />
-        EXASCALE
+        1TRADE
       </NuxtLink>
       <nav class="crumbs">
         <span>Design system</span>
@@ -400,7 +400,7 @@ const BOOK_VARIANTS: BookEmpty[] = ['no-orders', 'thin']
                   <span class="spinner" />
                 </span>
                 <div class="net-text">
-                  <span class="net-title">Connection to Exascale lost. Reconnecting…</span>
+                  <span class="net-title">Connection to 1Trade lost. Reconnecting…</span>
                   <span class="net-sub mono">
                     attempt {{ reconnectAttempt }} · last heartbeat 12s ago · ws://api.exascale.com/v1/stream
                   </span>
@@ -514,9 +514,12 @@ const BOOK_VARIANTS: BookEmpty[] = ['no-orders', 'thin']
   height: 32px;
 }
 .brand-mark {
-  width: 12px;
-  height: 12px;
+  width: 8.89px;
+  height: 20.6px;
+  flex: none;
   background: var(--brand);
+  -webkit-mask: url('/brand/mark.svg') center / contain no-repeat;
+  mask: url('/brand/mark.svg') center / contain no-repeat;
 }
 .crumbs {
   display: flex;
@@ -719,8 +722,8 @@ const BOOK_VARIANTS: BookEmpty[] = ['no-orders', 'thin']
   color: var(--text);
 }
 .surface-light {
-  background: #FAFAF7;
-  color: #0A0B0E;
+  background: #FAF8F3;
+  color: #0A0A0A;
 }
 
 /* ============================================================
@@ -800,11 +803,11 @@ const BOOK_VARIANTS: BookEmpty[] = ['no-orders', 'thin']
 .btn.secondary:hover { background: var(--hover); border-color: rgba(255, 255, 255, 0.22); }
 .btn.secondary.light {
   background: #FFFFFF;
-  color: #0A0B0E;
+  color: #0A0A0A;
   border-color: rgba(14, 14, 14, 0.18);
 }
 .btn.secondary.light:hover {
-  background: #F8F7F4;
+  background: #F7F4ED;
   border-color: rgba(14, 14, 14, 0.32);
 }
 .btn.ghost {
@@ -1110,7 +1113,7 @@ const BOOK_VARIANTS: BookEmpty[] = ['no-orders', 'thin']
   top: 16px;
   right: 16px;
   width: 360px;
-  background: var(--overlay, #1C1F26);
+  background: var(--overlay, #1A1A1A);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
@@ -1214,7 +1217,7 @@ const BOOK_VARIANTS: BookEmpty[] = ['no-orders', 'thin']
   line-height: 1;
   letter-spacing: -0.04em;
   font-weight: 600;
-  color: #0A0B0E;
+  color: #0A0A0A;
   margin-bottom: 4px;
 }
 .nf-meta {
@@ -1233,7 +1236,7 @@ const BOOK_VARIANTS: BookEmpty[] = ['no-orders', 'thin']
 .nf-meta-v {
   font-family: var(--font-mono);
   font-size: 11.5px;
-  color: #0A0B0E;
+  color: #0A0A0A;
   letter-spacing: 0.02em;
 }
 
@@ -1252,7 +1255,7 @@ const BOOK_VARIANTS: BookEmpty[] = ['no-orders', 'thin']
   font-size: 22px;
   font-weight: 600;
   letter-spacing: -0.02em;
-  color: #0A0B0E;
+  color: #0A0A0A;
   margin: 0 0 10px;
   line-height: 1.2;
 }
@@ -1265,11 +1268,11 @@ const BOOK_VARIANTS: BookEmpty[] = ['no-orders', 'thin']
 .nf-code-inline {
   font-family: var(--font-mono);
   font-size: 12px;
-  background: #F2EEE3;
+  background: #F1ECE1;
   border: 1px solid rgba(14, 14, 14, 0.08);
   padding: 1px 5px;
   border-radius: 2px;
-  color: #0A0B0E;
+  color: #0A0A0A;
 }
 .nf-actions {
   display: flex;
@@ -1287,7 +1290,7 @@ const BOOK_VARIANTS: BookEmpty[] = ['no-orders', 'thin']
   font-family: var(--font-mono);
   font-size: 10px;
   color: rgba(74, 74, 69, 1);
-  background: #F8F7F4;
+  background: #F7F4ED;
   border: 1px solid rgba(14, 14, 14, 0.10);
   border-bottom-width: 2px;
   border-radius: 2px;

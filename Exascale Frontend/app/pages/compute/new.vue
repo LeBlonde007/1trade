@@ -7,8 +7,8 @@
  * The cost card is sticky on the right and recomputes live.
  */
 
-definePageMeta({ layout: 'app' })
-useHead({ title: 'Provision new instance · Compute — Exascale' })
+definePageMeta({ layout: 'app', middleware: 'auth' })
+useHead({ title: 'Provision new instance · Compute — 1Trade' })
 
 const router = useRouter()
 
@@ -56,9 +56,9 @@ const REGIONS = [
 ]
 
 const IMAGES = [
-  { value: 'exa-ml',      label: 'Exascale ML Stack · PyTorch 2.4 · CUDA 12.4', sub: 'Default · maintained image · 3.7 GB' },
-  { value: 'exa-vllm',    label: 'Exascale vLLM · 0.5.2',                       sub: 'Optimized inference server' },
-  { value: 'exa-axolotl', label: 'Exascale Axolotl · 0.4',                       sub: 'Fine-tuning toolkit' },
+  { value: 'exa-ml',      label: '1Trade ML Stack · PyTorch 2.4 · CUDA 12.4', sub: 'Default · maintained image · 3.7 GB' },
+  { value: 'exa-vllm',    label: '1Trade vLLM · 0.5.2',                       sub: 'Optimized inference server' },
+  { value: 'exa-axolotl', label: '1Trade Axolotl · 0.4',                       sub: 'Fine-tuning toolkit' },
   { value: 'custom',      label: 'Custom image · paste image URI',               sub: 'docker.io / ghcr.io / private registry' },
   { value: 'byo',         label: 'Bring your own · Docker image URL',            sub: 'Untrusted images run in isolated VPC' },
 ]

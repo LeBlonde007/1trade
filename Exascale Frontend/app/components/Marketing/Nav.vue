@@ -1,23 +1,27 @@
 <script setup lang="ts">
 /**
  * MarketingNav — sticky top nav for public pages.
- * Ported from Exascale Homepage design.
+ * Ported from 1Trade Homepage design.
  *
  * Scroll past 24px → semi-transparent canvas backdrop + blur + bottom border.
  */
 const scrolled = ref(false)
 const mobileOpen = ref(false) // hamburger menu (≤768px)
-// The on-page section currently in view (e.g. "#markets") — drives the nav underline (scrollspy).
+// The on-page section currently in view (e.g. "#platform") — drives the nav underline (scrollspy).
 const activeHash = ref('')
 let spy: IntersectionObserver | null = null
 
+// Every entry goes where its label says. The previous set pointed "Docs" at /inference
+// (an authenticated app screen, not documentation), "Compute" at a section covering all
+// three layers, and "About" at #problem — four of six were same-page anchors, so the nav
+// read as a table of contents rather than a site nav. Anchors that remain are labelled as
+// the section they actually scroll to.
 const navLinks = [
-  { label: 'Markets',     to: '/#markets' },
-  { label: 'Methodology', to: '/benchmark' },
-  { label: 'Index',       to: '/#index' },
-  { label: 'Compute',     to: '/#products' },
-  { label: 'Docs',        to: '/inference' },
-  { label: 'About',       to: '/#problem' },
+  { label: 'Platform', to: '/#platform' },
+  { label: 'Credits',  to: '/#credits' },
+  { label: 'API',      to: '/#api' },
+  { label: 'Index',    to: '/benchmark' },
+  { label: 'Status',   to: '/status' },
 ]
 
 const route = useRoute()
@@ -38,7 +42,7 @@ onMounted(() => {
   // Scrollspy — only the landing page has the hash sections. Highlight whichever crosses the
   // viewport's middle band.
   if (route.path === '/' && 'IntersectionObserver' in window) {
-    const sections = ['markets', 'products', 'index', 'problem']
+    const sections = ['platform', 'credits', 'api', 'exchange']
       .map((id) => document.getElementById(id))
       .filter((el): el is HTMLElement => el !== null)
     if (sections.length) {
@@ -63,7 +67,7 @@ onMounted(() => {
   <nav class="top" :class="{ scrolled }" aria-label="Primary">
     <div class="container-x">
       <NuxtLink to="/" class="brand">
-        <span class="mark" />Exascale
+        <BrandLogo variant="full" size="lg" />
       </NuxtLink>
 
       <div class="links">
@@ -145,14 +149,7 @@ onMounted(() => {
   text-decoration: none;
 }
 
-.mark {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  background: var(--brand);
-  margin-right: 10px;
-  vertical-align: -1px;
-}
+/* the mark + wordmark come from <BrandLogo>; nothing to style here */
 
 .links {
   display: flex;

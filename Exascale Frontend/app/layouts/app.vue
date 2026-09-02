@@ -10,10 +10,15 @@
 useHead({ htmlAttrs: { 'data-theme': 'dark' } })
 // Mobile drawer state — the backdrop below dismisses the off-canvas sidebar.
 const sidebar = useSidebar()
+
+// The rail carries labels by default and collapses to icons. Driving the grid column
+// from here (rather than from the token) keeps the shell and the rail in lockstep —
+// the sidebar cannot end up a different width than the space reserved for it.
+const shellVars = computed(() => ({ '--app-sb-w': sidebar.collapsed.value ? '64px' : '232px' }))
 </script>
 
 <template>
-  <div class="a-shell" data-theme="dark">
+  <div class="a-shell" data-theme="dark" :style="shellVars">
     <AppTopbar />
     <AppSidebar />
     <!-- Backdrop: only shown/interactive on mobile while the drawer is open. -->

@@ -1,5 +1,5 @@
 /**
- * Exascale — Nuxt 4 config
+ * 1TRADE — Nuxt 4 config
  *
  * Two-theme app (light marketing + dark trading) on ONE design-token foundation.
  * Hybrid rendering: marketing pages prerender (SEO), app pages SPA (live data).
@@ -28,13 +28,18 @@ export default defineNuxtConfig({
   // Page <head> defaults — fonts only (everything else per-page via useHead)
   app: {
     head: {
-      title: 'Exascale — The Commodity Market for AI Compute',
+      title: '1TRADE — The Global Exchange for AI Compute',
       meta: [
         { charset: 'utf-8' },
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
         { name: 'description', content: 'Tradeable credits connecting GPU datacenters, traders, and AI companies.' },
+        // Brand chrome: browsers tint their UI with this on mobile.
+        { name: 'theme-color', content: '#0A0A0A' },
       ],
       link: [
+        // The mark on a midnight squircle — carries its own ground so it reads
+        // against both light and dark browser chrome.
+        { rel: 'icon', type: 'image/svg+xml', href: '/brand/favicon.svg' },
         // Self-host in production; CDN is fine for the dev/demo build.
         { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
         { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' },

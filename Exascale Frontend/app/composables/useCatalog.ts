@@ -1,5 +1,5 @@
 /**
- * useCatalog — the model catalog from the BFF (`/api/catalog`). Each entry carries the Exascale
+ * useCatalog — the model catalog from the BFF (`/api/catalog`). Each entry carries the 1Trade
  * pricing extension (modality, credit_type, unit, fixed-point price) the UI renders.
  */
 export interface CatalogModel {

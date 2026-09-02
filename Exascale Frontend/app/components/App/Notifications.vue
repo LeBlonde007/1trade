@@ -91,7 +91,7 @@ const items = ref<Notif[]>([
     tone: 'neutral',
     ts: '2d ago',
     tsSort: 6,
-    title: 'Welcome to Exascale',
+    title: 'Welcome to 1Trade',
     body: 'Take the 60-second tour to find the order book, methodology, and your wallet.',
     action: { label: 'Start tour →', to: '/' },
     unread: false,

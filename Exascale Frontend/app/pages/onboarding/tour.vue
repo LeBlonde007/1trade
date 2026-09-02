@@ -11,7 +11,7 @@ import { ChevronRight, Play, SkipForward, MousePointerClick, Film } from 'lucide
 import type { Persona as VPersona } from '~/composables/useTour'
 
 definePageMeta({ layout: false })
-useHead({ title: 'Product tour — Exascale', htmlAttrs: { 'data-theme': 'light' } })
+useHead({ title: 'Product tour — 1Trade', htmlAttrs: { 'data-theme': 'light' } })
 
 const guided = useGuidedTour()  // old engine — click-through, per-step feedback
 const video  = useTour()        // new engine — autoplay, end-of-tour feedback
@@ -88,7 +88,7 @@ function skip() {
 <template>
   <div class="page">
     <header class="head">
-      <NuxtLink to="/" class="brand mono">EXASCALE</NuxtLink>
+      <NuxtLink to="/" class="brand mono">1TRADE</NuxtLink>
       <button class="skip-btn" @click="skip">
         Skip tour <SkipForward :size="13" :stroke-width="1.7" />
       </button>
@@ -198,8 +198,8 @@ function skip() {
 
 <style scoped>
 .page {
-  background: var(--surface-canvas, #F8F7F4);
-  color: var(--text-primary, #0A0B0E);
+  background: var(--surface-canvas, #F7F4ED);
+  color: var(--text-primary, #0A0A0A);
   min-height: 100vh;
   font-family: 'Inter', system-ui, sans-serif;
   font-feature-settings: 'tnum';
@@ -208,7 +208,7 @@ function skip() {
 }
 
 .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; }
-.caps { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 600; color: var(--text-tertiary, #9A9A95); }
+.caps { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 600; color: var(--text-tertiary, #A8A196); }
 
 .head {
   display: flex;
@@ -233,7 +233,7 @@ function skip() {
   border-radius: 4px;
   padding: 6px 12px;
   font-size: 12px;
-  color: var(--text-secondary, #5F5F5C);
+  color: var(--text-secondary, #7E786C);
   cursor: pointer;
   font-family: inherit;
 }
@@ -259,7 +259,7 @@ function skip() {
   margin: 0;
   font-size: 16px;
   line-height: 1.55;
-  color: var(--text-secondary, #5F5F5C);
+  color: var(--text-secondary, #7E786C);
   max-width: 640px;
 }
 .lede strong { color: var(--text-primary); font-weight: 600; }
@@ -293,10 +293,10 @@ function skip() {
 .persona.selected {
   border-color: var(--text-primary);
   box-shadow: 0 4px 16px rgba(0,0,0,0.06);
-  background: #FCFBF8;
+  background: #FCFAF5;
 }
 .persona:focus-visible {
-  outline: 2px solid #4A90E2;
+  outline: 2px solid var(--info);
   outline-offset: 2px;
 }
 
@@ -312,7 +312,7 @@ function skip() {
   color: var(--text-primary);
   font-weight: 400;
 }
-.persona.selected .glyph { background: #0A0B0E; color: #C8F25C; }
+.persona.selected .glyph { background: var(--midnight); color: var(--brand); }
 
 .text { min-width: 0; }
 .row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
@@ -360,26 +360,26 @@ function skip() {
   transition: border-color 120ms ease, background-color 120ms ease;
 }
 .mode:hover { border-color: rgba(0,0,0,0.22); }
-.mode.on    { border-color: var(--text-primary, #0A0B0E); background: #FCFBF8; }
-.mode-icon  { color: var(--text-secondary, #5F5F5C); padding-top: 2px; }
-.mode.on .mode-icon { color: var(--text-primary, #0A0B0E); }
+.mode.on    { border-color: var(--text-primary, #0A0A0A); background: #FCFAF5; }
+.mode-icon  { color: var(--text-secondary, #7E786C); padding-top: 2px; }
+.mode.on .mode-icon { color: var(--text-primary, #0A0A0A); }
 
 .mode-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .mode-name {
   font-size: 13px; font-weight: 600;
-  color: var(--text-primary, #0A0B0E);
+  color: var(--text-primary, #0A0A0A);
   letter-spacing: -0.005em;
   display: inline-flex; align-items: center; gap: 6px;
 }
 .mode-tag {
-  background: var(--text-primary, #0A0B0E);
-  color: var(--brand-primary, #C8F25C);
+  background: var(--text-primary, #0A0A0A);
+  color: var(--brand);
   padding: 1px 5px;
   border-radius: 2px;
   font-size: 8.5px;
   letter-spacing: 0.14em;
 }
-.mode-blurb { font-size: 11.5px; color: var(--text-secondary, #5F5F5C); line-height: 1.5; }
+.mode-blurb { font-size: 11.5px; color: var(--text-secondary, #7E786C); line-height: 1.5; }
 
 .mode-radio {
   width: 18px; height: 18px;
@@ -400,7 +400,7 @@ function skip() {
   border-top: 1px solid rgba(0,0,0,0.08);
 }
 .cta-meta .empty { color: var(--text-tertiary); }
-.cta-mode { color: var(--text-tertiary, #9A9A95); margin-left: 4px; }
+.cta-mode { color: var(--text-tertiary, #A8A196); margin-left: 4px; }
 
 .btn-primary {
   display: inline-flex;
@@ -411,14 +411,14 @@ function skip() {
   font-size: 14px;
   font-weight: 600;
   background: var(--text-primary);
-  color: var(--brand-primary, #C8F25C);
+  color: var(--brand);
   border: 1px solid var(--text-primary);
   border-radius: 4px;
   cursor: pointer;
   font-family: inherit;
   transition: background 100ms ease;
 }
-.btn-primary:hover:not(:disabled) { background: #1C1F26; }
+.btn-primary:hover:not(:disabled) { background: #1A1A1A; }
 .btn-primary:disabled {
   background: rgba(0,0,0,0.12);
   color: var(--text-tertiary);

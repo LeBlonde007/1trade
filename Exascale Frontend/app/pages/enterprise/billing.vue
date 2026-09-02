@@ -10,7 +10,7 @@
 import { compact, full } from '~/utils/format'
 
 definePageMeta({ layout: 'app', middleware: 'auth' })
-useHead({ title: 'Billing & payment — Exascale' })
+useHead({ title: 'Billing & payment — 1Trade' })
 
 interface Budget { credit_type: string; monthly_limit: string }
 interface Purchase { id: string; amount: string; credit_type: string; currency: string; status: string; created_at: string }
@@ -196,7 +196,7 @@ function dt(s: string): string {
             </div>
             <div class="pay-row">
               <span class="pay-k">Card on file</span>
-              <span class="pay-v muted">None — Exascale never stores card data; Stripe holds it.</span>
+              <span class="pay-v muted">None — 1Trade never stores card data; Stripe holds it.</span>
             </div>
           </div>
         </section>

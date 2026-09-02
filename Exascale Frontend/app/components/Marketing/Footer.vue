@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * MarketingFooter — dark inverse site footer.
- * Ported from the Exascale Homepage design. Used across all marketing pages.
+ * Ported from the 1Trade Homepage design. Used across all marketing pages.
  *
  * Live AI Index value in the status bar updates every 5s.
  */
@@ -46,22 +46,21 @@ onUnmounted(() => {
 
 <template>
   <!--
-    Site footer is a dark "inverse block" inside the light marketing page.
-    DO NOT add data-theme="dark" here — that would swap --inverse to mean
-    the opposite (light) and the hardcoded light text rgba(232,230,224,...)
-    below would land on a light background and become invisible. The footer
-    intentionally renders using the LIGHT theme's --inverse (= dark) +
-    --text-inverse (= light) so it stays a dark band on the light page.
+    The footer is always a dark band. It used to borrow the LIGHT theme's --inverse
+    (= dark) plus hardcoded light greys, which broke the moment a page above it was
+    itself dark: --inverse flipped to cream while the greys stayed light. It now
+    declares data-theme="dark" and reads ordinary tokens, so it is self-contained and
+    correct under a light OR a dark page.
   -->
-  <footer class="site">
+  <footer class="site" data-theme="dark">
     <div class="container-x">
       <div class="row top">
         <div class="brand-col">
           <div class="brand">
-            <span class="mark" />Exascale
+            <BrandLogo variant="full" size="lg" />
           </div>
           <p class="tagline">
-            The commodity market for AI compute. Tradeable credits backed by owned datacenter capacity.
+            The global exchange for AI compute. Tradeable credits backed by owned datacenter capacity.
           </p>
         </div>
 
@@ -77,7 +76,7 @@ onUnmounted(() => {
 
       <div class="row bar">
         <div class="bar-copy">
-          © 2026 Exascale, Inc. · contact@exascale.com · San Francisco · Tokyo
+          © 2026 1Trade, Inc. · contact@exascale.com · San Francisco · Tokyo
         </div>
         <div class="bar-status">
           <span><span class="status-dot" />All systems operational</span>
@@ -93,10 +92,10 @@ onUnmounted(() => {
 
 <style scoped>
 .site {
-  background: var(--inverse);
-  color: var(--text-inverse);
+  background: var(--canvas);
+  color: var(--text);
   padding: 80px 0 32px;
-  border-top: 1px solid var(--border-on-dark);
+  border-top: 1px solid var(--border);
 }
 
 .container-x {
@@ -110,7 +109,7 @@ onUnmounted(() => {
   grid-template-columns: 2fr repeat(5, 1fr);
   gap: var(--sp-7);
   padding-bottom: 56px;
-  border-bottom: 1px solid var(--border-on-dark);
+  border-bottom: 1px solid var(--border);
 }
 
 .brand {
@@ -118,23 +117,16 @@ onUnmounted(() => {
   font-weight: 700;
   font-size: 20px;
   letter-spacing: -0.02em;
-  color: var(--text-inverse);
+  color: var(--text);
   display: inline-flex;
   align-items: center;
 }
 
-.mark {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  background: var(--brand);
-  margin-right: 10px;
-  vertical-align: -1px;
-}
+/* mark + wordmark come from <BrandLogo> */
 
 .tagline {
   margin-top: 20px;
-  color: rgba(232, 230, 224, 0.55);
+  color: var(--text-2);
   font-size: 13px;
   line-height: 1.6;
   max-width: 28ch;
@@ -145,7 +137,7 @@ h6 {
   font-size: 10px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: rgba(232, 230, 224, 0.5);
+  color: var(--text-3);
   margin: 0 0 var(--sp-4);
   font-weight: 500;
 }
@@ -159,13 +151,13 @@ ul {
 li { margin-bottom: 10px; }
 
 li a {
-  color: rgba(232, 230, 224, 0.7);
+  color: var(--text-2);
   font-size: var(--fs-base);
   text-decoration: none;
   transition: color var(--dur) var(--ease);
 }
 
-li a:hover { color: var(--text-inverse); }
+li a:hover { color: var(--text); }
 
 .row.bar {
   display: flex;
@@ -179,21 +171,21 @@ li a:hover { color: var(--text-inverse); }
   letter-spacing: 0.04em;
 }
 
-.bar-copy { color: rgba(232, 230, 224, 0.5); }
+.bar-copy { color: var(--text-3); }
 
 .bar-status {
   display: flex;
   gap: var(--sp-5);
   align-items: center;
-  color: rgba(232, 230, 224, 0.6);
+  color: var(--text-2);
 }
 
-.bar-num { color: var(--text-inverse); }
+.bar-num { color: var(--text); }
 
 .bar-sep {
   height: 12px;
   width: 1px;
-  background: var(--border-on-dark);
+  background: var(--border);
 }
 
 .tnum { font-variant-numeric: tabular-nums; }

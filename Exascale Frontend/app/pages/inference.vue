@@ -12,8 +12,8 @@ import { exportDoc, type DocFormat } from '~/utils/docExport'
 import type { CatalogModel } from '~/composables/useCatalog'
 import type { ChatUsage } from '~/composables/useInference'
 
-definePageMeta({ layout: 'app' })
-useHead({ title: 'Inference Playground — Exascale' })
+definePageMeta({ layout: 'app', middleware: 'auth' })
+useHead({ title: 'Inference Playground — 1Trade' })
 
 // =====================================================
 // Model catalog
@@ -45,15 +45,15 @@ function humanizeId(id: string): string {
     .map((p) => /^[0-9]/.test(p) || /^v[0-9]/i.test(p) ? p.toUpperCase() : p.charAt(0).toUpperCase() + p.slice(1))
     .join(' ')
 }
-/** toCategory maps an Exascale modality to a catalog UI category. */
+/** toCategory maps an 1Trade modality to a catalog UI category. */
 function toCategory(modality: string): Category {
   if (modality === 'embeddings' || modality === 'embed') return 'embed'
   if (modality === 'speech' || modality === 'image' || modality === 'video' || modality === 'vision' || modality === 'docs' || modality === 'agent' || modality === 'code') return modality
   return 'text'
 }
 /**
- * providerLabel frames the model as Exascale's own infrastructure. Exascale-owned catalog entries are
- * served on Exascale GPUs (the upstream that physically runs them is an implementation detail the
+ * providerLabel frames the model as 1Trade's own infrastructure. 1Trade-owned catalog entries are
+ * served on 1Trade GPUs (the upstream that physically runs them is an implementation detail the
  * customer never sees) → "Self-hosted". Anything else shows its owner.
  */
 function providerLabel(ownedBy: string): string {
@@ -163,7 +163,7 @@ const params = reactive({
   maxTokens: 4096,
   topP: 0.95,
   freqPenalty: 0,
-  systemPrompt: 'You are an expert assistant on the Exascale AI-compute platform. Write clear, well-structured, thorough answers — use short paragraphs, headings, lists, and fenced code blocks where helpful. When the user asks for an essay or long-form writing, write it in full and at length; otherwise match the depth to the question.',
+  systemPrompt: 'You are an expert assistant on the 1Trade AI-compute platform. Write clear, well-structured, thorough answers — use short paragraphs, headings, lists, and fenced code blocks where helpful. When the user asks for an essay or long-form writing, write it in full and at length; otherwise match the depth to the question.',
 })
 
 const paramsOpen = ref(false)

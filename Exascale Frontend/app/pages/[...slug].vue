@@ -3,7 +3,7 @@
  * Catch-all 404. Marketing layout, light theme.
  */
 definePageMeta({ layout: 'marketing' })
-useHead({ title: '404 — Exascale' })
+useHead({ title: '404 — 1Trade' })
 </script>
 
 <template>

@@ -9,7 +9,7 @@
 import { compact } from '~/utils/format'
 
 definePageMeta({ layout: 'app', middleware: 'auth' })
-useHead({ title: 'Audit log — Exascale' })
+useHead({ title: 'Audit log — 1Trade' })
 
 interface AuditEntry {
   id: string

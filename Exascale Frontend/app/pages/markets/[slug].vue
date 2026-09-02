@@ -14,7 +14,7 @@
  */
 import { createChart, ColorType, CrosshairMode } from 'lightweight-charts'
 
-definePageMeta({ layout: 'app' })
+definePageMeta({ layout: 'app', middleware: 'auth' })
 
 interface MarketDef {
   sym: string
@@ -30,7 +30,7 @@ const MARKETS: Record<string, MarketDef> = {
     name: 'AI Index',
     basePrice: 0.001005,
     decimals: 6,
-    desc: 'The Exascale AI Index represents the unified price of AI inference, computed from observed market data and consumption metrics across the text, speech, image, video, and niche credit markets.',
+    desc: 'The 1Trade AI Index represents the unified price of AI inference, computed from observed market data and consumption metrics across the text, speech, image, video, and niche credit markets.',
   },
   'text-spot':  { sym: 'TEXT-SPOT',  name: 'Text Credit',   basePrice: 0.001210, decimals: 6, desc: 'Spot market for text-inference credits.' },
   'image-spot': { sym: 'IMAGE-SPOT', name: 'Image Credit',  basePrice: 0.008000, decimals: 6, desc: 'Spot market for image-generation credits.' },
@@ -43,7 +43,7 @@ const slug = computed(() => {
   return s || 'eai-idx'
 })
 const market = computed<MarketDef>(() => MARKETS[slug.value] ?? MARKETS['eai-idx']!)
-useHead({ title: () => `${market.value.sym} · ${market.value.name} — Exascale` })
+useHead({ title: () => `${market.value.sym} · ${market.value.name} — 1Trade` })
 
 // =====================================================
 // State
@@ -159,8 +159,8 @@ function initChart() {
   if (!chartHost.value) return
   chart = createChart(chartHost.value, {
     layout: {
-      background: { type: ColorType.Solid, color: '#0A0B0E' },
-      textColor: '#9A9A95',
+      background: { type: ColorType.Solid, color: '#0A0A0A' },
+      textColor: '#A8A196',
       fontFamily: 'JetBrains Mono, ui-monospace, monospace',
       fontSize: 10,
     },
@@ -668,7 +668,7 @@ onBeforeUnmount(() => {
                 </td>
               </tr>
               <tr><th>Constituents</th><td>TEXT · SPEECH · IMAGE · VIDEO · NICHE</td></tr>
-              <tr><th>Index administrator</th><td>Exascale Index Co.</td></tr>
+              <tr><th>Index administrator</th><td>1Trade Index Co.</td></tr>
             </tbody>
           </table>
         </div>

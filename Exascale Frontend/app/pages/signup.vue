@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * /signup — Open an Exascale account
+ * /signup — Open an 1Trade account
  *
  * Faithful port of uploads/Exascale Signup.html from the design bundle.
  * Split-shell layout: 60% form (light) / 40% reassurance panel (dark inverse).
@@ -21,7 +21,7 @@ import {
 } from 'lucide-vue-next'
 
 definePageMeta({ layout: false })
-useHead({ title: 'Open an account — Exascale', htmlAttrs: { 'data-theme': 'light' } })
+useHead({ title: 'Open an account — 1Trade', htmlAttrs: { 'data-theme': 'light' } })
 
 // ─── Account type ───────────────────────────────────────────
 // Trader is disabled until the exchange/trading layer ships (license-gated, paused per the GTM
@@ -202,7 +202,7 @@ const onSubmit = async () => {
     <section class="form-side">
       <div class="topbar">
         <NuxtLink to="/" class="brand">
-          <span class="mark" />Exascale
+          <span class="mark" />1Trade
         </NuxtLink>
         <span class="step">
           Step <span class="step-num">1</span> <span class="total">of 2</span>
@@ -210,7 +210,7 @@ const onSubmit = async () => {
       </div>
 
       <div class="form-card">
-        <h1 class="title">Open an Exascale account</h1>
+        <h1 class="title">Open an 1Trade account</h1>
         <p class="subhead">5 minutes. No credit card required for paper trading.</p>
 
         <span class="lbl section-lbl">— Account type</span>
@@ -295,7 +295,7 @@ const onSubmit = async () => {
         <label class="terms">
           <input v-model="agreed" type="checkbox" />
           <span>
-            I agree to Exascale's
+            I agree to 1Trade's
             <a href="#">Terms of Service</a> and
             <a href="#">Privacy Policy</a>. Real-money trading requires further verification at v1.5.
           </span>
@@ -342,7 +342,7 @@ const onSubmit = async () => {
       <div class="ticker">
         <div class="head">
           <span class="live-dot" />
-          <span class="t-label">Exascale AI Index · Live</span>
+          <span class="t-label">1Trade AI Index · Live</span>
           <span class="badge">PUBLISHED DAILY</span>
         </div>
         <div class="row-2">
@@ -1193,7 +1193,7 @@ const onSubmit = async () => {
   to   { opacity: 1; transform: none; }
 }
 
-/* Keyboard focus — a visible accent ring on every interactive element (token --accent #4A90E2). */
+/* Keyboard focus — a visible accent ring on every interactive element (token --accent). */
 :where(a, button):focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;

@@ -6,7 +6,7 @@
 import { CheckCircle2, AlertTriangle, XCircle, Rss, Mail, MessageSquare, ChevronDown } from 'lucide-vue-next'
 
 definePageMeta({ layout: 'marketing' })
-useHead({ title: 'System status — Exascale' })
+useHead({ title: 'System status — 1Trade' })
 
 type Status = 'operational' | 'degraded' | 'outage' | 'maintenance'
 
@@ -311,8 +311,8 @@ const nowLabel = computed(() => {
 
 <style scoped>
 .page {
-  background: var(--surface-canvas, #F8F7F4);
-  color: var(--text-primary, #0A0B0E);
+  background: var(--surface-canvas, #F7F4ED);
+  color: var(--text-primary, #0A0A0A);
   min-height: 100vh;
   font-family: 'Inter', system-ui, sans-serif;
   font-feature-settings: 'tnum';
@@ -325,7 +325,7 @@ const nowLabel = computed(() => {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-weight: 600;
-  color: var(--text-tertiary, #9A9A95);
+  color: var(--text-tertiary, #A8A196);
 }
 
 /* Hero ---------------------------------------------- */
@@ -334,9 +334,9 @@ const nowLabel = computed(() => {
   background: #FFFFFF;
 }
 .hero.tone-pos  { box-shadow: inset 0 2px 0 #19C37D; }
-.hero.tone-warn { box-shadow: inset 0 2px 0 #F59E0B; }
+.hero.tone-warn { box-shadow: inset 0 2px 0 #F5A524; }
 .hero.tone-neg  { box-shadow: inset 0 2px 0 #EF4444; }
-.hero.tone-info { box-shadow: inset 0 2px 0 #4A90E2; }
+.hero.tone-info { box-shadow: inset 0 2px 0 var(--info); }
 
 .hero-inner {
   max-width: 1080px;
@@ -349,9 +349,9 @@ const nowLabel = computed(() => {
   gap: 12px;
 }
 .tone-pos  .hero-status > svg:first-child { color: #19C37D; }
-.tone-warn .hero-status > svg:first-child { color: #F59E0B; }
+.tone-warn .hero-status > svg:first-child { color: #F5A524; }
 .tone-neg  .hero-status > svg:first-child { color: #EF4444; }
-.tone-info .hero-status > svg:first-child { color: #4A90E2; }
+.tone-info .hero-status > svg:first-child { color: var(--info); }
 
 .hero-status h1 {
   font-size: 32px;
@@ -366,9 +366,9 @@ const nowLabel = computed(() => {
   gap: 8px;
   margin-top: 12px;
   font-size: 13px;
-  color: var(--text-secondary, #5F5F5C);
+  color: var(--text-secondary, #7E786C);
 }
-.meta-dot { color: var(--text-tertiary, #9A9A95); }
+.meta-dot { color: var(--text-tertiary, #A8A196); }
 .meta-value { color: var(--text-primary); }
 
 .hero-actions {
@@ -396,10 +396,10 @@ const nowLabel = computed(() => {
 }
 .btn-primary {
   background: var(--text-primary);
-  color: #F8F7F4;
+  color: #F7F4ED;
   border-color: var(--text-primary);
 }
-.btn-primary:hover { background: #1C1F26; }
+.btn-primary:hover { background: #1A1A1A; }
 .btn-ghost:hover   { border-color: rgba(0,0,0,0.16); }
 
 /* Subscribe form */
@@ -425,12 +425,12 @@ const nowLabel = computed(() => {
 .subscribe-form input:focus,
 .subscribe-form select:focus {
   outline: none;
-  border-color: #4A90E2;
+  border-color: var(--info);
   box-shadow: 0 0 0 3px rgba(74,144,226,0.15);
 }
 .subscribe-form button {
   background: var(--text-primary);
-  color: #F8F7F4;
+  color: #F7F4ED;
   border-color: var(--text-primary);
   cursor: pointer;
   font-weight: 500;
@@ -495,7 +495,7 @@ const nowLabel = computed(() => {
   padding: 16px 20px;
   margin-bottom: 12px;
 }
-.incident.sev-minor    { border-left: 3px solid #F59E0B; }
+.incident.sev-minor    { border-left: 3px solid #F5A524; }
 .incident.sev-major    { border-left: 3px solid #EF4444; }
 .incident.sev-critical { border-left: 3px solid #EF4444; background: rgba(239,68,68,0.04); }
 
@@ -525,9 +525,9 @@ const nowLabel = computed(() => {
   padding: 2px 6px;
   border-radius: 2px;
   background: rgba(245,158,11,0.12);
-  color: #B97A06;
+  color: #A16207;
 }
-.sev-major   .sev-chip { background: rgba(239,68,68,0.12); color: #B82929; }
+.sev-major   .sev-chip { background: rgba(239,68,68,0.12); color: #B91C1C; }
 .sev-critical .sev-chip { background: #EF4444; color: #FFF; }
 
 .inc-meta {
@@ -666,9 +666,9 @@ const nowLabel = computed(() => {
   flex-shrink: 0;
 }
 .dot.tone-pos  { background: #19C37D; box-shadow: 0 0 0 3px rgba(25,195,125,0.18); }
-.dot.tone-warn { background: #F59E0B; box-shadow: 0 0 0 3px rgba(245,158,11,0.18); }
+.dot.tone-warn { background: #F5A524; box-shadow: 0 0 0 3px rgba(245,158,11,0.18); }
 .dot.tone-neg  { background: #EF4444; box-shadow: 0 0 0 3px rgba(239,68,68,0.18); }
-.dot.tone-info { background: #4A90E2; box-shadow: 0 0 0 3px rgba(74,144,226,0.18); }
+.dot.tone-info { background: var(--info); box-shadow: 0 0 0 3px rgba(74,144,226,0.18); }
 
 .comp-name {
   font-size: 14px;
@@ -692,9 +692,9 @@ const nowLabel = computed(() => {
   min-width: 2px;
 }
 .bar.tone-pos  { background: #19C37D; opacity: 0.85; }
-.bar.tone-warn { background: #F59E0B; }
+.bar.tone-warn { background: #F5A524; }
 .bar.tone-neg  { background: #EF4444; }
-.bar.tone-info { background: #4A90E2; }
+.bar.tone-info { background: var(--info); }
 .comp-strip .bar:hover { opacity: 1; transform: scaleY(1.08); }
 
 .comp-right {
@@ -714,8 +714,8 @@ const nowLabel = computed(() => {
   border-radius: 2px;
 }
 .status-tag.tone-pos  { background: rgba(25,195,125,0.12); color: #128050; }
-.status-tag.tone-warn { background: rgba(245,158,11,0.12); color: #B97A06; }
-.status-tag.tone-neg  { background: rgba(239,68,68,0.12);  color: #B82929; }
+.status-tag.tone-warn { background: rgba(245,158,11,0.12); color: #A16207; }
+.status-tag.tone-neg  { background: rgba(239,68,68,0.12);  color: #B91C1C; }
 .status-tag.tone-info { background: rgba(74,144,226,0.12); color: #2A5FA6; }
 
 @media (max-width: 900px) {
@@ -753,8 +753,8 @@ const nowLabel = computed(() => {
   padding: 2px 6px;
   border-radius: 2px;
 }
-.hist-sev.sev-minor { background: rgba(245,158,11,0.12); color: #B97A06; }
-.hist-sev.sev-major { background: rgba(239,68,68,0.12); color: #B82929; }
+.hist-sev.sev-minor { background: rgba(245,158,11,0.12); color: #A16207; }
+.hist-sev.sev-major { background: rgba(239,68,68,0.12); color: #B91C1C; }
 
 /* Footer --------------------------------------------- */
 .page-foot {

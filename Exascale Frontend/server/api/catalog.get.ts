@@ -1,6 +1,6 @@
 /**
  * GET /api/catalog — the model catalog. Proxies inference-gateway /v1/models (OpenAI-shaped, with the
- * Exascale pricing extension).
+ * 1Trade pricing extension).
  */
 import { defineEventHandler } from 'h3'
 import { proxyJson } from '../utils/api'

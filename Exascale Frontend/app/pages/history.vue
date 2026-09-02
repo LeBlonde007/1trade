@@ -12,8 +12,8 @@
  */
 import { ChevronDown, ChevronRight, Copy, CheckCircle2, FileDown, Search, X, Download, ShieldCheck } from 'lucide-vue-next'
 
-definePageMeta({ layout: 'app' })
-useHead({ title: 'Trade History — Exascale' })
+definePageMeta({ layout: 'app', middleware: 'auth' })
+useHead({ title: 'Trade History — 1Trade' })
 
 const toasts = useToasts()
 const od = useOrderDetail()

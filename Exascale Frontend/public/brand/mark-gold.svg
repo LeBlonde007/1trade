@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 431.54 1000" role="img" aria-label="1TRADE">
+  <title>1TRADE</title>
+  <!-- Faceted gold treatment for hero / marketing use. The three facets are the mark's
+       bevel faces; each gradient spans the full height in user space so the whole mark
+       reads as one lit object while the facet steps still produce the bevel.
+       Ranges stay inside the brand's Sovereign Gold -> Desert Bronze axis. -->
+  <defs>
+    <linearGradient id="tr-flag" gradientUnits="userSpaceOnUse" x1="215" y1="0" x2="215" y2="1000">
+      <stop offset="0" stop-color="#E8CD75"/>
+      <stop offset="1" stop-color="#C9A233"/>
+    </linearGradient>
+    <linearGradient id="tr-stem" gradientUnits="userSpaceOnUse" x1="215" y1="0" x2="215" y2="1000">
+      <stop offset="0" stop-color="#C9A544"/>
+      <stop offset="1" stop-color="#A87833"/>
+    </linearGradient>
+    <linearGradient id="tr-base" gradientUnits="userSpaceOnUse" x1="215" y1="0" x2="215" y2="1000">
+      <stop offset="0" stop-color="#A67433"/>
+      <stop offset="1" stop-color="#6E4419"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#tr-base)" d="M3.49 1000L3.49 471.67C69 441.18 134.92 402.71 169.17 342.89L169.17 764.06L249.44 709.93L262.22 676.81L296.26 707.21L431.54 707.19Z"/>
+  <path fill="url(#tr-stem)" d="M262.61 235.76L428.2 235.76L428.2 535.66C363.03 563.5 298.6 599.74 262.61 657.06Z"/>
+  <path fill="url(#tr-flag)" d="M428.2 0L428.2 235.76L262.61 235.76L182.43 290.45L169.89 323.36L136.2 292.95L0 292.93Z"/>
+</svg>

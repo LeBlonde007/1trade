@@ -1,0 +1,167 @@
+openapi: 3.0.3
+info:
+  title: Exascale AI Credit Index API (reference index reads)
+  version: 1.0.0
+  description: >
+    **The AI credit index read API.** Owned by `index-service` (KW01). The index is the daily
+    reference price for AI compute, computed from real platform transactions and published on an
+    audit hash chain at 16:00 UTC.
+
+    **Phase 1 is internal-only and mock-backed.** The real computation lands with `index-service` at
+    M5; until then these read endpoints are served by the `matching-engine` keep-warm mock adapter so
+    the methodology page (KW02) can build against the final interface. Prints returned in Phase 1 are
+    **simulated and explicitly flagged** — every print carries `provisional: true` and
+    `source: mock`, and the collection carries `is_mock: true`. A client must not present a mock print
+    as a published index value.
+
+    **Integrity rules that hold from day one** (immutable commitment #2): the methodology is public
+    and versioned, every print is immutable and hash-chained
+    (`chain_hash = hash(prev_chain_hash || canonical_json(row))`), and constituent weights are
+    disclosed. Index values are fixed-point decimal strings, never JSON numbers.
+
+    See docs/plans/features/KW01-private-reference-index.md and docs/index-methodology.md.
+
+servers:
+  - { url: "https://api.exascale.io", description: prod }
+  - { url: "http://localhost:8087", description: "local (matching-engine mock adapter, Phase 1)" }
+
+tags:
+  - { name: index, description: "Index value + print history (internal scope in Phase 1)." }
+  - { name: methodology, description: "Published methodology metadata + constituent transparency." }
+
+paths:
+  /v1/index/latest:
+    get:
+      tags: [index]
+      summary: The most recent index print.
+      operationId: getLatestIndexPrint
+      responses:
+        '200':
+          description: Latest print.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [print, next_publication_at, is_mock]
+                properties:
+                  print: { $ref: '#/components/schemas/IndexPrint' }
+                  next_publication_at:
+                    type: string
+                    format: date-time
+                    description: The next 16:00 UTC publication instant.
+                  is_mock:
+                    type: boolean
+                    description: True while the mock adapter serves this endpoint (Phase 1).
+
+  /v1/index/history:
+    get:
+      tags: [index]
+      summary: Historical prints, oldest first.
+      operationId: listIndexPrints
+      parameters:
+        - { name: days, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 730, default: 90 } }
+      responses:
+        '200':
+          description: Prints.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [prints, is_mock]
+                properties:
+                  prints: { type: array, items: { $ref: '#/components/schemas/IndexPrint' } }
+                  is_mock: { type: boolean }
+        '422': { $ref: '#/components/responses/InvalidRequest' }
+
+  /v1/index/methodology:
+    get:
+      tags: [methodology]
+      summary: Current methodology version + the disclosed constituent weight schedule.
+      operationId: getIndexMethodology
+      responses:
+        '200':
+          description: Methodology metadata.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [version, effective_date, window_minutes, trim_pct, constituents, is_mock]
+                properties:
+                  version: { type: string, example: "1.2" }
+                  effective_date: { type: string, format: date }
+                  window_minutes:
+                    type: integer
+                    description: Observation window used per print.
+                    example: 120
+                  trim_pct:
+                    type: string
+                    description: Outlier trimming applied to observations, percent.
+                    example: "95.0"
+                  volume_floor: { $ref: '#/components/schemas/Decimal' }
+                  constituents: { type: array, items: { $ref: '#/components/schemas/Constituent' } }
+                  is_mock: { type: boolean }
+
+components:
+  responses:
+    InvalidRequest:
+      description: A parameter is unusable.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+
+  schemas:
+    Decimal:
+      type: string
+      description: Fixed-point decimal, 6dp (NUMERIC(20,6)). Never a JSON number.
+      pattern: '^-?[0-9]+\.[0-9]{6}$'
+      example: "0.001005"
+
+    IndexPrint:
+      type: object
+      description: >
+        One immutable index print. `chain_hash` chains to the previous print, so any edit to history
+        is detectable. In Phase 1 `source` is `mock` and `provisional` is true.
+      required: [print_id, value, published_at, methodology_version, observation_count, chain_hash, provisional, source]
+      properties:
+        print_id: { type: string, format: uuid }
+        value: { $ref: '#/components/schemas/Decimal' }
+        published_at: { type: string, format: date-time }
+        methodology_version: { type: string, example: "1.2" }
+        observation_count:
+          type: integer
+          description: Constituent observations that survived filtering.
+        excluded_count:
+          type: integer
+          description: Observations dropped by outlier filtering or the volume floor.
+        chain_hash:
+          type: string
+          description: hash(prev_chain_hash || canonical_json(row)).
+          example: "9f2c…"
+        prev_chain_hash: { type: string, nullable: true }
+        provisional:
+          type: boolean
+          description: True until reconciliation closes; always true for mock prints.
+        source:
+          type: string
+          enum: [mock, computed]
+          description: "`mock` in Phase 1 — never present a mock print as published."
+
+    Constituent:
+      type: object
+      required: [name, credit_type, weight, source]
+      properties:
+        name: { type: string, example: "Text credit spot" }
+        credit_type:
+          type: string
+          description: The canonical credit type observed (credit-types.md §1).
+          enum: [ai_index, text, speech, image, video, embeddings, gpu_h100, gpu_h200]
+        weight: { type: string, description: "Fractional weight, 4dp. Weights sum to 1.", example: "0.4200" }
+        source: { type: string, example: "Prepaid purchase prices" }
+        observed_at: { type: string, format: date-time, nullable: true }
+
+    ApiError:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string, example: invalid_request }
+        message: { type: string, example: "days must be between 1 and 730" }

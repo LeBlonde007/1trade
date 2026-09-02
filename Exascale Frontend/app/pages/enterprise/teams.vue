@@ -6,7 +6,7 @@
  * members/budgets — the backend for those is M4 (F02/F03), so we don't fabricate them.
  */
 definePageMeta({ layout: 'app', middleware: 'auth' })
-useHead({ title: 'Team & access — Exascale' })
+useHead({ title: 'Team & access — 1Trade' })
 
 const { user } = useAuth()
 

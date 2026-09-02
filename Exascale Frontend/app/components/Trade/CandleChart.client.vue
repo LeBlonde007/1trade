@@ -67,9 +67,9 @@ onMounted(() => {
   const v = (name: string, fallback = '') => (root.getPropertyValue(name).trim() || fallback)
   const POS    = v('--pos',    '#19C37D')
   const NEG    = v('--neg',    '#EF4444')
-  const TXT2   = v('--text-2', '#9A9A95')
-  const CANVAS = v('--canvas', '#0A0B0E')
-  const BRAND  = v('--brand',  '#C8F25C')
+  const TXT2   = v('--text-2', '#A8A196')
+  const CANVAS = v('--canvas', '#0A0A0A')
+  const BRAND  = v('--brand',  '#D4AF37')
   // Match border-on-dark / grid color tokens
   const GRID   = v('--border', 'rgba(255,255,255,0.08)')
 
