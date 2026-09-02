@@ -1,4 +1,4 @@
-# Exascale — Install & Run Locally
+# 1Trade — Install & Run Locally
 
 Everything you need to install, and the exact steps to bring the platform up on your own machine.
 This is the **dependency + local-run** guide. For the full deployment/CI map see [`DEPLOY.md`](DEPLOY.md);
@@ -14,7 +14,7 @@ for the deeper current-state runbook see [`docs/plans/RUN_LOCAL.md`](docs/plans/
 > ```bash
 > bash scripts/setup.sh   # or scripts/install-toolchain.sh on WSL2/Ubuntu — install deps only
 > make up                 # k3d cluster + data plane + services (live-reload)
-> cd "Exascale Frontend" && npm install && npm run dev   # web console → http://localhost:3000
+> cd "1Trade Frontend" && npm install && npm run dev   # web console → http://localhost:3000
 > ```
 
 ---
@@ -45,7 +45,7 @@ what's already present; `--force` reinstalls; `--gpu` adds the NVIDIA toolkit).
 | Tool | Version | Purpose |
 |---|---|---|
 | **Docker** | current | container runtime that hosts the k3d cluster and builds images |
-| **Go** | **1.25.x** | builds the five Go services + the `exascale` CLI |
+| **Go** | **1.25.x** | builds the five Go services + the `1trade` CLI |
 | **Node.js + npm** | **Node 20+** | builds & runs the Nuxt 4 web console |
 | **kubectl** | stable | talks to the local Kubernetes (k3d) cluster |
 | **k3d** | current | runs k3s (Kubernetes) inside Docker — the local cluster |
@@ -72,7 +72,7 @@ what's already present; `--force` reinstalls; `--gpu` adds the NVIDIA toolkit).
 ### Application dependencies (pulled automatically)
 
 - **Go modules** — fetched on first `make build` / `make up` (per-service `go.mod`, all `go 1.25.0`).
-- **Node packages** — installed with `npm install` in `Exascale Frontend/`. Key deps: `nuxt ^4`, `vue`,
+- **Node packages** — installed with `npm install` in `1Trade Frontend/`. Key deps: `nuxt ^4`, `vue`,
   `@vueuse/core`, `chart.js`, `lightweight-charts`, `lucide-vue-next`, `docx`, `exceljs`, `jspdf`,
   `pptxgenjs`, `driver.js`.
 - **Data plane** (Postgres · TimescaleDB · Redis · NATS · Mailpit) — installed into the cluster by
@@ -109,7 +109,7 @@ make up
 
 `make up` = **cluster → data-plane → tilt**:
 
-1. **cluster** — creates (or starts) the k3d cluster `exascale` from `deploy/k8s/local/k3d.yaml`.
+1. **cluster** — creates (or starts) the k3d cluster `1trade` from `deploy/k8s/local/k3d.yaml`.
 2. **data-plane** — applies Postgres · TimescaleDB · Redis · NATS · Mailpit into namespace `data`.
 3. **tilt** — `tilt up`: generates the `platform-auth` secret, applies DB migrations, builds + deploys
    the services, and **holds the port-forwards open**. Edit source → Tilt live-reloads the pod.
@@ -151,7 +151,7 @@ Default is **mock-GPU mode** — virtual GPUs, no driver, identical behavior on 
 The web app is **live-only** (no mock mode) — it needs the stack from §3 up and the Tilt port-forwards.
 
 ```bash
-cd "Exascale Frontend"
+cd "1Trade Frontend"
 npm install        # first time only
 npm run dev        # → http://localhost:3000
 ```
@@ -171,15 +171,15 @@ npm run dev
 ## 5. Build & use the CLI
 
 ```bash
-make cli                                                    # → bin/exascale
-./bin/exascale signup --email you@dev.test --password 'pw'  # or: login
-./bin/exascale whoami
-./bin/exascale catalog
-./bin/exascale credits balance
+make cli                                                    # → bin/1trade
+./bin/1trade signup --email you@dev.test --password 'pw'  # or: login
+./bin/1trade whoami
+./bin/1trade catalog
+./bin/1trade credits balance
 ```
 
-The CLI defaults to `localhost:8001/8085/8002`; override with `EXASCALE_PLATFORM_URL` /
-`EXASCALE_GATEWAY_URL` / `EXASCALE_LEDGER_URL`. The token is saved to `~/.exascale/config.json` (0600).
+The CLI defaults to `localhost:8001/8085/8002`; override with `TRADE1_PLATFORM_URL` /
+`TRADE1_GATEWAY_URL` / `TRADE1_LEDGER_URL`. The token is saved to `~/.1trade/config.json` (0600).
 
 ### Get credits on a fresh account (dev)
 
@@ -188,7 +188,7 @@ cluster secret):
 
 ```bash
 SVC=$(kubectl get secret platform-auth -o jsonpath='{.data.SERVICE_TOKEN}' | base64 -d)
-TENANT=…   # your tenant_id from `exascale whoami`
+TENANT=…   # your tenant_id from `1trade whoami`
 
 curl -s -X POST localhost:8002/v1/credits/purchase \
   -H "Authorization: Bearer $SVC" \
@@ -200,9 +200,9 @@ curl -s -X POST localhost:8002/v1/credits/purchase \
 ### Drive the end-to-end loop
 
 ```bash
-./bin/exascale infer chat -m llama-3.1-8b "Say hi in three words"   # stub reply + token usage
-./bin/exascale credits balance                                      # text drops ~1s later (async debit)
-./bin/exascale credits convert --from ai_index --to text --amount 100
+./bin/1trade infer chat -m llama-3.1-8b "Say hi in three words"   # stub reply + token usage
+./bin/1trade credits balance                                      # text drops ~1s later (async debit)
+./bin/1trade credits convert --from ai_index --to text --amount 100
 ```
 
 The same loop runs in the browser at `:3000`: buy/convert in the wallet → inference playground → live
@@ -219,7 +219,7 @@ balances update.
 | `make up` | cluster + data plane + Tilt (one-command bring-up) |
 | `make down` | delete the local k3d cluster |
 | `make ps` | `kubectl get pods -A` |
-| `make cli` | build the `exascale` CLI → `bin/exascale` |
+| `make cli` | build the `1trade` CLI → `bin/1trade` |
 | `make build` / `make test` | build / race-test every Go module |
 | `make lint` / `make fmt` | golangci-lint / gofmt across modules |
 | `make test-e2e` | timed sub-5-min signup→top-up→infer→GPU-debit loop |
@@ -235,8 +235,8 @@ balances update.
 | `docker` not found / `make up` hangs | start Docker Desktop and enable WSL integration; run from the WSL shell |
 | Web shows empty data / 502 | the stack or forwards are down — `tilt up`, or re-run the `kubectl port-forward`s |
 | `port-forward` "address already in use" | that port is already forwarded — leave it |
-| `make up` → `connection refused` | cluster is stopped — `make up` restarts it, or `k3d cluster start exascale` |
-| k3d LB `Bind for 0.0.0.0:8080 failed` | another project holds `:8080` — free it, then start; if wedged: `k3d cluster delete exascale && make up` (dev data is disposable) |
+| `make up` → `connection refused` | cluster is stopped — `make up` restarts it, or `k3d cluster start 1trade` |
+| k3d LB `Bind for 0.0.0.0:8080 failed` | another project holds `:8080` — free it, then start; if wedged: `k3d cluster delete 1trade && make up` (dev data is disposable) |
 | Inference returns `402` | tenant has no `text` credits — mint via §5 or `credits convert` into `text` |
 | Balance didn't change after `infer` | debits are async (~1s via NATS) — re-check a moment later |
 | `go` / `golangci-lint` not found | open a new shell or `source ~/.profile` (PATH picks up `$HOME/go/bin`) |

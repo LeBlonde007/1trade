@@ -12,8 +12,8 @@ later, real trading (Phase 2). Under the pivot:
   ratio + proof-of-reserves publication, partner DC onboarding (manual v1), the attestation
   stack.
 - **Deferred to Phase 2:** the trade-escrow flow (buyer cash → custodial escrow → DC on metered
-  delivery) is **designed and stubbed** because today, customers pay Exascale directly and
-  Exascale pays partner DCs (it's a redeem-only flow). When the exchange goes live, the same
+  delivery) is **designed and stubbed** because today, customers pay 1Trade directly and
+  1Trade pays partner DCs (it's a redeem-only flow). When the exchange goes live, the same
   primitives compose into the trade-escrow flow.
 
 ## 2. Features owned
@@ -48,7 +48,7 @@ later, real trading (Phase 2). Under the pivot:
 - **Staked bond** held in escrow; forfeitable on proven fraud.
 - First partner activated; soft launch (small allocation, monitored).
 - First **partner payout cycle**: monthly aggregation of `supply_source=<partner>` consumption,
-  `gpu_hours_consumed * agreed_rate`, minus Exascale fee, 10–20% holdback through dispute window,
+  `gpu_hours_consumed * agreed_rate`, minus 1Trade fee, 10–20% holdback through dispute window,
   wired to partner.
 
 ### Milestone 5 — Public proof of reserves
@@ -98,7 +98,7 @@ later, real trading (Phase 2). Under the pivot:
 
 The partner-DC agent (a separate small binary that runs at partner sites) has its own
 Dockerfile: `services/supply-service/agent/Dockerfile`. It's small, distroless, and only needs
-egress to `prod-real.exascale.io:443` over mTLS.
+egress to `prod-real.1trade.io:443` over mTLS.
 
 ## 7. Deploy
 
@@ -111,7 +111,7 @@ egress to `prod-real.exascale.io:443` over mTLS.
 
 ## 8. Conventions
 
-- **v1 backing = Exascale's own DC** (trivially attestable — bootstrap trust on hardware you control).
+- **v1 backing = 1Trade's own DC** (trivially attestable — bootstrap trust on hardware you control).
   External DCs onboarded through the full stack + bond afterward.
 - **Build the trade-escrow data model FOR REAL in v1** even though it's stubbed — so the Phase 2
   switch-on is a config flip, not a redesign.

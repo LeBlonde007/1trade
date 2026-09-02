@@ -1,4 +1,4 @@
-# Exascale event contract — orders.state.v1
+# 1Trade event contract — orders.state.v1
 # One event per order state transition, emitted by matching-engine. Consumed by surveillance
 # (spoofing / layering / excessive-cancellation detection needs the full order lifecycle, not just
 # fills) and by the trading frontend's order-updates stream.

@@ -1,15 +1,15 @@
 openapi: 3.0.3
 info:
-  title: Exascale Compute API (GPU types, quota, scheduled jobs, instances)
+  title: 1Trade Compute API (GPU types, quota, scheduled jobs, instances)
   version: 1.1.0
   description: >
-    **The Exascale compute control-plane API.** Owned by `compute-platform` (the `compute-control`
+    **The 1Trade compute control-plane API.** Owned by `compute-platform` (the `compute-control`
     service). It wraps the Kubernetes scheduling stack (Kueue queues per workload class + Volcano gang
     scheduling + the NVIDIA GPU Operator) behind a stable API.
 
     **v1.1.0 (M3, F13).** Adds the customer-facing **on-demand GPU instance lifecycle**:
     create / list / get / stop / start / delete instances, each drawn from the same GPU pool the
-    internal scheduler (M2) places jobs on. Instances boot a versioned **Exascale ML Stack image** and
+    internal scheduler (M2) places jobs on. Instances boot a versioned **1Trade ML Stack image** and
     return connection info (ssh / jupyter / http). Target: <90s P95 time-to-running. Per-second GPU
     usage meters to `events/compute.usage.v1` while an instance runs; stop releases its GPUs back to
     the pool and ends billing. The M2 internal scheduling + quota surface and the GPU-type catalog are
@@ -22,7 +22,7 @@ info:
     `usage_id`). See docs/plans/features/F12-compute-control-plane.md and credit-types.md §1 (GPU tiers).
 
 servers:
-  - { url: "https://api.exascale.io", description: prod }
+  - { url: "https://api.1trade.io", description: prod }
   - { url: "http://localhost:8086", description: "local (compute-control)" }
 
 tags:
@@ -267,9 +267,9 @@ components:
       type: object
       description: "How to reach a running instance. Null fields until the instance is running."
       properties:
-        ssh:     { type: [string, "null"], example: "ssh ubuntu@i-7c2a.gpu.exascale.io" }
-        jupyter: { type: [string, "null"], format: uri, example: "https://i-7c2a.gpu.exascale.io/jupyter" }
-        http:    { type: [string, "null"], format: uri, example: "https://i-7c2a.gpu.exascale.io" }
+        ssh:     { type: [string, "null"], example: "ssh ubuntu@i-7c2a.gpu.1trade.io" }
+        jupyter: { type: [string, "null"], format: uri, example: "https://i-7c2a.gpu.1trade.io/jupyter" }
+        http:    { type: [string, "null"], format: uri, example: "https://i-7c2a.gpu.1trade.io" }
 
     InstanceRequest:
       type: object
@@ -277,7 +277,7 @@ components:
       properties:
         type:           { type: string, enum: [gpu_h100, gpu_h200], description: "GPU tier (== credit_type debited)" }
         count:          { type: integer, minimum: 1, maximum: 32, default: 1, description: "GPUs in this instance (self-serve up to 32)" }
-        image:          { type: string, default: "stable", description: "ML-Stack image: 'stable' | 'latest' | a pinned version id (e.g. 'exascale-ml-stack-2026.05')" }
+        image:          { type: string, default: "stable", description: "ML-Stack image: 'stable' | 'latest' | a pinned version id (e.g. '1trade-ml-stack-2026.05')" }
         region:         { type: string, default: "us-east-1" }
         idle_stop_minutes: { type: [integer, "null"], minimum: 0, description: "auto-stop after this many idle minutes (null = no auto-stop; default per F06 policy)" }
         sub_account_id: { type: [string, "null"], format: uuid }

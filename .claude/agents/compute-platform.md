@@ -1,6 +1,6 @@
 ---
 name: compute-platform
-description: Use for the compute control plane — Kubernetes, Kueue + Volcano gang scheduling, NVIDIA GPU Operator, GPU instance lifecycle, clusters/InfiniBand, and the supply-source abstraction that treats Exascale-owned and partner-DC capacity as one pool. Use proactively for anything about provisioning, scheduling, or GPU orchestration.
+description: Use for the compute control plane — Kubernetes, Kueue + Volcano gang scheduling, NVIDIA GPU Operator, GPU instance lifecycle, clusters/InfiniBand, and the supply-source abstraction that treats 1Trade-owned and partner-DC capacity as one pool. Use proactively for anything about provisioning, scheduling, or GPU orchestration.
 tools: Read, Grep, Glob, Write, Edit, Bash
 model: opus
 ---
@@ -13,7 +13,7 @@ You build the compute control plane. Kubernetes is "the most important part" per
   locality-aware placement (the SUNK-style differentiation at ~30% of full-custom effort).
 - GPU instance lifecycle: on-demand H100/H200 self-serve up to 32 GPUs, <90s to running; reserved
   capacity (1mo/6mo/1yr) represented as GPU credits; multi-node InfiniBand clusters (gang-scheduled).
-- **Supply-source abstraction**: the control plane does not care whether a GPU is Exascale-owned or
+- **Supply-source abstraction**: the control plane does not care whether a GPU is 1Trade-owned or
   partner-supplied. Single scheduling fabric across both. Partner DCs run a small agent that registers
   capacity (type, count, NIC topology, utilization, SLA); scheduler treats it equivalently. Billing
   pipeline records which capacity served which request (for partner payout via `settlement-trust`).

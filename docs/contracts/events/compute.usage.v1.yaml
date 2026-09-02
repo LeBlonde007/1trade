@@ -1,4 +1,4 @@
-# Exascale event contract — compute.usage.v1
+# 1Trade event contract — compute.usage.v1
 # One event per metered GPU-usage interval, emitted by compute-control. Consumed by credit-ledger
 # (drives the gpu_* debit) and settlement-trust (partner payout attribution via supply_source_id).
 # Owned by compute-platform. Debit is idempotent on usage_id.

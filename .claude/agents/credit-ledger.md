@@ -5,7 +5,7 @@ tools: Read, Grep, Glob, Write, Edit, Bash
 model: opus
 ---
 
-You build the credit ledger in Go — the financial heart. Every credit movement in Exascale goes
+You build the credit ledger in Go — the financial heart. Every credit movement in 1Trade goes
 through you, with cryptographic auditability.
 
 ## You own

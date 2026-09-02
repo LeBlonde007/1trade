@@ -1,4 +1,4 @@
-# Exascale — Project Context (read by every agent)
+# 1Trade — Project Context (read by every agent)
 
 > This file is auto-loaded into every Claude Code session and subagent. It is the shared
 > ground truth. If something here conflicts with an agent's instructions, this file wins,
@@ -8,7 +8,7 @@
 > The build is **platform-first**: ship inference + compute + prepaid credits for AI startups
 > (revenue now); the **exchange/trading layer is paused** pending a license (designed, mock-built,
 > kept warm). This **supersedes the "trading layer first" sequencing** described below.
-> - The pivot: `docs/re/exascale_gtm_focus_update.md`
+> - The pivot: `docs/re/1trade_gtm_focus_update.md`
 > - The build plan (per-agent + per-feature, setup → local → deploy): `docs/plans/README.md`
 > - The engineering rulebook every agent follows: `docs/plans/ENGINEERING_STANDARDS.md`
 >
@@ -17,7 +17,7 @@
 > Product spec lives at `docs/re/phase6_v2.md` (the `docs/phase6-prd-ssd.md` path below is its
 > intended home).
 
-## What Exascale is
+## What 1Trade is
 
 A **commodity market for AI compute**. Three integrated layers over one credit system:
 
@@ -42,7 +42,7 @@ Real owned datacenter as credible underlying; partner DCs for scale.
 | Core services | **Go** (matching engine, ledger, index, market maker, surveillance, supply, platform-core) |
 | Inference | **Python + vLLM** behind a Go gateway |
 | Frontend | **Nuxt 4 + Vue 3 + TypeScript**, CSS-variable design tokens (see design system) |
-| CLI | `exascale` — Go binary |
+| CLI | `1trade` — Go binary |
 | Data | **PostgreSQL** (state), **TimescaleDB** (time-series: candles, prints, metrics), **Redis** (order books, cache), **NATS** (events) |
 | Orchestration | **Kubernetes + Kueue + Volcano + NVIDIA GPU Operator** |
 | Gateway / edge | Kong behind Cloudflare |
@@ -51,7 +51,7 @@ Real owned datacenter as credible underlying; partner DCs for scale.
 ## Monorepo layout
 
 ```
-exascale/
+1trade/
 ├── CLAUDE.md                  ← this file
 ├── docs/
 │   ├── phase6-prd-ssd.md      ← the spec (source of product truth)
@@ -62,7 +62,7 @@ exascale/
 │       └── credit-types.md    ← the canonical credit-type enum (shared everywhere)
 ├── services/                  ← Go services (one dir each)
 ├── apps/web/                  ← Nuxt 4 frontend
-├── apps/cli/                  ← exascale CLI
+├── apps/cli/                  ← 1trade CLI
 ├── deploy/                    ← k8s · terraform · ci
 └── .claude/agents/            ← the agent roster
 ```

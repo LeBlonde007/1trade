@@ -1,4 +1,4 @@
-// Package client is the exascale CLI's tiny JSON HTTP helper for the platform services. It attaches
+// Package client is the 1trade CLI's tiny JSON HTTP helper for the platform services. It attaches
 // the bearer token and surfaces upstream errors (code + message) so the CLI prints something useful.
 package client
 

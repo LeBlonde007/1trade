@@ -1,4 +1,4 @@
-# Exascale — CODEOWNERS. The tracking layer: every path routes to its owning agent's human
+# 1Trade — CODEOWNERS. The tracking layer: every path routes to its owning agent's human
 # reviewer, so nothing changes in someone's service without their review. Mirrors
 # docs/plans/REPO_LAYOUT.md §5 and the agent roster in docs/plans/README.md §3.
 #
@@ -46,7 +46,7 @@
 
 # --- frontend ---
 /apps/web/                          @trading-frontend
-/Exascale Frontend/                 @trading-frontend
+/1Trade Frontend/                 @trading-frontend
 
 # --- security-sensitive surfaces: security-compliance co-reviews regardless of path owner ---
 # (GitHub applies the LAST matching rule, so keep these specific patterns below the dir rules.)

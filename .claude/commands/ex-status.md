@@ -3,7 +3,7 @@ description: Show build progress — feature statuses from the plan vs. actual b
 argument-hint: [milestone, e.g. M2]  (optional — defaults to all)
 ---
 
-Give a concise progress report for Exascale. Milestone filter (if any): $1
+Give a concise progress report for 1Trade. Milestone filter (if any): $1
 
 ## 1. Gather
 - Read the feature tables in `docs/plans/MANAGEMENT_PLAN.md` (§6 Phase 1, §7 keep-warm) for the

@@ -13,7 +13,7 @@ Steps (per Phase 6 §11.6 and the settlement-trust architecture doc):
 2. Mutual NDA + technical scoping (GPU type, count, NIC topology, SLA, region).
 3. Capacity assessment (F19 attestation kickoff).
 4. Commercial agreement (pricing floor, payout %, term, bond requirement).
-5. Exascale agent deployed at partner DC.
+5. 1Trade agent deployed at partner DC.
 6. Capacity registered with compute control plane (F16).
 7. Soft launch — partner capacity receives small allocation (e.g., 10% of own DC).
 8. Monitor for 2-4 weeks (utilization, SLA hits, alerts).

@@ -7,12 +7,12 @@ import (
 	"os"
 	"time"
 
-	"github.com/exascale/inference-gateway/internal/api"
-	"github.com/exascale/inference-gateway/internal/config"
-	"github.com/exascale/inference-gateway/internal/events"
-	"github.com/exascale/inference-gateway/internal/ledger"
-	"github.com/exascale/inference-gateway/internal/model"
-	"github.com/exascale/inference-gateway/internal/obs"
+	"github.com/trade1/inference-gateway/internal/api"
+	"github.com/trade1/inference-gateway/internal/config"
+	"github.com/trade1/inference-gateway/internal/events"
+	"github.com/trade1/inference-gateway/internal/ledger"
+	"github.com/trade1/inference-gateway/internal/model"
+	"github.com/trade1/inference-gateway/internal/obs"
 )
 
 // Version is set at build time (-ldflags -X main.Version=...).

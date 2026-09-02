@@ -1,4 +1,4 @@
-module github.com/exascale/cli
+module github.com/trade1/cli
 
 go 1.25.0
 

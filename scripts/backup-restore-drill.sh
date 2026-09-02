@@ -2,20 +2,20 @@
 # Backup/restore drill (F01) — prove the credit ledger survives a Postgres dump + restore intact,
 # *including the append-only hash chain* (the financial heart; tampering would change the digest).
 #
-# It: (1) pg_dumps the `exascale` DB, (2) restores it into a scratch DB, (3) asserts every table's
+# It: (1) pg_dumps the `1trade` DB, (2) restores it into a scratch DB, (3) asserts every table's
 # row count matches the live DB, and (4) asserts the ledger's chain-hash digest is byte-identical.
 # Postgres-only — needs just the data plane (no app services). Idempotent; safe to re-run.
 #
 #   scripts/backup-restore-drill.sh          # run the full drill against the running cluster
 #   KEEP=1 scripts/backup-restore-drill.sh   # keep the scratch DB + dump for inspection
 #
-# Env: PG_NAMESPACE(data) PG_DB(exascale) RESTORE_DB(exascale_restore) PG_USER(exascale) OUT_DIR(backups)
+# Env: PG_NAMESPACE(data) PG_DB(1trade) RESTORE_DB(1trade_restore) PG_USER(1trade) OUT_DIR(backups)
 set -euo pipefail
 
 NS="${PG_NAMESPACE:-data}"
-DB="${PG_DB:-exascale}"
-RESTORE_DB="${RESTORE_DB:-exascale_restore}"
-PGUSER="${PG_USER:-exascale}"
+DB="${PG_DB:-1trade}"
+RESTORE_DB="${RESTORE_DB:-1trade_restore}"
+PGUSER="${PG_USER:-1trade}"
 OUT_DIR="${OUT_DIR:-backups}"
 DUMP="$OUT_DIR/${DB}-$(date +%Y%m%d-%H%M%S).sql"
 

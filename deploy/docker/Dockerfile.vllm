@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.6
-# Exascale — vLLM inference runtime (inference-ml). Built once per vLLM release, pushed to the
+# 1Trade — vLLM inference runtime (inference-ml). Built once per vLLM release, pushed to the
 # org registry, pulled by every inference pod. Model weights are MOUNTED (PVC), never baked in.
 # See docs/plans/DEPLOYMENT.md §4 and docs/plans/features/F09-vllm-deployment.md.
 FROM nvcr.io/nvidia/pytorch:24.10-py3 AS base

@@ -1,4 +1,4 @@
-module github.com/exascale/credit-ledger
+module github.com/trade1/credit-ledger
 
 go 1.25.0
 

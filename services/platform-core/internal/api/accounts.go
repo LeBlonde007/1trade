@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/exascale/platform-core/internal/domain"
-	"github.com/exascale/platform-core/internal/store"
+	"github.com/trade1/platform-core/internal/domain"
+	"github.com/trade1/platform-core/internal/store"
 )
 
 // listAudit returns the tenant's audit log, newest first (admin-only). The queryable audit trail is

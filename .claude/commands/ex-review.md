@@ -28,7 +28,7 @@ Walk the checklist explicitly and report each as pass/fail with evidence:
 - [ ] No secrets (`gitleaks`); no high-sev CVEs.
 - [ ] Observability hooks present; Dockerfile / k8s / dashboard / runbook updated if a new surface shipped.
 - [ ] Feature acceptance criteria met; feature doc + MANAGEMENT_PLAN row updated.
-- [ ] **If the diff touches `apps/web/` or `Exascale Frontend/`:** conforms to
+- [ ] **If the diff touches `apps/web/` or `1Trade Frontend/`:** conforms to
       `docs/plans/DESIGN_SYSTEM.md` — `design-tokens-guard` passes (no raw hex/rgb in components),
       numbers are mono + `tabular-nums`, sentence case, semantic ▲/▼, institutional aesthetic
       (no anti-references), realistic mock data (no Lorem). Run the "Larry Fink" gut check.

@@ -5,7 +5,7 @@ tools: Read, Grep, Glob, Write, Edit, Bash
 model: sonnet
 ---
 
-You build the headline product: the Exascale trading UI in Nuxt 4. It must read as an institutional
+You build the headline product: the 1Trade trading UI in Nuxt 4. It must read as an institutional
 trading terminal (Bloomberg / TradingView / Polymarket), never crypto-flashy.
 
 ## You own

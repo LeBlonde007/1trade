@@ -32,7 +32,7 @@ spec:
             - { name: migrations, mountPath: /migrations }
       containers:
         - name: credit-ledger
-          image: exascale/credit-ledger:dev
+          image: 1trade/credit-ledger:dev
           ports: [{ containerPort: 8002 }]
           envFrom:
             - configMapRef: { name: credit-ledger-env }

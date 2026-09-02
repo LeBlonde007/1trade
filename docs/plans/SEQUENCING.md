@@ -39,7 +39,7 @@ do **not** start until this is met.
 
 ## Milestone 2 — First inference dollar (sandbox)
 
-**Goal**: a developer signs up, buys $100 of credits via Stripe (paper), runs `exascale infer chat`
+**Goal**: a developer signs up, buys $100 of credits via Stripe (paper), runs `1trade infer chat`
 through a real vLLM (Llama-8B), wallet shows the debit. End-to-end on a sandbox tier.
 
 | Feature | Owner | Notes |
@@ -74,7 +74,7 @@ the platform — through Stripe (cards) and ACH/wire for larger purchases.
 | F11 — Multi-model-per-GPU packing | `inference-ml` | Static co-loc for top models; hot-swap LRU for the tail. |
 | F13 — GPU instance lifecycle (on-demand) | `compute-platform` | <90s instance start; CLI `gpu create/list/stop`. |
 | F14 — Reserved capacity (1/6/12 mo) | `compute-platform` + `credit-ledger` | Discount tiers; represented as GPU credits. |
-| F16 — Supply-source abstraction (Exascale-owned DC anchor) | `compute-platform` + `settlement-trust` | Owned DC as the only supply source this milestone; partner DCs land M4. |
+| F16 — Supply-source abstraction (1Trade-owned DC anchor) | `compute-platform` + `settlement-trust` | Owned DC as the only supply source this milestone; partner DCs land M4. |
 
 **Contracts authored this milestone**:
 - `openapi/inference.yaml` v1.1.0 (modality additions)

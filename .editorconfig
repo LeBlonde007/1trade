@@ -1,4 +1,4 @@
-# Exascale — editor defaults shared by every agent and contributor.
+# 1Trade — editor defaults shared by every agent and contributor.
 # See docs/plans/ENGINEERING_STANDARDS.md §4 for the per-language rationale.
 root = true
 

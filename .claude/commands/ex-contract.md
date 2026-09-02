@@ -3,7 +3,7 @@ description: Propose or author a shared-contract change the contract-first way (
 argument-hint: <service|contract> — <what needs to change and why>
 ---
 
-You are handling a contract change for Exascale: **$ARGUMENTS**
+You are handling a contract change for 1Trade: **$ARGUMENTS**
 
 Contracts are the ONLY way isolated services couple. They are owned by `tech-lead`. Changing one
 carelessly is the single biggest source of cross-service breakage — so follow this exactly

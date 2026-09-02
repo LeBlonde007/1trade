@@ -78,7 +78,7 @@ state, side effects).
 /**
  * useWallet — reactive access to the signed-in tenant's credit balances.
  * Polls /v1/credits/balances and exposes { balances, loading, error, refresh }.
- * Switches data source by EXASCALE_API_MODE (mock | local | staging) with zero call-site change.
+ * Switches data source by TRADE1_API_MODE (mock | local | staging) with zero call-site change.
  */
 export function useWallet() {
   ...
@@ -271,7 +271,7 @@ A change is done when **all** of these hold (superset of `CLAUDE.md`'s DoD):
 - [ ] Dockerfile + K8s manifests + dashboard + runbook updated if a new surface shipped
       (`DEPLOYMENT.md` §11).
 - [ ] Matches the spec (`docs/re/phase6_v2.md`) and the GTM pivot
-      (`docs/re/exascale_gtm_focus_update.md`).
+      (`docs/re/1trade_gtm_focus_update.md`).
 - [ ] The feature doc in `docs/plans/features/` updated if the surface changed.
 
 ---

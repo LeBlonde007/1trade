@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/exascale/platform-core/internal/domain"
-	"github.com/exascale/platform-core/internal/email"
-	"github.com/exascale/platform-core/internal/store"
+	"github.com/trade1/platform-core/internal/domain"
+	"github.com/trade1/platform-core/internal/email"
+	"github.com/trade1/platform-core/internal/store"
 )
 
 // issueVerifyToken generates + stores a verification token for a user and returns the raw token to

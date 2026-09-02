@@ -33,7 +33,7 @@ type Config struct {
 // Load reads configuration from the environment with sensible dev defaults.
 func Load() Config {
 	return Config{
-		Env:               envOr("EXASCALE_ENV", "dev"),
+		Env:               envOr("TRADE1_ENV", "dev"),
 		Addr:              envOr("INFERENCE_ADDR", ":8085"),
 		PlatformCoreURL:   envOr("PLATFORM_CORE_URL", "http://platform-core:8001"),
 		CreditLedgerURL:   envOr("CREDIT_LEDGER_URL", "http://credit-ledger:8002"),

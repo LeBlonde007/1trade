@@ -3,7 +3,7 @@
 ## Spec
 
 The **v1.5 screen backlog** — the post‑MVP frontend catalog in
-`docs/other/exascale_v15_screens_prompts.md` (Tiers E–N) — tracked as one feature so the screens are
+`docs/other/1trade_v15_screens_prompts.md` (Tiers E–N) — tracked as one feature so the screens are
 in the plan, sequenced against the backend feature each one consumes.
 
 This is the **screen‑by‑screen** tracker that `F20` (the console umbrella) does not itemize. Owning

@@ -32,7 +32,7 @@ spec:
             - { name: migrations, mountPath: /migrations }
       containers:
         - name: platform-core
-          image: exascale/platform-core:dev
+          image: 1trade/platform-core:dev
           ports: [{ containerPort: 8001 }]
           envFrom:
             - configMapRef: { name: platform-core-env }

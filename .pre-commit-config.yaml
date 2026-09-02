@@ -1,4 +1,4 @@
-# Exascale — pre-commit hooks shared by every contributor and agent.
+# 1Trade — pre-commit hooks shared by every contributor and agent.
 # These run before each commit so the standards in docs/plans/ENGINEERING_STANDARDS.md
 # are enforced locally, not just in CI. Install once: `pre-commit install`.
 # Owner: infra-sre.
@@ -14,7 +14,7 @@ fail_fast: false
 exclude: |
   (?x)^(
     docs/htmls/.*|
-    Exascale\ Frontend/server/data/.*
+    1Trade\ Frontend/server/data/.*
   )$
 
 repos:
@@ -69,7 +69,7 @@ repos:
       - id: eslint
         name: eslint (apps/web)
         language: system
-        files: '^(apps/web|Exascale Frontend)/.*\.(ts|vue|js)$'
+        files: '^(apps/web|1Trade Frontend)/.*\.(ts|vue|js)$'
         entry: bash -c 'cd "$(git rev-parse --show-toplevel)" && npm --prefix apps/web run lint --silent || true'
         pass_filenames: false
 
@@ -77,7 +77,7 @@ repos:
       - id: regulatory-framing
         name: regulatory framing guard (no securities language in customer-facing copy)
         language: pygrep
-        files: '^(apps/web|Exascale Frontend)/.*\.(vue|ts|md)$'
+        files: '^(apps/web|1Trade Frontend)/.*\.(vue|ts|md)$'
         entry: '(?i)\b(futures contract|speculation|investment return|guaranteed (return|yield))\b'
         # Credits are "prepaid service units"; trading is paused. See features/F22-licensing-track.md.
 
@@ -85,7 +85,7 @@ repos:
       - id: design-tokens-guard
         name: design tokens guard (use var(--token), not raw hex, in components)
         language: pygrep
-        files: '^(apps/web|Exascale Frontend)/.*\.vue$'
+        files: '^(apps/web|1Trade Frontend)/.*\.vue$'
         # tokens.css/global.css hold the raw values; components must reference var(--token).
         # Matches #rgb / #rrggbb / #rrggbbaa hex color literals. Runs only on changed .vue files.
         entry: '#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3}(?:[0-9a-fA-F]{2})?)?\b'
@@ -94,4 +94,4 @@ repos:
         # bespoke chart palettes, light/dark tour popovers) that need real design work, not a token
         # swap. The guard still enforces on every other (live) component + all new .vue files. Burn
         # this list down as the screens are rebuilt/unpaused.
-        exclude: '^Exascale Frontend/app/(pages/(trade|portfolio|benchmark|login|signup|states)\.vue|pages/(markets|datacenter|status|onboarding)/.*\.vue|pages/compute/\[id\]\.vue|pages/wallet/index\.vue|components/Trade/.*\.vue|components/App/GuidedTour\.client\.vue)$'
+        exclude: '^1Trade Frontend/app/(pages/(trade|portfolio|benchmark|login|signup|states)\.vue|pages/(markets|datacenter|status|onboarding)/.*\.vue|pages/compute/\[id\]\.vue|pages/wallet/index\.vue|components/Trade/.*\.vue|components/App/GuidedTour\.client\.vue)$'

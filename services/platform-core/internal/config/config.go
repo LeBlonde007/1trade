@@ -49,7 +49,7 @@ func Load() Config {
 		}
 	}
 	return Config{
-		Env:                 envOr("EXASCALE_ENV", "dev"),
+		Env:                 envOr("TRADE1_ENV", "dev"),
 		Addr:                envOr("PLATFORM_ADDR", ":8001"),
 		DatabaseURL:         os.Getenv("DATABASE_URL"),
 		JWTSecret:           os.Getenv("PLATFORM_JWT_SECRET"),
@@ -62,7 +62,7 @@ func Load() Config {
 		BillingAutoSettle: os.Getenv("STRIPE_SECRET_KEY") == "",
 		// Outside prod there is no compliance back-office, so a KYC submission is auto-verified to keep
 		// the real-money gate testable end-to-end. Prod requires a real review (manual or IDV vendor).
-		KYCAutoApprove:    os.Getenv("EXASCALE_ENV") != "prod",
+		KYCAutoApprove:    os.Getenv("TRADE1_ENV") != "prod",
 		SMTPAddr:          os.Getenv("SMTP_ADDR"),
 		SMTPUser:          os.Getenv("SMTP_USER"),
 		SMTPPass:          os.Getenv("SMTP_PASS"),
@@ -78,7 +78,7 @@ func Load() Config {
 		StorageUseCDN:     envBool("STORAGE_CDN", false),
 		StoragePublicRead: envBool("STORAGE_PUBLIC_READ", true),
 		StoragePrefix:     os.Getenv("STORAGE_PREFIX"),
-		EmailFrom:         envOr("EMAIL_FROM", "noreply@exascale.local"),
+		EmailFrom:         envOr("EMAIL_FROM", "noreply@1trade.local"),
 		AppBaseURL:        envOr("APP_BASE_URL", "http://localhost:3000"),
 		// Gate login on a verified email. OPT-IN (default off) and coupled to a working mailer: the deploy
 		// turns it on only when it wires real SMTP, so a sandbox without email creds isn't bricked (no one

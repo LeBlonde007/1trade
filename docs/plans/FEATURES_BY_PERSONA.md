@@ -52,7 +52,7 @@ each step marked done / showcase / paused. Pair with [STATUS.md](STATUS.md) (tre
 | **Rent + manage GPU instances** — provision / stop / start / delete | `/compute` · `/compute/new` | ✅ | **F13 (v0.3.0)** |
 | Wallet — live balances + transaction movements | `/wallet` | ✅ | F05 (v0.2.6) |
 | Mint an **API key** (shown once) | `/settings` | ✅ | F02 (v0.2.8) |
-| Drive it all from the **CLI** — `login / infer / gpu / credits / keys` | `exascale …` | ✅ | F04 + F13 |
+| Drive it all from the **CLI** — `login / infer / gpu / credits / keys` | `1trade …` | ✅ | F04 + F13 |
 | Console ops · budgets · purchase history | `/console` | ✅ | F20 · F06 |
 | **Admin home** — Settings → Account links to live Billing · Team · SSO · Audit (sidebar stays product-only) | `/settings` · `/enterprise/billing` | ✅ **live billing** (budget get/set · real balances + MTD spend · purchase history; honest Stripe/sandbox) | F06 (v0.3.11) |
 | Audit log + RBAC (admin actions → queryable trail) | `/enterprise/audit` | ✅ backend + **rich screen live** (filters + before→after diffs, admin-only) | F03 (v0.1.2) + F23 |

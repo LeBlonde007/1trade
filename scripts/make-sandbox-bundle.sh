@@ -2,7 +2,7 @@
 # Build sandbox-bundle.tar.gz — the NO-SOURCE deploy bundle for a box you don't fully control (e.g. a
 # client's droplet). It contains ONLY what `scripts/deploy-sandbox.sh` needs to deploy from PREBUILT
 # images: k8s manifests, the data plane, the migration SQL, and the deploy scripts. It deliberately
-# EXCLUDES all application source (no services/*/internal, no Exascale Frontend/app, no .go/.vue/.ts) —
+# EXCLUDES all application source (no services/*/internal, no 1Trade Frontend/app, no .go/.vue/.ts) —
 # the compiled product reaches the box as images pulled from your private registry, never as source.
 #
 # Use:

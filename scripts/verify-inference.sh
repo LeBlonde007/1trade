@@ -17,7 +17,7 @@ GATEWAY_URL="${GATEWAY_URL:-http://localhost:8085}"
 MODEL="${MODEL:-llama-3.1-8b}"
 PROMPT="${PROMPT:-In one short sentence, what is a GPU?}"
 PASSWORD="${PASSWORD:-verifypass123}"
-EMAIL="${EMAIL:-verify+$(date +%s)@exascale.local}"   # throwaway tenant per run (re-runnable)
+EMAIL="${EMAIL:-verify+$(date +%s)@1trade.local}"   # throwaway tenant per run (re-runnable)
 NAMESPACE="${NAMESPACE:-default}"
 PIDS=(); trap 'for p in "${PIDS[@]:-}"; do kill "$p" 2>/dev/null || true; done' EXIT
 

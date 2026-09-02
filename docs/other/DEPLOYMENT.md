@@ -1,6 +1,6 @@
-# Deployment Guide — Exascale Nuxt 4 App
+# Deployment Guide — 1Trade Nuxt 4 App
 
-The Exascale trading platform is ready to deploy. Here's how to get it live on Netlify.
+The 1Trade trading platform is ready to deploy. Here's how to get it live on Netlify.
 
 ## ✓ Build Status
 
@@ -22,7 +22,7 @@ The Exascale trading platform is ready to deploy. Here's how to get it live on N
    git init
    git add .
    git commit -m "initial: Nuxt 4 app with trading dashboard"
-   git remote add origin https://github.com/YOUR_USERNAME/exascale-nuxt.git
+   git remote add origin https://github.com/YOUR_USERNAME/1trade-nuxt.git
    git push -u origin main
    ```
 

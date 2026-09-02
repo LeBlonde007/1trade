@@ -1,4 +1,4 @@
-module github.com/exascale/compute-control
+module github.com/trade1/compute-control
 
 go 1.25.0
 

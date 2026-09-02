@@ -27,7 +27,7 @@ You build the layer that makes a GPU credit trustworthy enough to trade for real
 - Produce: payout records, proof-of-reserves endpoint, mint/burn calls to `credit-ledger`.
 
 ## Conventions
-- v1 backing = Exascale's own DC (trivially attestable — bootstrap trust on hardware you control),
+- v1 backing = 1Trade's own DC (trivially attestable — bootstrap trust on hardware you control),
   external DCs onboarded through the full stack + bond afterward.
 - Build the data model + interfaces FOR REAL in v1 even while trading is paper, so real-money
   testing is a config flip, not a rewrite.

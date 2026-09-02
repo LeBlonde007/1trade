@@ -11,15 +11,15 @@ import (
 	"os"
 	"time"
 
-	"github.com/exascale/compute-control/internal/api"
-	"github.com/exascale/compute-control/internal/auth"
-	"github.com/exascale/compute-control/internal/config"
-	"github.com/exascale/compute-control/internal/domain"
-	"github.com/exascale/compute-control/internal/events"
-	"github.com/exascale/compute-control/internal/instance"
-	"github.com/exascale/compute-control/internal/obs"
-	"github.com/exascale/compute-control/internal/pool"
-	"github.com/exascale/compute-control/internal/scheduler"
+	"github.com/trade1/compute-control/internal/api"
+	"github.com/trade1/compute-control/internal/auth"
+	"github.com/trade1/compute-control/internal/config"
+	"github.com/trade1/compute-control/internal/domain"
+	"github.com/trade1/compute-control/internal/events"
+	"github.com/trade1/compute-control/internal/instance"
+	"github.com/trade1/compute-control/internal/obs"
+	"github.com/trade1/compute-control/internal/pool"
+	"github.com/trade1/compute-control/internal/scheduler"
 )
 
 // Version is set at build time (-ldflags -X main.Version=...).

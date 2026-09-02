@@ -5,8 +5,8 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/exascale/credit-ledger/internal/domain"
-	"github.com/exascale/credit-ledger/internal/store"
+	"github.com/trade1/credit-ledger/internal/domain"
+	"github.com/trade1/credit-ledger/internal/store"
 )
 
 // convertBody is the POST /v1/credits/convert request (credit.yaml ConvertRequest).

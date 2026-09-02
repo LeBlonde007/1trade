@@ -1,4 +1,4 @@
-// Package ui is the exascale CLI's presentation layer (F24): semantic colour, spinners, confirmations,
+// Package ui is the 1trade CLI's presentation layer (F24): semantic colour, spinners, confirmations,
 // and actionable error hints. It stays institutional (Bloomberg, not flashy) — green ▲ / red ▼, mono
 // restraint. Colour auto-disables off-TTY and under NO_COLOR, so piped/CI output is plain and stable.
 package ui
@@ -113,15 +113,15 @@ func (s *Spinner) Stop() {
 func Hint(status int, code string) string {
 	switch {
 	case status == 401 || code == "invalid_token" || code == "unauthorized":
-		return "run `exascale login` to authenticate"
+		return "run `1trade login` to authenticate"
 	case status == 402 || code == "insufficient_credits":
 		return "top up at the web app (Wallet → Buy credits), then retry"
 	case code == "email_unverified":
-		return "verify your email (check your inbox), then `exascale login`"
+		return "verify your email (check your inbox), then `1trade login`"
 	case status == 403 || code == "forbidden":
 		return "your account lacks permission for this — check your role/KYC status"
 	case status == 404:
-		return "not found — check the id/model with `exascale catalog` or `exascale gpu list`"
+		return "not found — check the id/model with `1trade catalog` or `1trade gpu list`"
 	case status == 429:
 		return "rate limited — wait a moment and retry"
 	case status >= 500:

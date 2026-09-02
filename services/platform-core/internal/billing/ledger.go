@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/exascale/platform-core/internal/config"
+	"github.com/trade1/platform-core/internal/config"
 )
 
 // PurchaseBooking is a settled purchase to mint into the ledger.

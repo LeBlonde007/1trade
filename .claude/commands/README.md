@@ -1,4 +1,4 @@
-# Exascale workflow commands
+# 1Trade workflow commands
 
 Project slash commands that encode the build workflow from `docs/plans/`, so every feature is
 started, advanced, fixed, and merged the same way — branch + version + standards + contracts, no

@@ -1,6 +1,6 @@
 # credit-ledger (F05)
 
-The financial heart — every credit movement in Exascale goes through here, with cryptographic
+The financial heart — every credit movement in 1Trade goes through here, with cryptographic
 auditability. Owner: `credit-ledger`. Contracts: `docs/contracts/openapi/credit.yaml`,
 `docs/contracts/schemas/types.sql`, `docs/contracts/events/credit.tx.v1.yaml`,
 `docs/contracts/credit-types.md`.

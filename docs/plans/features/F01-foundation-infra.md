@@ -12,10 +12,10 @@
 >
 > **Scheduling stack live (v0.2.14):** `SCHED=1`/`FULL=1` installs **Kueue + Volcano** (ordered:
 > Kueue's cluster-wide webhook must be Ready before Volcano applies, or Volcano's own Deployments are
-> blocked), then advertises a **mock GPU** extended resource (`exascale.io/gpu=8`) on the
-> `exascale.io/gpu=mock` node and applies the project Kueue config — `ResourceFlavor`s + a
+> blocked), then advertises a **mock GPU** extended resource (`1trade.io/gpu=8`) on the
+> `1trade.io/gpu=mock` node and applies the project Kueue config — `ResourceFlavor`s + a
 > `ClusterQueue` per F12 workload class (`cq-inference`/`-training-small`/`-training-large`, cohort
-> `exascale`) + `LocalQueue`s (`kueue.x-k8s.io/v1beta2`). Verified live in k3d: a Kueue-admitted Job
+> `1trade`) + `LocalQueue`s (`kueue.x-k8s.io/v1beta2`). Verified live in k3d: a Kueue-admitted Job
 > places on the mock-GPU node, and a Volcano `minAvailable:2` gang schedules all-or-nothing. This
 > unblocks F12's M3 `k8s` scheduler backend (it targets these queues). See `deploy/k8s/scheduling/`.
 >

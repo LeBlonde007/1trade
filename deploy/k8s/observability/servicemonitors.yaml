@@ -1,4 +1,4 @@
-# ServiceMonitor for the Exascale Go services. Requires the Prometheus Operator CRDs, which the
+# ServiceMonitor for the 1Trade Go services. Requires the Prometheus Operator CRDs, which the
 # kube-prometheus-stack install provides (OBS=1 in deploy/k8s/local/install-data-plane.sh) — applying
 # this without that stack will fail (unknown kind). Each service exposes Prometheus metrics at /metrics
 # on its named `http` port (the same port as the API; cluster-internal, not customer-facing).
@@ -8,7 +8,7 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: exascale-go-services
+  name: 1trade-go-services
   namespace: default
   labels:
     release: kube-prom

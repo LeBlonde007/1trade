@@ -1,0 +1,1289 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>1Trade · Wallet</title>
+<meta name="viewport" content="width=1440, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+  :root {
+    --canvas:     #0A0B0E;
+    --elevated:   #14161B;
+    --overlay:    #1C1F26;
+    --hover:      #1F2229;
+    --text:       #E8E6E0;
+    --text-2:     #9A9A95;
+    --text-3:     #5F5F5C;
+    --border:     rgba(255,255,255,0.08);
+    --border-2:   rgba(255,255,255,0.14);
+    --brand:      #C8F25C;
+    --brand-hov:  #B8E548;
+    --accent:     #4A90E2;
+    --pos:        #19C37D;
+    --pos-sub:    rgba(25,195,125,0.12);
+    --neg:        #EF4444;
+    --neg-sub:    rgba(239,68,68,0.12);
+    --warn:       #F59E0B;
+
+    /* asset color-codes */
+    --c-cash:    #9A9A95;
+    --c-ai:      #C8F25C;
+    --c-text:    #4A90E2;
+    --c-speech:  #6BA4E8;
+    --c-image:   #8FB8E6;
+    --c-video:   #5B9BE0;
+    --c-niche:   #3A7FCC;
+    --c-h100:    #F5A623;
+    --c-h200:    #E89818;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--canvas);
+    color: var(--text);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    line-height: 1.55;
+    font-feature-settings: 'tnum' on, 'ss01' on, 'cv11' on;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  .mono { font-family: 'JetBrains Mono', ui-monospace, SF Mono, Menlo, monospace; font-variant-numeric: tabular-nums; }
+  .num  { font-family: 'JetBrains Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  .font-display { font-family: 'Inter Tight', 'Inter', sans-serif; }
+  .pos { color: var(--pos); }
+  .neg { color: var(--neg); }
+  .muted { color: var(--text-2); }
+  .muted-2 { color: var(--text-3); }
+
+  .lbl {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.20em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    font-weight: 500;
+  }
+  a { color: var(--text); text-decoration: none; }
+  a:hover { color: var(--brand); }
+
+  /* ========== LAYOUT ========== */
+  .app {
+    display: grid;
+    grid-template-columns: 64px 1fr;
+    grid-template-rows: 56px 1fr;
+    grid-template-areas:
+      "topbar topbar"
+      "sidebar main";
+    width: 100vw;
+    min-height: 100vh;
+  }
+  .topbar { grid-area: topbar; }
+  .sidebar { grid-area: sidebar; height: calc(100vh - 56px); position: sticky; top: 56px; }
+  .main { grid-area: main; min-width: 0; position: relative; transition: padding-right 280ms cubic-bezier(0.2, 0, 0, 1); }
+  .main.drawer-open { padding-right: 460px; }
+  .main.drawer-open .balance-grid { grid-template-columns: repeat(2, 1fr); }
+
+  /* ========== TOP BAR ========== */
+  .topbar {
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+    padding: 0 16px;
+    gap: 24px;
+    background: var(--canvas);
+    height: 56px;
+    position: sticky;
+    top: 0;
+    z-index: 30;
+  }
+  .topbar .brand {
+    font-family: 'Inter Tight';
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: -0.01em;
+    display: flex; align-items: center; gap: 8px;
+    padding-right: 16px;
+    border-right: 1px solid var(--border);
+    height: 36px;
+  }
+  .topbar .brand .mark { width: 12px; height: 12px; background: var(--brand); }
+  .breadcrumbs {
+    display: flex; align-items: center; gap: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--text-3);
+    letter-spacing: 0.02em;
+  }
+  .breadcrumbs a { color: var(--text-2); }
+  .breadcrumbs a:hover { color: var(--text); }
+  .breadcrumbs .cur { color: var(--text); }
+  .breadcrumbs [data-lucide] { width: 12px; height: 12px; opacity: 0.6; }
+
+  .top-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .top-pill {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--elevated);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    height: 32px; padding: 0 10px;
+    cursor: pointer; font-size: 12px;
+  }
+  .top-pill:hover { background: var(--hover); }
+  .icon-btn {
+    width: 32px; height: 32px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 2px; color: var(--text-2);
+    cursor: pointer; position: relative;
+  }
+  .icon-btn:hover { background: var(--hover); color: var(--text); }
+  .icon-btn .badge {
+    position: absolute; top: -4px; right: -4px;
+    background: var(--brand); color: var(--canvas);
+    font-size: 9px; font-weight: 700;
+    min-width: 14px; height: 14px;
+    border-radius: 999px;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0 4px;
+  }
+  .avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: var(--brand); color: var(--canvas);
+    font-weight: 700; font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+
+  /* ========== SIDEBAR ========== */
+  .sidebar {
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    padding: 8px 0; background: var(--canvas);
+  }
+  .nav-item {
+    height: 44px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-3); cursor: pointer;
+    border-left: 3px solid transparent;
+    position: relative;
+    transition: color 120ms, background 120ms;
+  }
+  .nav-item:hover { color: var(--text); background: rgba(255,255,255,0.02); }
+  .nav-item.active {
+    color: var(--brand);
+    background: rgba(200,242,92,0.06);
+    border-left-color: var(--brand);
+  }
+  .nav-item .tooltip {
+    position: absolute; left: 100%; margin-left: 12px;
+    background: var(--overlay); border: 1px solid var(--border);
+    color: var(--text); font-size: 11px;
+    padding: 4px 8px; border-radius: 2px;
+    pointer-events: none; opacity: 0;
+    transform: translateX(-4px);
+    transition: opacity 120ms, transform 120ms;
+    white-space: nowrap; z-index: 10;
+  }
+  .nav-item:hover .tooltip { opacity: 1; transform: translateX(0); }
+  .nav-divider { height: 1px; background: var(--border); margin: 8px 12px; }
+  .sidebar .foot {
+    margin-top: auto; padding: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; color: var(--text-3);
+    letter-spacing: 0.08em; text-align: center;
+    border-top: 1px solid var(--border);
+  }
+  .sidebar .foot .open-dot {
+    width: 6px; height: 6px; background: var(--pos);
+    border-radius: 50%; display: inline-block; margin-bottom: 4px;
+  }
+  [data-lucide] { width: 18px; height: 18px; stroke-width: 1.6; }
+
+  /* ========== PAGE ========== */
+  .page {
+    max-width: 1320px;
+    margin: 0 auto;
+    padding: 40px 40px 80px;
+  }
+
+  /* WALLET HEADER */
+  .wallet-header {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 64px;
+    align-items: end;
+    padding-bottom: 40px;
+    border-bottom: 1px solid var(--border);
+  }
+  .wallet-header h1 {
+    font-family: 'Inter Tight';
+    font-size: 40px; font-weight: 600;
+    letter-spacing: -0.025em;
+    margin: 0 0 8px;
+    line-height: 1.05;
+  }
+  .wallet-header .sub {
+    color: var(--text-2);
+    font-size: 16px;
+    margin: 0;
+  }
+  .wh-right { text-align: right; }
+  .wh-right .lbl { margin-bottom: 6px; display: block; }
+  .wh-total {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 60px;
+    font-weight: 600;
+    letter-spacing: -0.035em;
+    line-height: 1;
+    transition: color 600ms;
+  }
+  .wh-total.flash-up { color: var(--pos); }
+  .wh-total.flash-down { color: var(--neg); }
+  .wh-today {
+    margin-top: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
+    color: var(--pos);
+  }
+
+  /* ALLOCATION BAR */
+  .allocation { padding: 36px 0 8px; }
+  .alloc-labels {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 8px;
+  }
+  .alloc-label {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding-right: 12px;
+  }
+  .alloc-label .swatch {
+    width: 100%; height: 2px;
+    margin-bottom: 6px;
+  }
+  .alloc-label .nm {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--text-3);
+  }
+  .alloc-label .pct {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .alloc-bar {
+    height: 14px;
+    display: flex;
+    gap: 1px;
+    overflow: hidden;
+  }
+  .alloc-bar div { height: 100%; transition: width 400ms ease-out; }
+
+  /* SECTION HEAD */
+  .sec-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin: 56px 0 20px;
+  }
+  .sec-head h2 {
+    font-family: 'Inter Tight';
+    font-size: 22px; font-weight: 600;
+    letter-spacing: -0.02em;
+    margin: 0;
+  }
+  .sec-head .right {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-3);
+    letter-spacing: 0.06em;
+  }
+
+  /* BALANCE CARDS */
+  .balance-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  .bcard {
+    background: var(--canvas);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 20px 22px 18px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: border-color 150ms, background 150ms;
+  }
+  .bcard:hover { border-color: var(--border-2); background: rgba(255,255,255,0.012); }
+  .bcard .accent {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+  .bcard.featured {
+    border-color: rgba(200,242,92,0.30);
+    grid-column: span 1;
+    background: linear-gradient(180deg, rgba(200,242,92,0.04), transparent 60%);
+  }
+  .bcard.featured:hover { border-color: rgba(200,242,92,0.55); }
+  .bcard .head-row {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .bcard .ttl {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-2);
+    font-weight: 500;
+  }
+  .bcard .badge {
+    margin-left: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 10.5px;
+    padding: 2px 6px;
+    border-radius: 2px;
+    letter-spacing: 0.04em;
+  }
+  .bcard .badge.pos { background: var(--pos-sub); color: var(--pos); }
+  .bcard .badge.neg { background: var(--neg-sub); color: var(--neg); }
+  .bcard .qty {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    transition: color 600ms;
+  }
+  .bcard.featured .qty { font-size: 34px; }
+  .bcard .qty.flash-up { color: var(--pos); }
+  .bcard .qty.flash-down { color: var(--neg); }
+  .bcard .usd {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
+    color: var(--text-2);
+  }
+  .bcard .usd .secondary {
+    color: var(--text-3);
+    margin-left: 8px;
+  }
+  .bcard .lock {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    color: var(--warn);
+    background: rgba(245,158,11,0.08);
+    padding: 4px 8px;
+    border-radius: 2px;
+    align-self: flex-start;
+    letter-spacing: 0.02em;
+  }
+  .bcard .lock [data-lucide] { width: 11px; height: 11px; }
+
+  .bcard svg.spark {
+    width: 100%;
+    height: 36px;
+    display: block;
+    margin: 2px 0 4px;
+  }
+  .bcard .actions {
+    display: flex;
+    gap: 6px;
+    margin-top: auto;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+  }
+  .bcard .act {
+    flex: 1;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-2);
+    font-family: 'Inter';
+    font-size: 11.5px;
+    font-weight: 500;
+    height: 30px;
+    border-radius: 2px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: background 120ms, color 120ms, border-color 120ms;
+  }
+  .bcard .act:hover { background: var(--hover); color: var(--text); }
+  .bcard .act.primary {
+    background: var(--brand);
+    color: var(--canvas);
+    border-color: var(--brand);
+    font-weight: 600;
+  }
+  .bcard .act.primary:hover { background: var(--brand-hov); }
+  .bcard .act [data-lucide] { width: 13px; height: 13px; }
+
+  .bcard.empty {
+    background: rgba(255,255,255,0.012);
+  }
+  .bcard.empty .qty { color: var(--text-3); }
+
+  .bcard.cash .qty-row { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .bcard.cash .secondary-qty {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 16px;
+    color: var(--text-3);
+  }
+
+  /* RECENT MOVEMENTS */
+  .movements-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
+  }
+  .movements-table th, .movements-table td {
+    text-align: right;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .movements-table th:first-child, .movements-table td:first-child {
+    text-align: left;
+    color: var(--text-3);
+  }
+  .movements-table th:nth-child(2), .movements-table td:nth-child(2),
+  .movements-table th:nth-child(3), .movements-table td:nth-child(3) {
+    text-align: left;
+  }
+  .movements-table thead th {
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    font-weight: 500;
+    padding: 8px 14px;
+    border-bottom-color: var(--border-2);
+  }
+  .movements-table tbody tr { transition: background 120ms; cursor: pointer; }
+  .movements-table tbody tr:hover { background: rgba(255,255,255,0.02); }
+  .movements-table .type-pill {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 2px;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    font-weight: 500;
+  }
+  .movements-table .type-buy   { background: var(--pos-sub); color: var(--pos); }
+  .movements-table .type-sell  { background: var(--neg-sub); color: var(--neg); }
+  .movements-table .type-conv  { background: rgba(200,242,92,0.10); color: var(--brand); }
+  .movements-table .type-dep   { background: rgba(74,144,226,0.12); color: var(--accent); }
+  .movements-table .amt.pos { color: var(--pos); }
+  .movements-table .amt.neg { color: var(--neg); }
+  .movements-table .balance { color: var(--text); }
+  .full-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 24px;
+    color: var(--text-2);
+    font-size: 13px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 1px;
+  }
+  .full-link:hover { color: var(--brand); border-bottom-color: var(--brand); }
+  .full-link [data-lucide] { width: 14px; height: 14px; }
+
+  /* When drawer is open, scrim doesn't darken the page (page shifts instead) */
+  .drawer-scrim {
+    position: fixed;
+    inset: 0;
+    background: transparent;
+    z-index: 40;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 200ms;
+  }
+  .drawer-scrim.closed { opacity: 0; pointer-events: none; }
+  .drawer {
+    position: fixed;
+    top: 56px;
+    right: 0;
+    bottom: 0;
+    width: 460px;
+    background: var(--canvas);
+    border-left: 1px solid var(--border-2);
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    padding: 28px 32px;
+    transform: translateX(0);
+    transition: transform 280ms cubic-bezier(0.2, 0, 0, 1);
+    box-shadow: -24px 0 48px rgba(0,0,0,0.4);
+  }
+  .drawer.closed { transform: translateX(100%); }
+  .drawer-head {
+    display: flex; align-items: center;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
+  }
+  .drawer-head h2 {
+    font-family: 'Inter Tight';
+    font-size: 22px; font-weight: 600;
+    letter-spacing: -0.02em;
+    margin: 0;
+  }
+  .drawer-close {
+    margin-left: auto;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-2);
+    width: 30px; height: 30px;
+    cursor: pointer;
+    border-radius: 2px;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .drawer-close:hover { color: var(--text); background: var(--hover); }
+  .drawer-close [data-lucide] { width: 14px; height: 14px; }
+
+  .field-block { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+  .field-block .lbl { display: flex; justify-content: space-between; }
+  .field-block .lbl .avail {
+    color: var(--text-2);
+    letter-spacing: 0.04em;
+    font-size: 10px;
+  }
+  .select {
+    height: 48px;
+    background: var(--elevated);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 0 16px;
+    display: flex; align-items: center; gap: 12px;
+    cursor: pointer;
+    transition: border-color 120ms, background 120ms;
+  }
+  .select:hover { border-color: var(--border-2); background: var(--hover); }
+  .select .sym-swatch {
+    width: 18px; height: 18px;
+    background: var(--brand);
+    flex-shrink: 0;
+  }
+  .select .meta {
+    display: flex; flex-direction: column;
+    line-height: 1.15;
+  }
+  .select .nm {
+    font-family: 'Inter';
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text);
+  }
+  .select .bal {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-2);
+    letter-spacing: 0.02em;
+  }
+  .select .chev {
+    margin-left: auto;
+    color: var(--text-3);
+  }
+  .select .chev [data-lucide] { width: 14px; height: 14px; }
+
+  .swap-arrow {
+    display: flex; justify-content: center;
+    margin: 6px 0;
+  }
+  .swap-arrow .ring {
+    width: 32px; height: 32px;
+    background: var(--canvas);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--text-2);
+    cursor: pointer;
+    transition: transform 200ms, color 120ms;
+  }
+  .swap-arrow .ring:hover { color: var(--brand); transform: rotate(180deg); }
+  .swap-arrow .ring [data-lucide] { width: 14px; height: 14px; }
+
+  .amount-input {
+    height: 60px;
+    background: var(--elevated);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 0 16px;
+    display: flex; align-items: center;
+  }
+  .amount-input input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    outline: none;
+    text-align: right;
+  }
+  .amount-input input:focus { outline: 1px solid var(--accent); outline-offset: -1px; }
+  .amount-input .unit {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-3);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-left: 10px;
+  }
+  .amount-row {
+    display: flex; gap: 6px;
+  }
+  .amount-row button {
+    flex: 1;
+    background: var(--elevated);
+    border: 1px solid var(--border);
+    color: var(--text-2);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    height: 26px;
+    border-radius: 2px;
+    cursor: pointer;
+    letter-spacing: 0.02em;
+    transition: background 120ms, color 120ms;
+  }
+  .amount-row button:hover { background: var(--hover); color: var(--text); }
+
+  .preview-card {
+    margin-top: 24px;
+    background: rgba(200,242,92,0.04);
+    border: 1px solid rgba(200,242,92,0.20);
+    border-radius: 2px;
+    padding: 20px;
+  }
+  .preview-card .pv-out {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: -0.015em;
+    margin-bottom: 6px;
+  }
+  .preview-card .pv-out .arr {
+    color: var(--brand);
+    margin: 0 8px;
+  }
+  .preview-card .pv-rows {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(200,242,92,0.16);
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .preview-card .pv-row {
+    display: flex; justify-content: space-between;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11.5px;
+    font-variant-numeric: tabular-nums;
+  }
+  .preview-card .pv-row .k {
+    color: var(--text-3);
+    letter-spacing: 0.04em;
+  }
+  .preview-card .pv-row .v { color: var(--text); }
+  .preview-card .pv-row.live .v::after {
+    content: '';
+    display: inline-block;
+    width: 6px; height: 6px;
+    background: var(--pos);
+    border-radius: 50%;
+    margin-left: 6px;
+    vertical-align: 2px;
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse { 50% { opacity: 0.35; } }
+
+  .drawer-submit {
+    margin-top: auto;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+  }
+  .drawer-submit button {
+    width: 100%;
+    height: 48px;
+    background: var(--brand);
+    color: var(--canvas);
+    border: none;
+    border-radius: 2px;
+    font-family: 'Inter Tight';
+    font-weight: 600;
+    font-size: 15px;
+    letter-spacing: -0.005em;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: background 120ms;
+  }
+  .drawer-submit button:hover { background: var(--brand-hov); }
+  .drawer-submit .submit-note {
+    margin-top: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-3);
+    letter-spacing: 0.06em;
+    text-align: center;
+    text-transform: uppercase;
+  }
+
+  @media (max-width: 1200px) {
+    .balance-grid { grid-template-columns: repeat(2, 1fr); }
+    .wallet-header { grid-template-columns: 1fr; gap: 32px; }
+    .wh-right { text-align: left; }
+    .drawer { width: 380px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ====================== TOP BAR ====================== -->
+  <header class="topbar">
+    <div class="brand"><span class="mark"></span>1Trade</div>
+    <nav class="breadcrumbs">
+      <a href="#">Account</a>
+      <i data-lucide="chevron-right"></i>
+      <span class="cur">Wallet</span>
+    </nav>
+    <div class="top-right">
+      <div class="top-pill">
+        <i data-lucide="wallet" style="color: var(--brand); width: 14px; height: 14px;"></i>
+        <span class="num" style="font-size:13px; font-weight:500;" id="topPillBalance">$10,247.83</span>
+      </div>
+      <button class="icon-btn" title="Search"><i data-lucide="search"></i></button>
+      <button class="icon-btn" title="Notifications">
+        <i data-lucide="bell"></i>
+        <span class="badge">2</span>
+      </button>
+      <div class="avatar">A</div>
+    </div>
+  </header>
+
+  <!-- ====================== SIDEBAR ====================== -->
+  <aside class="sidebar">
+    <div class="nav-item"><i data-lucide="candlestick-chart"></i><span class="tooltip">Trade</span></div>
+    <div class="nav-item"><i data-lucide="list"></i><span class="tooltip">Markets</span></div>
+    <div class="nav-item"><i data-lucide="trending-up"></i><span class="tooltip">Index</span></div>
+    <div class="nav-item"><i data-lucide="briefcase"></i><span class="tooltip">Portfolio</span></div>
+    <div class="nav-item"><i data-lucide="clock"></i><span class="tooltip">History</span></div>
+    <div class="nav-item active"><i data-lucide="wallet"></i><span class="tooltip">Wallet</span></div>
+    <div class="nav-divider"></div>
+    <div class="nav-item"><i data-lucide="server"></i><span class="tooltip">Compute</span></div>
+    <div class="nav-item"><i data-lucide="message-square"></i><span class="tooltip">Inference</span></div>
+    <div class="nav-item" style="margin-top: auto;"><i data-lucide="settings"></i><span class="tooltip">Settings</span></div>
+    <div class="foot"><span class="open-dot"></span><br/>MKT OPEN</div>
+  </aside>
+
+  <!-- ====================== MAIN ====================== -->
+  <main class="main">
+    <div class="page">
+
+      <!-- WALLET HEADER -->
+      <section class="wallet-header">
+        <div>
+          <h1>Wallet</h1>
+          <p class="sub">Across all credit types and cash balances</p>
+        </div>
+        <div class="wh-right">
+          <span class="lbl">— Total value · USD</span>
+          <div class="wh-total" id="whTotal">$10,247.83</div>
+          <div class="wh-today pos" id="whToday">▲ +$23.41 (+0.23%) today</div>
+        </div>
+      </section>
+
+      <!-- ALLOCATION BAR -->
+      <section class="allocation">
+        <div class="alloc-labels" id="allocLabels"></div>
+        <div class="alloc-bar" id="allocBar"></div>
+      </section>
+
+      <!-- BALANCE CARDS -->
+      <div class="sec-head">
+        <h2>Balances</h2>
+        <span class="right">9 ASSETS · LIVE</span>
+      </div>
+
+      <div class="balance-grid" id="balanceGrid"></div>
+
+      <!-- RECENT MOVEMENTS -->
+      <div class="sec-head" style="margin-top: 64px;">
+        <h2>Recent movements</h2>
+        <span class="right">LAST 8 TRANSACTIONS</span>
+      </div>
+      <table class="movements-table">
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Type</th>
+            <th>Asset</th>
+            <th>Amount</th>
+            <th>Price</th>
+            <th>Balance after</th>
+          </tr>
+        </thead>
+        <tbody id="movementsBody"></tbody>
+      </table>
+      <a href="#" class="full-link">View full history <i data-lucide="arrow-right"></i></a>
+
+    </div>
+
+    <!-- ====== CONVERSION DRAWER (semi-open by default) ====== -->
+    <div class="drawer-scrim" id="drawerScrim"></div>
+    <aside class="drawer" id="drawer">
+      <div class="drawer-head">
+        <h2>Convert credits</h2>
+        <button class="drawer-close" id="drawerClose"><i data-lucide="x"></i></button>
+      </div>
+
+      <div class="field-block">
+        <span class="lbl">— From <span class="avail" id="convFromAvail">2,425,000 available</span></span>
+        <div class="select" id="convFromSelect">
+          <div class="sym-swatch" style="background: var(--c-ai);"></div>
+          <div class="meta">
+            <span class="nm">AI Credits</span>
+            <span class="bal">EAI · unified inference index</span>
+          </div>
+          <span class="chev"><i data-lucide="chevron-down"></i></span>
+        </div>
+      </div>
+
+      <div class="swap-arrow">
+        <span class="ring" title="Swap direction"><i data-lucide="arrow-down"></i></span>
+      </div>
+
+      <div class="field-block">
+        <span class="lbl">— To</span>
+        <div class="select" id="convToSelect">
+          <div class="sym-swatch" style="background: var(--c-text);"></div>
+          <div class="meta">
+            <span class="nm">Text Credits</span>
+            <span class="bal">LLM tokens</span>
+          </div>
+          <span class="chev"><i data-lucide="chevron-down"></i></span>
+        </div>
+      </div>
+
+      <div class="field-block">
+        <span class="lbl">— Amount</span>
+        <div class="amount-input">
+          <input type="text" value="1,000" id="convAmount"/>
+          <span class="unit">AI Credits</span>
+        </div>
+        <div class="amount-row">
+          <button data-pct="0.25">25%</button>
+          <button data-pct="0.5">50%</button>
+          <button data-pct="0.75">75%</button>
+          <button data-pct="1">Max</button>
+        </div>
+      </div>
+
+      <div class="preview-card">
+        <div class="pv-out"><span id="pvOutFrom">1,000</span> AI <span class="arr">→</span> <span id="pvOutTo">1,196</span> Text</div>
+        <div class="pv-rows">
+          <div class="pv-row live"><span class="k">RATE · LIVE</span><span class="v" id="pvRate">1 AI = 1.196 Text</span></div>
+          <div class="pv-row"><span class="k">HOUSE SPREAD</span><span class="v">0.50%</span></div>
+          <div class="pv-row"><span class="k">EFFECTIVE RATE</span><span class="v" id="pvEffRate">1.190</span></div>
+          <div class="pv-row"><span class="k">EST. SETTLEMENT</span><span class="v">Instant</span></div>
+        </div>
+      </div>
+
+      <div class="drawer-submit">
+        <button id="convSubmit">Convert 1,000 AI → 1,190 Text <i data-lucide="arrow-right" style="width: 14px; height: 14px;"></i></button>
+        <div class="submit-note">Rate locked for 8 seconds at submit</div>
+      </div>
+    </aside>
+  </main>
+</div>
+
+<script>
+/* ============================================================
+   STATE
+   ============================================================ */
+const ASSETS = [
+  { key: 'cash',   name: 'Cash · USD',         sym: 'USD',          qty: 3891.42,    usdPrice: 1,           color: 'cash',   secondary: '¥0', cls: 'cash', featured: false },
+  { key: 'ai',     name: 'AI Credits',         sym: 'EAI',          qty: 2425000,    usdPrice: 0.001005,    color: 'ai',     featured: true,
+                    description: 'Unified inference index', locked: 50000, change: +1.05, spark: [] },
+  { key: 'text',   name: 'Text Credits',       sym: 'TEXT',         qty: 1200000,    usdPrice: 0.001210,    color: 'text',   change: +0.42, locked: 0,    spark: [] },
+  { key: 'speech', name: 'Speech Credits',     sym: 'SPEECH',       qty: 480000,     usdPrice: 0.001200,    color: 'speech', change: -0.18, locked: 0,    spark: [] },
+  { key: 'image',  name: 'Image Credits',      sym: 'IMAGE',        qty: 152000,     usdPrice: 0.008000,    color: 'image',  change: +1.24, locked: 12000, spark: [] },
+  { key: 'video',  name: 'Video Credits',      sym: 'VIDEO',        qty: 7240,       usdPrice: 0.250000,    color: 'video',  change: -0.65, locked: 0,    spark: [] },
+  { key: 'niche',  name: 'Niche Credits',      sym: 'NICHE',        qty: 320000,     usdPrice: 0.000400,    color: 'niche',  change: +0.31, locked: 0,    spark: [] },
+  { key: 'h100',   name: 'H100 GPU Credits',   sym: 'H100',         qty: 245,        usdPrice: 2.99,        color: 'h100',   change: +0.41, locked: 8,    spark: [] },
+  { key: 'h200',   name: 'H200 GPU Credits',   sym: 'H200',         qty: 0,          usdPrice: 3.49,        color: 'h200',   change: 0,    locked: 0,    spark: [], empty: true },
+];
+
+const COLOR_VAR = { cash: '#9A9A95', ai: '#C8F25C', text: '#4A90E2', speech: '#6BA4E8', image: '#8FB8E6', video: '#5B9BE0', niche: '#3A7FCC', h100: '#F5A623', h200: '#E89818' };
+
+const fmt = (n, dp = 2) => Number(n).toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+const fmtInt = (n) => Number(n).toLocaleString('en-US');
+const fmtUsd = (n, dp = 2) => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+
+/* ============================================================
+   ALLOCATION BAR
+   ============================================================ */
+function totalUsd() {
+  return ASSETS.reduce((s, a) => s + a.qty * a.usdPrice, 0);
+}
+function buildAllocation() {
+  const total = totalUsd();
+  // Combine sub-credits visually
+  const groups = [
+    { key: 'cash',  name: 'Cash',         color: COLOR_VAR.cash,  usd: ASSETS[0].qty },
+    { key: 'ai',    name: 'AI Credits',   color: COLOR_VAR.ai,    usd: ASSETS[1].qty * ASSETS[1].usdPrice },
+    { key: 'text',  name: 'Text',         color: COLOR_VAR.text,  usd: ASSETS[2].qty * ASSETS[2].usdPrice },
+    { key: 'image', name: 'Image',        color: COLOR_VAR.image, usd: ASSETS[4].qty * ASSETS[4].usdPrice },
+    { key: 'h100',  name: 'H100',         color: COLOR_VAR.h100,  usd: ASSETS[7].qty * ASSETS[7].usdPrice },
+    { key: 'other', name: 'Other',        color: '#5F5F5C',
+      usd: ASSETS[3].qty * ASSETS[3].usdPrice + ASSETS[5].qty * ASSETS[5].usdPrice + ASSETS[6].qty * ASSETS[6].usdPrice
+    },
+  ];
+  const labels = document.getElementById('allocLabels');
+  const bar    = document.getElementById('allocBar');
+  labels.innerHTML = groups.map(g => {
+    const pct = (g.usd / total) * 100;
+    return `<div class="alloc-label" style="flex: ${pct};">
+      <div class="swatch" style="background: ${g.color};"></div>
+      <span class="nm">${g.name}</span>
+      <span class="pct">${pct.toFixed(1)}%</span>
+    </div>`;
+  }).join('');
+  bar.innerHTML = groups.map(g => {
+    const pct = (g.usd / total) * 100;
+    return `<div style="background: ${g.color}; width: ${pct}%;"></div>`;
+  }).join('');
+}
+
+/* ============================================================
+   BALANCE CARDS
+   ============================================================ */
+function genSpark(seed = 0) {
+  let v = 1.0;
+  const pts = [];
+  const trend = (Math.random() - 0.4);
+  for (let i = 0; i < 24; i++) {
+    v += (Math.random() - 0.5 + trend * 0.02) * 0.022;
+    pts.push(v);
+  }
+  return pts;
+}
+
+function sparkPath(pts, w, h) {
+  const min = Math.min(...pts), max = Math.max(...pts);
+  const range = max - min || 1;
+  const stepX = w / (pts.length - 1);
+  const pad = 3;
+  const usableH = h - pad * 2;
+  const line = pts.map((p, i) => {
+    const x = i * stepX;
+    const y = pad + usableH - ((p - min) / range) * usableH;
+    return (i === 0 ? 'M' : 'L') + x.toFixed(1) + ' ' + y.toFixed(1);
+  }).join(' ');
+  const fill = line + ` L ${w} ${h} L 0 ${h} Z`;
+  return { line, fill };
+}
+
+function buildCards() {
+  const grid = document.getElementById('balanceGrid');
+  grid.innerHTML = ASSETS.map(a => {
+    if (a.key === 'cash') {
+      return `<div class="bcard cash">
+        <div class="accent" style="background: ${COLOR_VAR.cash};"></div>
+        <div class="head-row">
+          <span class="ttl">— Cash · USD</span>
+        </div>
+        <div class="qty-row">
+          <span class="qty">${fmtUsd(a.qty)}</span>
+          <span class="secondary-qty">${a.secondary}</span>
+        </div>
+        <span class="usd">USD primary · JPY available</span>
+        <div class="actions">
+          <button class="act primary"><i data-lucide="plus"></i> Add cash</button>
+          <button class="act"><i data-lucide="arrow-up-right"></i> Send</button>
+        </div>
+      </div>`;
+    }
+    if (a.empty) {
+      return `<div class="bcard empty">
+        <div class="accent" style="background: ${COLOR_VAR[a.color]}; opacity: 0.3;"></div>
+        <div class="head-row">
+          <span class="ttl">— ${a.name}</span>
+        </div>
+        <span class="qty">${fmtInt(a.qty)}</span>
+        <span class="usd">No balance · Acquire to begin</span>
+        <div class="actions">
+          <button class="act primary"><i data-lucide="plus"></i> Acquire</button>
+          <button class="act"><i data-lucide="info"></i> About</button>
+        </div>
+      </div>`;
+    }
+
+    const usdEq = a.qty * a.usdPrice;
+    const change = a.change || 0;
+    const arr = change >= 0 ? '▲' : '▼';
+    const cls = change >= 0 ? 'pos' : 'neg';
+    const featuredClass = a.featured ? ' featured' : '';
+
+    // Mini sparkline
+    a.spark = genSpark();
+    const { line, fill } = sparkPath(a.spark, 240, 36);
+
+    let displayQty;
+    if (a.key === 'h100') displayQty = fmtInt(a.qty) + ' <span style="font-size:14px;color:var(--text-3);">credits</span>';
+    else displayQty = fmtInt(a.qty);
+
+    return `<div class="bcard${featuredClass}" data-key="${a.key}">
+      <div class="accent" style="background: ${COLOR_VAR[a.color]};"></div>
+      <div class="head-row">
+        <span class="ttl">— ${a.name}</span>
+        <span class="badge ${cls}">${arr} ${Math.abs(change).toFixed(2)}%</span>
+      </div>
+      <span class="qty" data-qty="${a.qty}">${displayQty}</span>
+      <span class="usd">${fmtUsd(usdEq, usdEq < 1 ? 4 : 2)} <span class="secondary">USD equivalent</span></span>
+      ${a.locked ? `<span class="lock"><i data-lucide="lock"></i>${fmtInt(a.locked)} locked in open orders</span>` : ''}
+      <svg class="spark" viewBox="0 0 240 36" preserveAspectRatio="none">
+        <path d="${fill}" fill="${COLOR_VAR[a.color]}" fill-opacity="0.10"/>
+        <path d="${line}" fill="none" stroke="${COLOR_VAR[a.color]}" stroke-width="1.4"
+              stroke-dasharray="800" stroke-dashoffset="800"
+              style="animation: draw 1.4s cubic-bezier(0.2,0,0,1) ${0.1 * ASSETS.indexOf(a)}s forwards;"/>
+      </svg>
+      <div class="actions">
+        <button class="act primary convert-btn" data-key="${a.key}"><i data-lucide="repeat"></i> Convert</button>
+        <button class="act"><i data-lucide="trending-up"></i> Trade</button>
+        <button class="act"><i data-lucide="arrow-up-right"></i> Send</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Wire convert buttons
+  document.querySelectorAll('.convert-btn').forEach(b => {
+    b.addEventListener('click', () => openDrawer(b.dataset.key));
+  });
+}
+
+const drawStyle = document.createElement('style');
+drawStyle.textContent = '@keyframes draw { to { stroke-dashoffset: 0; } }';
+document.head.appendChild(drawStyle);
+
+/* ============================================================
+   RECENT MOVEMENTS
+   ============================================================ */
+const MOVEMENTS = [
+  { time: '14:23:47', type: 'Trade buy',   typeKey: 'buy',  asset: 'AI Credits',     amount: +5000,    price: 0.000998, balance: 2425000 },
+  { time: '14:18:23', type: 'Trade sell',  typeKey: 'sell', asset: 'Text Credits',   amount: -250,     price: 0.001212, balance: 1200000 },
+  { time: '13:55:12', type: 'Conversion',  typeKey: 'conv', asset: 'AI → Speech',    amount: -1500,    price: '1.193',  balance: 2420000 },
+  { time: '13:41:08', type: 'Trade buy',   typeKey: 'buy',  asset: 'H100 GPU',       amount: +2,       price: 2.948,    balance: 245 },
+  { time: '12:18:55', type: 'Deposit',     typeKey: 'dep',  asset: 'USD',            amount: +500.00,  price: 1,        balance: 3891.42 },
+  { time: '11:02:14', type: 'Trade sell',  typeKey: 'sell', asset: 'Image Credits',  amount: -1200,    price: 0.007981, balance: 152000 },
+  { time: '10:47:31', type: 'Conversion',  typeKey: 'conv', asset: 'AI → Image',     amount: -8500,    price: '0.126',  balance: 2421500 },
+  { time: '09:38:22', type: 'Trade buy',   typeKey: 'buy',  asset: 'AI Credits',     amount: +20000,   price: 0.000994, balance: 2430000 },
+];
+
+function buildMovements() {
+  const body = document.getElementById('movementsBody');
+  body.innerHTML = MOVEMENTS.map(m => {
+    const sign = m.amount >= 0 ? '+' : '−';
+    const isUsd = m.asset === 'USD';
+    const amtStr = sign + (isUsd ? '$' + fmt(Math.abs(m.amount)) : fmtInt(Math.abs(m.amount)));
+    const cls = m.amount >= 0 ? 'pos' : 'neg';
+    const balStr = (m.asset === 'USD' ? '$' : '') + fmtInt(m.balance);
+    const pillCls = 'type-' + m.typeKey;
+    let priceStr;
+    if (typeof m.price === 'string') priceStr = m.price;
+    else if (m.price >= 1) priceStr = '$' + fmt(m.price);
+    else priceStr = '$' + fmt(m.price, 6);
+    return `<tr>
+      <td>${m.time} UTC</td>
+      <td><span class="type-pill ${pillCls}">${m.type}</span></td>
+      <td>${m.asset}</td>
+      <td class="amt ${cls}">${amtStr}</td>
+      <td>${priceStr}</td>
+      <td class="balance">${balStr}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ============================================================
+   CONVERSION DRAWER
+   ============================================================ */
+const drawer = document.getElementById('drawer');
+const scrim  = document.getElementById('drawerScrim');
+
+function openDrawer(fromKey) {
+  drawer.classList.remove('closed');
+  scrim.classList.remove('closed');
+  document.querySelector('.main').classList.add('drawer-open');
+  if (fromKey) {
+    const asset = ASSETS.find(a => a.key === fromKey);
+    if (asset) updateConversionFrom(asset);
+  }
+}
+function closeDrawer() {
+  drawer.classList.add('closed');
+  scrim.classList.add('closed');
+  document.querySelector('.main').classList.remove('drawer-open');
+}
+document.getElementById('drawerClose').addEventListener('click', closeDrawer);
+scrim.addEventListener('click', closeDrawer);
+
+function updateConversionFrom(asset) {
+  const el = document.getElementById('convFromSelect');
+  el.querySelector('.sym-swatch').style.background = COLOR_VAR[asset.color];
+  el.querySelector('.nm').textContent = asset.name;
+  el.querySelector('.bal').textContent = asset.sym + ' · ' + (asset.description || 'Available to convert');
+  document.getElementById('convFromAvail').textContent = fmtInt(asset.qty) + ' available';
+  document.querySelector('.amount-input .unit').textContent = asset.name;
+  syncConversion();
+}
+
+// Quick fill
+document.querySelectorAll('.amount-row button').forEach(b => {
+  b.addEventListener('click', () => {
+    const avail = 2425000;
+    const v = Math.round(avail * parseFloat(b.dataset.pct));
+    document.getElementById('convAmount').value = fmtInt(v);
+    syncConversion();
+  });
+});
+
+function syncConversion() {
+  const amtStr = document.getElementById('convAmount').value.replace(/[^\d.]/g, '');
+  const amt = parseFloat(amtStr) || 0;
+  const rate = 1.196;
+  const spread = 0.005;
+  const effRate = rate * (1 - spread);
+  const out = amt * effRate;
+  document.getElementById('pvOutFrom').textContent = fmtInt(amt);
+  document.getElementById('pvOutTo').textContent = fmtInt(Math.round(out));
+  document.getElementById('pvEffRate').textContent = effRate.toFixed(3);
+  document.getElementById('convSubmit').innerHTML =
+    `Convert ${fmtInt(amt)} AI → ${fmtInt(Math.round(out))} Text <i data-lucide="arrow-right" style="width:14px;height:14px;"></i>`;
+  if (window.lucide) lucide.createIcons();
+}
+document.getElementById('convAmount').addEventListener('input', syncConversion);
+
+/* ============================================================
+   LIVE SIMULATION
+   ============================================================ */
+function tick() {
+  // Drift each asset's qty slightly and possibly its price
+  ASSETS.forEach((a, i) => {
+    if (a.empty) return;
+    // tiny price drift
+    const noise = (Math.random() - 0.5) * (a.usdPrice * 0.002);
+    a.usdPrice = Math.max(a.usdPrice * 0.98, a.usdPrice + noise);
+
+    // very small qty drift to simulate background activity
+    if (Math.random() < 0.25) {
+      const dq = (Math.random() - 0.5) * (a.qty * 0.0008);
+      a.qty = Math.max(0, a.qty + dq);
+    }
+
+    // Flash qty
+    const card = document.querySelector(`.bcard[data-key="${a.key}"]`);
+    if (card) {
+      const qtyEl = card.querySelector('.qty');
+      const prev = parseFloat(qtyEl.dataset.qty);
+      const next = a.qty;
+      qtyEl.dataset.qty = next;
+      if (a.key === 'h100') {
+        qtyEl.innerHTML = fmtInt(Math.round(next)) + ' <span style="font-size:14px;color:var(--text-3);">credits</span>';
+      } else {
+        qtyEl.innerHTML = fmtInt(Math.round(next));
+      }
+      const usdEl = card.querySelector('.usd');
+      const usdEq = next * a.usdPrice;
+      usdEl.innerHTML = fmtUsd(usdEq, usdEq < 1 ? 4 : 2) + ' <span class="secondary">USD equivalent</span>';
+      if (Math.abs(next - prev) > 1) {
+        const up = next > prev;
+        qtyEl.classList.remove('flash-up','flash-down');
+        void qtyEl.offsetWidth;
+        qtyEl.classList.add(up ? 'flash-up' : 'flash-down');
+        setTimeout(() => qtyEl.classList.remove('flash-up','flash-down'), 700);
+      }
+    }
+  });
+
+  // Re-sync total
+  const total = totalUsd();
+  const totalEl = document.getElementById('whTotal');
+  const prevTxt = totalEl.textContent;
+  totalEl.textContent = fmtUsd(total);
+  const up = fmtUsd(total) > prevTxt;
+  totalEl.classList.remove('flash-up','flash-down');
+  void totalEl.offsetWidth;
+  totalEl.classList.add(up ? 'flash-up' : 'flash-down');
+  setTimeout(() => totalEl.classList.remove('flash-up','flash-down'), 700);
+  document.getElementById('topPillBalance').textContent = fmtUsd(total);
+
+  // Update P&L vs the boot-time baseline (set at DOMContentLoaded)
+  const start = window.__startTotal;
+  const pnl = total - start;
+  const pnlPct = (pnl / start) * 100;
+  document.getElementById('whToday').textContent =
+    (pnl >= 0 ? '▲ +$' : '▼ −$') + fmt(Math.abs(pnl)) + ' (' + (pnl >= 0 ? '+' : '−') + Math.abs(pnlPct).toFixed(2) + '%) today';
+  document.getElementById('whToday').classList.toggle('pos', pnl >= 0);
+  document.getElementById('whToday').classList.toggle('neg', pnl < 0);
+
+  buildAllocation();
+}
+
+/* ============================================================
+   BOOT
+   ============================================================ */
+document.addEventListener('DOMContentLoaded', () => {
+  buildAllocation();
+  buildCards();
+  buildMovements();
+  syncConversion();
+  if (window.lucide) lucide.createIcons();
+
+  // Set today's baseline so the +$23.41 / +0.23% reads naturally at boot
+  window.__startTotal = totalUsd() - 23.41;
+  // Render initial total + P&L
+  const total = totalUsd();
+  document.getElementById('whTotal').textContent = fmtUsd(total);
+  document.getElementById('topPillBalance').textContent = fmtUsd(total);
+  const pnl = total - window.__startTotal;
+  const pnlPct = (pnl / window.__startTotal) * 100;
+  document.getElementById('whToday').textContent =
+    '▲ +$' + fmt(Math.abs(pnl)) + ' (+' + Math.abs(pnlPct).toFixed(2) + '%) today';
+
+  setInterval(tick, 3000);
+
+  // Boot with drawer open to demonstrate the conversion flow
+  document.querySelector('.main').classList.add('drawer-open');
+});
+</script>
+
+</body>
+</html>

@@ -3,7 +3,7 @@ description: Start a feature — create its branch, set the target version, load
 argument-hint: <feature-id> (e.g. F01, F08, KW03)  [optional notes]
 ---
 
-You are starting work on Exascale feature **$1**. Notes (if any): $ARGUMENTS
+You are starting work on 1Trade feature **$1**. Notes (if any): $ARGUMENTS
 
 Follow this runbook exactly. Stop and ask the user only if a step genuinely blocks.
 
@@ -22,7 +22,7 @@ Follow this runbook exactly. Stop and ask the user only if a step genuinely bloc
   is **not yet** in `docs/contracts/`, STOP — that contract must be authored by `tech-lead` first
   (`/ex-contract`). Do not build against an assumed shape.
 - **If this feature touches the frontend** (owner `trading-frontend`, or any change under
-  `apps/web/` or `Exascale Frontend/`), also read `docs/plans/DESIGN_SYSTEM.md` and build to it:
+  `apps/web/` or `1Trade Frontend/`), also read `docs/plans/DESIGN_SYSTEM.md` and build to it:
   tokens only (no raw hex/rgb), mono + `tabular-nums` numbers, institutional aesthetic, realistic
   mock data. A design value with no token = add the token to `tokens.css`, never inline it.
 

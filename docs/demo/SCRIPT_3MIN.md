@@ -1,4 +1,4 @@
-# Exascale — 3-minute investor video — production script
+# 1Trade — 3-minute investor video — production script
 
 > **How to use:** record the voice-over **straight through from Part 1** (≈450 words ≈ 3:00 at a
 > natural ~150 wpm). Then record the screens and match them to the VO using the **synced shot list
@@ -15,7 +15,7 @@
 AI compute is the most valuable commodity on earth — and the hardest to buy. There's no public
 price for an H100-hour, no order book, no way to hedge a budget. Every commodity that became liquid
 — oil, electricity, currencies — made a fortune for whoever built the marketplace. Compute is the
-last one without one. Exascale is the world's first exchange and platform for AI and GPU compute —
+last one without one. 1Trade is the world's first exchange and platform for AI and GPU compute —
 and the platform that powers it is live today.
 
 **(0:24 — Inference)**
@@ -59,7 +59,7 @@ annual revenue and a hundred billion in compute traded.
 
 **(2:54 — Ask + close)**
 We're raising to take the platform to general availability, sign our first datacenters and AI
-customers, and scale toward that hundred-million-ARR, hundred-billion-volume market. Exascale —
+customers, and scale toward that hundred-million-ARR, hundred-billion-volume market. 1Trade —
 the commodity market for AI compute.
 
 ---
@@ -84,7 +84,7 @@ the commodity market for AI compute.
 ─────────────────────────────────────
 The commodity market for AI compute.
 
-exascale.com · raising [round]
+1trade.com · raising [round]
 ```
 
 ---

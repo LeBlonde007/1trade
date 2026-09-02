@@ -10,8 +10,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/exascale/credit-ledger/internal/domain"
-	"github.com/exascale/credit-ledger/internal/metrics"
+	"github.com/trade1/credit-ledger/internal/domain"
+	"github.com/trade1/credit-ledger/internal/metrics"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"

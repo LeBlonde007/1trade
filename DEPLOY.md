@@ -1,4 +1,4 @@
-# Exascale — Deployment Setup
+# 1Trade — Deployment Setup
 
 The as-built deployment of this project: how it runs locally, how it ships to a sandbox box, and how
 CI/CD builds the images. This is the practical "where does it run and how do I deploy it" map. For the
@@ -29,7 +29,7 @@ Rationale: `docs/plans/DECISIONS.md` **ADR-0001**.
 | `inference-gateway`      | `services/inference-gateway`      | `:8085`    | API · key auth · metering                                 |
 | `inference-runtime-stub` | `services/inference-runtime/stub` | `:8000`    | CPU stub (canned completions; real vLLM needs a GPU node) |
 | `compute-control`        | `services/compute-control`        | `:8086`    | GPU control plane · catalog · quota · mock-GPU scheduler  |
-| `web`                    | `Exascale Frontend/`              | `:3000`    | Nuxt console (BFF proxies to the services in-cluster)     |
+| `web`                    | `1Trade Frontend/`              | `:3000`    | Nuxt console (BFF proxies to the services in-cluster)     |
 
 The data plane (Postgres · TimescaleDB · Redis · NATS · Mailpit) deploys separately from the services in
 namespace `data`. Optional tiers add scheduling (Kueue/Volcano) and observability (Prometheus/Loki/Tempo/
@@ -48,16 +48,16 @@ make up                             # create k3d cluster + data plane + `tilt up
 
 `make up` = `cluster` + `data-plane` + `tilt`:
 
-1. **`cluster`** — creates (or starts) the k3d cluster `exascale` from `deploy/k8s/local/k3d.yaml`
+1. **`cluster`** — creates (or starts) the k3d cluster `1trade` from `deploy/k8s/local/k3d.yaml`
    (1 server + 1 agent, Traefik LB on `:8080`/`:8443`, a managed local registry on `:5111`, the agent
-   labelled `exascale.io/gpu=mock`).
+   labelled `1trade.io/gpu=mock`).
 2. **`data-plane`** — `deploy/k8s/local/install-data-plane.sh` applies the core data plane into namespace
    `data` (Postgres, TimescaleDB, Redis, NATS, Mailpit) and waits for rollouts.
 3. **`tilt`** — `tilt up` (driven by the `Tiltfile`): builds each service image, applies its Kustomize
    base, generates the `platform-auth` secret, applies DB migration ConfigMaps, and **holds the
    port-forwards** open. Edit source → Tilt live-updates the pod.
 
-Tilt is guarded to `allow_k8s_contexts('k3d-exascale')` — it will never act on a non-local cluster.
+Tilt is guarded to `allow_k8s_contexts('k3d-1trade')` — it will never act on a non-local cluster.
 
 ### Port-forwards Tilt holds open
 
@@ -70,7 +70,7 @@ Tilt is guarded to `allow_k8s_contexts('k3d-exascale')` — it will never act on
 | `:8086`   | compute-control                 |
 | `:8025`   | Mailpit web UI (captured email) |
 
-Run the web console against these with `cd "Exascale Frontend" && make web` (or `npm run dev`) → `:3000`.
+Run the web console against these with `cd "1Trade Frontend" && make web` (or `npm run dev`) → `:3000`.
 The BFF defaults its upstreams to `localhost:8001/8085/8002` — no env needed.
 
 ### Optional tiers
@@ -91,7 +91,7 @@ machine.
 | ------------------------------------------ | ------------------------------------------------------------------------- |
 | `make up`                                  | cluster + data plane + Tilt (the one-command bring-up)                    |
 | `make down`                                | delete the local cluster                                                  |
-| `make cli`                                 | build the `exascale` CLI → `bin/exascale`                                 |
+| `make cli`                                 | build the `1trade` CLI → `bin/1trade`                                 |
 | `make build` / `make test`                 | build / race-test every Go module (`scripts/go-all.sh`)                   |
 | `make lint` / `make fmt`                   | golangci-lint / gofmt across modules                                      |
 | `make test-e2e`                            | timed sub-5-min time-to-first-action loop (`scripts/e2e.sh`)              |
@@ -100,7 +100,7 @@ machine.
 | `make sandbox-bundle`                      | build the no-source deploy bundle                                         |
 | `make ps`                                  | `kubectl get pods -A`                                                     |
 
-> Note: a few `LOCAL_DEV.md` conveniences (`make seed`, `:8080` ingress, Grafana, `exascale login --dev`)
+> Note: a few `LOCAL_DEV.md` conveniences (`make seed`, `:8080` ingress, Grafana, `1trade login --dev`)
 > are **not wired yet** — follow `RUN_LOCAL.md` for the accurate current-state path (reach services via
 > the Tilt port-forwards; create credits the real way).
 
@@ -132,13 +132,13 @@ waits for rollouts, and prints the URL.
 
 The overlay is thin over the bases (which are already paper-mode): it adds the web frontend, one public
 Ingress, retags images `:sandbox`, points `APP_BASE_URL` at the public URL, and **hardens
-`EXASCALE_ENV=sandbox`** so the `X-Dev-Tenant` auth shortcut is off and a Traefik `strip-dev-headers`
+`TRADE1_ENV=sandbox`** so the `X-Dev-Tenant` auth shortcut is off and a Traefik `strip-dev-headers`
 middleware deletes dev headers at the edge. Credit minting needs the internal `SERVICE_TOKEN` (never
 public) — so on the sandbox you get credits the real way (sign up → buy credits → MockStripe settles
 instantly).
 
 **No-source deploy** (a box you don't control — e.g. a client droplet): don't build on the box. Publish
-images via CI (`ghcr.io/<owner>/exascale-<svc>:sandbox`), build a manifests-only bundle with
+images via CI (`ghcr.io/<owner>/1trade-<svc>:sandbox`), build a manifests-only bundle with
 `make sandbox-bundle` → `sandbox-bundle.tar.gz`, then on the box deploy in pull-mode:
 
 ```bash
@@ -166,7 +166,7 @@ Full detail + security notes: [`deploy/k8s/overlays/sandbox/README.md`](deploy/k
 - **contracts** — OpenAPI lint (advisory) + structural YAML parse of event/k8s manifests (hard).
 - **go** — `scripts/go-all.sh build` then `test -race`, then `golangci-lint v2.12.2` per module (hard gate; Go 1.25).
 
-**`.github/workflows/release.yml`** — builds + pushes the six images to GHCR (`ghcr.io/<owner>/exascale-<svc>`):
+**`.github/workflows/release.yml`** — builds + pushes the six images to GHCR (`ghcr.io/<owner>/1trade-<svc>`):
 
 | Trigger           | Tags                                        |
 | ----------------- | ------------------------------------------- |
@@ -243,7 +243,7 @@ the ledger **hash-chain digest** is byte-identical (any tamper/loss changes it).
 ```bash
 make up                  # local: k3d + data plane + Tilt (live-reload)
 make down                # delete local cluster
-make cli && ./bin/exascale signup --email you@dev.test --password pw
+make cli && ./bin/1trade signup --email you@dev.test --password pw
 make test-e2e            # timed signup→topup→infer→gpu-debit loop
 
 # sandbox VPS (paper mode):

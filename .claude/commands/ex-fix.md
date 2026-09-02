@@ -3,7 +3,7 @@ description: Fix a bug — create a fix branch, reproduce, fix with a regression
 argument-hint: "<short description of the bug>"  [feature-id or service]
 ---
 
-You are fixing a bug in Exascale: **$ARGUMENTS**
+You are fixing a bug in 1Trade: **$ARGUMENTS**
 
 ## 1. Branch
 - Run `git status`; make sure the working tree is clean (stash or ask if not).

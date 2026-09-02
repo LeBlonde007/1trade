@@ -1,6 +1,6 @@
 openapi: 3.0.3
 info:
-  title: Exascale Platform-Core API (auth, accounts, RBAC, keys, billing)
+  title: 1Trade Platform-Core API (auth, accounts, RBAC, keys, billing)
   version: 1.5.0
   description: >
     Identity for the whole platform. Owned by `platform-core`. Every other service authenticates
@@ -10,7 +10,7 @@ info:
     docs/plans/features/F02-auth-and-sso.md and F03-accounts-orgs-rbac.md.
 
 servers:
-  - { url: "https://api.exascale.io", description: prod }
+  - { url: "https://api.1trade.io", description: prod }
   - { url: "http://localhost:8080", description: "local (k3d ingress)" }
 
 tags:

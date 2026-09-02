@@ -1,11 +1,11 @@
 # F24 — CLI developer experience (Claude-Code-grade UX)
 
-> Owner: `platform-core` (owns the `exascale` CLI, built in F04). Milestone: **M3→M6** (incremental —
+> Owner: `platform-core` (owns the `1trade` CLI, built in F04). Milestone: **M3→M6** (incremental —
 > ships in slices on top of the live F04 binary). Builds on F04, F08 (streaming), F13 (`gpu`).
 
 ## Spec
 
-Make the `exascale` CLI feel like a modern, conversational developer tool (Claude Code / `gh` / `stripe`
+Make the `1trade` CLI feel like a modern, conversational developer tool (Claude Code / `gh` / `stripe`
 calibre) — **streaming, interactive, legible** — without leaving the design system. It stays
 **institutional / Bloomberg, not flashy**: semantic colour (green `▲` / red `▼`), mono + tabular
 numbers, restraint. Colour auto-disables off-TTY and under `NO_COLOR`; every interactive feature has a
@@ -44,7 +44,7 @@ plain tables, blocking requests, no streaming, terse errors. F24 is the **DX lay
 - Tests: SSE parser (`stream_test.go`) + formatter/hint (`ui_test.go`). golangci-lint clean.
 
 ### Phase 2 — the interactive chat REPL (the headline Claude-Code-like feature) — **shipped (v0.3.x)**
-- [x] `exascale chat` — a persistent, multi-turn, **streaming** session (`cmd/exascale/chat.go`).
+- [x] `1trade chat` — a persistent, multi-turn, **streaming** session (`cmd/1trade/chat.go`).
 - [x] Status prompt with context: `llama-3.1-8b · 982 text ▸` (model cyan, balance dim).
 - [x] **Slash commands**: `/model`, `/balance`, `/cost`, `/clear`, `/save`, `/exit` (+ `/help`).
 - [x] Per-turn live cost meter (`▼ 12.5 text · 982 left · N tok`), balance tracked locally + reconciled by `/balance`.
@@ -53,27 +53,27 @@ plain tables, blocking requests, no streaming, terse errors. F24 is the **DX lay
       Tests: slash-parser + price parser.
 
 ### Phase 3 — polish & productivity
-- [ ] **Shell completion** — `exascale completion {bash|zsh|fish}`.
-- [ ] **Browser/device login** (`exascale login` opens a browser + polls), pairing with F02 OAuth — no typed password.
-- [ ] **Config profiles** — `exascale --profile staging …` (multi-environment).
-- [ ] **`exascale status`** — one-line account · mode · balances · running GPUs; richer `whoami`.
+- [ ] **Shell completion** — `1trade completion {bash|zsh|fish}`.
+- [ ] **Browser/device login** (`1trade login` opens a browser + polls), pairing with F02 OAuth — no typed password.
+- [ ] **Config profiles** — `1trade --profile staging …` (multi-environment).
+- [ ] **`1trade status`** — one-line account · mode · balances · running GPUs; richer `whoami`.
 
 ## Open decisions
 
 - **TUI library:** ✅ **resolved → stdlib-only** for the Phase-2 REPL — no charm/bubbletea dep, lighter
   static binary, and the streaming SSE client already gives the live feel. Revisit only if Phase-3 needs
   full-screen TUI (e.g. a model picker).
-- **Distribution** — ✅ **done early**: one-line install `curl -fsSL https://sandbox.exascale.ai/cli/install.sh | sh`.
+- **Distribution** — ✅ **done early**: one-line install `curl -fsSL https://sandbox.1trade.ai/cli/install.sh | sh`.
   Cross-compiled static binaries (linux/darwin/windows × amd64/arm64, sandbox api URL baked in via ldflags)
   are built into the web image and served at `/cli/` (`scripts/build-cli-dist.sh` + `scripts/cli-install.sh`,
   staged by the release pipeline). brew/apt remain a later nicety.
 
 ## Acceptance criteria
 
-- [ ] `exascale infer chat` streams tokens live; `--json` returns the full non-streamed object.
+- [ ] `1trade infer chat` streams tokens live; `--json` returns the full non-streamed object.
 - [ ] Credit deltas render green `▲` / red `▼`; colour disabled off-TTY and under `NO_COLOR`.
 - [ ] Errors carry a next step (402/401/404 mapped); destructive commands confirm.
-- [ ] `exascale chat` holds a multi-turn streaming conversation with slash commands + a live cost meter.
+- [ ] `1trade chat` holds a multi-turn streaming conversation with slash commands + a live cost meter.
 - [ ] Every interactive feature has a non-interactive/`--json` equivalent (CI-safe).
 - [ ] No new service contract; per-function doc comments; tests for the formatter + SSE parser.
 

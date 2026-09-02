@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/exascale/inference-gateway/internal/config"
+	"github.com/trade1/inference-gateway/internal/config"
 	"github.com/golang-jwt/jwt/v5"
 )
 

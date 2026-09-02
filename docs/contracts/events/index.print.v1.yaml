@@ -1,4 +1,4 @@
-# Exascale event contract — index.print.v1
+# 1Trade event contract — index.print.v1
 # One event per published index print, emitted by index-service at the 16:00 UTC publication.
 # Consumed by the trading frontend (methodology page + index displays), market-maker (fair-value
 # anchor for quoting in Phase 2), and any downstream audit tooling verifying the print chain.

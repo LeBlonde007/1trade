@@ -6,7 +6,7 @@
 #   pull_request      → builds only (no push) — a packaging smoke test
 #   workflow_dispatch → manual run
 #
-# Images land at ghcr.io/<owner>/exascale-<service>. They are PRIVATE by default — to let a cluster
+# Images land at ghcr.io/<owner>/1trade-<service>. They are PRIVATE by default — to let a cluster
 # pull without auth, make each package Public (repo → Packages → package → Settings), or add an
 # imagePullSecret. No extra secrets needed to PUSH: the built-in GITHUB_TOKEN has packages:write.
 name: release
@@ -35,7 +35,7 @@ jobs:
           - { name: inference-gateway,      context: services/inference-gateway }
           - { name: compute-control,        context: services/compute-control }
           - { name: inference-runtime-stub, context: services/inference-runtime/stub }
-          - { name: web,                    context: Exascale Frontend }
+          - { name: web,                    context: 1Trade Frontend }
     steps:
       - uses: actions/checkout@v4
 
@@ -55,7 +55,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/exascale-${{ matrix.svc.name }}
+          images: ghcr.io/${{ github.repository_owner }}/1trade-${{ matrix.svc.name }}
           tags: |
             type=sha,format=short
             type=ref,event=branch

@@ -1,4 +1,4 @@
-module github.com/exascale/platform-core
+module github.com/trade1/platform-core
 
 go 1.25.0
 

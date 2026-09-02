@@ -1,4 +1,4 @@
-# Exascale — golangci-lint v2 config shared by every Go service + the CLI.
+# 1Trade — golangci-lint v2 config shared by every Go service + the CLI.
 # Enforces the non-negotiables in docs/plans/ENGINEERING_STANDARDS.md:
 #   - per-function doc comments (revive `exported` + godot)
 #   - errors handled (errcheck) + Is/As + %w correctness (errorlint)
@@ -94,7 +94,7 @@ linters:
       - path: cmd/.*/main\.go
         linters: [forbidigo, gocritic]
       # The CLI legitimately writes results to stdout via fmt.Print* (forbidigo is a service rule).
-      - path: cmd/exascale/.*\.go
+      - path: cmd/1trade/.*\.go
         linters: [forbidigo]
     paths:
       - third_party$

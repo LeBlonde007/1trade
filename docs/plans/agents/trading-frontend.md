@@ -29,15 +29,15 @@ Both run on **one design system** (already established in the existing repo's `t
 ### Milestone 1 — Shell + design system + mock layer
 - Confirm/lock the design system (`tokens.css`, components, mono/`tabular-nums` for numbers,
   sentence case, institutional aesthetic — no crypto-flashy).
-- Migration: the existing Nuxt repo (`Exascale Frontend/`) stays in place this milestone; the move to
+- Migration: the existing Nuxt repo (`1Trade Frontend/`) stays in place this milestone; the move to
   `apps/web/` is scheduled for end of M1 (after CI is green; see `REPO_LAYOUT.md` §3).
 - Migrate the remaining HTML mockups (`docs/htmls/*`) into Nuxt routes if not already done. The
-  existing app already has many — confirm coverage against [`exascale_mvp_screens_checklist.md`](../../other/exascale_mvp_screens_checklist.md).
+  existing app already has many — confirm coverage against [`1trade_mvp_screens_checklist.md`](../../other/1trade_mvp_screens_checklist.md).
 - Platform Console shell: nav, layouts (marketing light, app dark), "wallet empty" + "no models
   yet" empty states.
 - Trading dashboard at `/trade`: kept on mock data with a "Demo — exchange paused" ribbon.
 - Mock-data layer: a single `useApi()` composable that flips between `mock | local | staging`
-  per `EXASCALE_API_MODE`. Same shapes as the OpenAPI contracts.
+  per `TRADE1_API_MODE`. Same shapes as the OpenAPI contracts.
 
 ### Milestone 2 — Wallet + catalog (wired)
 - Wallet page wired to `credit-ledger` `GET /v1/credits/balances` + `GET /v1/credits/transactions`.
@@ -88,9 +88,9 @@ Both run on **one design system** (already established in the existing repo's `t
 
 ## 5. Local dev
 
-- Current path: `Exascale Frontend/` (own repo) — `npm install && npm run dev` on `:3000`.
+- Current path: `1Trade Frontend/` (own repo) — `npm install && npm run dev` on `:3000`.
 - Target path post-migration: `apps/web/` under the monorepo.
-- `EXASCALE_API_MODE=mock` default; switch to `local` once `make up` services are running.
+- `TRADE1_API_MODE=mock` default; switch to `local` once `make up` services are running.
 - `apps/web/server/api/*` holds the mocks (already partially built — see existing repo).
 - Storybook (or equivalent) not in scope for v1; we lean on visual smoke tests via Playwright.
 

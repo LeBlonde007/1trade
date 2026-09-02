@@ -1,4 +1,4 @@
-# Exascale — Investor Narrative (current state, 2026-05)
+# 1Trade — Investor Narrative (current state, 2026-05)
 
 > **Primary NotebookLM source.** This is the spine of the investor video: the story, grounded in
 > what is actually built today. It reflects the **2026-05 platform-first pivot** (not the older
@@ -9,7 +9,7 @@
 
 ## 1. One sentence
 
-**Exascale is the world's first exchange and platform for AI and GPU compute — already earning
+**1Trade is the world's first exchange and platform for AI and GPU compute — already earning
 revenue by selling inference and GPU compute to AI startups, paid for in prepaid credits.**
 
 ## 2. The thesis (the big vision)
@@ -40,7 +40,7 @@ real activity.**
   **text, code, speech, image, and video**. A single integration and an AI startup is live;
   pay-per-use, metered to the token. The fastest path to the first dollar.
 - **GPU compute** — on-demand H100/H200, reserved capacity (discounted, prepaid as GPU credits),
-  CLI-first. From `exascale gpu create` to a running box in under 90 seconds (target).
+  CLI-first. From `1trade gpu create` to a running box in under 90 seconds (target).
 - **Prepaid credits** — buy in advance, redeem against inference or compute. Improves our cash flow
   (cash in before consumption) and is the same credit primitive the exchange will later trade.
 - **Datacenter supply** — our own datacenter as the credible v1 anchor, plus partner DCs onboarded

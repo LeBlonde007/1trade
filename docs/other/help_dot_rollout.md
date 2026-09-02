@@ -1,7 +1,7 @@
 # Help-dot rollout guide
 
 Universal "what is this?" + free-text feedback affordance for every
-input, select, chart, and KPI in Exascale.
+input, select, chart, and KPI in 1Trade.
 
 > Implementation: `app/components/Base/HelpDot.vue` + `app/composables/useFieldHelp.ts`.
 > Auto-imports as `<BaseHelpDot />`. Feedback is collected via `useFieldHelp().submit()`

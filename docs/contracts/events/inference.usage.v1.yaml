@@ -1,4 +1,4 @@
-# Exascale event contract — inference.usage.v1
+# 1Trade event contract — inference.usage.v1
 # One event per inference request, emitted by inference-gateway AFTER the response stream closes.
 # Consumed by credit-ledger (drives the sub-credit debit) and analytics. Owned by inference-ml.
 # The debit is idempotent on request_id. See docs/contracts/credit-types.md §2 for modality→credit.

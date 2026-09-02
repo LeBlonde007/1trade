@@ -22,13 +22,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/exascale/matching-engine/internal/auth"
-	"github.com/exascale/matching-engine/internal/config"
-	"github.com/exascale/matching-engine/internal/domain"
-	"github.com/exascale/matching-engine/internal/marketdata"
-	"github.com/exascale/matching-engine/internal/metrics"
-	"github.com/exascale/matching-engine/internal/portfolio"
-	"github.com/exascale/matching-engine/internal/refindex"
+	"github.com/trade1/matching-engine/internal/auth"
+	"github.com/trade1/matching-engine/internal/config"
+	"github.com/trade1/matching-engine/internal/domain"
+	"github.com/trade1/matching-engine/internal/marketdata"
+	"github.com/trade1/matching-engine/internal/metrics"
+	"github.com/trade1/matching-engine/internal/portfolio"
+	"github.com/trade1/matching-engine/internal/refindex"
 )
 
 // Server wires config + the credential resolver behind one routed handler. The engine holds no state:

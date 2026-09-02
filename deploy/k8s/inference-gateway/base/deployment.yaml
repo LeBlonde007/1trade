@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: inference-gateway
-          image: exascale/inference-gateway:dev
+          image: 1trade/inference-gateway:dev
           ports: [{ containerPort: 8085 }]
           envFrom:
             - configMapRef: { name: inference-gateway-env }

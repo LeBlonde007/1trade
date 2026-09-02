@@ -21,7 +21,7 @@ func VerifyPassword(hash, plaintext string) bool {
 // dummyHash is a fixed bcrypt hash, computed once at package load, used to equalise login timing on
 // the user-not-found path (see DummyPasswordCheck).
 var dummyHash = func() []byte {
-	h, err := bcrypt.GenerateFromPassword([]byte("exascale-login-timing-equalizer"), bcrypt.DefaultCost)
+	h, err := bcrypt.GenerateFromPassword([]byte("1trade-login-timing-equalizer"), bcrypt.DefaultCost)
 	if err != nil { // bcrypt only errors on an absurd cost; never at DefaultCost.
 		panic(err)
 	}

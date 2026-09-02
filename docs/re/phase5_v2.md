@@ -9,7 +9,7 @@
 
 ## Table of contents
 
-1. [What Exascale actually is](#1-what-exascale-actually-is)
+1. [What 1Trade actually is](#1-what-1trade-actually-is)
 2. [The credit architecture](#2-the-credit-architecture)
 3. [The three-sided market structure](#3-the-three-sided-market-structure)
 4. [Institutional validation and timing](#4-institutional-validation-and-timing)
@@ -27,11 +27,11 @@
 
 ---
 
-## 1. What Exascale actually is
+## 1. What 1Trade actually is
 
 After all the research and Tai's clarifications, the strategic answer is:
 
-> **Exascale is the commodity market for AI compute — a venue connecting GPU datacenters with the AI companies that need their capacity, intermediated by traders who provide liquidity and price discovery. We own modest datacenter capacity to provide credible underlying delivery; we partner with larger operators to source supply; the business is the market itself, not the metal.**
+> **1Trade is the commodity market for AI compute — a venue connecting GPU datacenters with the AI companies that need their capacity, intermediated by traders who provide liquidity and price discovery. We own modest datacenter capacity to provide credible underlying delivery; we partner with larger operators to source supply; the business is the market itself, not the metal.**
 
 The chain we are building:
 
@@ -50,7 +50,7 @@ The closest analogues:
 - **ICE** (commodities + financial exchanges) — runs markets; doesn't pump natural gas
 - **Bloomberg** (data + index + platform) — the reference price benchmark for the asset class
 
-What Exascale is *not*:
+What 1Trade is *not*:
 - Not CoreWeave (vertically-integrated GPU cloud)
 - Not Together (managed inference platform)
 - Not AWS (services-everything-to-everyone)
@@ -88,7 +88,7 @@ Tai's design (from his 2026-05-19 messages), formalized.
 
 **Asset Class 1: AI Credits** (the unified inference market)
 
-A unified index credit, redeemable into sub-credits at conversion rates Exascale publishes:
+A unified index credit, redeemable into sub-credits at conversion rates 1Trade publishes:
 
 ```
                        UNIFIED AI INDEX
@@ -151,7 +151,7 @@ Three reasons:
 
 **1. Liquidity concentration**. If we had only sub-credits, we'd have 5+ thin markets. Each would have wide spreads, poor price discovery. The unified index concentrates trading volume in one deep market.
 
-**2. Index = headline product**. The "Exascale AI Index" becomes a quotable number — what is "the price of AI" today? Like the WTI Crude price for oil, or VIX for volatility. This is the route to becoming the reference benchmark for the entire AI economy.
+**2. Index = headline product**. The "1Trade AI Index" becomes a quotable number — what is "the price of AI" today? Like the WTI Crude price for oil, or VIX for volatility. This is the route to becoming the reference benchmark for the entire AI economy.
 
 **3. Customer optionality**. A buyer doesn't have to predict their text-vs-image-vs-video usage 6 months ahead. They buy AI credits and redeem into actual sub-credits at consumption time. This makes forward purchases viable for customers who can't forecast usage mix.
 
@@ -162,7 +162,7 @@ Three reasons:
 Markets need supply, liquidity, and demand. Tai's chain is explicit:
 
 ```
-                    EXASCALE TRADING VENUE
+                    1TRADE TRADING VENUE
                             │
         ┌───────────────────┼───────────────────┐
         ▼                   ▼                   ▼
@@ -207,12 +207,12 @@ Markets need supply, liquidity, and demand. Tai's chain is explicit:
 - Provides liquidity by quoting both bid and ask
 - Earns the spread minus fees
 - Critical for thin markets in v1
-- Exascale itself plays this role in v1 (simulated then real)
+- 1Trade itself plays this role in v1 (simulated then real)
 - Eventually: external market-making firms (Jane Street, Wintermute, etc.)
 
 **Type 4: The Supply-Side — Datacenter Partner**
 - Datacenter operators selling capacity into the market
-- v1: Exascale's own modest datacenter
+- v1: 1Trade's own modest datacenter
 - v1+: partner datacenters with idle capacity (significant near-term opportunity)
 - v2+: new DC builds anchored by the market (price discovery enables financing)
 
@@ -230,7 +230,7 @@ Each archetype demands different product capabilities:
 **V1 priority order**:
 1. Trading UI/UX (the demo asset — see Section 7)
 2. Demand-side buyer onboarding (volume credit purchases, CLI)
-3. Market-maker logic (Exascale-internal)
+3. Market-maker logic (1Trade-internal)
 4. Supply-side partner onboarding (manual in v1; productized in v1.5)
 5. External liquidity providers (post-v1.5, after liquidity proves)
 
@@ -238,7 +238,7 @@ Each archetype demands different product capabilities:
 
 ## 4. Institutional validation and timing
 
-The category is being validated by institutional voices outside Exascale. Worth capturing for positioning and pitch:
+The category is being validated by institutional voices outside 1Trade. Worth capturing for positioning and pitch:
 
 > **"There needs to be a market for compute. No solution yet."**
 > — Larry Fink, CEO BlackRock (2026)
@@ -324,7 +324,7 @@ Tai's instruction was clear: "Focus on AI frontier labs and Fortune 500 — that
 - They make the market exist
 - They're the reason the venue earns trading fees (the primary revenue line)
 
-**The chicken-and-egg problem**: traders won't show up without volume; volume won't form without traders. Exascale-as-internal-market-maker is the bridge — we provide both sides until external market makers are confident enough to come on.
+**The chicken-and-egg problem**: traders won't show up without volume; volume won't form without traders. 1Trade-as-internal-market-maker is the bridge — we provide both sides until external market makers are confident enough to come on.
 
 ### Supply-side ICP — Datacenter Partners
 
@@ -357,7 +357,7 @@ Updated from prior Phase 5:
 
 ## 6. Why not just back CoreWeave? — answered properly
 
-CoreWeave is publicly traded at $50B+. They have $25B+ backlog. They own 30+ datacenters. Why bet on Exascale?
+CoreWeave is publicly traded at $50B+. They have $25B+ backlog. They own 30+ datacenters. Why bet on 1Trade?
 
 ### The three-part answer
 
@@ -365,15 +365,15 @@ CoreWeave is publicly traded at $50B+. They have $25B+ backlog. They own 30+ dat
 
 CoreWeave is a hyperscale-adjacent compute provider. They sell GPU-hours through reserved contracts. They compete with Lambda, Nebius, the hyperscalers, and Microsoft's internal capacity.
 
-Exascale is a commodity market. There is no functioning tradeable AI compute market today. **The category we're creating doesn't have an incumbent.**
+1Trade is a commodity market. There is no functioning tradeable AI compute market today. **The category we're creating doesn't have an incumbent.**
 
-Backing CoreWeave is a bet on continued AI compute demand. Backing Exascale is a bet on AI compute becoming a tradeable asset class. Both can be right simultaneously.
+Backing CoreWeave is a bet on continued AI compute demand. Backing 1Trade is a bet on AI compute becoming a tradeable asset class. Both can be right simultaneously.
 
 **Part 2: The capital efficiency profile is fundamentally different.**
 
 CoreWeave spent ~$10B+ on capex to reach their current scale. They have ~$7.5B+ in debt. They need utilization rates >70% to service debt.
 
-Exascale's business is market structure + index + trading mechanic. Owned datacenter capacity exists for credibility (proving underlying is real), not as the revenue source. Supply scales primarily through partnerships, not capex. **Capital required to reach $100M revenue is dramatically lower than CoreWeave's capital path to the same milestone.**
+1Trade's business is market structure + index + trading mechanic. Owned datacenter capacity exists for credibility (proving underlying is real), not as the revenue source. Supply scales primarily through partnerships, not capex. **Capital required to reach $100M revenue is dramatically lower than CoreWeave's capital path to the same milestone.**
 
 CME doesn't own oil. Coinbase doesn't mine. We follow that pattern.
 
@@ -381,7 +381,7 @@ CME doesn't own oil. Coinbase doesn't mine. We follow that pattern.
 
 CoreWeave's strategic exit options: scaling further as independent (uncertain economics with debt load), or selling capacity wholesale to hyperscalers.
 
-Exascale's strategic exit options:
+1Trade's strategic exit options:
 - Become the reference exchange for AI compute (CME / NYMEX path)
 - Acquisition by an existing financial exchange wanting to enter AI commodities (CME, ICE, Cboe)
 - Acquisition by a hyperscaler that wants a tradeable credit product they can't build themselves
@@ -399,9 +399,9 @@ This is a real risk. The mitigation:
 - **The owned datacenter + inference platform is real business even if the trading layer doesn't take off**
 - **Demand-side revenue (F500 + frontier labs buying credits) anchors the business regardless of trading volume**
 
-If the trading layer doesn't take off as hoped, Exascale is still a niche compute provider with enterprise relationships. Not a great outcome, but not catastrophic.
+If the trading layer doesn't take off as hoped, 1Trade is still a niche compute provider with enterprise relationships. Not a great outcome, but not catastrophic.
 
-If the trading layer does take off, Exascale becomes the reference venue for an entirely new asset class. Asymmetric upside.
+If the trading layer does take off, 1Trade becomes the reference venue for an entirely new asset class. Asymmetric upside.
 
 ---
 
@@ -423,7 +423,7 @@ Per Tai's direction: ship UI/UX before backend. Specifically, ship a working tra
 - Matching engine v1 (real, persistent, recoverable)
 - Credit ledger (atomic balance tracking)
 - Index service (real methodology, daily publication)
-- Market maker logic (Exascale-internal automated quoting)
+- Market maker logic (1Trade-internal automated quoting)
 - Inference platform (curated catalog, multi-tenant per GPU)
 - Auth, billing, KYC
 
@@ -448,7 +448,7 @@ Per Tai's direction: ship UI/UX before backend. Specifically, ship a working tra
 - Order book for GPU credits (per tier — H100, H200)
 - Candlestick charts, depth visualization, market data
 - Maker-taker order types (limit + market)
-- Exascale internal market-maker logic
+- 1Trade internal market-maker logic
 - Real-money trading capability tested internally (deferred to customers in v1.5)
 - Paper-trading mode for customer-facing v1
 - Order management, position tracking, P&L visualization
@@ -573,7 +573,7 @@ Starts higher than Coinbase because no competition exists. Drops to competitive 
 - API for institutional traders
 
 **Quaternary**: Spread (v2+)
-- Exascale-as-market-maker spread
+- 1Trade-as-market-maker spread
 - Becomes meaningful at scale
 
 ### Unit economics
@@ -593,7 +593,7 @@ Starts higher than Coinbase because no competition exists. Drops to competitive 
 
 ## 10. Demand engine and GTM
 
-The biggest GTM asset Exascale has is warm enterprise relationships into Fortune 500 and frontier-lab procurement organizations. Most startups in this category cold-call into procurement; we don't have to.
+The biggest GTM asset 1Trade has is warm enterprise relationships into Fortune 500 and frontier-lab procurement organizations. Most startups in this category cold-call into procurement; we don't have to.
 
 ### GTM motion
 
@@ -630,11 +630,11 @@ The roadmap should treat demand-side revenue and trader-pipeline conversion as p
 
 ## 11. Supply engine and datacenter partnerships
 
-Exascale's owned datacenter is intentionally modest — not hyperscale, no B200/B300 yet. Per Tai: "we need to build up to the hyperscale data centers."
+1Trade's owned datacenter is intentionally modest — not hyperscale, no B200/B300 yet. Per Tai: "we need to build up to the hyperscale data centers."
 
 **The supply strategy has three components**:
 
-### Component 1: Exascale-owned capacity (v1 anchor)
+### Component 1: 1Trade-owned capacity (v1 anchor)
 
 - Modest datacenter with H100/H200 capacity
 - Provides credible underlying (every credit is backed by real GPUs)
@@ -645,7 +645,7 @@ Exascale's owned datacenter is intentionally modest — not hyperscale, no B200/
 
 - Tier 2/3 datacenter operators have meaningful idle capacity
 - They struggle to monetize short-tenor and burst capacity through traditional sales motions
-- Exascale onboards them as supply partners; they earn from the market
+- 1Trade onboards them as supply partners; they earn from the market
 - Initial partnerships negotiated bilaterally; productized onboarding flow in v1.5
 
 **The pitch to DC partners**:
@@ -657,15 +657,15 @@ Exascale's owned datacenter is intentionally modest — not hyperscale, no B200/
 
 - New DC build projects (e.g., 750MW-class projects in development) need anchor demand to finance construction
 - A live trading market provides forward price visibility that helps DC operators justify capex
-- Exascale can sign forward contracts with new builds as anchor demand
+- 1Trade can sign forward contracts with new builds as anchor demand
 - This creates a structural advantage: new capacity flows into the market by default
 
 ### Why this is capital-light
 
-Exascale's capital requirement scales with market structure and team, not with hardware acquisition. Compare:
+1Trade's capital requirement scales with market structure and team, not with hardware acquisition. Compare:
 
 - **CoreWeave path to $1B revenue**: ~$10B+ in capex
-- **Exascale path to $1B revenue**: <$500M in capex (owned capacity for credibility; rest is partner supply)
+- **1Trade path to $1B revenue**: <$500M in capex (owned capacity for credibility; rest is partner supply)
 
 This is the genuine financial-engineering insight of the credit-market thesis: the market mechanic monetizes underlying we don't have to own.
 
@@ -682,7 +682,7 @@ Per Tai's direction: fundraising target is $100M minimum, with $1B+ aspirational
 | Together AI | ~$1.5B | Managed inference + clusters |
 | Nebius | (public) — substantial | Neocloud, European positioning |
 | CoreWeave | ~$28B cash | Hyperscale-adjacent neocloud |
-| **Exascale** | **TBD — $100M-$1B target** | **Credit market with owned + partner underlying** |
+| **1Trade** | **TBD — $100M-$1B target** | **Credit market with owned + partner underlying** |
 
 ### Fundraising sequencing
 
@@ -754,9 +754,9 @@ Hitting all six is what unlocks $500M-$1B rounds.
 |---|---|---|
 | AWS / Azure / GCP | Compliance breadth, ecosystem | "Not your IT department's incumbent. The market for AI as a commodity." |
 | CoreWeave | Capacity scale, NVIDIA-first allocation | "Different category. They sell GPU-hours. We trade credits backed by GPU-hours from many operators." |
-| Lambda | H100 pricing, researcher brand | "Lambda for raw compute. Exascale for compute as a tradeable asset." |
-| Together | OSS model catalog breadth | "Together inferences for you. Exascale lets you hedge your inference spend." |
-| Groq | Tokens/sec speed | "Groq runs fast. Exascale lets you trade what Groq runs." |
+| Lambda | H100 pricing, researcher brand | "Lambda for raw compute. 1Trade for compute as a tradeable asset." |
+| Together | OSS model catalog breadth | "Together inferences for you. 1Trade lets you hedge your inference spend." |
+| Groq | Tokens/sec speed | "Groq runs fast. 1Trade lets you trade what Groq runs." |
 | Nebius | EU positioning, pricing | "Different markets. They sell capacity; we run the venue." |
 
 ### Claims to never make
@@ -773,16 +773,16 @@ Hitting all six is what unlocks $500M-$1B rounds.
 
 | # | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|---|
-| 1 | Trading market doesn't form (no liquidity) | High | Critical | Exascale-as-market-maker provides v1 liquidity; recruit external market makers aggressively; demand-side revenue from F500 / frontier-lab credit purchases anchors business even if speculator trading is slow |
+| 1 | Trading market doesn't form (no liquidity) | High | Critical | 1Trade-as-market-maker provides v1 liquidity; recruit external market makers aggressively; demand-side revenue from F500 / frontier-lab credit purchases anchors business even if speculator trading is slow |
 | 2 | Regulatory pushback on credit tradability | Medium | High | Conservative legal framing (credits as prepaid services); UBS Japan guidance on JFSA; consider Singapore or Cayman venue |
 | 3 | Index gets manipulated or compromised | Medium | High | Public methodology; external audit firm; volume thresholds; outlier exclusion; cryptographic audit trail |
 | 4 | Team doesn't materialize at v1 scale | Medium | High | Confirm employment vs. advisor status of all named team members |
 | 5 | F500 / frontier-lab sales cycles longer than expected | Medium | Medium | Warm relationships compress cycles vs. cold outreach; demand-side conversion is multi-year game with first deal anchoring subsequent ones |
-| 6 | Datacenter partnerships slow to materialize | Medium | Medium | Multiple operators in early conversations; Exascale-owned capacity sufficient for v1 paper trading regardless |
+| 6 | Datacenter partnerships slow to materialize | Medium | Medium | Multiple operators in early conversations; 1Trade-owned capacity sufficient for v1 paper trading regardless |
 | 7 | Trading layer perceived as gimmick | Medium | High | Index integrity; institutional partnership endorsements; quality of execution proves it's real |
 | 8 | AI compute costs collapse (eliminates hedging demand) | Low | Medium | Volatility creates hedging demand regardless of trend direction |
 | 9 | NVIDIA allocation crisis for owned capacity | Medium | Medium | Pursue NVIDIA partnership; partner DCs may have NVIDIA relationships; multi-vendor backup |
-| 10 | Customer-to-customer trading creates fraud/manipulation issues | Medium | High | Defer customer-to-customer to v2; v1 is Exascale-as-market-maker only; surveillance system before P2P launches |
+| 10 | Customer-to-customer trading creates fraud/manipulation issues | Medium | High | Defer customer-to-customer to v2; v1 is 1Trade-as-market-maker only; surveillance system before P2P launches |
 
 The top-3 existential risks: liquidity formation, regulatory, manipulation. Everything else is manageable.
 
@@ -816,7 +816,7 @@ The top-3 existential risks: liquidity formation, regulatory, manipulation. Ever
 
 ## Bottom-line summary
 
-**What Exascale is**: A three-sided commodity market for AI compute. Tradeable credits (AI credits + GPU credits) connecting GPU datacenters, traders, and AI companies. Modest owned underlying for credibility; partner datacenters for scale.
+**What 1Trade is**: A three-sided commodity market for AI compute. Tradeable credits (AI credits + GPU credits) connecting GPU datacenters, traders, and AI companies. Modest owned underlying for credibility; partner datacenters for scale.
 
 **Why now**: AI compute is the largest commodity in the world without a tradeable market. Hyperscalers can't ship transparent pricing. The category window is open. BlackRock's CEO and other institutional voices are publicly validating the thesis.
 

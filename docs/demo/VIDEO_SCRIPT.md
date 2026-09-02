@@ -1,4 +1,4 @@
-# Exascale — Investor Demo Video Script (current state)
+# 1Trade — Investor Demo Video Script (current state)
 
 > Platform-first cuts, grounded in the real UI (`UI_WALKTHROUGH.md`) and the narrative
 > (`INVESTOR_NARRATIVE.md`). VO in *italics*; [camera/action] in brackets. Mock numbers — replace.
@@ -13,7 +13,7 @@
 
 **VO (0:00):** *"AI compute is the new oil — but it trades like real estate: no public price, no
 order book, no way to hedge. Every commodity that became liquid made a fortune for whoever built
-the venue. Compute is the last one without it — and Exascale is the world's first exchange and
+the venue. Compute is the last one without it — and 1Trade is the world's first exchange and
 platform for AI and GPU markets."*
 
 [Cut to `/inference` — pick a model, run a prompt, tokens stream, a credit debit ticks down.]
@@ -47,9 +47,9 @@ underneath it generates."*
 
 [Pull back to the brand mark / end card.]
 
-**VO (1:18):** *"Exascale. The commodity market for AI compute."*
+**VO (1:18):** *"1Trade. The commodity market for AI compute."*
 
-[End card: E X A S C A L E · the commodity market for AI compute · raising [seed] · exascale.com]
+[End card: E X A S C A L E · the commodity market for AI compute · raising [seed] · 1trade.com]
 
 ---
 
@@ -102,7 +102,7 @@ is attributed for partner payout."*
 
 **VO:** *"This is the exchange: the order book, the market maker, and the price index that becomes
 the reference rate every compute contract prices against. The round funds the platform to GA, the
-first datacenter partners and AI-startup customers, and the path to the open market. Exascale —
+first datacenter partners and AI-startup customers, and the path to the open market. 1Trade —
 the commodity market for AI compute."*
 
 ---

@@ -1,4 +1,4 @@
-# Exascale CI — lint, test, contract-check. See docs/plans/DEPLOYMENT.md §8.
+# 1Trade CI — lint, test, contract-check. See docs/plans/DEPLOYMENT.md §8.
 # Fails closed; build/deploy stages are added as services land (M1+).
 name: ci
 on:

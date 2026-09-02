@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Exascale — developer toolchain installer for WSL2 / Ubuntu / Debian.
+# 1Trade — developer toolchain installer for WSL2 / Ubuntu / Debian.
 #
 # Installs everything needed to build + run the platform locally per docs/plans/DECISIONS.md
 # (ADR-0001: Kubernetes via k3s/k3d) and ENGINEERING_STANDARDS.md:

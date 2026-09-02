@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/exascale/credit-ledger/internal/domain"
+	"github.com/trade1/credit-ledger/internal/domain"
 	"github.com/jackc/pgx/v5"
 )
 

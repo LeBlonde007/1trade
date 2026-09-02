@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: compute-control
-          image: exascale/compute-control:dev
+          image: 1trade/compute-control:dev
           ports: [{ containerPort: 8086 }]
           envFrom:
             - configMapRef: { name: compute-control-env }

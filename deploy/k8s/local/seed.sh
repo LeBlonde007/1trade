@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Exascale — seed dev fixtures: a few tenants/users (platform-core, F02) each topped up with paper
+# 1Trade — seed dev fixtures: a few tenants/users (platform-core, F02) each topped up with paper
 # credits across the catalog credit-types (credit-ledger, F05). Idempotent: re-running logs in to an
 # existing user instead of failing, and mint is anchored so repeats don't double-credit.
 #
@@ -95,13 +95,13 @@ seed_tenant() { # $1 = email, $2 = tenant_name, then pairs: credit_type amount .
 
 # Credit types come from docs/contracts/credit-types.md: ai_index, text, speech, image, video,
 # embeddings, gpu_h100, gpu_h200. Amounts are paper (sandbox) credits, fixed-point strings.
-seed_tenant "alice@exascale.local" "Acme AI" \
+seed_tenant "alice@1trade.local" "Acme AI" \
   text 5000000 embeddings 2000000 image 500000
 
-seed_tenant "bob@exascale.local" "Globex Labs" \
+seed_tenant "bob@1trade.local" "Globex Labs" \
   gpu_h100 1000 gpu_h200 500 text 1000000
 
-seed_tenant "demo@exascale.local" "Exascale Demo" \
+seed_tenant "demo@1trade.local" "1Trade Demo" \
   ai_index 1000000 text 5000000 speech 1000000 image 1000000 \
   video 200000 embeddings 5000000 gpu_h100 2000 gpu_h200 1000
 

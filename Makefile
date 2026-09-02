@@ -1,8 +1,8 @@
-# Exascale — developer entrypoint. One command to a running platform locally.
+# 1Trade — developer entrypoint. One command to a running platform locally.
 # See docs/plans/LOCAL_DEV.md and docs/plans/DECISIONS.md ADR-0001 (k3s/k3d).
 # Toolchain: run scripts/install-toolchain.sh first (go, kubectl, k3d, helm, tilt, sops).
 
-CLUSTER ?= exascale
+CLUSTER ?= 1trade
 GPU     ?= 0          # set GPU=1 to schedule the host GPU (needs NVIDIA Container Toolkit)
 FULL    ?= 0          # set FULL=1 to also install scheduling + observability
 SCHED   ?= 0          # set SCHED=1 to also install Kueue + Volcano + mock-GPU queues
@@ -85,12 +85,12 @@ sandbox-bundle:
 ## web: run the Nuxt frontend dev server
 .PHONY: web
 web:
-	@cd "Exascale Frontend" && npm run dev
+	@cd "1Trade Frontend" && npm run dev
 
-## cli: build the exascale CLI (apps/cli — platform-core / F04; not scaffolded yet)
+## cli: build the 1trade CLI (apps/cli — platform-core / F04; not scaffolded yet)
 .PHONY: cli
 cli:
-	@test -d apps/cli && (cd apps/cli && go build -o ../../bin/exascale ./cmd/exascale) \
+	@test -d apps/cli && (cd apps/cli && go build -o ../../bin/1trade ./cmd/1trade) \
 		|| echo "apps/cli not scaffolded yet (F04)"
 
 ## build: build every Go module (services + CLI)
@@ -102,7 +102,7 @@ build:
 .PHONY: test
 test:
 	@bash scripts/go-all.sh test -race
-	@test -d "Exascale Frontend/node_modules" && (cd "Exascale Frontend" && npm run typecheck 2>/dev/null || true) || true
+	@test -d "1Trade Frontend/node_modules" && (cd "1Trade Frontend" && npm run typecheck 2>/dev/null || true) || true
 
 ## test-e2e: timed sub-5-min time-to-first-action loop (signup→top-up→infer→GPU debit). Needs `make up`.
 .PHONY: test-e2e

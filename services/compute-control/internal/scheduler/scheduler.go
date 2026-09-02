@@ -10,10 +10,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/exascale/compute-control/internal/domain"
-	"github.com/exascale/compute-control/internal/events"
-	"github.com/exascale/compute-control/internal/metrics"
-	"github.com/exascale/compute-control/internal/pool"
+	"github.com/trade1/compute-control/internal/domain"
+	"github.com/trade1/compute-control/internal/events"
+	"github.com/trade1/compute-control/internal/metrics"
+	"github.com/trade1/compute-control/internal/pool"
 	"github.com/google/uuid"
 )
 

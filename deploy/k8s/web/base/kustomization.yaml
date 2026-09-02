@@ -1,7 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 # web base — the Nuxt 4 SSR app + Nitro BFF. The BFF is the only public surface; it proxies to the
-# platform services in-cluster (see configmap.yaml). Image is built from "Exascale Frontend/Dockerfile".
+# platform services in-cluster (see configmap.yaml). Image is built from "1Trade Frontend/Dockerfile".
 resources:
   - configmap.yaml
   - service.yaml

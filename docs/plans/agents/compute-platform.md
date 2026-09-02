@@ -1,7 +1,7 @@
 # Agent plan — `compute-platform`
 
 > **Critical-path under the GTM pivot.** The control plane the founder flagged as "the most
-> important part." Schedules inference pods AND customer workloads on Exascale-owned + partner
+> important part." Schedules inference pods AND customer workloads on 1Trade-owned + partner
 > capacity as one fabric.
 
 ## 1. Scope
@@ -31,11 +31,11 @@ abstraction (owned + partner as one pool).
 ### Milestone 3 — Customer GPU rental
 - `POST /v1/compute/instances` → provision an H100/H200 instance, return SSH/connection details.
 - Target: **<90s time-to-running** (P95).
-- CLI: `exascale gpu create/list/stop` works end-to-end.
+- CLI: `1trade gpu create/list/stop` works end-to-end.
 - Reserved capacity: 1mo / 6mo / 12mo terms with 17% / 27% / 33% discounts; represented as
   GPU credits (purchased through `credit-ledger`).
 - Per-second GPU-hour metering → `events/compute.usage.v1.yaml` → `credit-ledger` debit.
-- Supply-source abstraction begins with Exascale-owned DC only — but the data model already
+- Supply-source abstraction begins with 1Trade-owned DC only — but the data model already
   carries `supply_source_id` so partner DCs slot in seamlessly.
 
 ### Milestone 4 — Partner DC integration
@@ -76,7 +76,7 @@ abstraction (owned + partner as one pool).
 - `services/compute-control/` runs on `:8004`.
 - `k3d` local cluster with mock GPU resources registered.
 - `make up GPU=1` enables real-GPU scheduling for local development against a host GPU.
-- `exascale gpu create --type mock-h100` works in mock mode.
+- `1trade gpu create --type mock-h100` works in mock mode.
 
 ## 6. Dockerfile
 

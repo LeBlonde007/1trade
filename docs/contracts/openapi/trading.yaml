@@ -1,9 +1,9 @@
 openapi: 3.0.3
 info:
-  title: Exascale Trading API (products, market data, orders, positions)
+  title: 1Trade Trading API (products, market data, orders, positions)
   version: 1.0.0
   description: >
-    **The Exascale exchange API.** Owned by `matching-engine`. This contract is published in full so
+    **The 1Trade exchange API.** Owned by `matching-engine`. This contract is published in full so
     the trading surface (KW02) and the eventual real engine (KW03 Phase 2) build against one stable
     interface — but in **Phase 1 only the read endpoints are implemented**, and they are served by the
     service's **mock adapter**: believable simulated market data, deterministic per product, generated
@@ -25,7 +25,7 @@ info:
     (credit-types.md §5). See docs/plans/features/KW03-matching-engine-mock-and-spec.md.
 
 servers:
-  - { url: "https://api.exascale.io", description: prod }
+  - { url: "https://api.1trade.io", description: prod }
   - { url: "http://localhost:8087", description: "local (matching-engine)" }
 
 tags:

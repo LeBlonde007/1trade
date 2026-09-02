@@ -1,4 +1,4 @@
-# inference-gateway (F08 — the Exascale inference API)
+# inference-gateway (F08 — the 1Trade inference API)
 
 The customer-facing inference API: OpenAI-wire-compatible chat/completions, embeddings, audio, and
 images. Owner: `inference-ml`. Contract: `docs/contracts/openapi/inference.yaml`. **The fastest

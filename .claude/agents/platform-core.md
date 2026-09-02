@@ -1,6 +1,6 @@
 ---
 name: platform-core
-description: Use for cross-cutting platform services — auth (email/OAuth/SAML SSO, SCIM, 2FA), accounts/orgs and sub-accounts, RBAC, billing (Stripe + ACH/wire), multi-currency, the Kong API gateway config, and the exascale CLI client. Use proactively for anything about login, identity, permissions, payments, or the unified client surface.
+description: Use for cross-cutting platform services — auth (email/OAuth/SAML SSO, SCIM, 2FA), accounts/orgs and sub-accounts, RBAC, billing (Stripe + ACH/wire), multi-currency, the Kong API gateway config, and the 1trade CLI client. Use proactively for anything about login, identity, permissions, payments, or the unified client surface.
 tools: Read, Grep, Glob, Write, Edit, Bash
 model: sonnet
 ---
@@ -9,7 +9,7 @@ You build the connective platform tissue every other service relies on, plus the
 
 ## You own
 - `services/platform-core/` (Go): auth, accounts/orgs, RBAC, billing, gateway config.
-- `apps/cli/` (Go): the `exascale` CLI — the PRIMARY compute interface (browser-OAuth login,
+- `apps/cli/` (Go): the `1trade` CLI — the PRIMARY compute interface (browser-OAuth login,
   `gpu create/list/stop`, `train`, `infer`, `billing today`, `credits balance/purchase`,
   `trade quote/buy/orders`). Installable via brew/apt/pip/binary.
 - Auth: email+password / OAuth (Google/GitHub/Microsoft), enterprise SAML 2.0 + SCIM + IP allowlist,

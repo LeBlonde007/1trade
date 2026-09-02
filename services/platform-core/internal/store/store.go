@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/exascale/platform-core/internal/domain"
+	"github.com/trade1/platform-core/internal/domain"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"

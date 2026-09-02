@@ -1,6 +1,6 @@
 openapi: 3.0.3
 info:
-  title: Exascale AI Credit Index API (reference index reads)
+  title: 1Trade AI Credit Index API (reference index reads)
   version: 1.0.0
   description: >
     **The AI credit index read API.** Owned by `index-service` (KW01). The index is the daily
@@ -22,7 +22,7 @@ info:
     See docs/plans/features/KW01-private-reference-index.md and docs/index-methodology.md.
 
 servers:
-  - { url: "https://api.exascale.io", description: prod }
+  - { url: "https://api.1trade.io", description: prod }
   - { url: "http://localhost:8087", description: "local (matching-engine mock adapter, Phase 1)" }
 
 tags:

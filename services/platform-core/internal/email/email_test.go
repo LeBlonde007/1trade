@@ -116,7 +116,7 @@ func TestTLSModeInferredFromPort(t *testing.T) {
 // SMTP server, asserting the MAIL/RCPT/DATA conversation completes and the message body is delivered.
 func TestPlainDelivery(t *testing.T) {
 	addr, got := fakeSMTP(t)
-	s := New(Config{Addr: addr, From: "from@exascale.ai"})
+	s := New(Config{Addr: addr, From: "from@1trade.ai"})
 	if err := s.SendVerification("user@example.com", "http://app/verify?token=tok123"); err != nil {
 		t.Fatalf("SendVerification: %v", err)
 	}
@@ -138,7 +138,7 @@ func TestAPIDelivery(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	s := New(Config{From: "hello@exascale.ai", APIURL: srv.URL, APIToken: "tok-abc"})
+	s := New(Config{From: "hello@1trade.ai", APIURL: srv.URL, APIToken: "tok-abc"})
 	if !s.Enabled() {
 		t.Fatal("Enabled() should be true when an API URL is set")
 	}
@@ -160,7 +160,7 @@ func TestAPIErrorSurfaced(t *testing.T) {
 		_, _ = w.Write([]byte(`{"errors":["Unauthorized"]}`))
 	}))
 	defer srv.Close()
-	s := New(Config{From: "hello@exascale.ai", APIURL: srv.URL, APIToken: "bad"})
+	s := New(Config{From: "hello@1trade.ai", APIURL: srv.URL, APIToken: "bad"})
 	err := s.SendVerification("user@example.com", "http://app/verify?token=x")
 	if err == nil || !strings.Contains(err.Error(), "401") {
 		t.Fatalf("expected a 401 error surfaced, got %v", err)

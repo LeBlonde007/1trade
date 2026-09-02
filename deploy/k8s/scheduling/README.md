@@ -8,8 +8,8 @@ so it all runs on k3d with no real GPU.
 
 | File | What |
 |---|---|
-| `mock-gpu-resource.sh` | Advertises `exascale.io/gpu: 8` on the node labeled `exascale.io/gpu=mock` (extended resource via a node-status PATCH). Re-run after a cluster restart. |
-| `kueue-config.yaml` | `ResourceFlavor`s (`default-flavor`, `mock-gpu`) + one `ClusterQueue` per workload class (`cq-inference` 4 GPU, `cq-training-small` 2, `cq-training-large` 2) in a shared `exascale` cohort + a `LocalQueue` per class in `default`. |
+| `mock-gpu-resource.sh` | Advertises `1trade.io/gpu: 8` on the node labeled `1trade.io/gpu=mock` (extended resource via a node-status PATCH). Re-run after a cluster restart. |
+| `kueue-config.yaml` | `ResourceFlavor`s (`default-flavor`, `mock-gpu`) + one `ClusterQueue` per workload class (`cq-inference` 4 GPU, `cq-training-small` 2, `cq-training-large` 2) in a shared `1trade` cohort + a `LocalQueue` per class in `default`. |
 | `examples/kueue-inference-job.yaml` | A suspended Job in the `inference` queue → Kueue admits + unsuspends (quota path). |
 | `examples/volcano-gang-job.yaml` | A Volcano `minAvailable: 2` job → gang-scheduled all-or-nothing (gang path). |
 
@@ -28,7 +28,7 @@ make data-plane SCHED=1     # core + Kueue + Volcano + mock-GPU resource + kueue
 ```bash
 kubectl apply -f deploy/k8s/scheduling/examples/kueue-inference-job.yaml
 kubectl get workloads -n default                 # Admitted=True
-kubectl get pods -n default -l job-name=mock-infer-job -o wide   # on k3d-exascale-agent-0
+kubectl get pods -n default -l job-name=mock-infer-job -o wide   # on k3d-1trade-agent-0
 
 kubectl apply -f deploy/k8s/scheduling/examples/volcano-gang-job.yaml
 kubectl get podgroups -n default                 # phase Running (both pods bound at once)

@@ -1,9 +1,9 @@
-# Exascale — local k3d (k3s-in-Docker) cluster. Same k3s as prod (ADR-0001), so local == prod.
+# 1Trade — local k3d (k3s-in-Docker) cluster. Same k3s as prod (ADR-0001), so local == prod.
 # Create: k3d cluster create --config deploy/k8s/local/k3d.yaml   (or `make up`)
 apiVersion: k3d.io/v1alpha5
 kind: Simple
 metadata:
-  name: exascale
+  name: 1trade
 servers: 1
 agents: 1
 ports:
@@ -28,7 +28,7 @@ options:
   k3s:
     nodeLabels:
       # Mark the agent as a GPU node placeholder; real GPU scheduling needs GPU=1 + NVIDIA toolkit.
-      - label: exascale.io/gpu=mock
+      - label: 1trade.io/gpu=mock
         nodeFilters:
           - agent:0
   kubeconfig:

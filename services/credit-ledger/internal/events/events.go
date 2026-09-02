@@ -6,7 +6,7 @@ package events
 import (
 	"log/slog"
 
-	"github.com/exascale/credit-ledger/internal/domain"
+	"github.com/trade1/credit-ledger/internal/domain"
 )
 
 // Publisher emits ledger events.

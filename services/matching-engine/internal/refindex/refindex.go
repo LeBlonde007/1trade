@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/exascale/matching-engine/internal/domain"
-	"github.com/exascale/matching-engine/internal/marketdata"
+	"github.com/trade1/matching-engine/internal/domain"
+	"github.com/trade1/matching-engine/internal/marketdata"
 )
 
 // MethodologyVersion is the version prints are computed under. Bumping it is a published,

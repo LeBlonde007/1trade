@@ -1,4 +1,4 @@
-// Package config loads and saves the exascale CLI config (~/.exascale/config.json): the session
+// Package config loads and saves the 1trade CLI config (~/.1trade/config.json): the session
 // token and the platform service URLs. Env vars override the file; sensible dev defaults apply.
 package config
 
@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 )
 
-// Config is the CLI's persisted settings. Token is the platform JWT from `exascale login`.
+// Config is the CLI's persisted settings. Token is the platform JWT from `1trade login`.
 type Config struct {
 	Token       string `json:"token,omitempty"`
 	PlatformURL string `json:"platform_url"`
@@ -18,7 +18,7 @@ type Config struct {
 }
 
 // DefaultAPIURL is baked in at build time via ldflags
-// (-X github.com/exascale/cli/internal/config.DefaultAPIURL=https://sandboxapi.exascale.ai) so a
+// (-X github.com/trade1/cli/internal/config.DefaultAPIURL=https://sandboxapi.1trade.ai) so a
 // distributed binary points every service at the sandbox/prod api host with zero config. Empty in a
 // dev build → local-dev defaults.
 var DefaultAPIURL = ""
@@ -36,13 +36,13 @@ func defaults() Config {
 	}
 }
 
-// Path returns the config file path (~/.exascale/config.json).
+// Path returns the config file path (~/.1trade/config.json).
 func Path() string {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		home = "."
 	}
-	return filepath.Join(home, ".exascale", "config.json")
+	return filepath.Join(home, ".1trade", "config.json")
 }
 
 // Load reads the config file (if any), applies defaults, then env overrides.
@@ -51,25 +51,25 @@ func Load() Config {
 	if b, err := os.ReadFile(Path()); err == nil {
 		_ = json.Unmarshal(b, &c)
 	}
-	// EXASCALE_API_URL points every service at one host (the sandbox/prod api gateway, which routes by
+	// TRADE1_API_URL points every service at one host (the sandbox/prod api gateway, which routes by
 	// path: /v1/auth+/v1/account+/v1/billing→platform, /v1/credits→ledger, /v1/models+/v1/chat→gateway,
-	// /v1/compute→compute). Per-service EXASCALE_*_URL below still override it for split deployments.
-	if v := os.Getenv("EXASCALE_API_URL"); v != "" {
+	// /v1/compute→compute). Per-service TRADE1_*_URL below still override it for split deployments.
+	if v := os.Getenv("TRADE1_API_URL"); v != "" {
 		c.PlatformURL, c.GatewayURL, c.LedgerURL, c.ComputeURL = v, v, v, v
 	}
-	if v := os.Getenv("EXASCALE_PLATFORM_URL"); v != "" {
+	if v := os.Getenv("TRADE1_PLATFORM_URL"); v != "" {
 		c.PlatformURL = v
 	}
-	if v := os.Getenv("EXASCALE_GATEWAY_URL"); v != "" {
+	if v := os.Getenv("TRADE1_GATEWAY_URL"); v != "" {
 		c.GatewayURL = v
 	}
-	if v := os.Getenv("EXASCALE_LEDGER_URL"); v != "" {
+	if v := os.Getenv("TRADE1_LEDGER_URL"); v != "" {
 		c.LedgerURL = v
 	}
-	if v := os.Getenv("EXASCALE_COMPUTE_URL"); v != "" {
+	if v := os.Getenv("TRADE1_COMPUTE_URL"); v != "" {
 		c.ComputeURL = v
 	}
-	if v := os.Getenv("EXASCALE_TOKEN"); v != "" {
+	if v := os.Getenv("TRADE1_TOKEN"); v != "" {
 		c.Token = v
 	}
 	return c

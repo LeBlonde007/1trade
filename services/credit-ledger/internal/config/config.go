@@ -17,7 +17,7 @@ type Config struct {
 // Load reads configuration from the environment, applying sensible dev defaults.
 func Load() Config {
 	return Config{
-		Env:          envOr("EXASCALE_ENV", "dev"),
+		Env:          envOr("TRADE1_ENV", "dev"),
 		Addr:         envOr("LEDGER_ADDR", ":8002"),
 		DatabaseURL:  os.Getenv("DATABASE_URL"),
 		NATSURL:      os.Getenv("NATS_URL"),

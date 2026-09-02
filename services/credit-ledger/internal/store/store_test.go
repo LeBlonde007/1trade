@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/exascale/credit-ledger/internal/domain"
+	"github.com/trade1/credit-ledger/internal/domain"
 	"github.com/google/uuid"
 )
 

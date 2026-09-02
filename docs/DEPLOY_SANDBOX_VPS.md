@@ -1,4 +1,4 @@
-# Deploy Exascale (sandbox) to a VPS — step by step
+# Deploy 1Trade (sandbox) to a VPS — step by step
 
 A start-to-finish runbook to host the **paper-mode** product on one Linux VPS. Sandbox = **CPU-only**:
 no GPU, no real Stripe, no KYC vendor, no real money — every external dependency runs on its mock/stub
@@ -71,8 +71,8 @@ docker run --rm hello-world      # sanity check → "Hello from Docker!"
 ## 4. Get the code
 
 ```bash
-git clone https://github.com/saadallahdev/ex-main.git exascale
-cd exascale
+git clone https://github.com/saadallahdev/ex-main.git 1trade
+cd 1trade
 ```
 
 > Private repo? Use a deploy key or `git clone https://<token>@github.com/...`.
@@ -86,7 +86,7 @@ Add **two A records** — one for the web app, one for the `/v1` API — both po
 | Type | Name              | Value          | Serves                          |
 |------|-------------------|----------------|---------------------------------|
 | A    | `sandbox`         | `203.0.113.10` | web app (browser)               |
-| A    | `sandboxapi`      | `203.0.113.10` | JSON API (`exascale` CLI/clients) |
+| A    | `sandboxapi`      | `203.0.113.10` | JSON API (`1trade` CLI/clients) |
 
 → gives you `sandbox.yourdomain.com` (web) and `sandboxapi.yourdomain.com` (api). Wait for **both** to
 resolve (`dig +short sandbox.yourdomain.com`) — for TLS, Let's Encrypt validates each host. **Skip this**
@@ -138,12 +138,12 @@ export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 
 # Build + import the six images (on the box):
 for s in platform-core credit-ledger inference-gateway compute-control; do
-  docker build -t exascale/$s:sandbox services/$s
+  docker build -t 1trade/$s:sandbox services/$s
 done
-docker build -t exascale/inference-runtime-stub:sandbox services/inference-runtime/stub
-docker build -t exascale/web:sandbox "Exascale Frontend"
+docker build -t 1trade/inference-runtime-stub:sandbox services/inference-runtime/stub
+docker build -t 1trade/web:sandbox "1Trade Frontend"
 for i in platform-core credit-ledger inference-gateway compute-control inference-runtime-stub web; do
-  docker save exascale/$i:sandbox | k3s ctr images import -
+  docker save 1trade/$i:sandbox | k3s ctr images import -
 done
 
 # Secret + migrations + data plane:
@@ -160,8 +160,8 @@ kubectl apply -f deploy/k8s/local/data-plane.yaml
 # Services + web + ingress (substitute your web host, api host, and url):
 HOST=sandbox.yourdomain.com; API_HOST=sandboxapi.yourdomain.com; URL=https://$HOST
 kubectl kustomize deploy/k8s/overlays/sandbox \
-  | sed -e "s|EXASCALE_SANDBOX_API_HOST|$API_HOST|g" \
-        -e "s|EXASCALE_SANDBOX_HOST|$HOST|g" -e "s|EXASCALE_SANDBOX_URL|$URL|g" \
+  | sed -e "s|TRADE1_SANDBOX_API_HOST|$API_HOST|g" \
+        -e "s|TRADE1_SANDBOX_HOST|$HOST|g" -e "s|TRADE1_SANDBOX_URL|$URL|g" \
   | kubectl apply -f -
 ```
 
@@ -177,7 +177,7 @@ kubectl kustomize deploy/k8s/overlays/sandbox \
 the box, so no `.go`/`.vue` source ever lands there — the compiled product arrives as images.
 
 The `release` GitHub Actions workflow (`.github/workflows/release.yml`) builds + pushes all six images to
-**`ghcr.io/<owner>/exascale-<service>`** on every push to `main` (tag `:sandbox`) and every `vX.Y.Z` tag.
+**`ghcr.io/<owner>/1trade-<service>`** on every push to `main` (tag `:sandbox`) and every `vX.Y.Z` tag.
 Make those packages **Public** (repo → Packages → each → Settings) — or keep them private and mint a
 `read:packages` token. Then:
 
@@ -195,8 +195,8 @@ IMAGE_REGISTRY=ghcr.io/<owner> \
   scripts/deploy-sandbox.sh
 ```
 
-`deploy-sandbox.sh` then skips the build, rewrites the overlay's `exascale/<svc>` image names to
-`ghcr.io/<owner>/exascale-<svc>`, and (if a token is given) creates an `imagePullSecret` on the default
+`deploy-sandbox.sh` then skips the build, rewrites the overlay's `1trade/<svc>` image names to
+`ghcr.io/<owner>/1trade-<svc>`, and (if a token is given) creates an `imagePullSecret` on the default
 ServiceAccount so the cluster can pull. Re-run after the workflow publishes a newer `:sandbox` to update.
 
 > **Honest limit:** whoever controls the box can still copy a *running* image (the web bundle is minified
@@ -241,7 +241,7 @@ git pull
 scripts/deploy-sandbox.sh   # re-run with the same SANDBOX_HOST (+ TLS/ACME_EMAIL) — rebuilds & rolls
 
 # Postgres backup (paper data, but still):
-kubectl -n data exec deploy/postgres -- pg_dump -U exascale exascale | gzip > backup-$(date +%F).sql.gz
+kubectl -n data exec deploy/postgres -- pg_dump -U 1trade 1trade | gzip > backup-$(date +%F).sql.gz
 ```
 
 ---

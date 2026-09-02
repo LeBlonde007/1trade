@@ -1,4 +1,4 @@
-# Exascale — Design Decisions (Phase 0 Reconciliation Note)
+# 1Trade — Design Decisions (Phase 0 Reconciliation Note)
 
 > One-page log of every conflict resolved during the token audit.
 > All Vue pages, components, and layouts reference `tokens.css` exclusively.
@@ -9,9 +9,9 @@
 | Source | Role | Authority |
 |---|---|---|
 | `/mnt/f/ex/brand-book.css` | Canonical brand document | **Primary source of truth** |
-| `Exascale Trading Dashboard.html` | Dark-mode trading UI reference | Authoritative for dark surfaces |
-| `Exascale Wallet.html`, `Market Detail.html` | Dark-mode app screens | Cross-check (consistent with Trading Dashboard) |
-| `Exascale Homepage.html`, `Signup.html` | Light-mode marketing | Cross-check (consistent with brand book) |
+| `1Trade Trading Dashboard.html` | Dark-mode trading UI reference | Authoritative for dark surfaces |
+| `1Trade Wallet.html`, `Market Detail.html` | Dark-mode app screens | Cross-check (consistent with Trading Dashboard) |
+| `1Trade Homepage.html`, `Signup.html` | Light-mode marketing | Cross-check (consistent with brand book) |
 | Migration plan §0 | Strategic guidance | Token structure (sp-*, fs-*, dur-*) adopted |
 
 ## Theme strategy

@@ -14,18 +14,18 @@ import (
 	"strings"
 	"time"
 
-	"github.com/exascale/inference-gateway/internal/auth"
-	"github.com/exascale/inference-gateway/internal/catalog"
-	"github.com/exascale/inference-gateway/internal/config"
-	"github.com/exascale/inference-gateway/internal/events"
-	"github.com/exascale/inference-gateway/internal/metrics"
-	"github.com/exascale/inference-gateway/internal/model"
-	"github.com/exascale/inference-gateway/internal/pricing"
+	"github.com/trade1/inference-gateway/internal/auth"
+	"github.com/trade1/inference-gateway/internal/catalog"
+	"github.com/trade1/inference-gateway/internal/config"
+	"github.com/trade1/inference-gateway/internal/events"
+	"github.com/trade1/inference-gateway/internal/metrics"
+	"github.com/trade1/inference-gateway/internal/model"
+	"github.com/trade1/inference-gateway/internal/pricing"
 	"github.com/google/uuid"
 )
 
 // buyCreditsURL is returned in a 402 so the customer knows where to top up.
-const buyCreditsURL = "https://app.exascale.io/billing/buy"
+const buyCreditsURL = "https://app.1trade.io/billing/buy"
 
 // CreditChecker is the pre-flight balance guard (implemented by internal/ledger). A nil checker
 // disables the pre-flight (e.g. in unit tests, or when no JWT secret is configured).
@@ -124,23 +124,23 @@ func (s *Server) chatCompletions(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "model_not_found", "unknown model: "+req.Model)
 		return
 	}
-	if m.Exascale.Modality != "text" && m.Exascale.Modality != "docs" && m.Exascale.Modality != "code" { // chat path: text + doc-writer + code-writer; refuse the rest so we never bill the wrong sub-credit
+	if m.Trade1.Modality != "text" && m.Trade1.Modality != "docs" && m.Trade1.Modality != "code" { // chat path: text + doc-writer + code-writer; refuse the rest so we never bill the wrong sub-credit
 		writeErr(w, http.StatusNotFound, "model_not_found", req.Model+" is not a chat model")
 		return
 	}
 	// Pre-flight: reject before consuming a GPU when the tenant has no credit. Fail-open on a ledger
 	// error (a balance-service blip shouldn't block inference; the event-driven debit still records it).
 	if s.credit != nil {
-		ok, bal, err := s.credit.Sufficient(r.Context(), p.TenantID, p.IsPaper, m.Exascale.CreditType)
+		ok, bal, err := s.credit.Sufficient(r.Context(), p.TenantID, p.IsPaper, m.Trade1.CreditType)
 		if err != nil {
 			slog.Warn("pre-flight balance check failed; serving anyway", "tenant_id", p.TenantID, "err", err)
 		} else if !ok {
 			writeJSON(w, http.StatusPaymentRequired, map[string]any{
 				"code":    "INSUFFICIENT_CREDIT",
-				"message": "Not enough " + m.Exascale.CreditType + " credits to serve this request.",
+				"message": "Not enough " + m.Trade1.CreditType + " credits to serve this request.",
 				"details": map[string]any{
-					"credit_type": m.Exascale.CreditType, "balance": bal,
-					"required": m.Exascale.Price, "buy_credits_url": buyCreditsURL,
+					"credit_type": m.Trade1.CreditType, "balance": bal,
+					"required": m.Trade1.Price, "buy_credits_url": buyCreditsURL,
 				},
 			})
 			return
@@ -160,7 +160,7 @@ func (s *Server) chatCompletions(w http.ResponseWriter, r *http.Request) {
 	}
 	latency := int(time.Since(start).Milliseconds())
 	total := res.PromptTokens + res.CompletionTokens
-	units, err := pricing.UnitsForTokens(m.Exascale.Price, total)
+	units, err := pricing.UnitsForTokens(m.Trade1.Price, total)
 	if err != nil {
 		serverError(w, err)
 		return
@@ -191,10 +191,10 @@ func (s *Server) chatCompletions(w http.ResponseWriter, r *http.Request) {
 // failure is logged, never fails the customer (the response was already produced).
 func (s *Server) meter(p auth.Principal, m catalog.Model, modelID string, res model.ChatResult, units string, latencyMS int, requestID string) {
 	in, out, lat := res.PromptTokens, res.CompletionTokens, latencyMS
-	metrics.RecordInference(modelID, m.Exascale.Modality, in, out)
+	metrics.RecordInference(modelID, m.Trade1.Modality, in, out)
 	e := events.UsageEvent{
 		RequestID: requestID, TenantID: p.TenantID, Model: modelID,
-		Modality: m.Exascale.Modality, CreditType: m.Exascale.CreditType,
+		Modality: m.Trade1.Modality, CreditType: m.Trade1.CreditType,
 		InputTokens: &in, OutputTokens: &out, Units: units, LatencyMS: &lat,
 		IsPaper: p.IsPaper, TS: time.Now().UTC().Format(time.RFC3339),
 	}
@@ -232,7 +232,7 @@ func (s *Server) imageGenerations(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "model_not_found", "unknown model: "+req.Model)
 		return
 	}
-	if m.Exascale.Modality != "image" { // refuse non-image models so we never bill the wrong sub-credit
+	if m.Trade1.Modality != "image" { // refuse non-image models so we never bill the wrong sub-credit
 		writeErr(w, http.StatusNotFound, "model_not_found", req.Model+" is not an image model")
 		return
 	}
@@ -245,16 +245,16 @@ func (s *Server) imageGenerations(w http.ResponseWriter, r *http.Request) {
 	}
 	// Pre-flight credit check (image credits). Fail-open on a ledger blip, like chat.
 	if s.credit != nil {
-		okBal, bal, err := s.credit.Sufficient(r.Context(), p.TenantID, p.IsPaper, m.Exascale.CreditType)
+		okBal, bal, err := s.credit.Sufficient(r.Context(), p.TenantID, p.IsPaper, m.Trade1.CreditType)
 		if err != nil {
 			slog.Warn("pre-flight balance check failed; serving anyway", "tenant_id", p.TenantID, "err", err)
 		} else if !okBal {
 			writeJSON(w, http.StatusPaymentRequired, map[string]any{
 				"code":    "INSUFFICIENT_CREDIT",
-				"message": "Not enough " + m.Exascale.CreditType + " credits to generate this image.",
+				"message": "Not enough " + m.Trade1.CreditType + " credits to generate this image.",
 				"details": map[string]any{
-					"credit_type": m.Exascale.CreditType, "balance": bal,
-					"required": m.Exascale.Price, "buy_credits_url": buyCreditsURL,
+					"credit_type": m.Trade1.CreditType, "balance": bal,
+					"required": m.Trade1.Price, "buy_credits_url": buyCreditsURL,
 				},
 			})
 			return
@@ -273,7 +273,7 @@ func (s *Server) imageGenerations(w http.ResponseWriter, r *http.Request) {
 	}
 	latency := int(time.Since(start).Milliseconds())
 	count := len(res.B64)
-	units, err := pricing.UnitsForCount(m.Exascale.Price, count)
+	units, err := pricing.UnitsForCount(m.Trade1.Price, count)
 	if err != nil {
 		serverError(w, err)
 		return
@@ -294,10 +294,10 @@ func (s *Server) imageGenerations(w http.ResponseWriter, r *http.Request) {
 // billed in `image` credits. Best-effort, like meter — a publish failure never fails the customer.
 func (s *Server) meterImage(p auth.Principal, m catalog.Model, modelID string, count int, units string, latencyMS int, requestID string) {
 	lat := latencyMS
-	metrics.RecordInference(modelID, m.Exascale.Modality, 0, 0)
+	metrics.RecordInference(modelID, m.Trade1.Modality, 0, 0)
 	e := events.UsageEvent{
 		RequestID: requestID, TenantID: p.TenantID, Model: modelID,
-		Modality: m.Exascale.Modality, CreditType: m.Exascale.CreditType,
+		Modality: m.Trade1.Modality, CreditType: m.Trade1.CreditType,
 		Units: units, LatencyMS: &lat,
 		IsPaper: p.IsPaper, TS: time.Now().UTC().Format(time.RFC3339),
 	}
@@ -337,18 +337,18 @@ func (s *Server) audioSpeech(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "model_not_found", "unknown model: "+req.Model)
 		return
 	}
-	if m.Exascale.Modality != "speech" {
+	if m.Trade1.Modality != "speech" {
 		writeErr(w, http.StatusNotFound, "model_not_found", req.Model+" is not a speech model")
 		return
 	}
 	if s.credit != nil {
-		okBal, bal, err := s.credit.Sufficient(r.Context(), p.TenantID, p.IsPaper, m.Exascale.CreditType)
+		okBal, bal, err := s.credit.Sufficient(r.Context(), p.TenantID, p.IsPaper, m.Trade1.CreditType)
 		if err != nil {
 			slog.Warn("pre-flight balance check failed; serving anyway", "tenant_id", p.TenantID, "err", err)
 		} else if !okBal {
 			writeJSON(w, http.StatusPaymentRequired, map[string]any{
-				"code": "INSUFFICIENT_CREDIT", "message": "Not enough " + m.Exascale.CreditType + " credits to generate speech.",
-				"details": map[string]any{"credit_type": m.Exascale.CreditType, "balance": bal, "required": m.Exascale.Price, "buy_credits_url": buyCreditsURL},
+				"code": "INSUFFICIENT_CREDIT", "message": "Not enough " + m.Trade1.CreditType + " credits to generate speech.",
+				"details": map[string]any{"credit_type": m.Trade1.CreditType, "balance": bal, "required": m.Trade1.Price, "buy_credits_url": buyCreditsURL},
 			})
 			return
 		}
@@ -372,7 +372,7 @@ func (s *Server) audioSpeech(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Bill speech credits = price × chars / 1K (UnitsForTokens computes price × n / 1000).
-	units, _ := pricing.UnitsForTokens(m.Exascale.Price, len(req.Input))
+	units, _ := pricing.UnitsForTokens(m.Trade1.Price, len(req.Input))
 	s.meterImage(p, m, req.Model, len(req.Input), units, 0, "ttsreq_"+uuid.NewString())
 	if ctype == "" {
 		ctype = "audio/wav"
@@ -410,18 +410,18 @@ func (s *Server) visionChat(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "model_not_found", "unknown model: "+req.Model)
 		return
 	}
-	if m.Exascale.Modality != "vision" {
+	if m.Trade1.Modality != "vision" {
 		writeErr(w, http.StatusNotFound, "model_not_found", req.Model+" is not a vision model")
 		return
 	}
 	if s.credit != nil {
-		okBal, bal, err := s.credit.Sufficient(r.Context(), p.TenantID, p.IsPaper, m.Exascale.CreditType)
+		okBal, bal, err := s.credit.Sufficient(r.Context(), p.TenantID, p.IsPaper, m.Trade1.CreditType)
 		if err != nil {
 			slog.Warn("pre-flight balance check failed; serving anyway", "tenant_id", p.TenantID, "err", err)
 		} else if !okBal {
 			writeJSON(w, http.StatusPaymentRequired, map[string]any{
-				"code": "INSUFFICIENT_CREDIT", "message": "Not enough " + m.Exascale.CreditType + " credits.",
-				"details": map[string]any{"credit_type": m.Exascale.CreditType, "balance": bal, "required": m.Exascale.Price, "buy_credits_url": buyCreditsURL},
+				"code": "INSUFFICIENT_CREDIT", "message": "Not enough " + m.Trade1.CreditType + " credits.",
+				"details": map[string]any{"credit_type": m.Trade1.CreditType, "balance": bal, "required": m.Trade1.Price, "buy_credits_url": buyCreditsURL},
 			})
 			return
 		}
@@ -438,7 +438,7 @@ func (s *Server) visionChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	total := res.PromptTokens + res.CompletionTokens
-	units, err := pricing.UnitsForTokens(m.Exascale.Price, total)
+	units, err := pricing.UnitsForTokens(m.Trade1.Price, total)
 	if err != nil {
 		serverError(w, err)
 		return
@@ -477,18 +477,18 @@ func (s *Server) submitVideo(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "model_not_found", "unknown model: "+req.Model)
 		return
 	}
-	if m.Exascale.Modality != "video" {
+	if m.Trade1.Modality != "video" {
 		writeErr(w, http.StatusNotFound, "model_not_found", req.Model+" is not a video model")
 		return
 	}
 	if s.credit != nil {
-		okBal, bal, err := s.credit.Sufficient(r.Context(), p.TenantID, p.IsPaper, m.Exascale.CreditType)
+		okBal, bal, err := s.credit.Sufficient(r.Context(), p.TenantID, p.IsPaper, m.Trade1.CreditType)
 		if err != nil {
 			slog.Warn("pre-flight balance check failed; serving anyway", "tenant_id", p.TenantID, "err", err)
 		} else if !okBal {
 			writeJSON(w, http.StatusPaymentRequired, map[string]any{
-				"code": "INSUFFICIENT_CREDIT", "message": "Not enough " + m.Exascale.CreditType + " credits to generate this video.",
-				"details": map[string]any{"credit_type": m.Exascale.CreditType, "balance": bal, "required": m.Exascale.Price, "buy_credits_url": buyCreditsURL},
+				"code": "INSUFFICIENT_CREDIT", "message": "Not enough " + m.Trade1.CreditType + " credits to generate this video.",
+				"details": map[string]any{"credit_type": m.Trade1.CreditType, "balance": bal, "required": m.Trade1.Price, "buy_credits_url": buyCreditsURL},
 			})
 			return
 		}
@@ -504,7 +504,7 @@ func (s *Server) submitVideo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Bill one clip on a successful submit (units = price × 1).
-	units, _ := pricing.UnitsForCount(m.Exascale.Price, 1)
+	units, _ := pricing.UnitsForCount(m.Trade1.Price, 1)
 	s.meterImage(p, m, req.Model, 1, units, 0, "vidreq_"+uuid.NewString())
 	writeJSON(w, http.StatusAccepted, map[string]any{"id": job.ID, "status": job.Status, "model": req.Model})
 }

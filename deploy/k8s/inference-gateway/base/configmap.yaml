@@ -5,7 +5,7 @@ kind: ConfigMap
 metadata:
   name: inference-gateway-env
 data:
-  EXASCALE_ENV: "dev"
+  TRADE1_ENV: "dev"
   INFERENCE_ADDR: ":8085"
   PLATFORM_CORE_URL: "http://platform-core:8001"
   CREDIT_LEDGER_URL: "http://credit-ledger:8002"

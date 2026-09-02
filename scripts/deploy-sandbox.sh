@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deploy the Exascale SANDBOX (paper mode, CPU-only — no GPU, no real Stripe, no KYC vendor) to a
+# Deploy the 1Trade SANDBOX (paper mode, CPU-only — no GPU, no real Stripe, no KYC vendor) to a
 # single-node k3s cluster, e.g. a VPS. Idempotent: safe to re-run.
 #
 #   SANDBOX_HOST=sandbox.example.com scripts/deploy-sandbox.sh          # HTTP, k3s already installed
@@ -27,7 +27,7 @@
 #                             login on a verified email. EMAIL_API_URL = send URL (default Mailtrap live
 #                             https://send.api.mailtrap.io/api/send; sandbox inbox:
 #                             https://sandbox.api.mailtrap.io/api/send/<inbox_id>). EMAIL_FROM default
-#                             hello@exascale.ai. Token → platform-auth Secret; never committed.
+#                             hello@1trade.ai. Token → platform-auth Secret; never committed.
 #   STORAGE_SECRET_KEY        OPTIONAL. Set it (+ STORAGE_ACCESS_KEY, STORAGE_BUCKET) to enable file
 #                             uploads to DigitalOcean Spaces (S3-compatible). STORAGE_ENDPOINT (default
 #                             nyc3.digitaloceanspaces.com), STORAGE_REGION (nyc3). STORAGE_CDN=true serves
@@ -43,7 +43,7 @@
 #                             $API_URL/v1/billing/webhook/stripe. Both → platform-auth Secret; never committed.
 #   SMTP_PASS                 OPTIONAL (SMTP fallback; many VPS block 25/465/587). With it: SMTP_ADDR
 #                             (default mail.privateemail.com:465), SMTP_TLS (implicit|starttls), EMAIL_FROM
-#                             + SMTP_USER (default hello@exascale.ai). Neither set → no gate (paper demo).
+#                             + SMTP_USER (default hello@1trade.ai). Neither set → no gate (paper demo).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
 
@@ -82,31 +82,31 @@ if [ -n "$IMAGE_REGISTRY" ]; then
   say "no-source mode — pulling prebuilt images from $IMAGE_REGISTRY (no build on this box)"
   if [ -n "$REGISTRY_TOKEN" ]; then
     # Private registry → imagePullSecret on the namespace's default ServiceAccount, so every pod uses it.
-    kubectl create secret docker-registry exascale-pull \
+    kubectl create secret docker-registry 1trade-pull \
       --docker-server="${IMAGE_REGISTRY%%/*}" \
       --docker-username="${REGISTRY_USER:?REGISTRY_USER is required with REGISTRY_TOKEN}" \
       --docker-password="$REGISTRY_TOKEN" \
       --dry-run=client -o yaml | kubectl apply -f -
-    kubectl patch serviceaccount default -p '{"imagePullSecrets":[{"name":"exascale-pull"}]}'
+    kubectl patch serviceaccount default -p '{"imagePullSecrets":[{"name":"1trade-pull"}]}'
   else
     echo "   (no REGISTRY_TOKEN — assuming the $IMAGE_REGISTRY packages are public)"
   fi
 else
   say "building images (:$TAG)"
-  docker build -t "exascale/platform-core:$TAG"          services/platform-core
-  docker build -t "exascale/credit-ledger:$TAG"          services/credit-ledger
-  docker build -t "exascale/inference-gateway:$TAG"      services/inference-gateway
-  docker build -t "exascale/compute-control:$TAG"        services/compute-control
-  docker build -t "exascale/inference-runtime-stub:$TAG" services/inference-runtime/stub
+  docker build -t "1trade/platform-core:$TAG"          services/platform-core
+  docker build -t "1trade/credit-ledger:$TAG"          services/credit-ledger
+  docker build -t "1trade/inference-gateway:$TAG"      services/inference-gateway
+  docker build -t "1trade/compute-control:$TAG"        services/compute-control
+  docker build -t "1trade/inference-runtime-stub:$TAG" services/inference-runtime/stub
   # Bundle the CLI binaries into the web image (served at /cli/) — bake the api host into them.
   CLI_API_URL="$API_URL" bash scripts/build-cli-dist.sh
-  docker build -t "exascale/web:$TAG"                    "Exascale Frontend"
+  docker build -t "1trade/web:$TAG"                    "1Trade Frontend"
 
   case "$IMPORT" in
     k3s)  say "importing images into k3s containerd"
-          for i in $SVCS; do docker save "exascale/$i:$TAG" | $SUDO k3s ctr images import -; done ;;
+          for i in $SVCS; do docker save "1trade/$i:$TAG" | $SUDO k3s ctr images import -; done ;;
     k3d)  say "importing images into k3d"
-          for i in $SVCS; do k3d image import "exascale/$i:$TAG" -c exascale; done ;;
+          for i in $SVCS; do k3d image import "1trade/$i:$TAG" -c 1trade; done ;;
     none) echo "IMPORT=none — images must be pullable from a registry the cluster can reach." ;;
   esac
 fi
@@ -149,13 +149,13 @@ EOF
 fi
 
 # 7. services + web + ingress. Substitute the host/url placeholders; in no-source mode also rewrite the
-#    local image names (exascale/<svc>) to the registry ones (<registry>/exascale-<svc>) so the cluster
+#    local image names (1trade/<svc>) to the registry ones (<registry>/1trade-<svc>) so the cluster
 #    pulls the prebuilt images. Build the sed program in an array so the registry rule is optional.
 say "deploying services + web + ingress (web=$SANDBOX_HOST api=$SANDBOX_API_HOST url=$URL)"
-SED_ARGS=(-e "s|EXASCALE_SANDBOX_API_HOST|$SANDBOX_API_HOST|g" \
-          -e "s|EXASCALE_SANDBOX_HOST|$SANDBOX_HOST|g" \
-          -e "s|EXASCALE_SANDBOX_URL|$URL|g")
-[ -n "$IMAGE_REGISTRY" ] && SED_ARGS+=(-e "s|image: exascale/|image: $IMAGE_REGISTRY/exascale-|g")
+SED_ARGS=(-e "s|TRADE1_SANDBOX_API_HOST|$SANDBOX_API_HOST|g" \
+          -e "s|TRADE1_SANDBOX_HOST|$SANDBOX_HOST|g" \
+          -e "s|TRADE1_SANDBOX_URL|$URL|g")
+[ -n "$IMAGE_REGISTRY" ] && SED_ARGS+=(-e "s|image: 1trade/|image: $IMAGE_REGISTRY/1trade-|g")
 kubectl kustomize deploy/k8s/overlays/sandbox \
   | sed "${SED_ARGS[@]}" \
   | kubectl apply -f -
@@ -188,7 +188,7 @@ fi
 #   • else SMTP_PASS set  → SMTP (PrivateEmail by default). Note: many VPS block 25/465/587.
 if [ -n "${EMAIL_API_TOKEN:-}" ]; then
   EMAIL_API_URL_V="${EMAIL_API_URL:-https://send.api.mailtrap.io/api/send}"
-  EMAIL_FROM_V="${EMAIL_FROM:-hello@exascale.ai}"
+  EMAIL_FROM_V="${EMAIL_FROM:-hello@1trade.ai}"
   say "transactional email via HTTP API $EMAIL_API_URL_V (from $EMAIL_FROM_V) — login gated on email verification"
   kubectl patch secret platform-auth --type merge -p "$(cat <<EOF
 stringData:
@@ -207,7 +207,7 @@ EOF
 elif [ -n "${SMTP_PASS:-}" ]; then
   SMTP_ADDR_V="${SMTP_ADDR:-mail.privateemail.com:465}"
   SMTP_TLS_V="${SMTP_TLS:-implicit}"
-  EMAIL_FROM_V="${EMAIL_FROM:-hello@exascale.ai}"
+  EMAIL_FROM_V="${EMAIL_FROM:-hello@1trade.ai}"
   SMTP_USER_V="${SMTP_USER:-$EMAIL_FROM_V}"
   say "transactional email via SMTP $SMTP_ADDR_V (from $EMAIL_FROM_V) — login gated on email verification"
   kubectl patch secret platform-auth --type merge -p "$(cat <<EOF
@@ -277,5 +277,5 @@ say "sandbox up → web $URL · api $API_URL"
 echo "   • DNS: point A records for BOTH $SANDBOX_HOST and $SANDBOX_API_HOST at this node's IP (open 80/443)."
 [ "$TLS" != 1 ] && echo "   • HTTP only. For HTTPS re-run with: TLS=1 ACME_EMAIL=you@example.com (both domains must resolve first)."
 echo "   • web flow: sign up → buy credits (MockStripe settles instantly) → run inference → see the ledger debit."
-echo "   • CLI (the api host, /v1/* → services):  EXASCALE_API_URL=$API_URL exascale login   → balance / catalog / infer / gpu."
+echo "   • CLI (the api host, /v1/* → services):  TRADE1_API_URL=$API_URL 1trade login   → balance / catalog / infer / gpu."
 echo "   • captured email (verification/receipts) lands in Mailpit: kubectl -n data port-forward svc/mailpit 8025:8025"

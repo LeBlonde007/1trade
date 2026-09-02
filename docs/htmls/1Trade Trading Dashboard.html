@@ -1,0 +1,1635 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>1Trade · Trade — EAI-IDX</title>
+<meta name="viewport" content="width=1440, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+  :root {
+    --canvas:     #0A0B0E;
+    --elevated:   #14161B;
+    --overlay:    #1C1F26;
+    --hover:      #1F2229;
+    --text:       #E8E6E0;
+    --text-2:     #9A9A95;
+    --text-3:     #5F5F5C;
+    --border:     rgba(255,255,255,0.08);
+    --border-2:   rgba(255,255,255,0.14);
+    --brand:      #C8F25C;
+    --brand-hov:  #B8E548;
+    --accent:     #4A90E2;
+    --pos:        #19C37D;
+    --pos-sub:    rgba(25,195,125,0.12);
+    --pos-bar:    rgba(25,195,125,0.16);
+    --neg:        #EF4444;
+    --neg-sub:    rgba(239,68,68,0.12);
+    --neg-bar:    rgba(239,68,68,0.16);
+    --warn:       #F59E0B;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--canvas);
+    color: var(--text);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    font-feature-settings: 'tnum' on, 'ss01' on, 'cv11' on;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overflow: hidden;  /* dashboard is fixed-viewport */
+  }
+  .font-display { font-family: 'Inter Tight', 'Inter', sans-serif; }
+  .mono { font-family: 'JetBrains Mono', ui-monospace, SF Mono, Menlo, monospace; }
+  .tnum { font-variant-numeric: tabular-nums; }
+  .num  { font-family: 'JetBrains Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  .pos { color: var(--pos); }
+  .neg { color: var(--neg); }
+  .muted { color: var(--text-2); }
+  .muted-2 { color: var(--text-3); }
+  .upper { text-transform: uppercase; letter-spacing: 0.18em; }
+
+  /* Eyebrow / micro-label */
+  .lbl {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    font-weight: 500;
+  }
+
+  /* ============================================================
+     LAYOUT
+     ============================================================ */
+  .app {
+    display: grid;
+    grid-template-rows: 56px 1fr 200px;
+    grid-template-columns: 64px 1fr;
+    grid-template-areas:
+      "topbar topbar"
+      "sidebar main"
+      "sidebar positions";
+    width: 100vw;
+    height: 100vh;
+    min-width: 1280px;
+    min-height: 800px;
+  }
+  .topbar { grid-area: topbar; }
+  .sidebar { grid-area: sidebar; }
+  .main { grid-area: main; }
+  .positions { grid-area: positions; }
+
+  /* ============================================================
+     TOP BAR
+     ============================================================ */
+  .topbar {
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+    padding: 0 16px;
+    gap: 24px;
+    background: var(--canvas);
+  }
+  .topbar .brand {
+    font-family: 'Inter Tight';
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: -0.01em;
+    display: flex; align-items: center; gap: 8px;
+    padding-right: 16px;
+    border-right: 1px solid var(--border);
+    height: 36px;
+  }
+  .topbar .brand .mark {
+    width: 12px; height: 12px;
+    background: var(--brand);
+  }
+  .market-select {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--elevated);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 6px 12px;
+    cursor: pointer;
+    transition: background 120ms;
+  }
+  .market-select:hover { background: var(--hover); }
+  .market-select .sym { font-weight: 600; font-size: 13px; }
+  .market-select .name { font-size: 11px; color: var(--text-2); }
+  .market-select .px { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-variant-numeric: tabular-nums; font-weight: 500; }
+  .market-select .delta { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-variant-numeric: tabular-nums; }
+
+  .top-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .top-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--elevated);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    height: 32px;
+    padding: 0 10px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background 120ms;
+  }
+  .top-pill:hover { background: var(--hover); }
+  .top-pill .num { font-size: 13px; font-weight: 500; }
+  .icon-btn {
+    width: 32px; height: 32px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    color: var(--text-2);
+    cursor: pointer;
+    position: relative;
+    transition: background 120ms, color 120ms;
+  }
+  .icon-btn:hover { background: var(--hover); color: var(--text); }
+  .icon-btn .badge {
+    position: absolute;
+    top: -4px; right: -4px;
+    background: var(--brand);
+    color: var(--canvas);
+    font-size: 9px;
+    font-weight: 700;
+    min-width: 14px;
+    height: 14px;
+    border-radius: 999px;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0 4px;
+  }
+  .avatar {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: var(--brand);
+    color: var(--canvas);
+    font-weight: 700;
+    font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .kbd {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    border: 1px solid var(--border);
+    padding: 1px 5px;
+    color: var(--text-3);
+    border-radius: 2px;
+    line-height: 1.2;
+  }
+
+  /* ============================================================
+     SIDEBAR
+     ============================================================ */
+  .sidebar {
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 8px 0;
+    background: var(--canvas);
+  }
+  .nav-item {
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-3);
+    cursor: pointer;
+    border-left: 3px solid transparent;
+    position: relative;
+    transition: color 120ms, background 120ms;
+  }
+  .nav-item:hover { color: var(--text); background: rgba(255,255,255,0.02); }
+  .nav-item.active {
+    color: var(--brand);
+    background: rgba(200,242,92,0.06);
+    border-left-color: var(--brand);
+  }
+  .nav-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 8px 12px;
+  }
+  .sidebar .foot {
+    margin-top: auto;
+    padding: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--text-3);
+    letter-spacing: 0.08em;
+    text-align: center;
+    border-top: 1px solid var(--border);
+  }
+  .sidebar .foot .open-dot {
+    width: 6px; height: 6px;
+    background: var(--pos);
+    border-radius: 50%;
+    display: inline-block;
+    margin-bottom: 4px;
+  }
+
+  /* ============================================================
+     MAIN GRID — chart / order book / tape / order entry
+     ============================================================ */
+  .main {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    grid-template-rows: 1.55fr 1fr;
+    grid-template-areas:
+      "chart    book"
+      "entry    tape";
+    gap: 0;
+    overflow: hidden;
+  }
+  .panel {
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    background: var(--canvas);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .panel:last-child { border-right: none; }
+  .panel-head {
+    height: 36px;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 12px;
+  }
+  .panel-body {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* CHART PANEL */
+  .chart-panel { grid-area: chart; }
+  .chart-head {
+    height: 48px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+    padding: 0 14px;
+    gap: 14px;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+  }
+  .chart-head .sym {
+    font-family: 'Inter Tight';
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: -0.01em;
+    flex-shrink: 0;
+  }
+  .chart-head .px {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 18px;
+    font-weight: 600;
+    transition: color 600ms;
+  }
+  .chart-head .px.flash-up   { color: var(--pos); }
+  .chart-head .px.flash-down { color: var(--neg); }
+  .chart-head .delta {
+    background: var(--pos-sub);
+    color: var(--pos);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    padding: 3px 8px;
+    border-radius: 2px;
+    letter-spacing: 0.02em;
+  }
+  .chart-head .delta.neg { background: var(--neg-sub); color: var(--neg); }
+  .chart-head .stats {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-2);
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .chart-head .stats .k { color: var(--text-3); }
+  .chart-head .right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+  .seg {
+    display: inline-flex;
+    background: var(--elevated);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .seg button {
+    background: transparent;
+    color: var(--text-2);
+    border: none;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    height: 26px;
+    padding: 0 10px;
+    cursor: pointer;
+    border-right: 1px solid var(--border);
+    transition: background 120ms, color 120ms;
+  }
+  .seg button:last-child { border-right: none; }
+  .seg button:hover { background: var(--hover); color: var(--text); }
+  .seg button.active {
+    background: rgba(200,242,92,0.10);
+    color: var(--brand);
+  }
+  .indicators-btn {
+    height: 26px;
+    background: var(--elevated);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    color: var(--text-2);
+    padding: 0 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .indicators-btn:hover { background: var(--hover); color: var(--text); }
+
+  #chartContainer { position: absolute; inset: 0; }
+
+  /* ORDER BOOK */
+  .book-panel { grid-area: book; }
+  .book-head .lbl-badge {
+    background: var(--elevated);
+    color: var(--text-2);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 2px;
+    margin-left: auto;
+  }
+  .ob {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+  .ob-cols {
+    display: grid;
+    grid-template-columns: 1.05fr 1fr 1fr;
+    padding: 8px 14px;
+    color: var(--text-3);
+    font-size: 9.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+  }
+  .ob-cols span { text-align: right; }
+  .ob-cols span:first-child { text-align: left; }
+
+  .ob-rows {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .ob-side {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    justify-content: flex-end;
+  }
+  .ob-side.bids { justify-content: flex-start; }
+  .ob-row {
+    display: grid;
+    grid-template-columns: 1.05fr 1fr 1fr;
+    padding: 0 14px;
+    height: 18px;
+    align-items: center;
+    position: relative;
+    cursor: pointer;
+    transition: background 100ms;
+  }
+  .ob-row:hover { background: rgba(255,255,255,0.03); }
+  .ob-row .bar {
+    position: absolute;
+    right: 0; top: 0; bottom: 0;
+    transition: width 250ms ease-out, opacity 250ms;
+  }
+  .ob-row.ask .bar { background: var(--neg-bar); }
+  .ob-row.bid .bar { background: var(--pos-bar); }
+  .ob-row > * { position: relative; text-align: right; }
+  .ob-row > .px { text-align: left; }
+  .ob-row.ask .px { color: var(--neg); }
+  .ob-row.bid .px { color: var(--pos); }
+  .ob-row .qty { color: var(--text); }
+  .ob-row .tot { color: var(--text-3); }
+  .ob-row.flash {
+    background: rgba(255,255,255,0.08);
+  }
+
+  .ob-mid {
+    height: 48px;
+    flex-shrink: 0;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    background: var(--elevated);
+  }
+  .ob-mid .midpx {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 15px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    transition: color 600ms;
+  }
+  .ob-mid .midpx.flash-up { color: var(--pos); }
+  .ob-mid .midpx.flash-down { color: var(--neg); }
+  .ob-mid .midpx .arrow { font-size: 11px; vertical-align: 2px; margin-left: 6px; }
+  .ob-mid .spread {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-3);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.04em;
+  }
+
+  /* TRADE TAPE */
+  .tape-panel { grid-area: tape; }
+  .tape-head .lbl-badge { margin-left: auto; }
+  .tape-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--elevated);
+    border: 1px solid var(--border);
+    height: 22px;
+    padding: 0 8px;
+    border-radius: 2px;
+    color: var(--text-2);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    cursor: pointer;
+    letter-spacing: 0.06em;
+  }
+  .tape-toggle:hover { background: var(--hover); color: var(--text); }
+  .tape-toggle .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--pos); }
+  .tape {
+    height: 100%;
+    overflow: hidden;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+  .tape-cols {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr 1fr 16px;
+    padding: 8px 14px;
+    color: var(--text-3);
+    font-size: 9.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+  }
+  .tape-cols span:nth-child(2),
+  .tape-cols span:nth-child(3) { text-align: right; }
+  .tape-list {
+    overflow-y: hidden;
+    height: calc(100% - 32px);
+  }
+  .tape-row {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr 1fr 16px;
+    padding: 0 14px;
+    height: 18px;
+    align-items: center;
+    color: var(--text);
+  }
+  .tape-row.up .px { color: var(--pos); }
+  .tape-row.down .px { color: var(--neg); }
+  .tape-row .time { color: var(--text-3); }
+  .tape-row .qty  { text-align: right; }
+  .tape-row .px   { text-align: right; }
+  .tape-row .side {
+    text-align: center;
+    font-size: 10px;
+  }
+  .tape-row.up .side   { color: var(--pos); }
+  .tape-row.down .side { color: var(--neg); }
+  .tape-row.large {
+    background: rgba(255,255,255,0.025);
+  }
+  .tape-row.enter {
+    animation: tapeIn 200ms ease-out;
+  }
+  @keyframes tapeIn {
+    from { transform: translateY(-8px); opacity: 0; }
+    to   { transform: translateY(0); opacity: 1; }
+  }
+
+  /* ORDER ENTRY */
+  .entry-panel { grid-area: entry; }
+  .entry {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 0;
+  }
+  .side-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .side-tab {
+    height: 40px;
+    background: transparent;
+    border: none;
+    color: var(--text-2);
+    font-family: 'Inter Tight';
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    letter-spacing: -0.005em;
+    position: relative;
+    border-bottom: 2px solid transparent;
+    transition: color 120ms, border-color 120ms, background 120ms;
+  }
+  .side-tab:hover { color: var(--text); background: rgba(255,255,255,0.02); }
+  .side-tab.active.buy  { color: var(--pos); border-bottom-color: var(--pos); background: var(--pos-sub); }
+  .side-tab.active.sell { color: var(--neg); border-bottom-color: var(--neg); background: var(--neg-sub); }
+
+  .entry-body {
+    padding: 16px 20px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    flex: 1;
+    min-height: 0;
+  }
+  .entry-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 0;
+  }
+  .seg-sm { height: 24px; }
+  .seg-sm button { height: 22px; font-size: 10px; padding: 0 8px; }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .field .row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .field .row .last-px {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-2);
+    background: var(--elevated);
+    padding: 2px 6px;
+    border-radius: 2px;
+    cursor: pointer;
+    border: 1px solid var(--border);
+  }
+  .field .row .last-px:hover { background: var(--hover); color: var(--text); }
+  .field .input-row {
+    display: grid;
+    grid-template-columns: 1fr 28px;
+    height: 34px;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    background: var(--elevated);
+    overflow: hidden;
+  }
+  .field .input-row input {
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 14px;
+    font-weight: 500;
+    padding: 0 12px;
+    outline: none;
+    text-align: right;
+  }
+  .field .input-row input:focus {
+    outline: 1px solid var(--accent);
+    outline-offset: -1px;
+  }
+  .field .input-row .ticks {
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid var(--border);
+  }
+  .field .input-row .ticks button {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text-3);
+    cursor: pointer;
+    font-size: 10px;
+    display: flex; align-items: center; justify-content: center;
+    border-bottom: 1px solid var(--border);
+    transition: background 120ms, color 120ms;
+  }
+  .field .input-row .ticks button:last-child { border-bottom: none; }
+  .field .input-row .ticks button:hover { background: var(--hover); color: var(--text); }
+  .quick-fill {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+  }
+  .quick-fill button {
+    height: 22px;
+    background: var(--elevated);
+    border: 1px solid var(--border);
+    color: var(--text-2);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: background 120ms, color 120ms;
+  }
+  .quick-fill button:hover { background: var(--hover); color: var(--text); }
+
+  .summary {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: auto;
+  }
+  .summary .row {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+  .summary .row .k { color: var(--text-3); letter-spacing: 0.04em; }
+  .summary .row .v { color: var(--text); }
+  .summary .row.total {
+    padding-top: 8px;
+    margin-top: 4px;
+    border-top: 1px solid var(--border);
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .balance {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-2);
+    letter-spacing: 0.04em;
+    padding: 6px 0;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    text-align: center;
+  }
+  .balance .v { color: var(--text); }
+  .submit-btn {
+    height: 44px;
+    width: 100%;
+    border: none;
+    border-radius: 2px;
+    color: #fff;
+    font-family: 'Inter Tight';
+    font-weight: 600;
+    font-size: 14px;
+    letter-spacing: -0.005em;
+    cursor: pointer;
+    transition: filter 120ms;
+  }
+  .submit-btn:hover { filter: brightness(1.08); }
+  .submit-btn.buy  { background: var(--pos); }
+  .submit-btn.sell { background: var(--neg); }
+
+  /* POSITIONS */
+  .positions {
+    border-top: 1px solid var(--border);
+    background: var(--canvas);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .pos-head {
+    height: 40px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .pos-head .pos-title {
+    font-family: 'Inter Tight';
+    font-weight: 600;
+    font-size: 13px;
+  }
+  .pos-tabs {
+    display: inline-flex;
+    gap: 0;
+  }
+  .pos-tab {
+    background: transparent;
+    border: none;
+    color: var(--text-2);
+    font-size: 12px;
+    height: 26px;
+    padding: 0 10px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    font-family: 'Inter';
+    transition: color 120ms, border-color 120ms;
+  }
+  .pos-tab:hover { color: var(--text); }
+  .pos-tab.active { color: var(--brand); border-bottom-color: var(--brand); }
+  .pos-tab .count {
+    color: var(--text-3);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    margin-left: 4px;
+  }
+  .pos-head .right {
+    margin-left: auto;
+    display: flex;
+    gap: 24px;
+    align-items: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+  .pos-head .right .k { color: var(--text-3); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; }
+  .pos-head .right .v { color: var(--text); }
+  .pos-table {
+    flex: 1;
+    overflow: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+  .pos-table table { width: 100%; border-collapse: collapse; }
+  .pos-table th, .pos-table td {
+    padding: 6px 14px;
+    text-align: right;
+    border-bottom: 1px solid var(--border);
+    font-weight: 500;
+  }
+  .pos-table th:first-child, .pos-table td:first-child { text-align: left; }
+  .pos-table thead th {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    font-weight: 500;
+    padding: 5px 14px;
+    border-bottom-color: var(--border-2);
+  }
+  .pos-table tbody tr {
+    transition: background 120ms;
+    cursor: pointer;
+  }
+  .pos-table tbody tr:hover { background: rgba(255,255,255,0.025); }
+  .pos-table .side-pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 2px;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 500;
+  }
+  .pos-table .side-pill.long  { background: var(--pos-sub); color: var(--pos); }
+  .pos-table .side-pill.short { background: var(--neg-sub); color: var(--neg); }
+  .pos-table .close-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-2);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 3px 10px;
+    border-radius: 2px;
+    cursor: pointer;
+    letter-spacing: 0.04em;
+    transition: background 120ms, color 120ms, border-color 120ms;
+  }
+  .pos-table .close-btn:hover { background: var(--neg-sub); color: var(--neg); border-color: var(--neg); }
+
+  /* Lucide icon sizing */
+  [data-lucide] { width: 18px; height: 18px; stroke-width: 1.6; }
+  .nav-item [data-lucide] { width: 18px; height: 18px; }
+  .icon-btn [data-lucide] { width: 16px; height: 16px; }
+  .market-select [data-lucide] { width: 14px; height: 14px; }
+
+  /* Tiny tooltip-like text on sidebar items */
+  .nav-item .tooltip {
+    position: absolute;
+    left: 100%;
+    margin-left: 12px;
+    background: var(--overlay);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 2px;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateX(-4px);
+    transition: opacity 120ms, transform 120ms;
+    white-space: nowrap;
+    z-index: 10;
+  }
+  .nav-item:hover .tooltip { opacity: 1; transform: translateX(0); }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ====================== TOP BAR ====================== -->
+  <header class="topbar">
+    <div class="brand"><span class="mark"></span>1Trade</div>
+
+    <div class="market-select" id="marketSelect">
+      <div>
+        <span class="sym">EAI-IDX</span>
+        <span class="name muted" style="margin-left:6px;">AI Index</span>
+      </div>
+      <span class="px" id="topMarketPx">0.001005</span>
+      <span class="delta pos" id="topMarketDelta">▲ 0.18%</span>
+      <i data-lucide="chevron-down" style="color: var(--text-3);"></i>
+    </div>
+
+    <div class="top-right">
+      <div class="top-pill">
+        <i data-lucide="wallet" style="color: var(--brand); width: 14px; height: 14px;"></i>
+        <span class="num" id="walletBalance">$10,247.83</span>
+      </div>
+      <button class="icon-btn" title="Search">
+        <i data-lucide="search"></i>
+        <span class="kbd" style="position: absolute; right: -34px;">⌘K</span>
+      </button>
+      <button class="icon-btn" title="Notifications">
+        <i data-lucide="bell"></i>
+        <span class="badge">2</span>
+      </button>
+      <div class="avatar">A</div>
+    </div>
+  </header>
+
+  <!-- ====================== SIDEBAR ====================== -->
+  <aside class="sidebar">
+    <div class="nav-item active"><i data-lucide="candlestick-chart"></i><span class="tooltip">Trade</span></div>
+    <div class="nav-item"><i data-lucide="list"></i><span class="tooltip">Markets</span></div>
+    <div class="nav-item"><i data-lucide="trending-up"></i><span class="tooltip">Index</span></div>
+    <div class="nav-item"><i data-lucide="briefcase"></i><span class="tooltip">Portfolio</span></div>
+    <div class="nav-item"><i data-lucide="clock"></i><span class="tooltip">History</span></div>
+    <div class="nav-item"><i data-lucide="wallet"></i><span class="tooltip">Wallet</span></div>
+
+    <div class="nav-divider"></div>
+
+    <div class="nav-item"><i data-lucide="server"></i><span class="tooltip">Compute</span></div>
+    <div class="nav-item"><i data-lucide="message-square"></i><span class="tooltip">Inference</span></div>
+
+    <div class="nav-item" style="margin-top: auto;"><i data-lucide="settings"></i><span class="tooltip">Settings</span></div>
+    <div class="foot">
+      <span class="open-dot"></span><br/>MKT OPEN
+    </div>
+  </aside>
+
+  <!-- ====================== MAIN ====================== -->
+  <section class="main">
+
+    <!-- CHART -->
+    <div class="panel chart-panel">
+      <div class="chart-head">
+        <span class="sym">EAI-IDX</span>
+        <span class="px" id="chartPx">0.001005</span>
+        <span class="delta" id="chartDelta">▲ 0.18%</span>
+        <span class="stats">
+          <span class="k">Vol</span> $1.2M
+          <span class="k" style="margin-left:10px;">H</span> <span id="statH">0.001012</span>
+          <span class="k" style="margin-left:10px;">L</span> <span id="statL">0.000996</span>
+        </span>
+        <div class="right">
+          <div class="seg" id="tfSeg">
+            <button data-tf="1m">1m</button>
+            <button data-tf="5m" class="active">5m</button>
+            <button data-tf="15m">15m</button>
+            <button data-tf="1h">1h</button>
+            <button data-tf="4h">4h</button>
+            <button data-tf="1d">1d</button>
+          </div>
+          <button class="indicators-btn"><i data-lucide="plus" style="width:12px;height:12px;"></i> Indicators</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div id="chartContainer"></div>
+      </div>
+    </div>
+
+    <!-- ORDER BOOK -->
+    <div class="panel book-panel">
+      <div class="panel-head book-head">
+        <i data-lucide="layers" style="color: var(--text-2); width: 14px; height: 14px;"></i>
+        <span class="lbl">Order Book</span>
+        <span class="lbl-badge">10 LVL</span>
+      </div>
+      <div class="panel-body">
+        <div class="ob">
+          <div class="ob-cols">
+            <span>Price (USD)</span><span>Size</span><span>Total</span>
+          </div>
+          <div class="ob-rows">
+            <div class="ob-side asks" id="obAsks"></div>
+            <div class="ob-mid">
+              <div class="midpx" id="obMidPx">0.001005 <span class="arrow pos" id="obMidArr">▲</span></div>
+              <div class="spread" id="obSpread">Spread 0.000020 / 1.99%</div>
+            </div>
+            <div class="ob-side bids" id="obBids"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ORDER ENTRY -->
+    <div class="panel entry-panel">
+      <div class="entry">
+        <div class="side-tabs">
+          <button class="side-tab buy active" data-side="buy">Buy</button>
+          <button class="side-tab sell" data-side="sell">Sell</button>
+        </div>
+        <div class="entry-body">
+          <div class="entry-form">
+            <div class="field">
+              <div class="row">
+                <span class="lbl">Order type</span>
+              </div>
+              <div class="seg seg-sm" id="orderTypeSeg">
+                <button class="active">Market</button>
+                <button class="active-target">Limit</button>
+                <button disabled style="opacity: 0.4; cursor: not-allowed;">Stop</button>
+              </div>
+            </div>
+
+            <div class="field">
+              <div class="row">
+                <span class="lbl">Limit price</span>
+                <span class="last-px" id="setLastPx">Last 0.001005</span>
+              </div>
+              <div class="input-row">
+                <input type="text" value="0.001004" id="limitPriceInput"/>
+                <div class="ticks">
+                  <button>▲</button>
+                  <button>▼</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="field">
+              <div class="row">
+                <span class="lbl">Quantity (credits)</span>
+              </div>
+              <div class="input-row">
+                <input type="text" value="1,000" id="qtyInput"/>
+                <div class="ticks">
+                  <button>▲</button>
+                  <button>▼</button>
+                </div>
+              </div>
+              <div class="quick-fill" style="margin-top: 4px;">
+                <button>25%</button>
+                <button>50%</button>
+                <button>75%</button>
+                <button>100%</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="entry-form" style="justify-content: space-between;">
+            <div class="summary">
+              <div class="row">
+                <span class="k">PRICE × QTY</span>
+                <span class="v" id="sumNotional">$0.001005 × 1,000 = $1.005</span>
+              </div>
+              <div class="row">
+                <span class="k">TAKER FEE · 1.00%</span>
+                <span class="v">+ $0.010</span>
+              </div>
+              <div class="row">
+                <span class="k">FUNDING (EST)</span>
+                <span class="v muted-2">—</span>
+              </div>
+              <div class="row total">
+                <span class="k" style="color: var(--text);">TOTAL</span>
+                <span class="v" id="sumTotal">$1.015</span>
+              </div>
+            </div>
+
+            <div class="balance">
+              <span class="k">AVAILABLE</span> <span class="v">$10,247.83 USD</span>
+              <span style="margin: 0 8px; color: var(--text-3);">·</span>
+              <span class="v">10,196,841</span> <span class="k">credits buying power</span>
+            </div>
+
+            <button class="submit-btn buy" id="submitBtn">Buy 1,000 AI credits — $1.015</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TRADE TAPE -->
+    <div class="panel tape-panel">
+      <div class="panel-head tape-head">
+        <i data-lucide="activity" style="color: var(--text-2); width: 14px; height: 14px;"></i>
+        <span class="lbl">Trades</span>
+        <button class="tape-toggle" id="tapeToggle">
+          <span class="dot"></span> AUTO-SCROLL
+        </button>
+      </div>
+      <div class="panel-body">
+        <div class="tape">
+          <div class="tape-cols">
+            <span>Time</span><span>Price</span><span>Qty</span><span></span>
+          </div>
+          <div class="tape-list" id="tapeList"></div>
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ====================== POSITIONS ====================== -->
+  <section class="positions">
+    <div class="pos-head">
+      <span class="pos-title">Positions</span>
+      <div class="pos-tabs">
+        <button class="pos-tab active">Open<span class="count">· 4</span></button>
+        <button class="pos-tab">Closed</button>
+        <button class="pos-tab">All</button>
+      </div>
+      <div class="right">
+        <div>
+          <span class="k">TODAY P&amp;L</span>
+          <span class="v pos" id="todayPnl" style="margin-left: 8px;">+$23.41 ▲ 0.45%</span>
+        </div>
+        <div>
+          <span class="k">TOTAL VALUE</span>
+          <span class="v" id="totalValue" style="margin-left: 8px;">$10,247.83</span>
+        </div>
+      </div>
+    </div>
+    <div class="pos-table">
+      <table>
+        <thead>
+          <tr>
+            <th>Market</th>
+            <th style="text-align:left;">Side</th>
+            <th>Size</th>
+            <th>Avg Entry</th>
+            <th>Mark</th>
+            <th>Notional</th>
+            <th>P&amp;L $</th>
+            <th>P&amp;L %</th>
+            <th style="text-align:right;">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="positionsBody">
+          <!-- filled by JS -->
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+</div>
+
+<script>
+/* ============================================================
+   DATA + LIVE MARKET SIMULATION
+   ============================================================ */
+
+const STATE = {
+  midPrice: 0.001005,
+  open24h: 0.001003,
+  high24h: 0.001012,
+  low24h:  0.000996,
+  positions: [
+    { market: 'EAI-IDX',   side: 'long',  size: 50000, entry: 0.000980, mark: 0.001005 },
+    { market: 'TEXT-SPOT', side: 'long',  size: 12000, entry: 0.00118,  mark: 0.00120 },
+    { market: 'IMAGE-SPOT',side: 'short', size: 5000,  entry: 0.00810,  mark: 0.00798 },
+    { market: 'H100-SPOT', side: 'long',  size: 8,     entry: 2.95,     mark: 2.99 },
+  ],
+};
+
+const fmtPx = (n, dp = 6) => Number(n).toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+const fmtUsd = (n, dp = 2) => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+const fmtInt = (n) => Number(n).toLocaleString('en-US');
+const pctSign = (p) => (p >= 0 ? '+' : '') + p.toFixed(2) + '%';
+const arrow = (p) => (p >= 0 ? '▲' : '▼');
+
+/* ============================================================
+   LIGHTWEIGHT CHARTS — candlestick + volume
+   ============================================================ */
+
+let chart, candleSeries, volumeSeries;
+let candles = [];   // OHLC array
+let volumes = [];
+
+function initChart() {
+  const container = document.getElementById('chartContainer');
+  chart = LightweightCharts.createChart(container, {
+    layout: {
+      background: { color: '#0A0B0E' },
+      textColor: '#9A9A95',
+      fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+      fontSize: 10,
+    },
+    grid: {
+      vertLines: { color: 'rgba(255,255,255,0.03)' },
+      horzLines: { color: 'rgba(255,255,255,0.03)' },
+    },
+    rightPriceScale: {
+      borderColor: 'rgba(255,255,255,0.08)',
+      scaleMargins: { top: 0.08, bottom: 0.28 },
+    },
+    timeScale: {
+      borderColor: 'rgba(255,255,255,0.08)',
+      timeVisible: true,
+      secondsVisible: false,
+    },
+    crosshair: {
+      mode: LightweightCharts.CrosshairMode.Normal,
+      vertLine: { color: 'rgba(232,230,224,0.30)', width: 1, style: 0 },
+      horzLine: { color: 'rgba(232,230,224,0.30)', width: 1, style: 0 },
+    },
+    handleScroll: true,
+    handleScale: true,
+  });
+
+  candleSeries = chart.addCandlestickSeries({
+    upColor: '#19C37D',
+    downColor: '#EF4444',
+    borderUpColor: '#19C37D',
+    borderDownColor: '#EF4444',
+    wickUpColor: '#19C37D',
+    wickDownColor: '#EF4444',
+    priceFormat: { type: 'price', precision: 6, minMove: 0.000001 },
+  });
+
+  volumeSeries = chart.addHistogramSeries({
+    priceFormat: { type: 'volume' },
+    priceScaleId: '',
+    color: 'rgba(232,230,224,0.18)',
+  });
+  volumeSeries.priceScale().applyOptions({
+    scaleMargins: { top: 0.80, bottom: 0 },
+  });
+
+  // Generate 200 1-min candles working backward from "now" with Brownian motion
+  const N = 200;
+  let p = 0.001005;
+  const target = 0.001005;
+  const startTime = Math.floor(Date.now() / 1000) - N * 60;
+  for (let i = 0; i < N; i++) {
+    const drift = (target - p) * 0.02;
+    const noise = (Math.random() - 0.5) * 0.0000035;
+    const open = p;
+    const close = Math.max(0.00094, Math.min(0.001065, p + drift + noise));
+    // intra-bar range
+    const swing = Math.random() * 0.0000025 + 0.0000005;
+    const high = Math.max(open, close) + swing;
+    const low  = Math.min(open, close) - swing;
+    const t = startTime + i * 60;
+    candles.push({ time: t, open, high, low, close });
+    const vol = Math.exp(Math.random() * 1.5 + 6); // log-normal
+    volumes.push({ time: t, value: vol, color: close >= open ? 'rgba(25,195,125,0.30)' : 'rgba(239,68,68,0.30)' });
+    p = close;
+  }
+  STATE.midPrice = candles[candles.length - 1].close;
+
+  candleSeries.setData(candles);
+  volumeSeries.setData(volumes);
+
+  // Fit content
+  chart.timeScale().fitContent();
+
+  // Resize observer
+  const ro = new ResizeObserver(() => {
+    chart.applyOptions({ width: container.clientWidth, height: container.clientHeight });
+  });
+  ro.observe(container);
+}
+
+/* Update chart with new live tick — modifies last candle, occasionally appends new */
+let lastBarTime = null;
+let lastBarOpen = 0.001005;
+function chartTick() {
+  if (!candles.length) return;
+  const last = candles[candles.length - 1];
+  lastBarTime = lastBarTime || last.time;
+
+  const now = Math.floor(Date.now() / 1000);
+  const newBar = now - lastBarTime >= 60;
+
+  // Drift toward 0.001005 +/- noise
+  const drift = (0.001005 - STATE.midPrice) * 0.04;
+  const noise = (Math.random() - 0.5) * 0.0000028;
+  let next = Math.max(0.00094, Math.min(0.001065, STATE.midPrice + drift + noise));
+  STATE.midPrice = next;
+
+  if (newBar) {
+    lastBarTime += 60;
+    lastBarOpen = last.close;
+    const bar = {
+      time: lastBarTime,
+      open: lastBarOpen,
+      high: Math.max(lastBarOpen, next),
+      low:  Math.min(lastBarOpen, next),
+      close: next,
+    };
+    candles.push(bar);
+    candleSeries.update(bar);
+    const vol = Math.exp(Math.random() * 1.5 + 6);
+    const v = { time: lastBarTime, value: vol, color: next >= lastBarOpen ? 'rgba(25,195,125,0.30)' : 'rgba(239,68,68,0.30)' };
+    volumes.push(v);
+    volumeSeries.update(v);
+  } else {
+    // Update current bar
+    const cur = candles[candles.length - 1];
+    cur.close = next;
+    cur.high = Math.max(cur.high, next);
+    cur.low  = Math.min(cur.low, next);
+    candleSeries.update(cur);
+  }
+
+  STATE.high24h = Math.max(STATE.high24h, next);
+  STATE.low24h  = Math.min(STATE.low24h, next);
+  syncHeader();
+  syncPositions();
+}
+
+function syncHeader() {
+  const px = STATE.midPrice;
+  const dpct = ((px - STATE.open24h) / STATE.open24h) * 100;
+  document.getElementById('chartPx').textContent = fmtPx(px);
+  document.getElementById('topMarketPx').textContent = fmtPx(px);
+  const dEl  = document.getElementById('chartDelta');
+  const dTop = document.getElementById('topMarketDelta');
+  dEl.textContent  = arrow(dpct) + ' ' + Math.abs(dpct).toFixed(2) + '%';
+  dTop.textContent = arrow(dpct) + ' ' + Math.abs(dpct).toFixed(2) + '%';
+  dEl.classList.toggle('neg', dpct < 0);
+  dTop.classList.toggle('pos', dpct >= 0);
+  dTop.classList.toggle('neg', dpct < 0);
+
+  document.getElementById('statH').textContent = fmtPx(STATE.high24h);
+  document.getElementById('statL').textContent = fmtPx(STATE.low24h);
+
+  // Flash on header px
+  const pxEl = document.getElementById('chartPx');
+  pxEl.classList.remove('flash-up', 'flash-down');
+  void pxEl.offsetWidth;
+  pxEl.classList.add(dpct >= 0 ? 'flash-up' : 'flash-down');
+  setTimeout(() => pxEl.classList.remove('flash-up','flash-down'), 700);
+}
+
+/* ============================================================
+   ORDER BOOK
+   ============================================================ */
+
+let book = { asks: [], bids: [] };
+
+function generateBook() {
+  const mid = STATE.midPrice;
+  const halfSpread = mid * 0.0005; // 0.05% half-spread
+  const asks = [];
+  const bids = [];
+  for (let i = 0; i < 10; i++) {
+    // Power-law depth: deeper = larger
+    const baseQty = 5000 + Math.pow(i, 1.6) * 4500;
+    const jitter = (Math.random() - 0.5) * 1200;
+    const askPx = mid + halfSpread + i * mid * 0.0008;
+    const bidPx = mid - halfSpread - i * mid * 0.0008;
+    asks.push({ price: askPx, qty: Math.round(baseQty + jitter), changed: false });
+    bids.push({ price: bidPx, qty: Math.round(baseQty + jitter), changed: false });
+  }
+  book = { asks, bids };
+}
+
+function updateBook() {
+  // Slightly mutate 2-3 random levels per side
+  for (const side of ['asks', 'bids']) {
+    const levels = book[side];
+    const nChanged = 1 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < nChanged; i++) {
+      const idx = Math.floor(Math.random() * levels.length);
+      const delta = (Math.random() - 0.5) * 3000;
+      levels[idx].qty = Math.max(800, Math.round(levels[idx].qty + delta));
+      levels[idx].changed = true;
+    }
+  }
+  renderBook();
+}
+
+function renderBook() {
+  const asksEl = document.getElementById('obAsks');
+  const bidsEl = document.getElementById('obBids');
+
+  // Pre-compute totals + max for bar scaling
+  const allQtys = [...book.asks.map(l => l.qty), ...book.bids.map(l => l.qty)];
+  const maxQty = Math.max(...allQtys);
+
+  // Asks: deepest at top (highest price), best ask at bottom
+  let asksHtml = '';
+  let cum = 0;
+  const asksRev = [...book.asks].reverse();
+  // Compute cumulative totals from best (last) to worst (first)
+  const asksCum = new Array(book.asks.length);
+  let runAsk = 0;
+  for (let i = 0; i < book.asks.length; i++) { runAsk += book.asks[i].qty; asksCum[i] = runAsk; }
+  for (let i = book.asks.length - 1; i >= 0; i--) {
+    const l = book.asks[i];
+    const barW = (l.qty / maxQty) * 100;
+    asksHtml += `<div class="ob-row ask${l.changed ? ' flash' : ''}">
+      <div class="bar" style="width: ${barW}%;"></div>
+      <span class="px">${fmtPx(l.price)}</span>
+      <span class="qty">${fmtInt(l.qty)}</span>
+      <span class="tot">${fmtInt(asksCum[i])}</span>
+    </div>`;
+    l.changed = false;
+  }
+  asksEl.innerHTML = asksHtml;
+
+  // Bids: best bid at top, deepest at bottom
+  let bidsHtml = '';
+  let runBid = 0;
+  for (let i = 0; i < book.bids.length; i++) {
+    const l = book.bids[i];
+    runBid += l.qty;
+    const barW = (l.qty / maxQty) * 100;
+    bidsHtml += `<div class="ob-row bid${l.changed ? ' flash' : ''}">
+      <div class="bar" style="width: ${barW}%;"></div>
+      <span class="px">${fmtPx(l.price)}</span>
+      <span class="qty">${fmtInt(l.qty)}</span>
+      <span class="tot">${fmtInt(runBid)}</span>
+    </div>`;
+    l.changed = false;
+  }
+  bidsEl.innerHTML = bidsHtml;
+
+  // Mid + spread
+  const bestAsk = book.asks[0].price;
+  const bestBid = book.bids[0].price;
+  const mid = (bestAsk + bestBid) / 2;
+  const spread = bestAsk - bestBid;
+  const spreadPct = (spread / mid) * 100;
+  const midEl = document.getElementById('obMidPx');
+  const arrEl = document.getElementById('obMidArr');
+  const dpct = ((STATE.midPrice - STATE.open24h) / STATE.open24h) * 100;
+  midEl.firstChild.nodeValue = fmtPx(STATE.midPrice) + ' ';
+  arrEl.textContent = arrow(dpct);
+  arrEl.classList.toggle('neg', dpct < 0);
+  arrEl.classList.toggle('pos', dpct >= 0);
+  midEl.classList.remove('flash-up','flash-down');
+  void midEl.offsetWidth;
+  midEl.classList.add(dpct >= 0 ? 'flash-up' : 'flash-down');
+  setTimeout(() => midEl.classList.remove('flash-up','flash-down'), 700);
+
+  document.getElementById('obSpread').textContent =
+    `Spread ${fmtPx(spread)} / ${spreadPct.toFixed(2)}%`;
+
+  // Clear flash after a tick
+  setTimeout(() => {
+    document.querySelectorAll('.ob-row.flash').forEach(r => r.classList.remove('flash'));
+  }, 220);
+}
+
+/* ============================================================
+   TRADE TAPE
+   ============================================================ */
+
+const tapeList = document.getElementById('tapeList');
+let tapePaused = false;
+const MAX_TAPE = 40;
+const tape = []; // newest first
+
+function addTrade() {
+  // 1-3 trades per call
+  const burst = 1 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < burst; i++) {
+    const side = Math.random() < 0.5 ? 'up' : 'down';
+    const px = side === 'up'
+      ? STATE.midPrice + (Math.random() * 0.0000015)
+      : STATE.midPrice - (Math.random() * 0.0000015);
+    // log-normal size, median 500, occasional fat
+    const lnSize = Math.exp(Math.random() * 2.6 + 4.4);
+    const isLarge = Math.random() < 0.05;
+    const qty = Math.round(isLarge ? lnSize * 60 : lnSize);
+    const now = new Date();
+    const time = now.toLocaleTimeString('en-GB', { hour12: false }) + '.' + String(now.getMilliseconds()).padStart(3, '0');
+    tape.unshift({ side, px, qty, time, large: isLarge });
+    if (tape.length > MAX_TAPE) tape.pop();
+  }
+  if (!tapePaused) renderTape();
+}
+
+function renderTape() {
+  const html = tape.map((t, idx) => {
+    const arr = t.side === 'up' ? '▲' : '▼';
+    return `<div class="tape-row ${t.side}${idx === 0 ? ' enter' : ''}${t.large ? ' large' : ''}">
+      <span class="time">${t.time}</span>
+      <span class="px">${fmtPx(t.px)}</span>
+      <span class="qty">${fmtInt(t.qty)}</span>
+      <span class="side">${arr}</span>
+    </div>`;
+  }).join('');
+  tapeList.innerHTML = html;
+}
+
+document.getElementById('tapeToggle').addEventListener('click', (e) => {
+  tapePaused = !tapePaused;
+  const dot = e.currentTarget.querySelector('.dot');
+  if (tapePaused) {
+    e.currentTarget.innerHTML = '<span class="dot" style="background: var(--warn);"></span> PAUSED';
+  } else {
+    e.currentTarget.innerHTML = '<span class="dot"></span> AUTO-SCROLL';
+    renderTape();
+  }
+});
+// Pause on hover, resume on leave
+tapeList.parentElement.addEventListener('mouseenter', () => { tapePaused = true; });
+tapeList.parentElement.addEventListener('mouseleave', () => { tapePaused = false; renderTape(); });
+
+/* ============================================================
+   POSITIONS
+   ============================================================ */
+
+function renderPositions() {
+  let totalNotional = 0;
+  let totalPnl = 0;
+  const html = STATE.positions.map(p => {
+    const dir = p.side === 'long' ? 1 : -1;
+    const pnl = (p.mark - p.entry) * p.size * dir;
+    const pnlPct = ((p.mark - p.entry) / p.entry) * 100 * dir;
+    const notional = p.mark * p.size;
+    totalNotional += notional;
+    totalPnl += pnl;
+    const arrow = pnl >= 0 ? '▲' : '▼';
+    const cls = pnl >= 0 ? 'pos' : 'neg';
+    const sizeFmt = p.market === 'H100-SPOT' ? fmtInt(p.size) : fmtInt(p.size);
+    const entryFmt = p.market === 'H100-SPOT' ? p.entry.toFixed(2) : fmtPx(p.entry, p.market === 'TEXT-SPOT' || p.market === 'IMAGE-SPOT' ? 5 : 6);
+    const markFmt  = p.market === 'H100-SPOT' ? p.mark.toFixed(2)  : fmtPx(p.mark,  p.market === 'TEXT-SPOT' || p.market === 'IMAGE-SPOT' ? 5 : 6);
+
+    return `<tr>
+      <td>${p.market}</td>
+      <td style="text-align:left;"><span class="side-pill ${p.side}">${p.side.toUpperCase()}</span></td>
+      <td>${sizeFmt}</td>
+      <td>${entryFmt}</td>
+      <td>${markFmt}</td>
+      <td>${fmtUsd(notional, notional < 100 ? 4 : 2)}</td>
+      <td class="${cls}">${pnl >= 0 ? '+' : ''}${fmtUsd(Math.abs(pnl), 2).replace('$','$')}</td>
+      <td class="${cls}">${arrow} ${Math.abs(pnlPct).toFixed(2)}%</td>
+      <td style="text-align:right;"><button class="close-btn">CLOSE</button></td>
+    </tr>`;
+  }).join('');
+  document.getElementById('positionsBody').innerHTML = html;
+}
+
+function syncPositions() {
+  // Update EAI-IDX mark; others drift with small noise
+  STATE.positions[0].mark = STATE.midPrice;
+  STATE.positions[1].mark += (0.00120 - STATE.positions[1].mark) * 0.05 + (Math.random() - 0.5) * 0.000004;
+  STATE.positions[2].mark += (0.00798 - STATE.positions[2].mark) * 0.05 + (Math.random() - 0.5) * 0.00003;
+  STATE.positions[3].mark += (2.99 - STATE.positions[3].mark) * 0.05 + (Math.random() - 0.5) * 0.005;
+  renderPositions();
+
+  let pnl = 0;
+  for (const p of STATE.positions) {
+    const dir = p.side === 'long' ? 1 : -1;
+    pnl += (p.mark - p.entry) * p.size * dir;
+  }
+  document.getElementById('todayPnl').textContent =
+    (pnl >= 0 ? '+' : '−') + fmtUsd(Math.abs(pnl), 2).replace('$','$') + ' ' + (pnl >= 0 ? '▲' : '▼') + ' ' + Math.abs(pnl / 10247.83 * 100).toFixed(2) + '%';
+  document.getElementById('todayPnl').classList.toggle('pos', pnl >= 0);
+  document.getElementById('todayPnl').classList.toggle('neg', pnl < 0);
+
+  // total value = cash + sum positions
+  const total = 10247.83 + (pnl - 23.41);
+  document.getElementById('totalValue').textContent = fmtUsd(total, 2);
+}
+
+/* ============================================================
+   ORDER ENTRY — sync summary on inputs + side switch
+   ============================================================ */
+
+let currentSide = 'buy';
+document.querySelectorAll('.side-tab').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.side-tab').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    currentSide = t.dataset.side;
+    const btn = document.getElementById('submitBtn');
+    btn.classList.toggle('buy', currentSide === 'buy');
+    btn.classList.toggle('sell', currentSide === 'sell');
+    syncSummary();
+  });
+});
+
+// Order type segmented
+document.querySelectorAll('#orderTypeSeg button').forEach(b => {
+  b.addEventListener('click', () => {
+    if (b.disabled) return;
+    document.querySelectorAll('#orderTypeSeg button').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+  });
+});
+
+function syncSummary() {
+  const pxStr = document.getElementById('limitPriceInput').value.replace(/[^\d.]/g, '');
+  const qtyStr = document.getElementById('qtyInput').value.replace(/[^\d.]/g, '');
+  const px = parseFloat(pxStr) || 0;
+  const qty = parseFloat(qtyStr) || 0;
+  const notional = px * qty;
+  const fee = notional * 0.01;
+  const total = currentSide === 'buy' ? notional + fee : notional - fee;
+  document.getElementById('sumNotional').textContent =
+    fmtUsd(px, 6) + ' × ' + fmtInt(qty) + ' = ' + fmtUsd(notional, notional < 10 ? 4 : 2);
+  document.getElementById('sumTotal').textContent = fmtUsd(total, total < 10 ? 4 : 2);
+  document.getElementById('submitBtn').textContent =
+    (currentSide === 'buy' ? 'Buy ' : 'Sell ') + fmtInt(qty) + ' AI credits — ' + fmtUsd(total, total < 10 ? 4 : 2);
+}
+document.getElementById('limitPriceInput').addEventListener('input', syncSummary);
+document.getElementById('qtyInput').addEventListener('input', syncSummary);
+document.getElementById('setLastPx').addEventListener('click', () => {
+  document.getElementById('limitPriceInput').value = fmtPx(STATE.midPrice);
+  syncSummary();
+});
+
+// Quick-fill buttons
+document.querySelectorAll('.quick-fill button').forEach((b, idx) => {
+  b.addEventListener('click', () => {
+    const pct = [0.25, 0.5, 0.75, 1.0][idx];
+    const buying = 10196841 * pct;
+    document.getElementById('qtyInput').value = fmtInt(Math.round(buying));
+    syncSummary();
+  });
+});
+
+/* ============================================================
+   BOOT
+   ============================================================ */
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Init Lucide
+  if (window.lucide) lucide.createIcons();
+
+  initChart();
+  generateBook();
+  renderBook();
+  // Seed tape with 40 trades
+  for (let i = 0; i < MAX_TAPE; i++) addTrade();
+  // Refresh tape so 'enter' anim doesn't pile up
+  tape.forEach(t => t.justAdded = false);
+  renderPositions();
+  syncSummary();
+  syncPositions();
+  syncHeader();
+
+  // Live update loops
+  setInterval(chartTick, 3000);
+  setInterval(updateBook, 1500);
+  setInterval(addTrade, 5000);
+});
+</script>
+
+</body>
+</html>

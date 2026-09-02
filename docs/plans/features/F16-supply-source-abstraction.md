@@ -5,7 +5,7 @@
 
 ## Spec
 
-The control plane treats Exascale-owned and partner-supplied GPUs as **one scheduling pool**.
+The control plane treats 1Trade-owned and partner-supplied GPUs as **one scheduling pool**.
 The distinction surfaces only in:
 
 - **Billing attribution**: every served request records which capacity served it (`supply_source_id`).
@@ -14,7 +14,7 @@ The distinction surfaces only in:
 Partner DC integration:
 
 ```
-Partner DC operator → installs Exascale agent (provided binary; mTLS bootstrap)
+Partner DC operator → installs 1Trade agent (provided binary; mTLS bootstrap)
   → agent registers capacity:
     POST /v1/supply/partners/{id}/capacity
       { gpu_type: "h100-80gb-sxm5", count: 128, nic: "infiniband-ndr",

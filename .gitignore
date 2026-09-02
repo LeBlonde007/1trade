@@ -1,4 +1,4 @@
-# Exascale — root gitignore. Per-app ignores live alongside the app (e.g. apps/web/.gitignore).
+# 1Trade — root gitignore. Per-app ignores live alongside the app (e.g. apps/web/.gitignore).
 # Rule of thumb: source, tests, migrations, contracts, and docs are IN; everything generated,
 # secret, or huge is OUT. See docs/plans/REPO_LAYOUT.md §6.
 
@@ -79,4 +79,4 @@ deploy/secrets/*.plain.yaml
 backups/
 
 # Generated CLI distribution (built into the web image at release; never committed)
-Exascale Frontend/public/cli/
+1Trade Frontend/public/cli/

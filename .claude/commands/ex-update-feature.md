@@ -3,7 +3,7 @@ description: Continue an in-progress feature — re-load its plan + branch state
 argument-hint: <feature-id> (e.g. F08)  [what to do next]
 ---
 
-You are continuing work on Exascale feature **$1**. Direction (if any): $ARGUMENTS
+You are continuing work on 1Trade feature **$1**. Direction (if any): $ARGUMENTS
 
 ## 1. Re-orient
 - Find and read `docs/plans/features/$1-*.md` (the spec + acceptance criteria + milestone).

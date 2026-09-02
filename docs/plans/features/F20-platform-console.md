@@ -5,7 +5,7 @@
 ## Spec
 
 The Platform Console is the **customer-facing surface for Phase 1**. Repurposes the existing
-Nuxt frontend (currently `Exascale Frontend/`, scheduled to migrate to `apps/web/` per
+Nuxt frontend (currently `1Trade Frontend/`, scheduled to migrate to `apps/web/` per
 `REPO_LAYOUT.md` §3).
 
 Screens:
@@ -35,7 +35,7 @@ Kept warm (Phase 2 surface):
 ```
 
 Existing screens to confirm (cross-check against
-`docs/exascale_mvp_screens_checklist.md`):
+`docs/1trade_mvp_screens_checklist.md`):
 - Trading Dashboard, Market Detail, Wallet, Portfolio, Signup, Sign-in, 2FA, KYC, Buy Credits,
   Trader KYC, Methodology, Homepage, Brand Book.
 
@@ -73,7 +73,7 @@ Existing screens to confirm (cross-check against
 ## Acceptance criteria
 
 - [ ] Every screen renders on mock data convincingly (M1).
-- [ ] `EXASCALE_API_MODE=local` switches all screens to live data with zero UI change (M2+).
+- [ ] `TRADE1_API_MODE=local` switches all screens to live data with zero UI change (M2+).
 - [ ] Sub-5-min signup → first inference flow (Playwright CI).
 - [ ] WCAG AA: contrast, keyboard nav, screen-reader labels.
 - [ ] Single design system; no drift; numbers in mono+`tabular-nums`.

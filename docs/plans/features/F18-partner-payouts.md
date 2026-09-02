@@ -8,13 +8,13 @@
 Payout pipeline:
 
 ```
-1. Customer prepays Exascale (F06) → cash sits in custodial escrow account (not the DC).
+1. Customer prepays 1Trade (F06) → cash sits in custodial escrow account (not the DC).
 2. compute-platform serves request on partner capacity → compute.usage.v1 with supply_source_id.
 3. settlement-trust aggregates per-partner consumption per cycle (daily streaming, monthly cycle).
 4. payout_calc:
      gross_revenue = sum(gpu_hours × agreed_rate_per_partner)
-     exascale_fee  = gross_revenue × fee_percent
-     gross_payout  = gross_revenue - exascale_fee
+     1trade_fee  = gross_revenue × fee_percent
+     gross_payout  = gross_revenue - 1trade_fee
      holdback      = gross_payout × holdback_percent  (10-20%, per agreement)
      released      = gross_payout - holdback
 5. wire transfer `released` amount; `holdback` released after dispute window passes.
@@ -31,7 +31,7 @@ CREATE TABLE partner_payouts (
     period_end DATE NOT NULL,
     gpu_hours_consumed NUMERIC(20, 4) NOT NULL,
     gross_revenue NUMERIC(20, 4) NOT NULL,
-    exascale_fee NUMERIC(20, 4) NOT NULL,
+    1trade_fee NUMERIC(20, 4) NOT NULL,
     holdback NUMERIC(20, 4) NOT NULL,
     partner_payout NUMERIC(20, 4) NOT NULL,
     state TEXT NOT NULL, -- 'pending' | 'wired' | 'holdback-released' | 'settled' | 'disputed'

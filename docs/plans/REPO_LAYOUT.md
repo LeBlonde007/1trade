@@ -1,7 +1,7 @@
 # Repo Layout
 
 This documents the monorepo layout each agent builds into. It matches `CLAUDE.md`'s declared
-structure. The existing `Exascale Frontend/` directory stays where it is for now; it migrates
+structure. The existing `1Trade Frontend/` directory stays where it is for now; it migrates
 to `apps/web/` in a planned step (§3 below).
 
 ---
@@ -45,8 +45,8 @@ to `apps/web/` in a planned step (§3 below).
 │   └── surveillance/                    ← (basic abuse only)
 │
 ├── apps/
-│   ├── web/                             ← Nuxt 4 frontend (after migration from Exascale Frontend/)
-│   └── cli/                             ← `exascale` Go CLI
+│   ├── web/                             ← Nuxt 4 frontend (after migration from 1Trade Frontend/)
+│   └── cli/                             ← `1trade` Go CLI
 │
 ├── deploy/
 │   ├── docker/                          ← Dockerfile patterns + per-service Dockerfiles
@@ -55,7 +55,7 @@ to `apps/web/` in a planned step (§3 below).
 │   ├── terraform/                       ← IaC (added M3; env-scoped: staging, prod-paper, prod-real)
 │   └── ci/                              ← GH Actions pipelines (build → Helm/Kustomize apply)
 │
-├── Exascale Frontend/                   ← CURRENT frontend (own git repo, to be merged) [exists]
+├── 1Trade Frontend/                   ← CURRENT frontend (own git repo, to be merged) [exists]
 │
 └── .claude/
     ├── agents/                          ← agent definitions [exists]
@@ -90,16 +90,16 @@ services/<name>/
 
 ---
 
-## 3. Frontend migration plan ("Exascale Frontend/" → "apps/web/")
+## 3. Frontend migration plan ("1Trade Frontend/" → "apps/web/")
 
 The existing frontend is a separate git repo. To merge it cleanly while preserving history:
 
 ```
 # from repo root
-git remote add frontend-orig "/home/dministrator/projects/ex/Exascale Frontend"
+git remote add frontend-orig "/home/dministrator/projects/ex/1Trade Frontend"
 git fetch frontend-orig
 git merge --allow-unrelated-histories frontend-orig/main \
-  -m "Merge Exascale Frontend repo as apps/web/"
+  -m "Merge 1Trade Frontend repo as apps/web/"
 
 # then rewrite paths so all frontend files land under apps/web/
 git filter-repo --to-subdirectory-filter apps/web   # (run in a temp clone of just the frontend repo first)
@@ -109,18 +109,18 @@ Owner of this migration step: `trading-frontend` agent, with `tech-lead` approva
 Trigger: scheduled for end of Milestone 1, **once** the foundation infra and CI are green so the
 move doesn't break the dev experience for the frontend engineer.
 
-Until then, the frontend stays in `Exascale Frontend/` and CI runs against that path. Plan docs
-refer to both `apps/web/` (target) and `Exascale Frontend/` (current); after migration the
+Until then, the frontend stays in `1Trade Frontend/` and CI runs against that path. Plan docs
+refer to both `apps/web/` (target) and `1Trade Frontend/` (current); after migration the
 plan docs are updated in one PR.
 
 ---
 
 ## 4. Naming conventions
 
-- Go module path: `github.com/exascale/<name>` (subject to `tech-lead` finalizing the org name).
-- Container image name: `exascale/<service>` published to the org registry.
-- K8s namespace per environment: `exascale-dev`, `exascale-staging`, `exascale-prod`.
-- **Paper / real isolation also at the infra layer:** `exascale-paper-*` and `exascale-real-*`
+- Go module path: `github.com/trade1/<name>` (subject to `tech-lead` finalizing the org name).
+- Container image name: `1trade/<service>` published to the org registry.
+- K8s namespace per environment: `1trade-dev`, `1trade-staging`, `1trade-prod`.
+- **Paper / real isolation also at the infra layer:** `1trade-paper-*` and `1trade-real-*`
   namespaces, separate secrets, separate Postgres clusters (even though trading is paused, the
   ledger keeps `is_paper` so the split is real today).
 
@@ -141,7 +141,7 @@ plan docs are updated in one PR.
 | `matching-engine` | `services/matching-engine/` (mock adapter only in Phase 1) |
 | `market-maker` | `services/market-maker/` (spec only) |
 | `surveillance` | `services/surveillance/` (abuse-only in Phase 1) |
-| `trading-frontend` | `apps/web/` (target), `Exascale Frontend/` (current) |
+| `trading-frontend` | `apps/web/` (target), `1Trade Frontend/` (current) |
 | `security-compliance` | reviewer; touches nothing directly; comments on PRs |
 
 ---

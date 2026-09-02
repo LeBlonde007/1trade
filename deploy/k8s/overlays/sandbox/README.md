@@ -1,6 +1,6 @@
 # env=sandbox — deploy the paper-mode product to a VPS
 
-A **single-node k3s** deployment of the whole Exascale product in **sandbox / paper mode**: no GPU, no
+A **single-node k3s** deployment of the whole 1Trade product in **sandbox / paper mode**: no GPU, no
 real Stripe, no KYC vendor, no real money. Everything runs on its mock/stub path — `MockStripe` settles
 purchases inline, the **CPU stub** serves inference, the **mock-GPU** scheduler runs instance
 lifecycle, and KYC auto-approves. It's the full live journey (signup → buy credits → run inference →
@@ -49,16 +49,16 @@ Then point DNS at the node and open `http(s)://$SANDBOX_HOST`.
 
 The service **bases are already paper-mode**, so the overlay is thin: it adds the **web** frontend
 (`deploy/k8s/web/base`), a single public **Ingress**, retags images to **`:sandbox`**, points
-**`APP_BASE_URL`** at the public URL, and **hardens `EXASCALE_ENV=sandbox`** (see security note below).
-`EXASCALE_SANDBOX_HOST` / `EXASCALE_SANDBOX_URL` are placeholders the script substitutes.
+**`APP_BASE_URL`** at the public URL, and **hardens `TRADE1_ENV=sandbox`** (see security note below).
+`TRADE1_SANDBOX_HOST` / `TRADE1_SANDBOX_URL` are placeholders the script substitutes.
 
-## Two hosts: web + API (for the `exascale` CLI)
+## Two hosts: web + API (for the `1trade` CLI)
 
 The sandbox uses **two subdomains**, both A-records at the node IP:
 
-- **`SANDBOX_HOST`** (e.g. `sandbox.exascale.ai`) — the **web app** (browser). Its Nuxt BFF (`/api/*`)
+- **`SANDBOX_HOST`** (e.g. `sandbox.1trade.ai`) — the **web app** (browser). Its Nuxt BFF (`/api/*`)
   talks to the services in-cluster, so the browser only needs this host.
-- **`SANDBOX_API_HOST`** (e.g. `sandboxapi.exascale.ai`) — the **JSON API** for the `exascale` CLI +
+- **`SANDBOX_API_HOST`** (e.g. `sandboxapi.1trade.ai`) — the **JSON API** for the `1trade` CLI +
   external clients: `/v1/*` routed by path prefix to the Go services (`/v1/auth`,`/v1/account`,
   `/v1/billing` → platform-core · `/v1/credits` → credit-ledger · `/v1/models`,`/v1/chat` →
   inference-gateway · `/v1/compute` → compute-control). It also serves the web app at `/` so a browser
@@ -67,14 +67,14 @@ The sandbox uses **two subdomains**, both A-records at the node IP:
 Point the CLI at the API host (one env var sets all four service URLs):
 
 ```bash
-EXASCALE_API_URL=https://sandboxapi.exascale.ai exascale login     # then: balance · catalog · infer · gpu
+TRADE1_API_URL=https://sandboxapi.1trade.ai 1trade login     # then: balance · catalog · infer · gpu
 ```
 
 ### Security: going public turns off the dev auth shortcut
 
-The credit-ledger trusts an `X-Dev-Tenant` header as an auth shortcut **only when `EXASCALE_ENV=dev`**
+The credit-ledger trusts an `X-Dev-Tenant` header as an auth shortcut **only when `TRADE1_ENV=dev`**
 (it lets you mint credits / act as any tenant with no token — fine on a laptop, fatal if public). The
-overlay therefore sets **`EXASCALE_ENV=sandbox`** on all four services so the server **never** trusts
+overlay therefore sets **`TRADE1_ENV=sandbox`** on all four services so the server **never** trusts
 that header, and a Traefik **`strip-dev-headers`** middleware deletes `X-Dev-Tenant`/`X-Dev-Paper` at
 the edge as defence-in-depth. Credit creation (`/v1/credits/mint|burn|debit|purchase`) needs the
 internal `SERVICE_TOKEN`, which is never public — those endpoints 401 from the internet. **Consequence:**
@@ -88,7 +88,7 @@ don't own that hands your unpaid work to whoever controls the disk. Avoid it: de
 images** instead, and ship only manifests + SQL — never `.go`/`.vue`.
 
 1. **Publish images once** (from your machine or CI). The `release` GitHub Action pushes
-   `ghcr.io/<owner>/exascale-<svc>:sandbox` on every push to `main`. Make those packages **public**
+   `ghcr.io/<owner>/1trade-<svc>:sandbox` on every push to `main`. Make those packages **public**
    (simplest), or keep them private and mint a `read:packages` token for the box.
 2. **Make the bundle** (no source): `scripts/make-sandbox-bundle.sh` → `sandbox-bundle.tar.gz`
    (k8s manifests + migration SQL + deploy scripts only; it refuses to ship if any source slips in).

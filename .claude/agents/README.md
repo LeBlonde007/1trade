@@ -1,4 +1,4 @@
-# Exascale — Claude Code Agent System
+# 1Trade — Claude Code Agent System
 
 A roster of specialized subagents, one per domain in the Phase 6 v2 PRD/SSD, plus an
 orchestration model that makes them work **together** without stepping on each other.
@@ -137,7 +137,7 @@ surveillance (basic abuse only), index-service (private), trading-frontend (`/tr
 1. Drop `CLAUDE.md` at the repo root and the `agents/` files into `.claude/agents/`.
 2. Create `docs/contracts/` and `docs/phase6-prd-ssd.md` (paste the Phase 6 v2 doc there).
 3. From the repo root run `claude`. Confirm agents are loaded with `/agents`.
-4. Start with: *"Read CLAUDE.md, docs/re/exascale_gtm_focus_update.md, and docs/plans/README.md.
+4. Start with: *"Read CLAUDE.md, docs/re/1trade_gtm_focus_update.md, and docs/plans/README.md.
    Use tech-lead to produce the Milestone-1 task breakdown and author the initial contracts,
    then begin delegating."*
 

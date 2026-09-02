@@ -8,12 +8,12 @@ import (
 	"os"
 	"time"
 
-	"github.com/exascale/credit-ledger/internal/api"
-	"github.com/exascale/credit-ledger/internal/config"
-	"github.com/exascale/credit-ledger/internal/consumer"
-	"github.com/exascale/credit-ledger/internal/events"
-	"github.com/exascale/credit-ledger/internal/obs"
-	"github.com/exascale/credit-ledger/internal/store"
+	"github.com/trade1/credit-ledger/internal/api"
+	"github.com/trade1/credit-ledger/internal/config"
+	"github.com/trade1/credit-ledger/internal/consumer"
+	"github.com/trade1/credit-ledger/internal/events"
+	"github.com/trade1/credit-ledger/internal/obs"
+	"github.com/trade1/credit-ledger/internal/store"
 )
 
 // Version is set at build time (-ldflags -X main.Version=...).

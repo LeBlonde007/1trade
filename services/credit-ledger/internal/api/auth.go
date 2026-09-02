@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/exascale/credit-ledger/internal/config"
+	"github.com/trade1/credit-ledger/internal/config"
 	"github.com/golang-jwt/jwt/v5"
 )
 
@@ -19,7 +19,7 @@ type principal struct {
 
 // tenantPrincipal resolves a customer principal from the platform JWT (HS256, shared secret).
 // In dev, an X-Dev-Tenant header is accepted as a shortcut so the ledger is testable without
-// platform-core running (X-Dev-Paper defaults to true). Never enabled outside EXASCALE_ENV=dev.
+// platform-core running (X-Dev-Paper defaults to true). Never enabled outside TRADE1_ENV=dev.
 func tenantPrincipal(cfg config.Config, r *http.Request) (principal, error) {
 	if cfg.IsDev() {
 		if t := r.Header.Get("X-Dev-Tenant"); t != "" {

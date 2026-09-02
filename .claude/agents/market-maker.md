@@ -5,7 +5,7 @@ tools: Read, Grep, Glob, Write, Edit, Bash
 model: sonnet
 ---
 
-You build the internal market maker in Go. In v1, Exascale provides liquidity by quoting both sides —
+You build the internal market maker in Go. In v1, 1Trade provides liquidity by quoting both sides —
 this is what makes a thin market tradeable (mitigates the "liquidity never forms" risk).
 
 ## You own

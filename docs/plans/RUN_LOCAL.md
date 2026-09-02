@@ -1,8 +1,8 @@
-# Run Exascale locally — what's built so far
+# Run 1Trade locally — what's built so far
 
 **This is the accurate, current-state runbook** (verified against the `Tiltfile`, `Makefile`, and the
 live services). `LOCAL_DEV.md` describes the *intended* end-state (ingress `:8080`, Grafana, `make
-seed`, `exascale login --dev`); several of those aren't wired yet. When in doubt, follow this file.
+seed`, `1trade login --dev`); several of those aren't wired yet. When in doubt, follow this file.
 
 Last verified: 2026-05-31 (tags up to `v0.2.8`). To **verify the shipped features** once it's up, see
 **[TESTING.md](./TESTING.md)** (automated tests + curl + CLI + web, per feature).
@@ -17,11 +17,11 @@ Last verified: 2026-05-31 (tags up to `v0.2.8`). To **verify the shipped feature
 - `credit-ledger` (balances · convert · hash-chained debits) — `:8002`
 - `inference-gateway` (OpenAI-compatible API · API-key auth · metering) — `:8085`
 - `inference-runtime` (**CPU stub** — canned completions with real token counts; no GPU) — `:8000`
-- the **Nuxt web console** (`Exascale Frontend/`) — `:3000`
-- the **`exascale` CLI** (`apps/cli/`) → `bin/exascale`
+- the **Nuxt web console** (`1Trade Frontend/`) — `:3000`
+- the **`1trade` CLI** (`apps/cli/`) → `bin/1trade`
 
 **Not wired yet (don't follow `LOCAL_DEV.md` for these):** the `:8080` Traefik ingress, Grafana/
-Prometheus dashboards, `make seed`, `exascale login --dev`, and the compute/exchange layers. You
+Prometheus dashboards, `make seed`, `1trade login --dev`, and the compute/exchange layers. You
 reach services through the **Tilt port-forwards** and create accounts/credits the real way
 (signup + mint).
 
@@ -72,7 +72,7 @@ then `curl -s localhost:8001/healthz` etc. should return `200`.
 The web app is **always live** (there is no mock mode) — it needs the stack up + the forwards from §1.
 
 ```bash
-cd "Exascale Frontend"
+cd "1Trade Frontend"
 npm run dev        # → http://localhost:3000
 ```
 
@@ -91,16 +91,16 @@ npm run dev
 ## 3. Build & run the CLI
 
 ```bash
-make cli                                              # → bin/exascale
-./bin/exascale signup --email you@dev.test --password 'pw'   # or: login --email … --password …
-./bin/exascale whoami
-./bin/exascale catalog
-./bin/exascale credits balance
+make cli                                              # → bin/1trade
+./bin/1trade signup --email you@dev.test --password 'pw'   # or: login --email … --password …
+./bin/1trade whoami
+./bin/1trade catalog
+./bin/1trade credits balance
 ```
 
-The CLI defaults to `localhost:8001/8085/8002`; override with `EXASCALE_PLATFORM_URL` /
-`EXASCALE_GATEWAY_URL` / `EXASCALE_LEDGER_URL`. The token is saved to `~/.exascale/config.json`
-(0600). Password can come from `EXASCALE_PASSWORD` or the hidden prompt instead of `--password`.
+The CLI defaults to `localhost:8001/8085/8002`; override with `TRADE1_PLATFORM_URL` /
+`TRADE1_GATEWAY_URL` / `TRADE1_LEDGER_URL`. The token is saved to `~/.1trade/config.json`
+(0600). Password can come from `TRADE1_PASSWORD` or the hidden prompt instead of `--password`.
 
 ---
 
@@ -111,7 +111,7 @@ secret) — this is the reliable dev path:
 
 ```bash
 SVC=$(kubectl get secret platform-auth -o jsonpath='{.data.SERVICE_TOKEN}' | base64 -d)
-TENANT=…   # your tenant_id from `exascale whoami` / GET :8001/v1/auth/me
+TENANT=…   # your tenant_id from `1trade whoami` / GET :8001/v1/auth/me
 
 curl -s -X POST localhost:8002/v1/credits/purchase \
   -H "Authorization: Bearer $SVC" \
@@ -127,9 +127,9 @@ Mint `ai_index` the same way (`"credit_type":"ai_index"`) if you want to exercis
 ## 5. The loop you can drive end-to-end
 
 ```bash
-./bin/exascale infer chat -m llama-3.1-8b "Say hi in three words"   # stub reply + token usage
-./bin/exascale credits balance                                      # text drops ~1s later (debit)
-./bin/exascale credits convert --from ai_index --to text --amount 100
+./bin/1trade infer chat -m llama-3.1-8b "Say hi in three words"   # stub reply + token usage
+./bin/1trade credits balance                                      # text drops ~1s later (debit)
+./bin/1trade credits convert --from ai_index --to text --amount 100
 ```
 
 …and the same loop in the browser at `:3000`:
@@ -174,5 +174,5 @@ meter) → wallet balances + recent-movements update live.**
 | Inference returns 402 | tenant has no `text` credits | mint via §4, or `credits convert` into `text` |
 | Balance didn't change after `infer` | debit is async (~1s) | re-check `credits balance` a moment later |
 | `curl :8001/healthz` fails | services not up / no forward | `kubectl get pods -A`; `tilt up` |
-| `make up` → `connection refused` on `…:43407` | cluster is **stopped** (was: Makefile skipped starting it — fixed) | `make up` now starts it; or `k3d cluster start exascale` |
-| `k3d cluster start` → serverlb `Bind for 0.0.0.0:8080 failed: port is already allocated` | another local project holds `:8080` (k3d's LB also fronts the kube API) | free `:8080` (`docker ps`, stop the holder) **then** start; if the LB got wedged from a failed start, `k3d cluster delete exascale && make up` (dev data is disposable; images are cached so it's quick) |
+| `make up` → `connection refused` on `…:43407` | cluster is **stopped** (was: Makefile skipped starting it — fixed) | `make up` now starts it; or `k3d cluster start 1trade` |
+| `k3d cluster start` → serverlb `Bind for 0.0.0.0:8080 failed: port is already allocated` | another local project holds `:8080` (k3d's LB also fronts the kube API) | free `:8080` (`docker ps`, stop the holder) **then** start; if the LB got wedged from a failed start, `k3d cluster delete 1trade && make up` (dev data is disposable; images are cached so it's quick) |

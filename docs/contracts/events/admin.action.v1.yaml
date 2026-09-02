@@ -1,4 +1,4 @@
-# Exascale event contract — admin.action.v1
+# 1Trade event contract — admin.action.v1
 # One event per sensitive / administrative action (signup, API-key create/revoke, org create, role
 # assignment, ...). Emitted by platform-core AFTER the action commits. Consumed by
 # security-compliance (the SOC 2 audit trail) and analytics. The authoritative record is the

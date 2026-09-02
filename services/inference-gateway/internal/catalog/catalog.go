@@ -3,7 +3,7 @@
 // fixed-point price per unit. Real vLLM-backed models (F09) register here; the shape never changes.
 package catalog
 
-// Pricing is the Exascale billing extension on a catalog entry (the `exascale` object in the
+// Pricing is the 1Trade billing extension on a catalog entry (the `trade1` object in the
 // OpenAPI Model schema). Price is a fixed-point decimal string (credits per unit) — never a float.
 type Pricing struct {
 	Modality   string `json:"modality"`
@@ -13,116 +13,116 @@ type Pricing struct {
 }
 
 // Model is one catalog entry, OpenAI-shaped (`id`/`object`/`owned_by`) plus a human display `name` and
-// the Exascale pricing extension. `Created` is a fixed catalog-epoch timestamp (not per-request).
+// the 1Trade pricing extension. `Created` is a fixed catalog-epoch timestamp (not per-request).
 type Model struct {
 	ID       string  `json:"id"`
 	Object   string  `json:"object"`
 	Name     string  `json:"name"`
 	Created  int64   `json:"created"`
 	OwnedBy  string  `json:"owned_by"`
-	Exascale Pricing `json:"exascale"`
+	Trade1 Pricing `json:"trade1"`
 }
 
 // catalogEpoch is a stable `created` value for catalog entries (2026-01-01T00:00:00Z).
 const catalogEpoch int64 = 1767225600
 
-// models is the curated catalog — the customer-facing menu. Every entry is served on Exascale infra
-// (owned_by=exascale); the upstream that physically runs it is an implementation detail mapped at the
+// models is the curated catalog — the customer-facing menu. Every entry is served on 1Trade infra
+// (owned_by=1trade); the upstream that physically runs it is an implementation detail mapped at the
 // gateway (INFERENCE_MODEL_MAP). All are chat/text and bill in `text` credits. Add a row here + its
 // provider-slug to the model map and it just works — no API change.
 var models = []Model{
 	{
-		ID: "llama-3.1-70b", Name: "Llama 3.1 70B", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
-		Exascale: Pricing{Modality: "text", CreditType: "text", Unit: "1K tokens", Price: "25.000000"},
+		ID: "llama-3.1-70b", Name: "Llama 3.1 70B", Object: "model", Created: catalogEpoch, OwnedBy: "1trade",
+		Trade1: Pricing{Modality: "text", CreditType: "text", Unit: "1K tokens", Price: "25.000000"},
 	},
 	{
-		ID: "llama-3.1-8b", Name: "Llama 3.1 8B", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
-		Exascale: Pricing{Modality: "text", CreditType: "text", Unit: "1K tokens", Price: "5.000000"},
+		ID: "llama-3.1-8b", Name: "Llama 3.1 8B", Object: "model", Created: catalogEpoch, OwnedBy: "1trade",
+		Trade1: Pricing{Modality: "text", CreditType: "text", Unit: "1K tokens", Price: "5.000000"},
 	},
 	{
-		ID: "claude-opus-4.8", Name: "Claude Opus 4.8", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
-		Exascale: Pricing{Modality: "text", CreditType: "text", Unit: "1K tokens", Price: "80.000000"},
+		ID: "claude-opus-4.8", Name: "Claude Opus 4.8", Object: "model", Created: catalogEpoch, OwnedBy: "1trade",
+		Trade1: Pricing{Modality: "text", CreditType: "text", Unit: "1K tokens", Price: "80.000000"},
 	},
 	{
-		ID: "claude-sonnet-4.5", Name: "Claude Sonnet 4.5", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
-		Exascale: Pricing{Modality: "text", CreditType: "text", Unit: "1K tokens", Price: "30.000000"},
+		ID: "claude-sonnet-4.5", Name: "Claude Sonnet 4.5", Object: "model", Created: catalogEpoch, OwnedBy: "1trade",
+		Trade1: Pricing{Modality: "text", CreditType: "text", Unit: "1K tokens", Price: "30.000000"},
 	},
 	{
-		ID: "gpt-5", Name: "GPT-5", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
-		Exascale: Pricing{Modality: "text", CreditType: "text", Unit: "1K tokens", Price: "40.000000"},
+		ID: "gpt-5", Name: "GPT-5", Object: "model", Created: catalogEpoch, OwnedBy: "1trade",
+		Trade1: Pricing{Modality: "text", CreditType: "text", Unit: "1K tokens", Price: "40.000000"},
 	},
 	{
-		ID: "gpt-4o", Name: "GPT-4o", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
-		Exascale: Pricing{Modality: "text", CreditType: "text", Unit: "1K tokens", Price: "25.000000"},
+		ID: "gpt-4o", Name: "GPT-4o", Object: "model", Created: catalogEpoch, OwnedBy: "1trade",
+		Trade1: Pricing{Modality: "text", CreditType: "text", Unit: "1K tokens", Price: "25.000000"},
 	},
 	{
-		ID: "deepseek-v3.2", Name: "DeepSeek V3.2", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
-		Exascale: Pricing{Modality: "text", CreditType: "text", Unit: "1K tokens", Price: "8.000000"},
+		ID: "deepseek-v3.2", Name: "DeepSeek V3.2", Object: "model", Created: catalogEpoch, OwnedBy: "1trade",
+		Trade1: Pricing{Modality: "text", CreditType: "text", Unit: "1K tokens", Price: "8.000000"},
 	},
 	{
-		ID: "qwen3-32b", Name: "Qwen3 32B", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
-		Exascale: Pricing{Modality: "text", CreditType: "text", Unit: "1K tokens", Price: "6.000000"},
+		ID: "qwen3-32b", Name: "Qwen3 32B", Object: "model", Created: catalogEpoch, OwnedBy: "1trade",
+		Trade1: Pricing{Modality: "text", CreditType: "text", Unit: "1K tokens", Price: "6.000000"},
 	},
 	// Vision (image/screen understanding → text). Bills in `text` credits — the output is text. Served
 	// via POST /v1/chat/vision with an image_url content part.
 	{
-		ID: "nemotron-vision", Name: "Nemotron Vision", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
-		Exascale: Pricing{Modality: "vision", CreditType: "text", Unit: "1K tokens", Price: "10.000000"},
+		ID: "nemotron-vision", Name: "Nemotron Vision", Object: "model", Created: catalogEpoch, OwnedBy: "1trade",
+		Trade1: Pricing{Modality: "vision", CreditType: "text", Unit: "1K tokens", Price: "10.000000"},
 	},
 	// Document writer (text → Word / Excel / PowerPoint / PDF / Markdown). Generates the content over the
 	// chat path; the client renders + downloads the file. Bills in `text` credits — the output is text.
 	{
-		ID: "doc-writer", Name: "Document Writer", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
-		Exascale: Pricing{Modality: "docs", CreditType: "text", Unit: "1K tokens", Price: "6.000000"},
+		ID: "doc-writer", Name: "Document Writer", Object: "model", Created: catalogEpoch, OwnedBy: "1trade",
+		Trade1: Pricing{Modality: "docs", CreditType: "text", Unit: "1K tokens", Price: "6.000000"},
 	},
 	// Code generation (text → raw code: HTML/CSS/JS/TS/Python). Runs over the chat path, billed in text
 	// credits; the console renders it with a ▶ Run + live preview.
 	{
-		ID: "code-writer", Name: "Code Writer", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
-		Exascale: Pricing{Modality: "code", CreditType: "text", Unit: "1K tokens", Price: "8.000000"},
+		ID: "code-writer", Name: "Code Writer", Object: "model", Created: catalogEpoch, OwnedBy: "1trade",
+		Trade1: Pricing{Modality: "code", CreditType: "text", Unit: "1K tokens", Price: "8.000000"},
 	},
 	// Autonomous computer-use agent (text instruction → browser/computer actions). Listed for the catalog;
 	// the runner is not live yet, so the console surfaces it as "coming soon".
 	{
-		ID: "agent-operator", Name: "Operator Agent", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
-		Exascale: Pricing{Modality: "agent", CreditType: "text", Unit: "task", Price: "20.000000"},
+		ID: "agent-operator", Name: "Operator Agent", Object: "model", Created: catalogEpoch, OwnedBy: "1trade",
+		Trade1: Pricing{Modality: "agent", CreditType: "text", Unit: "task", Price: "20.000000"},
 	},
 	// Image generation (billed in `image` credits, per image). Inline playground is chat-only — these
 	// run via the image API/SDK; the catalog surfaces them so the marketplace reads as multi-modal.
 	{
-		ID: "stable-diffusion-3.5", Name: "Stable Diffusion 3.5", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
-		Exascale: Pricing{Modality: "image", CreditType: "image", Unit: "1 image", Price: "80.000000"},
+		ID: "stable-diffusion-3.5", Name: "Stable Diffusion 3.5", Object: "model", Created: catalogEpoch, OwnedBy: "1trade",
+		Trade1: Pricing{Modality: "image", CreditType: "image", Unit: "1 image", Price: "80.000000"},
 	},
 	{
-		ID: "flux-schnell", Name: "Flux Schnell", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
-		Exascale: Pricing{Modality: "image", CreditType: "image", Unit: "1 image", Price: "30.000000"},
+		ID: "flux-schnell", Name: "Flux Schnell", Object: "model", Created: catalogEpoch, OwnedBy: "1trade",
+		Trade1: Pricing{Modality: "image", CreditType: "image", Unit: "1 image", Price: "30.000000"},
 	},
 	{
-		ID: "gpt-image-1.5", Name: "GPT Image 1.5", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
-		Exascale: Pricing{Modality: "image", CreditType: "image", Unit: "1 image", Price: "120.000000"},
+		ID: "gpt-image-1.5", Name: "GPT Image 1.5", Object: "model", Created: catalogEpoch, OwnedBy: "1trade",
+		Trade1: Pricing{Modality: "image", CreditType: "image", Unit: "1 image", Price: "120.000000"},
 	},
 	// Speech / audio (text-to-speech), billed in `speech` credits per 1K characters.
 	{
-		ID: "elevenlabs-tts", Name: "ElevenLabs TTS Multilingual", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
-		Exascale: Pricing{Modality: "speech", CreditType: "speech", Unit: "1K chars", Price: "2.000000"},
+		ID: "elevenlabs-tts", Name: "ElevenLabs TTS Multilingual", Object: "model", Created: catalogEpoch, OwnedBy: "1trade",
+		Trade1: Pricing{Modality: "speech", CreditType: "speech", Unit: "1K chars", Price: "2.000000"},
 	},
 	{
-		ID: "qwen3-tts", Name: "Qwen3 TTS", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
-		Exascale: Pricing{Modality: "speech", CreditType: "speech", Unit: "1K chars", Price: "1.000000"},
+		ID: "qwen3-tts", Name: "Qwen3 TTS", Object: "model", Created: catalogEpoch, OwnedBy: "1trade",
+		Trade1: Pricing{Modality: "speech", CreditType: "speech", Unit: "1K chars", Price: "1.000000"},
 	},
 	// Video (text-to-video), billed in `video` credits per clip.
 	{
-		ID: "wan-t2v", Name: "Wan 2.2 Text-to-Video", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
-		Exascale: Pricing{Modality: "video", CreditType: "video", Unit: "1 video", Price: "600.000000"},
+		ID: "wan-t2v", Name: "Wan 2.2 Text-to-Video", Object: "model", Created: catalogEpoch, OwnedBy: "1trade",
+		Trade1: Pricing{Modality: "video", CreditType: "video", Unit: "1 video", Price: "600.000000"},
 	},
 	// Embeddings, billed in `embeddings` credits per 1M tokens.
 	{
-		ID: "bge-m3", Name: "BGE M3", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
-		Exascale: Pricing{Modality: "embeddings", CreditType: "embeddings", Unit: "1M tokens", Price: "2.000000"},
+		ID: "bge-m3", Name: "BGE M3", Object: "model", Created: catalogEpoch, OwnedBy: "1trade",
+		Trade1: Pricing{Modality: "embeddings", CreditType: "embeddings", Unit: "1M tokens", Price: "2.000000"},
 	},
 	{
-		ID: "e5-large", Name: "E5 Large v2", Object: "model", Created: catalogEpoch, OwnedBy: "exascale",
-		Exascale: Pricing{Modality: "embeddings", CreditType: "embeddings", Unit: "1M tokens", Price: "2.000000"},
+		ID: "e5-large", Name: "E5 Large v2", Object: "model", Created: catalogEpoch, OwnedBy: "1trade",
+		Trade1: Pricing{Modality: "embeddings", CreditType: "embeddings", Unit: "1M tokens", Price: "2.000000"},
 	},
 }
 

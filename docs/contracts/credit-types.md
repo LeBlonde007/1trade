@@ -1,6 +1,6 @@
 # Credit types — the canonical enum (v1.0)
 
-> **This is the single source of truth for every credit type in Exascale.** Every service reads
+> **This is the single source of truth for every credit type in 1Trade.** Every service reads
 > it; no service hardcodes a credit type that isn't here. Adding/removing a type is a `tech-lead`
 > change + a coordinated rollout across `credit-ledger` + `inference-ml` + `compute-platform` +
 > `platform-core` (billing/UI) + `trading-frontend`. Owned by `tech-lead`.

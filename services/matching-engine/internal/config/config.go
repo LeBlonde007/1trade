@@ -22,7 +22,7 @@ type Config struct {
 // Load reads configuration from the environment with sensible dev defaults.
 func Load() Config {
 	return Config{
-		Env:            envOr("EXASCALE_ENV", "dev"),
+		Env:            envOr("TRADE1_ENV", "dev"),
 		Addr:           envOr("TRADING_ADDR", ":8087"),
 		JWTSecret:      os.Getenv("PLATFORM_JWT_SECRET"),
 		MethodologyURL: envOr("INDEX_METHODOLOGY_URL", "/methodology"),

@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/exascale/platform-core/internal/config"
-	"github.com/exascale/platform-core/internal/domain"
+	"github.com/trade1/platform-core/internal/config"
+	"github.com/trade1/platform-core/internal/domain"
 )
 
 // principal is the authenticated caller resolved from a platform JWT.

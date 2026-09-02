@@ -1,4 +1,4 @@
-module github.com/exascale/inference-gateway
+module github.com/trade1/inference-gateway
 
 go 1.25.0
 

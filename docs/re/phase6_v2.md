@@ -1,4 +1,4 @@
-# Phase 6 (v2) — Exascale Integrated PRD + System Design
+# Phase 6 (v2) — 1Trade Integrated PRD + System Design
 **The engineering kickoff document. Built around the credit-market thesis. UI/UX first.**
 
 > Status: Phase 6 v2 — 2026-05-19. Reflects Tai's latest direction: UI/UX with mock data first, then backend underneath. CLI as primary platform-side interface. Demand-side onboarding for Fortune 500 and frontier labs. Supply-side onboarding for datacenter partners.
@@ -42,7 +42,7 @@
 
 ### 1.1 What we're building
 
-Exascale v1 is a **commodity market for AI compute**, with three integrated layers:
+1Trade v1 is a **commodity market for AI compute**, with three integrated layers:
 
 1. **Trading layer** (headline product): Order book, market maker, credit ledger, index publication. Shipped UI/UX first as the demo asset.
 2. **Inference layer**: Curated catalog of SoTA OSS models with multi-tenant per-GPU deployment.
@@ -60,7 +60,7 @@ From Phase 5:
 **Use case 1: Trader executes a position on AI credits**
 - Trader logs into trading dashboard, sees live index price, candlestick chart, order book
 - Submits limit or market order
-- Matches against Exascale market-maker quote
+- Matches against 1Trade market-maker quote
 - Position + P&L track in real-time
 
 **Use case 2: Fortune 500 procurement buys AI credits in bulk**
@@ -77,14 +77,14 @@ From Phase 5:
 - Treasury reports mark-to-market value at quarter-end
 
 **Use case 4: AI engineer uses CLI to provision and consume**
-- Engineer installs `exascale` CLI
+- Engineer installs `1trade` CLI
 - Authenticates with corporate SSO
-- Provisions GPU via `exascale gpu create`
+- Provisions GPU via `1trade gpu create`
 - Runs training/inference workload
 - Credits debited per-second; CLI shows real-time spend
 
 **Use case 5: Datacenter partner onboards capacity**
-- DC operator engages with Exascale supply team
+- DC operator engages with 1Trade supply team
 - Capacity validated (GPU type, network, SLA capability)
 - Onboarded into supply pool — manual process in v1
 - DC sees demand flow; receives payouts from credit consumption against their capacity
@@ -164,13 +164,13 @@ As an F500 procurement buyer, I can:
 **User stories**:
 ```
 As a frontier-lab engineer, I can:
-- Install `exascale` CLI in <60 seconds
+- Install `1trade` CLI in <60 seconds
 - Authenticate via SSO with corporate identity provider
-- Provision GPUs with one command (`exascale gpu create --type h100 --count 32`)
-- Submit distributed training jobs (`exascale train --image ... --gpus 256`)
+- Provision GPUs with one command (`1trade gpu create --type h100 --count 32`)
+- Submit distributed training jobs (`1trade train --image ... --gpus 256`)
 - Use OpenAI-compatible SDK with one base-URL change
 - Pull metrics via Prometheus-compatible endpoint
-- See real-time spend via `exascale billing today`
+- See real-time spend via `1trade billing today`
 - Set budget alerts and auto-stop policies
 - Migrate workloads from hyperscaler with minimal code changes
 ```
@@ -197,7 +197,7 @@ As a hedger, I can:
 **User stories**:
 ```
 As a DC partner, I can:
-- Engage with Exascale supply team for capacity onboarding
+- Engage with 1Trade supply team for capacity onboarding
 - Have my capacity verified (GPU type, network specs, SLA)
 - Set minimum acceptable prices per GPU tier
 - See real-time utilization of my contributed capacity
@@ -208,7 +208,7 @@ As a DC partner, I can:
 
 ### 3.6 Persona F — Internal Market Maker (system, not user)
 
-**Profile**: Exascale's automated quoting system providing v1 liquidity.
+**Profile**: 1Trade's automated quoting system providing v1 liquidity.
 
 **System requirements**:
 ```
@@ -323,15 +323,15 @@ The market-maker system must:
 
 ### 4.5 Compute platform (CLI-primary)
 
-**CLI tool** (`exascale`):
+**CLI tool** (`1trade`):
 - Installable via `brew`, `apt`, `pip`, or direct binary download
 - SSO-friendly authentication (browser-based OAuth flow)
-- Resource provisioning (`exascale gpu create`, `gpu list`, `gpu stop`)
-- Training submission (`exascale train`)
-- Inference (`exascale infer`)
-- Billing (`exascale billing today`, `billing alerts set`)
-- Credits (`exascale credits balance`, `credits purchase`)
-- Trading (`exascale trade quote`, `trade buy`, `trade orders`)
+- Resource provisioning (`1trade gpu create`, `gpu list`, `gpu stop`)
+- Training submission (`1trade train`)
+- Inference (`1trade infer`)
+- Billing (`1trade billing today`, `billing alerts set`)
+- Credits (`1trade credits balance`, `credits purchase`)
+- Trading (`1trade trade quote`, `trade buy`, `trade orders`)
 
 **Basic web UI for compute**:
 - View instances, jobs, billing
@@ -341,7 +341,7 @@ The market-maker system must:
 **On-demand GPU instances**:
 - H100 80GB SXM5, H200
 - Self-serve up to 32 GPUs
-- Pre-built Exascale ML Stack images
+- Pre-built 1Trade ML Stack images
 - Time-to-running: <90 seconds typical
 
 **Reserved capacity**:
@@ -375,10 +375,10 @@ The market-maker system must:
 ### 4.7 Supply-side onboarding
 
 **v1: Manual process**
-- DC partner engagement through Exascale supply team
+- DC partner engagement through 1Trade supply team
 - Capacity verification (GPU type, NIC topology, SLA capability)
 - Bilateral commercial agreement (pricing floor, payout terms)
-- Manual integration into supply pool (Exascale ops team adds capacity to scheduling)
+- Manual integration into supply pool (1Trade ops team adds capacity to scheduling)
 - Payout via wire transfer, monthly
 
 **v1.5: Productized onboarding**
@@ -508,7 +508,7 @@ The market-maker system must:
 ## 6. Out of scope for v1
 
 **Trading**:
-- Customer-to-customer matching (Exascale-internal market maker only)
+- Customer-to-customer matching (1Trade-internal market maker only)
 - Margin trading
 - Options or volatility products
 - Forward contracts (v1.5)
@@ -600,7 +600,7 @@ The market-maker system must:
                     ┌─────────┴─────────┐
                     ▼                   ▼
             ┌─────────────┐     ┌─────────────┐
-            │ Exascale-   │     │ Partner DC  │
+            │ 1Trade-   │     │ Partner DC  │
             │ owned DC    │     │ capacity    │
             │ (v1 anchor) │     │ (v1+ scale) │
             └─────────────┘     └─────────────┘
@@ -625,7 +625,7 @@ The market-maker system must:
 
 **Mock data mode for trading UI.** First 2 months use plausible mock data; real backend swaps in seamlessly.
 
-**Supply abstraction.** Compute control plane doesn't care whether GPU is Exascale-owned or partner-supplied. Single scheduling fabric across both.
+**Supply abstraction.** Compute control plane doesn't care whether GPU is 1Trade-owned or partner-supplied. Single scheduling fabric across both.
 
 ---
 
@@ -735,7 +735,7 @@ CREATE INDEX idx_credit_tx_ref ON credit_transactions (reference_id);
 
 ### 8.4 Market Maker Service
 
-**Responsibility**: Provide liquidity by quoting both sides. v1: Exascale-internal automated quoting.
+**Responsibility**: Provide liquidity by quoting both sides. v1: 1Trade-internal automated quoting.
 
 **Pricing logic**:
 - Base spread: 1% bid-ask (matches taker fee tier)
@@ -789,12 +789,12 @@ CREATE INDEX idx_credit_tx_ref ON credit_transactions (reference_id);
 
 ### 8.7 Compute Control Plane
 
-**Responsibility**: Manage GPU lifecycle across Exascale-owned and partner DC capacity.
+**Responsibility**: Manage GPU lifecycle across 1Trade-owned and partner DC capacity.
 
-**Key feature**: supply-source abstraction. The control plane treats Exascale-owned GPUs and partner-supplied GPUs as a single pool, scheduled by Kueue + Volcano with topology and locality awareness.
+**Key feature**: supply-source abstraction. The control plane treats 1Trade-owned GPUs and partner-supplied GPUs as a single pool, scheduled by Kueue + Volcano with topology and locality awareness.
 
 **Partner capacity integration**:
-- Partner DCs run a small Exascale agent that registers capacity with control plane
+- Partner DCs run a small 1Trade agent that registers capacity with control plane
 - Capacity reports include: GPU type, count, NIC topology, current utilization, SLA status
 - Scheduler treats partner capacity equivalently for placement decisions
 - Billing pipeline tracks which capacity served which request (for partner payout)
@@ -923,7 +923,7 @@ CREATE TABLE partner_payouts (
     period_end DATE NOT NULL,
     gpu_hours_consumed NUMERIC(20, 4) NOT NULL,
     gross_revenue NUMERIC(20, 4) NOT NULL,
-    exascale_fee NUMERIC(20, 4) NOT NULL,
+    1trade_fee NUMERIC(20, 4) NOT NULL,
     partner_payout NUMERIC(20, 4) NOT NULL,
     state TEXT NOT NULL, -- 'pending' | 'wired' | 'settled'
     wired_at TIMESTAMPTZ
@@ -1027,7 +1027,7 @@ GET  /v1/supply/partners/{id}/payouts
 ### 11.1 Flow: Trader signup to first paper trade
 
 ```
-1. Trader visits exascale.com
+1. Trader visits 1trade.com
 2. Clicks "Sign Up" → corporate email
 3. Email verified
 4. Light KYC: name, jurisdiction, accreditation self-attestation
@@ -1101,7 +1101,7 @@ Target: 3-9 month sales cycle for first deal; faster for subsequent.
 2. Mutual NDA + technical scoping
 3. Capacity assessment (GPU type, count, NIC topology, SLA)
 4. Commercial agreement (pricing floor, payout %, term)
-5. Exascale agent deployed at partner DC
+5. 1Trade agent deployed at partner DC
 6. Capacity registered with compute control plane
 7. Soft launch — partner capacity receives small allocation
 8. Monitor for 2-4 weeks
@@ -1205,7 +1205,7 @@ The biggest change from Phase 6 v1: UI/UX with mock data ships in months 1-2 as 
 - Index service v0 (basic methodology, daily print starts)
 - Compute control plane v1 (K8s + Kueue + Volcano + NVIDIA Operator)
 - vLLM deployment with first 3 models (Llama 70B, Llama 8B, Whisper)
-- CLI tool v0 (`exascale` — basic commands)
+- CLI tool v0 (`1trade` — basic commands)
 - Trading API endpoints
 
 **Business**:
@@ -1218,7 +1218,7 @@ The biggest change from Phase 6 v1: UI/UX with mock data ships in months 1-2 as 
 ### Month 3: Trading + Inference Integration
 
 **Engineering**:
-- Market maker service v1 (Exascale-internal automated quoting)
+- Market maker service v1 (1Trade-internal automated quoting)
 - Multi-model-per-GPU deployment (top 5 models)
 - Credit conversion service (AI → sub-credit)
 - Inference API with credit debit logic
@@ -1372,7 +1372,7 @@ The biggest change from Phase 6 v1: UI/UX with mock data ships in months 1-2 as 
 | T3 | Real-money testing leaks into customer paper trading | Low | Critical | Strict account separation; `is_paper` flag enforced |
 | T4 | Market maker logic causes spread blowout | Medium | High | Risk limits; auto-quote-withdrawal; manual override |
 | T5 | Surveillance misses critical manipulation | Medium | High | Rule-based v1 has gaps; ML-based v2 planned |
-| T6 | Liquidity never forms | High | Critical | Exascale-as-market-maker v1; recruit external; demand-side anchors |
+| T6 | Liquidity never forms | High | Critical | 1Trade-as-market-maker v1; recruit external; demand-side anchors |
 
 ### 16.2 Demand-side risks
 
@@ -1387,7 +1387,7 @@ The biggest change from Phase 6 v1: UI/UX with mock data ships in months 1-2 as 
 | ID | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|---|
 | S1 | DC partners reluctant to commit capacity without volume proof | Medium | Medium | Bilateral commercial terms; small initial allocation; volume-based scaling |
-| S2 | Partner DC reliability issues affect Exascale brand | Medium | High | SLA terms with partners; capacity verification before activation; alerting |
+| S2 | Partner DC reliability issues affect 1Trade brand | Medium | High | SLA terms with partners; capacity verification before activation; alerting |
 | S3 | Partner payout disputes | Low | Medium | Clear contractual terms; transparent reporting; reconciliation processes |
 
 ### 16.4 Regulatory risks

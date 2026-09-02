@@ -1,5 +1,5 @@
 // Package domain — instance.go holds the customer-facing on-demand GPU instance model (F13): its
-// lifecycle states, the versioned Exascale ML-Stack image catalog, and connection info. An instance
+// lifecycle states, the versioned 1Trade ML-Stack image catalog, and connection info. An instance
 // draws GPUs of one tier from the same shared pool the internal scheduler places jobs on.
 package domain
 
@@ -20,18 +20,18 @@ const (
 	InstanceTerminated   = "terminated"
 )
 
-// Exascale ML-Stack images (Ubuntu + CUDA + PyTorch + common libs), newest last. `stable` and
-// `latest` are aliases customers can pin against; a concrete id (e.g. exascale-ml-stack-2026.05)
+// 1Trade ML-Stack images (Ubuntu + CUDA + PyTorch + common libs), newest last. `stable` and
+// `latest` are aliases customers can pin against; a concrete id (e.g. 1trade-ml-stack-2026.05)
 // pins exactly. Default on create is the latest stable.
 const (
-	ImageStable = "exascale-ml-stack-2026.05" // default; latest GA
-	ImageLatest = "exascale-ml-stack-2026.06" // newest (may include preview libs)
+	ImageStable = "1trade-ml-stack-2026.05" // default; latest GA
+	ImageLatest = "1trade-ml-stack-2026.06" // newest (may include preview libs)
 	aliasStable = "stable"
 	aliasLatest = "latest"
 )
 
 // mlStackImages is the set of pinnable concrete image ids.
-var mlStackImages = []string{"exascale-ml-stack-2026.03", "exascale-ml-stack-2026.05", "exascale-ml-stack-2026.06"}
+var mlStackImages = []string{"1trade-ml-stack-2026.03", "1trade-ml-stack-2026.05", "1trade-ml-stack-2026.06"}
 
 // ConnectInfo is how a customer reaches a running instance; fields are empty until it is running.
 type ConnectInfo struct {
@@ -93,7 +93,7 @@ func CanStart(s string) bool { return s == InstanceStopped }
 
 // BuildConnect returns the connection endpoints for a running instance id in a region.
 func BuildConnect(id, region string) ConnectInfo {
-	host := fmt.Sprintf("%s.%s.gpu.exascale.io", id, region)
+	host := fmt.Sprintf("%s.%s.gpu.1trade.io", id, region)
 	return ConnectInfo{
 		SSH:     "ssh ubuntu@" + host,
 		Jupyter: "https://" + host + "/jupyter",

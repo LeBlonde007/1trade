@@ -1,10 +1,10 @@
 # Point the email-verification / receipt links at the public sandbox URL (default localhost in the
 # base). In sandbox (paper) mode verification only gates real-money purchases, so it's not required to
 # use the product — but any links generated should still resolve. The deploy script substitutes
-# EXASCALE_SANDBOX_URL (http://host or https://host depending on TLS).
+# TRADE1_SANDBOX_URL (http://host or https://host depending on TLS).
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: platform-core-env
 data:
-  APP_BASE_URL: "EXASCALE_SANDBOX_URL"
+  APP_BASE_URL: "TRADE1_SANDBOX_URL"

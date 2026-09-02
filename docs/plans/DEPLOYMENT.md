@@ -32,10 +32,10 @@ K8s later if the cloud footprint grows.
 
 | Env | Hostname | Purpose | `is_paper` default | Real money? |
 |---|---|---|---|---|
-| `dev` | `*.dev.exascale.local` | Developer laptops + ephemeral CI | true | no |
-| `staging` | `*.staging.exascale.io` | Pre-prod, mirrors prod | true | no |
-| `prod-paper` | `*.paper.exascale.io` | Paper/sandbox for customers | true | no |
-| `prod-real` | `*.exascale.io` | Real money. Phase 2 once licensed. | false | yes (Phase 2) |
+| `dev` | `*.dev.1trade.local` | Developer laptops + ephemeral CI | true | no |
+| `staging` | `*.staging.1trade.io` | Pre-prod, mirrors prod | true | no |
+| `prod-paper` | `*.paper.1trade.io` | Paper/sandbox for customers | true | no |
+| `prod-real` | `*.1trade.io` | Real money. Phase 2 once licensed. | false | yes (Phase 2) |
 
 Even though trading is paused, **`prod-paper` and `prod-real` are two separate Kubernetes
 clusters with separate Postgres and separate secrets**, from day one. The pivot doesn't relax
@@ -76,7 +76,7 @@ EXPOSE 8000
 ENTRYPOINT ["/usr/local/bin/app"]
 ```
 
-Build: `docker build --build-arg SERVICE=credit-ledger -t exascale/credit-ledger:$(git rev-parse --short HEAD) .`
+Build: `docker build --build-arg SERVICE=credit-ledger -t 1trade/credit-ledger:$(git rev-parse --short HEAD) .`
 
 Rules:
 - Distroless runtime; non-root user.
@@ -135,7 +135,7 @@ RUN pip install --no-cache-dir vllm==${VLLM_VERSION} \
 COPY services/inference-runtime/python /app
 EXPOSE 8000 8001
 ENV PYTHONUNBUFFERED=1
-ENTRYPOINT ["python", "-m", "exascale_runtime"]
+ENTRYPOINT ["python", "-m", "1trade_runtime"]
 ```
 
 This image is large (~12 GB); it is built once per vLLM release, pushed to the org registry, and
@@ -149,10 +149,10 @@ pulled by every inference pod. Model weights are mounted, not baked in (S3-backe
 
 - `darwin/arm64`, `darwin/amd64`, `linux/amd64`, `linux/arm64`, `windows/amd64`.
 - Uploaded to GH Releases.
-- Homebrew tap (`exascale/exascale`): published in CI on tag.
-- `apt` repo (Debian/Ubuntu) hosted at `https://pkg.exascale.io/apt`.
-- `pip install exascale` is a thin Python wrapper that vendors the binary (for `pip`-friendly users).
-- Direct binary: `curl -sSL https://exascale.io/install.sh | sh`.
+- Homebrew tap (`1trade/1trade`): published in CI on tag.
+- `apt` repo (Debian/Ubuntu) hosted at `https://pkg.1trade.io/apt`.
+- `pip install 1trade` is a thin Python wrapper that vendors the binary (for `pip`-friendly users).
+- Direct binary: `curl -sSL https://1trade.io/install.sh | sh`.
 
 CLI release pipeline is owned by `platform-core` for the build content; `infra-sre` for the
 distribution infra.
@@ -195,11 +195,11 @@ spec:
     spec:
       containers:
         - name: credit-ledger
-          image: exascale/credit-ledger:$(VERSION)
+          image: 1trade/credit-ledger:$(VERSION)
           ports: [{ containerPort: 8000 }]
           env: # from configmap + Vault-injected secrets
-            - { name: EXASCALE_ENV, valueFrom: { configMapKeyRef: { name: env, key: env } } }
-            - { name: EXASCALE_PAPER, valueFrom: { configMapKeyRef: { name: env, key: paper } } }
+            - { name: TRADE1_ENV, valueFrom: { configMapKeyRef: { name: env, key: env } } }
+            - { name: TRADE1_PAPER, valueFrom: { configMapKeyRef: { name: env, key: paper } } }
           livenessProbe:  { httpGet: { path: /healthz, port: 8000 }, periodSeconds: 10 }
           readinessProbe: { httpGet: { path: /readyz,  port: 8000 }, periodSeconds: 5  }
           resources: # tuned per service
@@ -228,7 +228,7 @@ PostgreSQL via CloudNativePG operator (Postgres 16):
 
 **Backup/restore drill (`make backup-restore-drill` · `scripts/backup-restore-drill.sh`).**
 Proves the relational state — above all the **credit ledger** — survives a dump+restore intact.
-It `pg_dump`s the `exascale` DB, restores it into a scratch DB, then asserts (1) **every table's row
+It `pg_dump`s the `1trade` DB, restores it into a scratch DB, then asserts (1) **every table's row
 count** matches the live DB and (2) the **ledger hash-chain digest** (`md5` over `credit_transactions.
 chain_hash` ordered by `tx_id`) is **byte-identical** — any tamper/loss changes the digest. Postgres-only
 (needs just the data plane). Verified live: 14 hash-chained txns across 3 tenants restored with an
@@ -341,7 +341,7 @@ Definition of done for "deploy-ready" per service:
 Every deployment is reversible:
 
 ```
-kubectl -n exascale-prod-paper rollout undo deploy/<service>
+kubectl -n 1trade-prod-paper rollout undo deploy/<service>
 ```
 
 For database migrations: every migration ships with a tested `down`. `credit-ledger` is the

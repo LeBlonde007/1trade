@@ -1,8 +1,8 @@
-# Exascale — local dev (Tilt). Run from the repo root: `tilt up` (via `make up` / `make tilt`).
+# 1Trade — local dev (Tilt). Run from the repo root: `tilt up` (via `make up` / `make tilt`).
 # Builds + deploys services into the k3d cluster with live-reload on save. The data plane +
 # observability come from `make data-plane` (manifests/Helm), not Tilt. See docs/plans/LOCAL_DEV.md.
 
-allow_k8s_contexts('k3d-exascale')  # guard: never act on a non-local cluster
+allow_k8s_contexts('k3d-1trade')  # guard: never act on a non-local cluster
 
 # --- shared auth secret (F02/F08) — PLATFORM_JWT_SECRET (platform-core issues with it; credit-ledger
 # and inference-gateway verify/mint with it) and SERVICE_TOKEN (the gateway uses it to introspect API
@@ -29,7 +29,7 @@ local_resource(
     deps=['docs/contracts/schemas/types.sql', 'services/credit-ledger/migrations/0001_init.sql',
           'services/credit-ledger/migrations/0002_conversion.sql'],
 )
-docker_build('exascale/credit-ledger:dev', 'services/credit-ledger',
+docker_build('1trade/credit-ledger:dev', 'services/credit-ledger',
              dockerfile='services/credit-ledger/Dockerfile')
 k8s_yaml(kustomize('deploy/k8s/credit-ledger/base'))
 k8s_resource('credit-ledger', port_forwards='8002:8002',
@@ -53,20 +53,20 @@ local_resource(
           'services/platform-core/migrations/0005_kyc.sql',
           'services/platform-core/migrations/0006_conversations.sql'],
 )
-docker_build('exascale/platform-core:dev', 'services/platform-core',
+docker_build('1trade/platform-core:dev', 'services/platform-core',
              dockerfile='services/platform-core/Dockerfile')
 k8s_yaml(kustomize('deploy/k8s/platform-core/base'))
 k8s_resource('platform-core', port_forwards='8001:8001',
              resource_deps=['platform-core-migrations', 'platform-auth'])
 
 # --- inference-runtime (F09) — CPU stub locally (real vLLM GPU worker on a GPU node) ---
-docker_build('exascale/inference-runtime-stub:dev', 'services/inference-runtime/stub',
+docker_build('1trade/inference-runtime-stub:dev', 'services/inference-runtime/stub',
              dockerfile='services/inference-runtime/stub/Dockerfile')
 k8s_yaml(kustomize('deploy/k8s/inference-runtime/base'))
 k8s_resource('inference-runtime', port_forwards='8000:8000')
 
 # --- inference-gateway (F08) — the OpenAI-compatible API; authenticates customers, meters usage ---
-docker_build('exascale/inference-gateway:dev', 'services/inference-gateway',
+docker_build('1trade/inference-gateway:dev', 'services/inference-gateway',
              dockerfile='services/inference-gateway/Dockerfile')
 k8s_yaml(kustomize('deploy/k8s/inference-gateway/base'))
 k8s_resource('inference-gateway', port_forwards='8085:8085',
@@ -74,7 +74,7 @@ k8s_resource('inference-gateway', port_forwards='8085:8085',
 
 # --- compute-control (F12) — GPU control plane: catalog + quota + the internal scheduling surface.
 # M2 runs the in-memory mock-GPU scheduler; it emits compute.usage.v1 → credit-ledger debits gpu_*. ---
-docker_build('exascale/compute-control:dev', 'services/compute-control',
+docker_build('1trade/compute-control:dev', 'services/compute-control',
              dockerfile='services/compute-control/Dockerfile')
 k8s_yaml(kustomize('deploy/k8s/compute-control/base'))
 k8s_resource('compute-control', port_forwards='8086:8086',

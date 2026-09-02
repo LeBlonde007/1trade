@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Exascale. Format: [Keep a Changelog](https://keepachangelog.com); pre-GA
+All notable changes to 1Trade. Format: [Keep a Changelog](https://keepachangelog.com); pre-GA
 SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not dates — see
 `docs/plans/MANAGEMENT_PLAN.md`).
 
@@ -16,7 +16,7 @@ SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not da
   - **`end-of-file-fixer` / `mixed-line-ending`** now exempt `*.md` (consistent with
     `trailing-whitespace`, which already did) — markdown EOF/endings are left to authors.
   - Added a top-level `exclude` for verbatim **design exports** (`docs/htmls/`) and **runtime data**
-    (`Exascale Frontend/server/data/`), so whitespace hooks + gitleaks false-positives on the mock
+    (`1Trade Frontend/server/data/`), so whitespace hooks + gitleaks false-positives on the mock
     KYC/brand HTML don't fail the build.
 
 ### Verified
@@ -134,7 +134,7 @@ SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not da
     name · ISO-3166 country · entity type), and an **internal** `POST /v1/account/kyc/{tenant}/decision`
     (service-token only — a tenant can't verify itself; the prod manual-review / IDV-vendor path).
     `kyc_status` is now on `/v1/auth/me`. Submissions are audited (`kyc.submit` / `kyc.verified`).
-  - **Dev/sandbox auto-approve** (`KYCAutoApprove`, derived from `EXASCALE_ENV != prod`): a submission
+  - **Dev/sandbox auto-approve** (`KYCAutoApprove`, derived from `TRADE1_ENV != prod`): a submission
     verifies instantly so the flow is testable end-to-end without a compliance back-office. Prod lands
     `pending` for real review.
   - **Migration** `0005_kyc.sql` adds the KYC columns to `tenants` (minimal PII; documents stay with
@@ -362,14 +362,14 @@ SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not da
 - **Customer-facing on-demand GPU instances** (`compute-control`, `compute.yaml` **v1.1.0**):
   `POST/GET /v1/compute/instances`, `GET/DELETE /v1/compute/instances/{id}`, `POST {id}/stop|start`.
   Tenant-JWT scoped (cross-tenant → 404), `is_paper` derived from the principal, `Idempotency-Key` on
-  create. Versioned **Exascale ML-Stack image** catalog (`stable`/`latest`/pinned); connect info
+  create. Versioned **1Trade ML-Stack image** catalog (`stable`/`latest`/pinned); connect info
   (ssh/jupyter/http) on running instances.
 - **Shared GPU pool** (`internal/pool`): customer instances and internal scheduler jobs draw from one
   per-tier pool, so capacity is never double-counted; stop/delete release GPUs back to it.
 - **Per-interval GPU metering**: a ticker emits `compute.usage.v1` (units = GPU-hours × count) →
   credit-ledger's `Compute` consumer debits the `gpu_*` tier, idempotent on `usage_id`.
-- **`exascale gpu`** CLI — `types | create | list | get | stop | start | delete` (+ `compute_url`
-  config / `EXASCALE_COMPUTE_URL`).
+- **`1trade gpu`** CLI — `types | create | list | get | stop | start | delete` (+ `compute_url`
+  config / `TRADE1_COMPUTE_URL`).
 - **Live web `/compute`** — BFF (`/api/compute/*`) + `useCompute`; the instances list + provision flow
   are wired to the real service (no mock mode).
 
@@ -449,10 +449,10 @@ SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not da
 ### Added
 - **`make sched` / `SCHED=1` — the cluster-side scheduling layer** the F12 control plane targets,
   running on k3d with no real GPU. Installs **Kueue** (per-workload-class quota admission) + **Volcano**
-  (gang scheduling), advertises a **mock GPU** extended resource (`exascale.io/gpu=8`) on the
-  `exascale.io/gpu=mock` node, and applies the project Kueue config under `deploy/k8s/scheduling/`:
+  (gang scheduling), advertises a **mock GPU** extended resource (`1trade.io/gpu=8`) on the
+  `1trade.io/gpu=mock` node, and applies the project Kueue config under `deploy/k8s/scheduling/`:
   `ResourceFlavor`s (`default-flavor`, `mock-gpu`) + a `ClusterQueue` per workload class
-  (`cq-inference` 4 GPU / `cq-training-small` 2 / `cq-training-large` 2, shared cohort `exascale`) +
+  (`cq-inference` 4 GPU / `cq-training-small` 2 / `cq-training-large` 2, shared cohort `1trade`) +
   a `LocalQueue` per class (`kueue.x-k8s.io/v1beta2`).
 - `deploy/k8s/scheduling/` — `kueue-config.yaml`, `mock-gpu-resource.sh` (node-status PATCH; re-run
   after a cluster restart), `examples/{kueue-inference-job,volcano-gang-job}.yaml`, and a README.
@@ -468,7 +468,7 @@ SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not da
 
 ### Verified
 - Live in k3d: install completes clean; all 3 `ClusterQueue`s report `Active=True`. A Kueue-admitted
-  Job (`inference` queue, `exascale.io/gpu` request) → `Admitted=True`, both pods Running on the
+  Job (`inference` queue, `1trade.io/gpu` request) → `Admitted=True`, both pods Running on the
   mock-GPU node. A Volcano `minAvailable:2` gang → `PodGroup` `Running` (`MINMEMBER=2 RUNNINGS=2`),
   both pods bound together by the `volcano` scheduler. App stack unaffected by the new operators.
 - This is the F12 mock-GPU gang-scheduling acceptance at cluster level; it unblocks F12's M3 `k8s`
@@ -532,7 +532,7 @@ SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not da
 ### Changed
 - **Removed frontend "mock mode" entirely — the web app is always live.** Every BFF route
   (`server/api/**`, 19 routes) now just proxies to the real platform service — no `isMock` branch;
-  `isMock`/`mockIdentity` dropped from `server/utils/api.ts`; `EXASCALE_API_MODE`/`apiMode` removed
+  `isMock`/`mockIdentity` dropped from `server/utils/api.ts`; `TRADE1_API_MODE`/`apiMode` removed
   from `nuxt.config`. `npm run dev` now needs the platform stack up.
 - **Wired screens render only real data** with loading/empty states — the seeded showcase/mock that
   used to render on linked screens is gone: the inference playground starts with an **empty
@@ -568,7 +568,7 @@ SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not da
 ### Added
 - **Transactional email — works in local mode (F02).** platform-core now actually **sends** the
   email-verification link over SMTP (`internal/email`), wired to **Mailpit** in the local data plane
-  (`axllent/mailpit` — SMTP `:1025`, web UI `:8025`). Sign up → the *"Verify your Exascale email"*
+  (`axllent/mailpit` — SMTP `:1025`, web UI `:8025`). Sign up → the *"Verify your 1Trade email"*
   message appears in Mailpit → click the link → `/onboarding/verify` consumes the token → you land on
   `/console`. The signup email-verify dead-end is gone. `SMTP_ADDR`/`EMAIL_FROM`/`APP_BASE_URL` config;
   a blank `SMTP_ADDR` makes sending a safe no-op (CI), which still surfaces the dev token.
@@ -587,7 +587,7 @@ SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not da
 
 ### Added
 - **The settings → API Keys screen now manages real platform-core keys** in `local` mode
-  (`Exascale Frontend`). Create mints a key through platform-core and reveals the **real one-time
+  (`1Trade Frontend`). Create mints a key through platform-core and reveals the **real one-time
   secret**; the list and revoke run against the live API; the count, created date, and status
   (active/revoked) reflect real data. `mock` mode keeps the showcase keys + client-side generation.
   Scope rendering tolerates arbitrary live scope strings (falls back gracefully for scopes not in the
@@ -606,7 +606,7 @@ SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not da
 ## [v0.2.7] — Milestone 2: inference playground credit meter + debit-flow fix (F20 × F08, F08↔F05)
 
 ### Added
-- **Real-time credit visibility in the inference playground** (`Exascale Frontend`). In `local` mode
+- **Real-time credit visibility in the inference playground** (`1Trade Frontend`). In `local` mode
   each run shows its **real credit cost** — `total_tokens / 1000 × catalog price`, in the model's
   credit type — on the turn, in the response sidebar, and as a pre-send estimate. A live **session
   meter** sums credits spent and shows the tenant's live `text` balance (pulled after each run).
@@ -646,7 +646,7 @@ SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not da
 ## [v0.2.5] — Milestone 2: wallet convert UI — live (F20 × F07)
 
 ### Added
-- **The wallet convert drawer now executes real conversions** (`Exascale Frontend`). In `local` mode
+- **The wallet convert drawer now executes real conversions** (`1Trade Frontend`). In `local` mode
   the showcase drawer is driven by live data: published rate + house spread for the selected pair,
   and the submit button calls the ledger to atomically burn `from` / mint `to`, then refreshes
   balances and toasts the result. `mock` mode is untouched — same drawer, canned cross-rate.
@@ -693,7 +693,7 @@ SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not da
 
 ### Added
 - **Mock→live seam (F20):** a Nitro BFF (`server/api/**`) so every screen calls same-origin `/api/**`
-  with the JWT in an httpOnly cookie; `EXASCALE_API_MODE=mock|local` flips canned↔live with zero UI
+  with the JWT in an httpOnly cookie; `TRADE1_API_MODE=mock|local` flips canned↔live with zero UI
   change. BFF routes for auth, catalog, wallet (balances/transactions), inference, billing checkout,
   and API keys — each mock|live. Composables: `useAuth/useCatalog/useWallet/useInference/useBilling/
   useKeys`. `login` + `signup` wired to real auth; route guard.
@@ -757,7 +757,7 @@ SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not da
 ## [v0.2.0] — Milestone 2: first inference dollar (sandbox) — inference gateway (F08)
 
 ### Added
-- **Inference gateway (F08):** the Exascale OpenAI-compatible inference API. `GET /v1/models`
+- **Inference gateway (F08):** the 1Trade OpenAI-compatible inference API. `GET /v1/models`
   (curated catalog: Llama-70B/8B + Whisper, with fixed-point pricing); `POST /v1/chat/completions`
   on a swappable `model.Backend` (mock now, vLLM in F09) with JSON + **SSE** streaming. Customer
   auth by **API key** (resolved via platform-core introspection, 30s cache) or first-party JWT.
@@ -783,19 +783,19 @@ SemVer `0.<milestone>.<patch>` (milestones are dependency-ordered stages, not da
 ## [v0.1.5] — Milestone 1: CLI signup `--password` flag (F04 fix)
 
 ### Fixed
-- **`exascale signup` now accepts `--password`** (and `EXASCALE_PASSWORD`), matching `login` — it
+- **`1trade signup` now accepts `--password`** (and `TRADE1_PASSWORD`), matching `login` — it
   previously only took `--email`/`--name` and always prompted, so the documented non-interactive
   signup (`signup --email … --password …`) failed with "flag provided but not defined: -password".
   The hidden prompt remains the default when neither is given. Proven live: `signup --email …
   --password … --name …` → account created + identity printed.
 
-## [v0.1.4] — Milestone 1: exascale CLI v0 (F04)
+## [v0.1.4] — Milestone 1: 1trade CLI v0 (F04)
 
 ### Added
-- **`exascale` CLI (F04):** the primary engineer interface — a thin Go client over the live platform
+- **`1trade` CLI (F04):** the primary engineer interface — a thin Go client over the live platform
   (`apps/cli`). Commands: `login`/`signup` (hidden password)/`whoami`/`logout`; `credits
   balance`/`transactions`/`convert`; `catalog`; `infer chat -m MODEL "prompt"`; `keys
-  create`/`list`/`revoke`; `config get`/`set`. Token in `~/.exascale/config.json` (0600); per-service
+  create`/`list`/`revoke`; `config get`/`set`. Token in `~/.1trade/config.json` (0600); per-service
   URLs with env overrides + dev defaults. Client unit-tested.
 - **Proven live:** `login → whoami → catalog → credits balance → convert (ai_index→text) → infer
   chat`. M1 v0 acceptance (login/whoami/credits balance) met, plus the live M2/M3 commands whose

@@ -9,10 +9,10 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/exascale/credit-ledger/internal/config"
-	"github.com/exascale/credit-ledger/internal/domain"
-	"github.com/exascale/credit-ledger/internal/events"
-	"github.com/exascale/credit-ledger/internal/store"
+	"github.com/trade1/credit-ledger/internal/config"
+	"github.com/trade1/credit-ledger/internal/domain"
+	"github.com/trade1/credit-ledger/internal/events"
+	"github.com/trade1/credit-ledger/internal/store"
 )
 
 // Server wires config + store + event publisher into an http.Handler.

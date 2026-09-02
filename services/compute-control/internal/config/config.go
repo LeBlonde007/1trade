@@ -26,14 +26,14 @@ type Config struct {
 // Load reads configuration from the environment with sensible dev defaults.
 func Load() Config {
 	return Config{
-		Env:           envOr("EXASCALE_ENV", "dev"),
+		Env:           envOr("TRADE1_ENV", "dev"),
 		Addr:          envOr("COMPUTE_ADDR", ":8086"),
 		NATSURL:       envOr("NATS_URL", "nats://nats.data.svc.cluster.local:4222"),
 		JWTSecret:     os.Getenv("PLATFORM_JWT_SECRET"),
 		ServiceToken:  os.Getenv("SERVICE_TOKEN"),
 		Scheduler:     envOr("COMPUTE_SCHEDULER", "mock"),
 		SupplySource:  envOr("SUPPLY_SOURCE_ID", "dc-owned-1"),
-		Paper:         envOr("EXASCALE_PAPER", "true") != "false",
+		Paper:         envOr("TRADE1_PAPER", "true") != "false",
 		H100Count:     intEnv("COMPUTE_H100_COUNT", 8),
 		H200Count:     intEnv("COMPUTE_H200_COUNT", 0),
 		HTTPTimeout:   5 * time.Second,

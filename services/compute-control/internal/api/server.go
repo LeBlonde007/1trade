@@ -12,11 +12,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/exascale/compute-control/internal/auth"
-	"github.com/exascale/compute-control/internal/config"
-	"github.com/exascale/compute-control/internal/domain"
-	"github.com/exascale/compute-control/internal/instance"
-	"github.com/exascale/compute-control/internal/scheduler"
+	"github.com/trade1/compute-control/internal/auth"
+	"github.com/trade1/compute-control/internal/config"
+	"github.com/trade1/compute-control/internal/domain"
+	"github.com/trade1/compute-control/internal/instance"
+	"github.com/trade1/compute-control/internal/scheduler"
 )
 
 // Server wires config + the credential resolver + the scheduler (internal jobs) + the instance

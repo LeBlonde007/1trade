@@ -9,7 +9,7 @@ kind: Kustomization
 # Secret/ConfigMaps (platform-auth, *-migrations) are applied SEPARATELY by scripts/deploy-sandbox.sh —
 # they aren't kustomize resources here (the data plane pins namespace `data`).
 #
-# `EXASCALE_SANDBOX_HOST` / `EXASCALE_SANDBOX_URL` are placeholders the deploy script substitutes.
+# `TRADE1_SANDBOX_HOST` / `TRADE1_SANDBOX_URL` are placeholders the deploy script substitutes.
 namespace: default
 
 resources:
@@ -19,19 +19,19 @@ resources:
   - ../../compute-control/base
   - ../../inference-runtime/base
   - ../../web/base
-  - ingress.yaml   # one host: / → web, /v1/* → the platform services (for the exascale CLI + clients)
+  - ingress.yaml   # one host: / → web, /v1/* → the platform services (for the 1trade CLI + clients)
 
 images:
-  - { name: exascale/platform-core, newTag: sandbox }
-  - { name: exascale/credit-ledger, newTag: sandbox }
-  - { name: exascale/inference-gateway, newTag: sandbox }
-  - { name: exascale/compute-control, newTag: sandbox }
-  - { name: exascale/inference-runtime-stub, newTag: sandbox }
-  - { name: exascale/web, newTag: sandbox }
+  - { name: 1trade/platform-core, newTag: sandbox }
+  - { name: 1trade/credit-ledger, newTag: sandbox }
+  - { name: 1trade/inference-gateway, newTag: sandbox }
+  - { name: 1trade/compute-control, newTag: sandbox }
+  - { name: 1trade/inference-runtime-stub, newTag: sandbox }
+  - { name: 1trade/web, newTag: sandbox }
 
 patches:
   - path: patch-app-url.yaml
-  # Harden EXASCALE_ENV=dev → sandbox on the Go services so the credit-ledger stops trusting the
+  # Harden TRADE1_ENV=dev → sandbox on the Go services so the credit-ledger stops trusting the
   # X-Dev-Tenant auth shortcut once the API is publicly reachable. Applied to every *-env ConfigMap.
   - path: patch-env-sandbox.yaml
     target:

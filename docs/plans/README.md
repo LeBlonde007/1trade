@@ -1,8 +1,8 @@
-# Exascale — Build Plan (Master)
+# 1Trade — Build Plan (Master)
 
 > This is the operational plan. It tells each agent **what to build, in what order, against
 > which contracts, from project setup → local dev → deployment.** It is built against the
-> **2026-05 GTM pivot** (`docs/re/exascale_gtm_focus_update.md`) — **platform-first, exchange
+> **2026-05 GTM pivot** (`docs/re/1trade_gtm_focus_update.md`) — **platform-first, exchange
 > paused** — and honors the system design in `docs/re/phase6_v2.md`.
 >
 > If anything below conflicts with `CLAUDE.md` immutable commitments, the immutable commitments
@@ -14,7 +14,7 @@
 ## 0. Read these in order
 
 1. `CLAUDE.md` — global ground truth (every agent already loads it).
-2. `docs/re/exascale_gtm_focus_update.md` — **the pivot. Read this first**: platform now, exchange paused.
+2. `docs/re/1trade_gtm_focus_update.md` — **the pivot. Read this first**: platform now, exchange paused.
 3. `docs/re/phase6_v2.md` — product + system design source of truth.
 4. `docs/plans/SEQUENCING.md` — the milestone-by-milestone order this plan delivers in.
 5. `docs/plans/ENGINEERING_STANDARDS.md` — **how to write the code**: clean-code rules, the
@@ -30,7 +30,7 @@
 
 A commodity-market-for-AI-compute, delivered in two phases:
 
-- **Phase 1 — Platform (now → first dollar):** AI startups buy compute and inference from Exascale,
+- **Phase 1 — Platform (now → first dollar):** AI startups buy compute and inference from 1Trade,
   paid for in prepaid, redeemable AI/GPU credits. Datacenters (owned + partner) supply capacity
   through a single scheduling fabric. Credits are explicitly **redeemable, not tradeable** — no
   securities/commodities license needed.
@@ -114,7 +114,7 @@ See [`features/`](features/) for one doc per feature.
 | [F01](features/F01-foundation-infra.md) | Foundation infra (K8s, data plane, CI/CD, obs) | `infra-sre` | active |
 | [F02](features/F02-auth-and-sso.md) | Auth (email/OAuth/SAML), SCIM, 2FA | `platform-core` | active |
 | [F03](features/F03-accounts-orgs-rbac.md) | Accounts, orgs, sub-accounts, RBAC | `platform-core` | active |
-| [F04](features/F04-cli.md) | `exascale` CLI (browser-OAuth login, all platform commands) | `platform-core` | active |
+| [F04](features/F04-cli.md) | `1trade` CLI (browser-OAuth login, all platform commands) | `platform-core` | active |
 | [F05](features/F05-prepaid-credit-ledger.md) | Prepaid credit ledger (balances, append-only tx, hash chain) | `credit-ledger` | active |
 | [F06](features/F06-credit-purchase-billing.md) | Credit purchase: Stripe (cards) + ACH/wire + POs + multi-currency | `platform-core` + `credit-ledger` | active |
 | [F07](features/F07-credit-conversion.md) | AI ↔ sub-credit conversion (text/speech/image/video/embeddings/GPU tiers) | `credit-ledger` | active |
@@ -189,12 +189,12 @@ Four documents:
 Re-cast from `phase6_v2.md` §15, adjusted for platform-first ordering.
 
 ### Gate 1 — End of Milestone 1: Platform foundation
-Pass: cluster up; CI/CD green; auth + first CLI command works end-to-end (`exascale login`,
-`exascale credits balance` shows $0); `trading-frontend` running platform-console shell with mock data.
+Pass: cluster up; CI/CD green; auth + first CLI command works end-to-end (`1trade login`,
+`1trade credits balance` shows $0); `trading-frontend` running platform-console shell with mock data.
 
 ### Gate 2 — End of Milestone 2: First inference dollar (sandbox)
 Pass: vLLM serves Llama-70B and Llama-8B through the gateway; usage events debit the ledger
-correctly; CLI `exascale infer` works; prepaid credit purchase via Stripe books to ledger.
+correctly; CLI `1trade infer` works; prepaid credit purchase via Stripe books to ledger.
 
 ### Gate 3 — End of Milestone 3: First real customer revenue
 Pass: ≥1 AI-startup customer using inference for real workloads on real money; on-demand GPU
@@ -217,7 +217,7 @@ jurisdiction decision; Phase 2 switch-on date scheduled (or explicit defer with 
 ## 8. What this plan deliberately is NOT
 
 - **A re-justification of the GTM pivot.** That argument is closed in
-  `docs/re/exascale_gtm_focus_update.md`. This plan executes it.
+  `docs/re/1trade_gtm_focus_update.md`. This plan executes it.
 - **A frozen design.** Contracts in `docs/contracts/` are versioned and change through `tech-lead`.
   Plan docs update when contracts do — every PR that changes a contract touches the relevant
   feature doc.
@@ -232,7 +232,7 @@ jurisdiction decision; Phase 2 switch-on date scheduled (or explicit defer with 
 - **Sub-credit** — modality-scoped credit (text / speech / image / video / embeddings).
 - **GPU credit** — class-standardized GPU-hour (e.g., H100-80GB-hour); represents reserved capacity.
 - **Backing ratio** — outstanding GPU credits / attested reserved capacity; ≥100% in v1.
-- **Owned DC** — Exascale's own datacenter (v1 anchor, trivially attestable).
+- **Owned DC** — 1Trade's own datacenter (v1 anchor, trivially attestable).
 - **Partner DC** — external operator's capacity registered through the supply-source abstraction.
 - **Keep-warm** — designed, sometimes mock-built, not shipped to customers; switch-on later.
 - **`is_paper`** — sacred flag on every order/trade/balance — even though the exchange is paused,

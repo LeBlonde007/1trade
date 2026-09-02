@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Exascale — end-to-end "time-to-first-action" acceptance test (Decision Gate 2 + immutable
+# 1Trade — end-to-end "time-to-first-action" acceptance test (Decision Gate 2 + immutable
 # commitment #3, "sub-5-minute time-to-first-action"). Drives the REAL services over their HTTP APIs
 # and asserts the whole first-value loop completes under a 5-minute budget:
 #
@@ -91,7 +91,7 @@ SVC_TOKEN=$(kubectl get secret platform-auth -n "$NAMESPACE" -o jsonpath='{.data
 
 # ── the timed loop starts here ─────────────────────────────────────────────────────────────────────
 START_NS=$(date +%s%N)
-EMAIL="e2e+$(date +%s)@exascale.local"
+EMAIL="e2e+$(date +%s)@1trade.local"
 echo
 echo "── time-to-first-action loop (budget ${BUDGET_S}s) ─────────"
 c_dim "  tenant: $EMAIL"

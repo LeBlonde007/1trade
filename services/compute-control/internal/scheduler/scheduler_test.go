@@ -4,8 +4,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/exascale/compute-control/internal/domain"
-	"github.com/exascale/compute-control/internal/events"
+	"github.com/trade1/compute-control/internal/domain"
+	"github.com/trade1/compute-control/internal/events"
 )
 
 // capturePublisher records emitted usage events for assertions.

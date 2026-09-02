@@ -8,10 +8,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/exascale/platform-core/internal/api"
-	"github.com/exascale/platform-core/internal/config"
-	"github.com/exascale/platform-core/internal/obs"
-	"github.com/exascale/platform-core/internal/store"
+	"github.com/trade1/platform-core/internal/api"
+	"github.com/trade1/platform-core/internal/config"
+	"github.com/trade1/platform-core/internal/obs"
+	"github.com/trade1/platform-core/internal/store"
 )
 
 // Version is set at build time (-ldflags -X main.Version=...).

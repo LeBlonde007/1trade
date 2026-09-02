@@ -13,7 +13,7 @@ Pair with [PLATFORM_GAPS.md](PLATFORM_GAPS.md).
 
 | `env` | What it is | GPU | Purpose |
 |---|---|---|---|
-| **`env=local`** | k3d on the dev box (Tilt) | **mock‑GPU** (`exascale.io/gpu=mock`) | Day‑to‑day dev; the whole stack runs GPU‑free. |
+| **`env=local`** | k3d on the dev box (Tilt) | **mock‑GPU** (`1trade.io/gpu=mock`) | Day‑to‑day dev; the whole stack runs GPU‑free. |
 | **`env=sandbox`** 🟢 | a single **RTX 5090** (32 GB, Blackwell) reached by **SSH over a Tailscale IP** | **real, 1× RTX 5090** | **Validation‑only** — prove the real‑GPU path (F09 real vLLM serving + the live meter→debit loop; F12/F13 on real hardware). NOT a sellable tier. |
 | **`env=prod`** 🔴/🟠 | managed K8s / bare‑metal (later) | **H100/H200 supply** | The sellable `gpu_*` tiers, 70B‑class models, multi‑GPU gangs, the <90s‑on‑H100 SLA. |
 
@@ -33,9 +33,9 @@ Pair with [PLATFORM_GAPS.md](PLATFORM_GAPS.md).
 | Account / service | Gives you (env / config) | What it's for |
 |---|---|---|
 | **Stripe** | `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET` | Credit‑card purchases (F06). Wired today on a mock. |
-| **Domain + Cloudflare** | DNS, edge, WAF | `api.exascale.io` + `app.exascale.io` are already in the code (OpenAPI servers, buy‑credits link). |
+| **Domain + Cloudflare** | DNS, edge, WAF | `api.1trade.io` + `app.1trade.io` are already in the code (OpenAPI servers, buy‑credits link). |
 | **TLS certs** | — | `https://` (via Cloudflare or Let's Encrypt). |
-| **Container registry** | image host | GHCR / Docker Hub / cloud. GPU manifest refs `registry.exascale.io/inference-runtime:vllm`. |
+| **Container registry** | image host | GHCR / Docker Hub / cloud. GPU manifest refs `registry.1trade.io/inference-runtime:vllm`. |
 | **Managed K8s or bare‑metal k3s** | `KUBECONFIG` | Real cluster (local is k3d only). |
 | **GPU node(s)** | H100/H200 supply (`env=prod`) | The sellable `gpu_*` tiers + 70B‑class models in production. **Validation is already covered by `env=sandbox` (RTX 5090)** — see Environments above; this row is the *production supply* (Lambda/CoreWeave/RunPod or owned). |
 | **Hugging Face + Llama license** | `HF_TOKEN` | Pull gated Llama 3.1 weights to the PVC (Whisper is open; accept Meta's license). |

@@ -6,9 +6,9 @@ kind: ConfigMap
 metadata:
   name: platform-core-env
 data:
-  EXASCALE_ENV: "dev"
+  TRADE1_ENV: "dev"
   PLATFORM_ADDR: ":8001"
-  DATABASE_URL: "postgres://exascale:exascale@postgres.data.svc.cluster.local:5432/exascale"
+  DATABASE_URL: "postgres://1trade:1trade@postgres.data.svc.cluster.local:5432/1trade"
   # Transactional email → Mailpit (local SMTP sink + web UI). APP_BASE_URL is the web app the
   # verification link points at, so it must be reachable from the developer's browser.
   SMTP_ADDR: "mailpit.data.svc.cluster.local:1025"

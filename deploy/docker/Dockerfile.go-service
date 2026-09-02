@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.6
-# Exascale — shared Go service image. Build with: SERVICE=<name> (cmd/<name>/main.go).
+# 1Trade — shared Go service image. Build with: SERVICE=<name> (cmd/<name>/main.go).
 # Distroless + non-root + static binary. See docs/plans/DEPLOYMENT.md §2.
 ARG GO_VERSION=1.23
 

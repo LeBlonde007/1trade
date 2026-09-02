@@ -1,11 +1,11 @@
 # Agent plan — `inference-ml`
 
 > **Critical-path under the GTM pivot.** Fastest revenue path: AI startups pay-per-use against
-> **Exascale's own platform API** (text, code, speech, image, video).
+> **1Trade's own platform API** (text, code, speech, image, video).
 
 > **Framing (positioning):** this is *our* platform and *our* API. We keep it **wire-compatible
 > with the OpenAI request/response format** purely as a drop-in-migration convenience (a customer
-> switches by changing one base URL) — that's a feature, not our identity. Lead with "the Exascale
+> switches by changing one base URL) — that's a feature, not our identity. Lead with "the 1Trade
 > API"; treat OpenAI-wire-compatibility as a migration detail, never as what we are.
 
 ## 1. Scope under the GTM pivot
@@ -35,7 +35,7 @@ the API must be flawless, drop-in migration must be frictionless, latency compet
   optimize next.
 - Usage event → `events/inference.usage.v1.yaml` → consumed by `credit-ledger` for text/speech
   sub-credit debit.
-- CLI: `exascale infer chat -m llama-3.1-8b "hi"` works end-to-end.
+- CLI: `1trade infer chat -m llama-3.1-8b "hi"` works end-to-end.
 
 ### Milestone 3 — Catalog expansion + packing
 - Add: text/code (Qwen 2.5 Coder 32B, DeepSeek Coder V2.5), text/small (Phi-4, Qwen 2.5 7B),
@@ -82,7 +82,7 @@ the API must be flawless, drop-in migration must be frictionless, latency compet
   flow is testable without GPUs).
 - `make up GPU=1` switches to real vLLM on the host GPU for the dev-sized models (Llama-8B fits
   on most dev GPUs).
-- `exascale infer chat -m llama-3.1-8b` from the local CLI hits the local gateway.
+- `1trade infer chat -m llama-3.1-8b` from the local CLI hits the local gateway.
 
 ## 6. Dockerfile
 

@@ -45,7 +45,7 @@
 - [ ] Assign roles per user per org.
 - [ ] (M4) Create sub-account; assign budget; restrict members.
 - [ ] (M4) Org-wide consumption dashboard data API.
-- [ ] (M4) Audit log queryable via API + CLI (`exascale audit log`).
+- [ ] (M4) Audit log queryable via API + CLI (`1trade audit log`).
 - [ ] All sensitive actions logged.
 - [ ] Sub-account RBAC blocks cross-sub-account data access (penetration-tested by `security-compliance`).
 

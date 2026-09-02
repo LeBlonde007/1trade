@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/exascale/compute-control/internal/domain"
-	"github.com/exascale/compute-control/internal/events"
-	"github.com/exascale/compute-control/internal/pool"
+	"github.com/trade1/compute-control/internal/domain"
+	"github.com/trade1/compute-control/internal/events"
+	"github.com/trade1/compute-control/internal/pool"
 )
 
 // capturePublisher records emitted usage events for assertions.
@@ -85,7 +85,7 @@ func TestCreate_Validation(t *testing.T) {
 		t.Fatalf("err = %v, want ErrUnknownGPU", err)
 	}
 	img := spec("t1")
-	img.Image = "exascale-ml-stack-1999.01"
+	img.Image = "1trade-ml-stack-1999.01"
 	if _, err := m.Create(img, ""); err != ErrBadImage {
 		t.Fatalf("err = %v, want ErrBadImage", err)
 	}

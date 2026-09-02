@@ -52,7 +52,7 @@ type Sender struct {
 func New(c Config) Sender {
 	from := c.From
 	if from == "" {
-		from = "noreply@exascale.local"
+		from = "noreply@1trade.local"
 	}
 	tlsMode := strings.ToLower(strings.TrimSpace(c.TLS))
 	if tlsMode == "" && c.Addr != "" {
@@ -81,8 +81,8 @@ func (s Sender) SendVerification(to, link string) error {
 	if !s.Enabled() {
 		return nil
 	}
-	const subject = "Verify your Exascale email"
-	body := "Welcome to Exascale.\r\n\r\n" +
+	const subject = "Verify your 1Trade email"
+	body := "Welcome to 1Trade.\r\n\r\n" +
 		"Confirm your email to finish setting up your account:\r\n" + link + "\r\n\r\n" +
 		"If you didn't create an account, you can ignore this message.\r\n"
 	if s.apiURL != "" {
@@ -111,7 +111,7 @@ type addr struct {
 // non-2xx is surfaced with the provider's response body (truncated) so misconfig is visible in logs.
 func (s Sender) sendAPI(to, subject, body string) error {
 	payload, _ := json.Marshal(mailtrapPayload{
-		From:     addr{Email: s.from, Name: "Exascale"},
+		From:     addr{Email: s.from, Name: "1Trade"},
 		To:       []addr{{Email: to}},
 		Subject:  subject,
 		Text:     body,

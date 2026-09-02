@@ -72,7 +72,7 @@ get written (specced, not implemented) alongside Phase 1.
 For every multi-service task arriving from the orchestrator:
 
 ```
-1. Read CLAUDE.md, docs/re/exascale_gtm_focus_update.md, docs/re/phase6_v2.md, docs/plans/README.md.
+1. Read CLAUDE.md, docs/re/1trade_gtm_focus_update.md, docs/re/phase6_v2.md, docs/plans/README.md.
 
 2. If the task touches a shared interface:
    - Look at the existing contract.

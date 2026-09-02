@@ -33,7 +33,7 @@ deferred to Phase 2; they return a "trading paused — see /trade demo" message 
 ### Milestone 2
 - Stripe Connect for card-based credit purchases.
 - CLI: `infer chat`, `credits purchase` (Stripe link out), `--help` polish.
-- Sub-5-min onboarding: signup → `exascale login` → `exascale credits purchase $50` → `exascale infer chat -m llama-3.1-8b "hi"`. Measured in `make test-e2e`.
+- Sub-5-min onboarding: signup → `1trade login` → `1trade credits purchase $50` → `1trade infer chat -m llama-3.1-8b "hi"`. Measured in `make test-e2e`.
 
 ### Milestone 3
 - ACH / wire flow for $10K+ purchases (manual reconciliation initially; automated later).
@@ -73,8 +73,8 @@ deferred to Phase 2; they return a "trading paused — see /trade demo" message 
 ## 5. Local dev
 
 - `services/platform-core/` runs on `:8001`.
-- `apps/cli/` builds with `make cli`; `exascale config set api-url http://localhost:8080`,
-  `exascale login --dev` uses a dev token issued by platform-core's dev endpoint.
+- `apps/cli/` builds with `make cli`; `1trade config set api-url http://localhost:8080`,
+  `1trade login --dev` uses a dev token issued by platform-core's dev endpoint.
 - `make seed` creates 3 tenants (`acme-ai`, `f500-co`, `internal-mm`) and an admin user per.
 
 ## 6. Dockerfile

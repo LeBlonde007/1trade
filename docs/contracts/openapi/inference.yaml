@@ -1,11 +1,11 @@
 openapi: 3.0.3
 info:
-  title: Exascale Inference API (chat, completions, embeddings, audio, images)
+  title: 1Trade Inference API (chat, completions, embeddings, audio, images)
   version: 1.0.0
   description: >
-    **The Exascale inference API.** Owned by `inference-ml` (the inference-gateway). It is
+    **The 1Trade inference API.** Owned by `inference-ml` (the inference-gateway). It is
     wire-compatible with the OpenAI request/response format so a customer migrates by changing one
-    base URL — a convenience, not a dependency. Lead with "the Exascale API."
+    base URL — a convenience, not a dependency. Lead with "the 1Trade API."
 
     Auth is a **bearer API key** (`Authorization: Bearer exk_...`) minted in platform-core; a
     first-party tenant JWT is also accepted. The gateway resolves the key → tenant_id /
@@ -17,7 +17,7 @@ info:
     credit-types.md §2 (modality → credit_type).
 
 servers:
-  - { url: "https://api.exascale.io", description: prod }
+  - { url: "https://api.1trade.io", description: prod }
   - { url: "http://localhost:8080", description: "local (k3d ingress)" }
 
 tags:
@@ -157,7 +157,7 @@ paths:
   /v1/models:
     get:
       tags: [models]
-      summary: List the curated catalog (OpenAI-compatible shape + Exascale pricing extension).
+      summary: List the curated catalog (OpenAI-compatible shape + 1Trade pricing extension).
       operationId: listModels
       responses:
         '200':
@@ -195,7 +195,7 @@ components:
               credit_type: text
               balance: "0.000000"
               required: "12.500000"
-              buy_credits_url: "https://app.exascale.io/billing/buy"
+              buy_credits_url: "https://app.1trade.io/billing/buy"
     ModelNotFound:
       description: Unknown or unavailable model id.
       content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
@@ -349,15 +349,15 @@ components:
 
     Model:
       type: object
-      description: A catalog entry. OpenAI fields + an Exascale pricing extension (`exascale`).
+      description: A catalog entry. OpenAI fields + an 1Trade pricing extension (`1trade`).
       properties:
         id:       { type: string, example: llama-3.1-70b }
         object:   { type: string, example: model }
         created:  { type: integer }
-        owned_by: { type: string, example: exascale }
-        exascale:
+        owned_by: { type: string, example: 1trade }
+        trade1:
           type: object
-          description: Exascale pricing/metadata extension.
+          description: 1Trade pricing/metadata extension.
           properties:
             modality:    { type: string, enum: [text, speech, image, video, embeddings] }
             credit_type: { type: string, enum: [text, speech, image, video, embeddings] }

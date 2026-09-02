@@ -1,9 +1,9 @@
-// tweaks.jsx — Exascale deck tweaks
+// tweaks.jsx — 1Trade deck tweaks
 // Brand name, accent color, highlight style.
 
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
-  "brandName": "Exascale",
-  "contactEmail": "contact@exascale.com",
+  "brandName": "1Trade",
+  "contactEmail": "contact@1trade.com",
   "highlightStyle": "rough",
   "accentColor": "#C8F25C",
   "displayFont": "Inter Tight"
@@ -26,7 +26,7 @@ function loadGoogleFont(family) {
   document.head.appendChild(link);
 }
 
-function ExascaleTweaks() {
+function Trade1Tweaks() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
 
   // Apply brand name + contact across DOM
@@ -101,4 +101,4 @@ function ExascaleTweaks() {
 }
 
 const __twkRoot = ReactDOM.createRoot(document.getElementById("tweaks-root"));
-__twkRoot.render(<ExascaleTweaks />);
+__twkRoot.render(<Trade1Tweaks />);

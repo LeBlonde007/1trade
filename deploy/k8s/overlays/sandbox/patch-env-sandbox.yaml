@@ -1,11 +1,11 @@
-# Set EXASCALE_ENV=sandbox on the four Go services (applied to every *-env ConfigMap via the target
-# selector in kustomization.yaml). This is a SECURITY hardening: in EXASCALE_ENV=dev the credit-ledger
+# Set TRADE1_ENV=sandbox on the four Go services (applied to every *-env ConfigMap via the target
+# selector in kustomization.yaml). This is a SECURITY hardening: in TRADE1_ENV=dev the credit-ledger
 # trusts an `X-Dev-Tenant` header as an auth shortcut (mint credits / act as any tenant with no token).
 # That is fine on a laptop but unacceptable once the API is publicly reachable (api.<host>). At
 # `sandbox` the server stops trusting that header entirely.
 #
 # Confirmed safe: the only behaviour keyed on dev-vs-not is that bypass. MockStripe inline settle is
-# gated on STRIPE_SECRET_KEY=="" (not env), KYC auto-approve on EXASCALE_ENV!="prod" (so sandbox still
+# gated on STRIPE_SECRET_KEY=="" (not env), KYC auto-approve on TRADE1_ENV!="prod" (so sandbox still
 # auto-approves), and the dev email-token log on !mailer.Enabled() (Mailpit is enabled here). So paper
 # mode is fully preserved; only the dev auth shortcut is removed.
 apiVersion: v1
@@ -13,4 +13,4 @@ kind: ConfigMap
 metadata:
   name: ignored # overridden by the target selector in kustomization.yaml (applies to all *-env CMs)
 data:
-  EXASCALE_ENV: "sandbox"
+  TRADE1_ENV: "sandbox"

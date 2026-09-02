@@ -1,7 +1,7 @@
-# Design System — Exascale frontend (canonical)
+# Design System — 1Trade frontend (canonical)
 
 > **Every frontend change conforms to this document.** It is the single source of visual truth for
-> `apps/web/` (and the current `Exascale Frontend/`). Owned by `trading-frontend`; treated like a
+> `apps/web/` (and the current `1Trade Frontend/`). Owned by `trading-frontend`; treated like a
 > contract — you consume it, you don't quietly deviate from it. Enforced by `ENGINEERING_STANDARDS.md`
 > §4, the `/ex-review` gate, and a pre-commit token check (§7 below).
 >
@@ -162,7 +162,7 @@ Total value: $10,247.83 · Today P&L: +$23.41 (+0.45%)
 
 ## 3. Aesthetic guardrails (A3)
 
-**Exascale is institutional / technical / financial / modern.**
+**1Trade is institutional / technical / financial / modern.**
 
 ### Reference points (study these)
 ✓ Bloomberg Terminal (density, gravitas) · ✓ Polymarket (clean serious trading UI) ·

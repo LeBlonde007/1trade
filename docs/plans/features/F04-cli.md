@@ -1,38 +1,38 @@
-# F04 — `exascale` CLI
+# F04 — `1trade` CLI
 
 > Ship in **Milestone 1** (v0) → **Milestone 6** (v1.0 release). Owner: `platform-core`.
 
 ## Spec
 
-The `exascale` CLI is the **primary platform-side interface** for AI engineers and the unified
+The `1trade` CLI is the **primary platform-side interface** for AI engineers and the unified
 client surface for everything a customer can do.
 
 Commands (final v1.0 set):
 
 ```
-exascale login | logout | whoami
-exascale config get|set <key> [value]
+1trade login | logout | whoami
+1trade config get|set <key> [value]
 
-exascale credits balance | purchase --amount $X | convert --from <ai> --to <text> --amount X
+1trade credits balance | purchase --amount $X | convert --from <ai> --to <text> --amount X
                 | transactions
 
-exascale infer chat -m <model> | completions | embeddings | audio transcribe | image generate
-exascale catalog list | inspect <model>
+1trade infer chat -m <model> | completions | embeddings | audio transcribe | image generate
+1trade catalog list | inspect <model>
 
-exascale gpu create --type h100 --count N
-exascale gpu list | stop <id> | start <id> | rm <id>
-exascale train submit --image ... --gpus 256 --slurm-script ./run.sh
-exascale cluster create --gpus 64 --network infiniband
+1trade gpu create --type h100 --count N
+1trade gpu list | stop <id> | start <id> | rm <id>
+1trade train submit --image ... --gpus 256 --slurm-script ./run.sh
+1trade cluster create --gpus 64 --network infiniband
 
-exascale billing today | this-month | alerts set --limit $X
-exascale keys create | list | revoke <id>
-exascale audit log
-exascale trade quote | buy | sell | orders         # Phase 2 — returns "trading paused" stub in Phase 1
+1trade billing today | this-month | alerts set --limit $X
+1trade keys create | list | revoke <id>
+1trade audit log
+1trade trade quote | buy | sell | orders         # Phase 2 — returns "trading paused" stub in Phase 1
 ```
 
-Distribution: brew (`brew install exascale/tap/exascale`), apt
-(`apt install exascale`), pip (`pip install exascale`), direct binary
-(`curl -sSL https://exascale.io/install.sh | sh`).
+Distribution: brew (`brew install 1trade/tap/1trade`), apt
+(`apt install 1trade`), pip (`pip install 1trade`), direct binary
+(`curl -sSL https://1trade.io/install.sh | sh`).
 
 ## Owning agent
 
@@ -43,7 +43,7 @@ tap, install script CDN).
 
 ### Produces
 - None new — CLI is a client.
-- `exascale --help` is the documented surface; every new command needs a corresponding OpenAPI
+- `1trade --help` is the documented surface; every new command needs a corresponding OpenAPI
   route in `docs/contracts/openapi/`.
 
 ### Consumes
@@ -70,7 +70,7 @@ tap, install script CDN).
 ## Acceptance criteria
 
 - [ ] Installable via brew, apt, pip, binary.
-- [ ] `exascale login` opens browser OAuth and lands a token at `~/.exascale/credentials`.
+- [ ] `1trade login` opens browser OAuth and lands a token at `~/.1trade/credentials`.
 - [ ] Every command has `--help` matching the OpenAPI documentation.
 - [ ] Sub-5-min flow: install → login → buy credits → first inference call (Playwright via
       headless CLI in CI).

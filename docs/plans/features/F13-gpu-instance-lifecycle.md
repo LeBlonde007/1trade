@@ -8,7 +8,7 @@ Customer-facing on-demand GPU instances. Both CLI-first and web-available.
 
 ```
 POST /v1/compute/instances
-  body: { type: "h100", count: 1, image: "exascale-ml-stack-2026.05", region: "us-east-1" }
+  body: { type: "h100", count: 1, image: "1trade-ml-stack-2026.05", region: "us-east-1" }
   response: { instance_id, state: "provisioning", connect: { ssh, jupyter, http } }
 
 GET  /v1/compute/instances?state=running
@@ -22,7 +22,7 @@ Instance types in v1:
 - H100 80GB SXM5 (single or up to 32 self-serve).
 - H200 (added M3 if hardware available; else M4).
 
-Pre-built **Exascale ML Stack images** (Ubuntu + CUDA + PyTorch + common libs) — versioned;
+Pre-built **1Trade ML Stack images** (Ubuntu + CUDA + PyTorch + common libs) — versioned;
 customers can choose stable / latest / pinned.
 
 Target: <90s P95 time-to-running.
@@ -49,7 +49,7 @@ Target: <90s P95 time-to-running.
 
 ## Acceptance criteria
 
-- [x] `exascale gpu create --type h100` returns connection info — instant on mock-GPU; the <90s-P95
+- [x] `1trade gpu create --type h100` returns connection info — instant on mock-GPU; the <90s-P95
   real-hardware timing is GPU-node-gated (the mock backend proves the lifecycle end-to-end).
 - [x] Per-second GPU-hour debits applied to the right GPU credit tier — a metering ticker emits
   `compute.usage.v1` per interval (units = GPU-hours × count, `credit_type` = the instance tier);
@@ -62,7 +62,7 @@ Target: <90s P95 time-to-running.
   API/CLI/web; the enforcement loop lands with the F06 idle-policy integration (not in this increment).
 
 **Delivered (v0.3.0):** `compute.yaml` v1.1.0 (instance lifecycle) · `compute-control` instance manager
-(create/list/get/stop/start/delete + shared GPU pool + per-interval metering) · `exascale gpu …` CLI ·
+(create/list/get/stop/start/delete + shared GPU pool + per-interval metering) · `1trade gpu …` CLI ·
 live web `/compute` list + provision (BFF + `useCompute`). Mock-GPU backend; real K8s provisioner +
 <90s-P95 timing land on a GPU node.
 

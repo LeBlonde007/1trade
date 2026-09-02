@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Exascale — one-command, OS-aware bootstrap.
+# 1Trade — one-command, OS-aware bootstrap.
 #
 # Detects your OS, installs EVERY dependency the right way for that OS, then (with --up)
 # brings the whole platform up locally via `make up`. One command from a clean machine to a

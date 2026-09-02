@@ -16,10 +16,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/exascale/matching-engine/internal/api"
-	"github.com/exascale/matching-engine/internal/auth"
-	"github.com/exascale/matching-engine/internal/config"
-	"github.com/exascale/matching-engine/internal/obs"
+	"github.com/trade1/matching-engine/internal/api"
+	"github.com/trade1/matching-engine/internal/auth"
+	"github.com/trade1/matching-engine/internal/config"
+	"github.com/trade1/matching-engine/internal/obs"
 )
 
 // Version is set at build time (-ldflags -X main.Version=...).

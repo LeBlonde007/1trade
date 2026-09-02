@@ -1,4 +1,4 @@
--- Exascale — shared SQL types (v1.0). Owned by tech-lead. Consumed by every service.
+-- 1Trade — shared SQL types (v1.0). Owned by tech-lead. Consumed by every service.
 --
 -- These are the types/conventions that MUST be identical across services so two services can't
 -- disagree on a shared shape. Per-service tables live in services/<name>/migrations/ — NOT here.

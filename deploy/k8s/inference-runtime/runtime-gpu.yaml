@@ -22,7 +22,7 @@ spec:
         - { key: "nvidia.com/gpu", operator: "Exists", effect: "NoSchedule" }
       containers:
         - name: runtime
-          image: registry.exascale.io/inference-runtime:vllm   # built from deploy/docker/Dockerfile.vllm
+          image: registry.1trade.io/inference-runtime:vllm   # built from deploy/docker/Dockerfile.vllm
           ports: [{ containerPort: 8000 }]
           env:
             - { name: MODEL_ID, value: "llama-3.1-8b" }

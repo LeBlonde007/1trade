@@ -13,9 +13,9 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/exascale/credit-ledger/internal/domain"
-	"github.com/exascale/credit-ledger/internal/events"
-	"github.com/exascale/credit-ledger/internal/store"
+	"github.com/trade1/credit-ledger/internal/domain"
+	"github.com/trade1/credit-ledger/internal/events"
+	"github.com/trade1/credit-ledger/internal/store"
 	"github.com/nats-io/nats.go"
 )
 

@@ -1,4 +1,4 @@
-# Exascale Nuxt 4 Migration — Complete ✅
+# 1Trade Nuxt 4 Migration — Complete ✅
 
 **Completed:** 2026-05-20  
 **Status**: Ready for Netlify deployment  
@@ -84,7 +84,7 @@ cd /mnt/f/ex/nuxt-app
 git init
 git add .
 git commit -m "initial: Nuxt 4 trading app"
-git remote add origin https://github.com/YOUR_USERNAME/exascale.git
+git remote add origin https://github.com/YOUR_USERNAME/1trade.git
 git push -u origin main
 ```
 
@@ -135,7 +135,7 @@ In `/mnt/f/ex/`:
 | File | Purpose |
 |------|---------|
 | `nuxt4-reference.md` | Complete Nuxt 4 guide (installation, routing, components, styling, etc.) |
-| `exascale_mvp_screens_checklist.md` | Status of all 26 design screens (8/26 done) |
+| `1trade_mvp_screens_checklist.md` | Status of all 26 design screens (8/26 done) |
 | `NUXT4_MIGRATION_SUMMARY.md` | This file |
 
 In `/mnt/f/ex/nuxt-app/`:

@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/exascale/platform-core/internal/domain"
-	"github.com/exascale/platform-core/internal/store"
+	"github.com/trade1/platform-core/internal/domain"
+	"github.com/trade1/platform-core/internal/store"
 )
 
 // kycResponse renders a KYC record for the API (GET + submit return the same shape). can_purchase is

@@ -1,4 +1,4 @@
-# Exascale event contract — trades.executed.v1
+# 1Trade event contract — trades.executed.v1
 # One event per executed trade, emitted by matching-engine at match time. Consumed by credit-ledger
 # (atomic two-sided settlement), index-service (live trade prints become constituent observations in
 # Phase 2), and surveillance (wash-trade / spoofing / marking-the-close detection).

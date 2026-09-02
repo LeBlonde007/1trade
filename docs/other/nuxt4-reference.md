@@ -2,7 +2,7 @@
 
 > Source: https://nuxt.com/docs/4.x/guide
 > Compiled: 2026-05-20
-> Purpose: Reference guide for migrating Exascale HTML mockups into a Nuxt 4 app.
+> Purpose: Reference guide for migrating 1Trade HTML mockups into a Nuxt 4 app.
 
 ---
 
@@ -892,7 +892,7 @@ export default defineNuxtConfig({
   // ─── App <head> defaults ─────────────────────────────────────
   app: {
     head: {
-      title: 'Exascale — The Commodity Market for AI Compute',
+      title: '1Trade — The Commodity Market for AI Compute',
       meta: [
         { charset: 'utf-8' },
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
@@ -936,7 +936,7 @@ export default defineNuxtConfig({
   runtimeConfig: {
     apiSecret: process.env.API_SECRET,  // Server-only
     public: {
-      apiBase: process.env.API_BASE_URL || 'https://api.exascale.com',
+      apiBase: process.env.API_BASE_URL || 'https://api.1trade.com',
     },
   },
 
@@ -971,7 +971,7 @@ export default defineNuxtConfig({
   <NuxtLink to="/markets/eai-idx">AI Index Market</NuxtLink>
 
   <!-- External links — use a plain <a> tag instead -->
-  <a href="https://docs.exascale.com" target="_blank" rel="noopener">Docs</a>
+  <a href="https://docs.1trade.com" target="_blank" rel="noopener">Docs</a>
 
   <!-- Dynamic routes -->
   <NuxtLink :to="`/markets/${market.slug}`">{{ market.name }}</NuxtLink>
@@ -999,7 +999,7 @@ await navigateTo('/trade')
 await navigateTo({ path: '/markets', query: { filter: 'active' } })
 
 // External redirect (must set external: true for full URLs)
-await navigateTo('https://docs.exascale.com', { external: true })
+await navigateTo('https://docs.1trade.com', { external: true })
 
 // Replace current history entry (no back button)
 await navigateTo('/login', { replace: true })
@@ -1088,7 +1088,7 @@ export default defineNuxtRouteMiddleware((to) => {
 
 ```vue
 <!-- Referencing an asset (processed by Vite — gets hashed filename) -->
-<img src="~/assets/images/logo.svg" alt="Exascale" />
+<img src="~/assets/images/logo.svg" alt="1Trade" />
 
 <!-- Referencing a public file (served directly — URL stays the same) -->
 <img src="/og-image.png" alt="OG Image" />

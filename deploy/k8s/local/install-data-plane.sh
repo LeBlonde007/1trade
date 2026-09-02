@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Exascale — install the local data plane into the k3d cluster. Tiers (compose them):
+# 1Trade — install the local data plane into the k3d cluster. Tiers (compose them):
 #   default : the CORE (Postgres, TimescaleDB, Redis, NATS, Mailpit) from data-plane.yaml — fast.
 #   SCHED=1 : also scheduling — Kueue + Volcano + the mock-GPU resource + the project Kueue config.
 #   OBS=1   : also observability — Prometheus + Loki + Tempo + Grafana (heavy, Helm).

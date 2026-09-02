@@ -4,9 +4,9 @@
 
 ## Spec
 
-**Exascale's own inference API** (Go gateway) for text, code, speech, image, and video. It is
+**1Trade's own inference API** (Go gateway) for text, code, speech, image, and video. It is
 wire-compatible with the OpenAI request/response format, so a customer migrates by changing a single
-base URL — a migration convenience, not a dependency. Lead with "the Exascale API."
+base URL — a migration convenience, not a dependency. Lead with "the 1Trade API."
 
 Endpoints:
 

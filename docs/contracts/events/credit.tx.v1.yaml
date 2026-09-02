@@ -1,4 +1,4 @@
-# Exascale event contract — credit.tx.v1
+# 1Trade event contract — credit.tx.v1
 # One event per committed ledger movement. Owned by credit-ledger; consumed by observability,
 # settlement-trust (payout reconciliation), and the realtime wallet (frontend via a fan-out).
 # See docs/plans/CONTRACTS.md and docs/contracts/credit-types.md.

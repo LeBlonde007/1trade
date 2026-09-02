@@ -1,8 +1,8 @@
-# Exascale
+# 1Trade
 
 A commodity market for AI compute — built **platform-first**: inference + GPU compute + prepaid,
 redeemable credits for AI startups now; the tradeable **exchange** is designed and kept warm,
-switched on once licensed. See the GTM pivot in `docs/re/exascale_gtm_focus_update.md`.
+switched on once licensed. See the GTM pivot in `docs/re/1trade_gtm_focus_update.md`.
 
 > **Start here:** [`docs/plans/README.md`](docs/plans/README.md) — the master build plan
 > (sequencing, agents, features). Ground rules live in [`CLAUDE.md`](CLAUDE.md) and
@@ -30,7 +30,7 @@ make web         # Nuxt dev server on :3000
 docs/plans/      the build plan (start at README.md) + ENGINEERING_STANDARDS + DESIGN_SYSTEM + DECISIONS
 docs/contracts/  the shared contracts (OpenAPI / SQL / events / credit-types) — owned by tech-lead
 services/        Go services (one dir each) — scaffolded per feature
-apps/            web (Nuxt) + cli (exascale)
+apps/            web (Nuxt) + cli (1trade)
 deploy/          docker templates · k8s (k3d local + overlays) · ci
 scripts/         dev tooling (install-toolchain.sh, …)
 .claude/         agent roster + /ex-* workflow commands

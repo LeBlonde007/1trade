@@ -9,9 +9,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/exascale/platform-core/internal/billing"
-	"github.com/exascale/platform-core/internal/domain"
-	"github.com/exascale/platform-core/internal/store"
+	"github.com/trade1/platform-core/internal/billing"
+	"github.com/trade1/platform-core/internal/domain"
+	"github.com/trade1/platform-core/internal/store"
 	"github.com/google/uuid"
 )
 

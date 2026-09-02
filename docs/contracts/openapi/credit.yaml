@@ -1,6 +1,6 @@
 openapi: 3.0.3
 info:
-  title: Exascale Credit Ledger API
+  title: 1Trade Credit Ledger API
   version: 1.0.0
   description: >
     Per-tenant prepaid credit balances, append-only hash-chained transactions, purchases, and
@@ -11,7 +11,7 @@ info:
     fill) is Phase 2 and not in v1.
 
 servers:
-  - url: https://api.exascale.io
+  - url: https://api.1trade.io
     description: prod
   - url: http://localhost:8080
     description: local (k3d ingress)

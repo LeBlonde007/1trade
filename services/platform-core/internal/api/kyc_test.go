@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/exascale/platform-core/internal/api"
-	"github.com/exascale/platform-core/internal/billing"
-	"github.com/exascale/platform-core/internal/config"
-	"github.com/exascale/platform-core/internal/domain"
-	"github.com/exascale/platform-core/internal/store"
+	"github.com/trade1/platform-core/internal/api"
+	"github.com/trade1/platform-core/internal/billing"
+	"github.com/trade1/platform-core/internal/config"
+	"github.com/trade1/platform-core/internal/domain"
+	"github.com/trade1/platform-core/internal/store"
 	"github.com/google/uuid"
 )
 

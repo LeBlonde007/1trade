@@ -1,4 +1,4 @@
-# Exascale — Build Status (tree map)
+# 1Trade — Build Status (tree map)
 
 **Living status.** ✅ done · 🟩 partly done / in progress · ⬜ not started · ⏸ paused (by design).
 Updated as work lands. Pair with `SEQUENCING.md` (plan), `MANAGEMENT_PLAN.md` (tracker), `CHANGELOG.md` (releases).
@@ -12,7 +12,7 @@ Last updated: 2026-06-04.
 > mock), onboarding Walmart-mock removed, **F22 KYC/AML enforcement**). All on `main` (origin).
 
 ```
-Exascale
+1Trade
 │
 ├── ✅ Foundations — planning, standards, workflow, design system, ADRs, tooling
 │
@@ -47,7 +47,7 @@ Exascale
 │   │                            in local mode (v0.2.9). OAuth/SAML/2FA = M4.
 │   ├── ✅ F03 accounts/orgs/RBAC  audit log (admin.action.v1 + queryable trail), requireRole→403,
 │   │                            org CRUD + role assignment, tenant-scoped. Sub-accounts = M4.
-│   ├── 🟩 F04 exascale CLI v0   login/whoami/credits balance+convert/catalog/infer/keys/config —
+│   ├── 🟩 F04 1trade CLI v0   login/whoami/credits balance+convert/catalog/infer/keys/config —
 │   │                            Go client over the live APIs (v0.1.4). M3+: gpu/cluster/train; dist M6.
 │   └── ✅ F20 console shell     Nuxt app + design system (live-only; no mock mode, v0.2.11).
 │
@@ -88,7 +88,7 @@ Exascale
 │
 ├── ⬜ F24 CLI developer experience (Claude-Code-grade) — DX layer over the live F04 CLI: P1
 │        streaming inference (SSE) + spinners + semantic colour + actionable errors + --json; P2
-│        `exascale chat` interactive REPL; P3 completion/browser-login/profiles. M3→M6, incremental.
+│        `1trade chat` interactive REPL; P3 completion/browser-login/profiles. M3→M6, incremental.
 │        See features/F24-cli-dx.md.
 │
 ├── 🟩 Compliance & trust  — ⬜ F21 SOC 2 (M4→M6) · 🟩 F22 licensing track: ✅ **KYC/AML enforcement**
@@ -113,7 +113,7 @@ Exascale
 - **M3 (First real customer revenue):** 🟩 **started.** ✅ **F13 GPU instance lifecycle** (v0.3.0) —
   customer-facing on-demand instances (create/list/get/stop/start/delete) over `compute.yaml` v1.1.0,
   sharing one GPU pool with the scheduler; per-interval metering → `compute.usage.v1` → `gpu_*` debit;
-  `exascale gpu …` CLI + live web `/compute` list & provision. Mock-GPU backend (real K8s provisioner +
+  `1trade gpu …` CLI + live web `/compute` list & provision. Mock-GPU backend (real K8s provisioner +
   <90s-P95 timing GPU-node-gated). **Since v0.3.0 (v0.3.1→v0.3.12):** the AI-company product hardened
   to live / no-mock end-to-end (console command-center, inference, wallet, **billing**); the enterprise
   admin surface went live + honest under **Settings** (audit · teams · SSO · billing); and **F22
@@ -155,7 +155,7 @@ playbook). _Earlier:_ **F13 GPU instance lifecycle — M3 begins** (v0.3.0): cus
 on-demand instances (create/list/get/stop/start/delete) over `compute.yaml` v1.1.0, drawing from one
 shared `pool.Pool` with the scheduler (capacity never double-counted); a per-interval metering ticker
 emits `compute.usage.v1` → credit-ledger `Compute` consumer debits the `gpu_*` tier (idempotent on
-`usage_id`); versioned ML-Stack image catalog (stable/latest/pinned); `exascale gpu …` CLI + live web
+`usage_id`); versioned ML-Stack image catalog (stable/latest/pinned); `1trade gpu …` CLI + live web
 `/compute` list & provision (BFF + `useCompute`). Mock-GPU backend; security-review clean. Also closed
 a latent golangci-lint cold-cache gap (all 5 modules lint-clean cold). _Earlier:_ **F12 compute control
 plane v0 — M2 complete** (v0.2.12): mock-GPU gang scheduling → `gpu_*` debit (gang→cancel→debit

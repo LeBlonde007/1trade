@@ -1,6 +1,6 @@
 # Two public hosts for the sandbox:
-#   • EXASCALE_SANDBOX_HOST      (e.g. sandbox.exascale.ai)    → the web app (browser).
-#   • EXASCALE_SANDBOX_API_HOST  (e.g. sandboxapi.exascale.ai) → the JSON API (exascale CLI + clients),
+#   • TRADE1_SANDBOX_HOST      (e.g. sandbox.1trade.ai)    → the web app (browser).
+#   • TRADE1_SANDBOX_API_HOST  (e.g. sandboxapi.1trade.ai) → the JSON API (1trade CLI + clients),
 #       /v1/* routed by path prefix: /v1/auth,/v1/account,/v1/billing → platform-core ·
 #       /v1/credits → credit-ledger · /v1/models,/v1/chat → inference-gateway · /v1/compute → compute.
 # The api host also serves the web app at "/" so a browser hitting it gets a page, not a 404. The web
@@ -8,7 +8,7 @@
 # web host. Both A records must point at the node IP; for TLS both must resolve before deploy.
 #
 # SECURITY model for a publicly-reachable API:
-#   • EXASCALE_ENV=sandbox (patch-env-sandbox.yaml) makes the credit-ledger stop trusting the
+#   • TRADE1_ENV=sandbox (patch-env-sandbox.yaml) makes the credit-ledger stop trusting the
 #     `X-Dev-Tenant` dev auth shortcut — the server rejects it.
 #   • The strip-dev-headers middleware below is defence-in-depth: it deletes X-Dev-Tenant / X-Dev-Paper
 #     at the edge for every request to these hosts, so the bypass can never be invoked from outside.
@@ -32,21 +32,21 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: exascale-web
+  name: 1trade-web
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt # inert until cert-manager + this issuer exist (TLS=1)
     traefik.ingress.kubernetes.io/router.middlewares: default-strip-dev-headers@kubernetescrd
 spec:
   ingressClassName: traefik
   tls:
-    - hosts: [EXASCALE_SANDBOX_HOST, EXASCALE_SANDBOX_API_HOST] # one SAN cert covers both
+    - hosts: [TRADE1_SANDBOX_HOST, TRADE1_SANDBOX_API_HOST] # one SAN cert covers both
       secretName: web-tls
   rules:
-    - host: EXASCALE_SANDBOX_HOST # web app (browser); the BFF /api/* proxies to services in-cluster
+    - host: TRADE1_SANDBOX_HOST # web app (browser); the BFF /api/* proxies to services in-cluster
       http:
         paths:
           - { path: /, pathType: Prefix, backend: { service: { name: web, port: { number: 3000 } } } }
-    - host: EXASCALE_SANDBOX_API_HOST # JSON API for the exascale CLI + external clients
+    - host: TRADE1_SANDBOX_API_HOST # JSON API for the 1trade CLI + external clients
       http:
         paths:
           - { path: /v1/auth, pathType: Prefix, backend: { service: { name: platform-core, port: { number: 8001 } } } }

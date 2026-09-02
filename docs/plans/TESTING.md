@@ -1,10 +1,10 @@
-# Testing Exascale
+# Testing 1Trade
 
 How to verify everything built so far. Two ways to read this:
 
 - **Part 1 — Frontend by persona (dev mode).** Click-through journeys for each of the app's three
   personas. Start here.
-- **Part 2 — Backend / CLI / automated.** `curl`, the `exascale` CLI, and `go test` — the proof
+- **Part 2 — Backend / CLI / automated.** `curl`, the `1trade` CLI, and `go test` — the proof
   underneath the UI.
 
 Covers tags **v0.1.0 → v0.1.5** (M1), **v0.2.0 → v0.2.16** (M2 + F01 hardening) and **v0.3.0** (M3 —
@@ -19,7 +19,7 @@ The web app is **always live** — there is no mock mode. Bring the stack up fir
 `:8001/:8002/:8085` answer), then:
 
 ```bash
-cd "Exascale Frontend"
+cd "1Trade Frontend"
 npm run dev                              # → http://localhost:3000 (needs the stack up)
 ```
 
@@ -59,7 +59,7 @@ via the sidebar persona pill.
   terms → **Open Account**.
 - This creates a **real account** (BFF `/api/auth/signup` → platform-core; httpOnly session cookie set)
   and **emails a verification link to Mailpit**, then routes to **`/onboarding/verify`**. Open
-  **Mailpit → http://localhost:8025**, open the *"Verify your Exascale email"* message, and click its
+  **Mailpit → http://localhost:8025**, open the *"Verify your 1Trade email"* message, and click its
   link — it consumes the token and lands you on **`/console`**. (You're already authenticated from
   signup, so you can also just open `/console` directly.)
 - **Easiest for testing:** once the account exists, use **`/login`** — it signs in and lands you
@@ -224,31 +224,31 @@ curl -s -o /dev/null -w 'revoke %{http_code}\n' -X DELETE $PC/v1/auth/keys/$KID 
 
 ### 2.8 CLI — F04
 ```bash
-make cli                                  # → bin/exascale
+make cli                                  # → bin/1trade
 EM="cli+$(date +%s)@dev.test"
-./bin/exascale signup --email "$EM" --password 'pw' --name 'CliQA'   # v0.1.5 --password
-./bin/exascale whoami
+./bin/1trade signup --email "$EM" --password 'pw' --name 'CliQA'   # v0.1.5 --password
+./bin/1trade whoami
 #   (mint credits for this tenant via §2.2, then:)
-./bin/exascale catalog
-./bin/exascale credits convert --from ai_index --to text --amount 100
-./bin/exascale infer chat -m llama-3.1-8b "Define a GPU in one line"
-./bin/exascale keys create --name production
+./bin/1trade catalog
+./bin/1trade credits convert --from ai_index --to text --amount 100
+./bin/1trade infer chat -m llama-3.1-8b "Define a GPU in one line"
+./bin/1trade keys create --name production
 ```
 
 ### 2.9 GPU instances — F13 (compute-control)
 ```bash
 # Port-forward compute-control if testing the CLI from the host (Tilt forwards :8086):
 #   kubectl port-forward svc/compute-control 8086:8086 &
-./bin/exascale gpu types                         # H100/H200 + price/hr + availability
-./bin/exascale gpu create --type h100 --count 2  # → instance id + ssh/jupyter/http connect info
-./bin/exascale gpu list                          # the new instance, running
-ID=$(./bin/exascale gpu list | awk 'NR==2{print $1}')
-./bin/exascale gpu get "$ID"
-./bin/exascale gpu stop "$ID"                     # frees GPUs back to the pool; ends billing
-./bin/exascale gpu start "$ID"                    # re-reserves (capacity permitting)
-./bin/exascale gpu delete "$ID"                   # terminate
+./bin/1trade gpu types                         # H100/H200 + price/hr + availability
+./bin/1trade gpu create --type h100 --count 2  # → instance id + ssh/jupyter/http connect info
+./bin/1trade gpu list                          # the new instance, running
+ID=$(./bin/1trade gpu list | awk 'NR==2{print $1}')
+./bin/1trade gpu get "$ID"
+./bin/1trade gpu stop "$ID"                     # frees GPUs back to the pool; ends billing
+./bin/1trade gpu start "$ID"                    # re-reserves (capacity permitting)
+./bin/1trade gpu delete "$ID"                   # terminate
 # A running instance meters compute.usage.v1 → ledger debits gpu_* (idempotent on usage_id);
-# check the drop with: ./bin/exascale credits balance   (gpu_h100 ticks down per metering interval)
+# check the drop with: ./bin/1trade credits balance   (gpu_h100 ticks down per metering interval)
 ```
 > Mock-GPU backend: instances boot instantly. The shared GPU pool is contended with the scheduler —
 > an instance holding all H100s makes a `POST /v1/compute/jobs` return **402** until it stops.
@@ -257,7 +257,7 @@ ID=$(./bin/exascale gpu list | awk 'NR==2{print $1}')
 ```bash
 for s in credit-ledger platform-core inference-gateway compute-control; do (cd services/$s && go vet ./... && go test ./...); done
 (cd apps/cli && go vet ./... && go test ./...)
-(cd "Exascale Frontend" && npm run typecheck)     # pre-existing chart-lib errors are unrelated
+(cd "1Trade Frontend" && npm run typecheck)     # pre-existing chart-lib errors are unrelated
 ```
 
 ---
@@ -271,7 +271,7 @@ for s in credit-ledger platform-core inference-gateway compute-control; do (cd s
 | F02 API keys | v0.2.0, v0.2.8 | UI 1A·7 / §2.6 | ✅ |
 | F02 email verify, budgets | v0.1.3 | `openapi/platform-core.yaml` | 📄 |
 | F03 accounts/orgs/RBAC + audit | v0.1.2 | §2.7 (403 + audit) / console | 📄 |
-| F04 exascale CLI (+ `--password`) | v0.1.4, v0.1.5 | §2.8 | ✅ |
+| F04 1trade CLI (+ `--password`) | v0.1.4, v0.1.5 | §2.8 | ✅ |
 | F05 credit ledger (chain, idempotency) | v0.1.0+ | UI 1A·6 / §2.2 | ✅ |
 | F06 billing (Stripe → mint) | v0.2.1 | UI 1A·4 / §2.7 | 🔁📄 |
 | F07 credit conversion | v0.2.4 | UI 1A·6 / §2.4 | ✅ |

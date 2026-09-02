@@ -10,12 +10,12 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/exascale/platform-core/internal/billing"
-	"github.com/exascale/platform-core/internal/config"
-	"github.com/exascale/platform-core/internal/domain"
-	"github.com/exascale/platform-core/internal/email"
-	"github.com/exascale/platform-core/internal/storage"
-	"github.com/exascale/platform-core/internal/store"
+	"github.com/trade1/platform-core/internal/billing"
+	"github.com/trade1/platform-core/internal/config"
+	"github.com/trade1/platform-core/internal/domain"
+	"github.com/trade1/platform-core/internal/email"
+	"github.com/trade1/platform-core/internal/storage"
+	"github.com/trade1/platform-core/internal/store"
 	"github.com/google/uuid"
 )
 
