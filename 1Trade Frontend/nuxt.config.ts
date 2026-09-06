@@ -84,6 +84,7 @@ export default defineNuxtConfig({
     gatewayUrl: process.env.INFERENCE_GATEWAY_URL || 'http://localhost:8085',
     ledgerUrl: process.env.CREDIT_LEDGER_URL || 'http://localhost:8002',
     computeUrl: process.env.COMPUTE_CONTROL_URL || 'http://localhost:8086',
+    tradingUrl: process.env.MATCHING_ENGINE_URL || 'http://localhost:8087',
   },
 
   // No Tailwind for v1 — keeps tokens.css the sole styling language.
