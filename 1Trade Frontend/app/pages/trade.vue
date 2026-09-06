@@ -51,12 +51,31 @@ const high24h = ref(0.001012)
 const low24h  = ref(0.000996)
 const flashHeader = ref<'up' | 'down' | null>(null)
 
-const positions = reactive<Position[]>([
-  { market: 'EAI-IDX',    side: 'long',  size: 50000, entry: 0.000980, mark: 0.001005 },
-  { market: 'TEXT-SPOT',  side: 'long',  size: 12000, entry: 0.00118,  mark: 0.00120 },
-  { market: 'IMAGE-SPOT', side: 'short', size: 5000,  entry: 0.00810,  mark: 0.00798 },
-  { market: 'H100-SPOT',  side: 'long',  size: 8,     entry: 2.95,     mark: 2.99 },
-])
+interface PositionApi {
+  product_id: string; side: string; net_quantity: string
+  avg_entry_price: string; mark_price: string; is_paper: boolean
+}
+
+// The caller's real paper positions. These were four hardcoded rows whose marks were nudged by
+// Math.random on a timer — a P&L that responded to nothing. The engine holds the paper book.
+const positions = reactive<Position[]>([])
+const positionsErr = ref('')
+
+async function loadPositions() {
+  try {
+    const r = await $fetch<{ positions: PositionApi[] }>('/api/trading/positions')
+    positions.splice(0, positions.length, ...(r.positions ?? []).map((p) => ({
+      market: p.product_id,
+      side: (p.side === 'short' ? 'short' : 'long') as 'long' | 'short',
+      size: Number(p.net_quantity),
+      entry: Number(p.avg_entry_price),
+      mark: Number(p.mark_price),
+    })))
+    positionsErr.value = ''
+  } catch {
+    positionsErr.value = 'Positions unavailable — retrying…'
+  }
+}
 
 const posTab = ref<'open' | 'closed' | 'all'>('open')
 
@@ -93,31 +112,57 @@ let candleSeries: ReturnType<NonNullable<typeof chart>['addCandlestickSeries']> 
 let volumeSeries: ReturnType<NonNullable<typeof chart>['addHistogramSeries']> | null = null
 let chartRO: ResizeObserver | null = null
 
-interface Candle { time: number; open: number; high: number; low: number; close: number }
+interface Candle { time: number; open: number; high: number; low: number; close: number; volume: number }
 const candles: Candle[] = []
 let lastBarTime = 0
 let lastBarOpen = 0.001005
 
-function seedChart() {
-  const N = 200
-  let p = 0.001005
-  const target = 0.001005
-  const startTime = Math.floor(Date.now() / 1000) - N * 60
-  for (let i = 0; i < N; i++) {
-    const drift = (target - p) * 0.02
-    const noise = (Math.random() - 0.5) * 0.0000035
-    const open = p
-    const close = Math.max(0.00094, Math.min(0.001065, p + drift + noise))
-    const swing = Math.random() * 0.0000025 + 0.0000005
-    const high = Math.max(open, close) + swing
-    const low  = Math.min(open, close) - swing
-    const t = startTime + i * 60
-    candles.push({ time: t, open, high, low, close })
-    p = close
+interface CandleApi { time: number; open: string; high: string; low: string; close: string; volume: string }
+const chartErr = ref('')
+
+/**
+ * loadCandles pulls the OHLCV series from the engine.
+ *
+ * The chart used to generate 200 bars locally and extend them on a timer, so its "history"
+ * disagreed with the book, the tape and /markets. The engine publishes the series — simulated
+ * while the venue is paused, but simulated once, server-side — so every surface agrees. Volume is
+ * real too; it was previously exp(random) purely for bar height.
+ */
+async function loadCandles(): Promise<boolean> {
+  try {
+    const r = await $fetch<{ candles: CandleApi[] }>(
+      `/api/trading/products/${PRODUCT_ID}/candles`, { query: { interval: '1m', limit: 200 } },
+    )
+    const rows = (r.candles ?? []).map((c) => ({
+      time: c.time,
+      open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close),
+      volume: Number(c.volume),
+    }))
+    if (!rows.length) return false
+    candles.splice(0, candles.length, ...rows)
+    const last = candles[candles.length - 1]!
+    midPrice.value = last.close
+    lastBarTime = last.time
+    lastBarOpen = last.open
+    chartErr.value = ''
+    return true
+  } catch {
+    chartErr.value = 'Chart data unavailable — retrying…'
+    return false
   }
-  midPrice.value = candles[candles.length - 1]!.close
-  lastBarTime = candles[candles.length - 1]!.time
-  lastBarOpen = candles[candles.length - 1]!.open
+}
+
+/** applyCandles pushes the current series into the chart. */
+function applyCandles() {
+  if (!candleSeries || !volumeSeries || !candles.length) return
+  candleSeries.setData(candles.map((c) => ({
+    time: c.time as never, open: c.open, high: c.high, low: c.low, close: c.close,
+  })))
+  volumeSeries.setData(candles.map((c) => ({
+    time: c.time as never,
+    value: c.volume,
+    color: c.close >= c.open ? 'rgba(25,195,125,0.30)' : 'rgba(239,68,68,0.30)',
+  })))
 }
 
 function initChart() {
@@ -166,14 +211,7 @@ function initChart() {
   })
   volumeSeries.priceScale().applyOptions({ scaleMargins: { top: 0.80, bottom: 0 } })
 
-  const cdata = candles.map(c => ({ time: c.time as never, open: c.open, high: c.high, low: c.low, close: c.close }))
-  const vdata = candles.map(c => ({
-    time: c.time as never,
-    value: Math.exp(Math.random() * 1.5 + 6),
-    color: c.close >= c.open ? 'rgba(25,195,125,0.30)' : 'rgba(239,68,68,0.30)',
-  }))
-  candleSeries.setData(cdata)
-  volumeSeries.setData(vdata)
+    applyCandles()
   chart.timeScale().fitContent()
 
   chartRO = new ResizeObserver(() => {
@@ -187,50 +225,16 @@ function initChart() {
   chartRO.observe(chartContainer.value)
 }
 
-function chartTick() {
-  if (!candleSeries || !volumeSeries || candles.length === 0) return
-  const now = Math.floor(Date.now() / 1000)
-  const newBar = now - lastBarTime >= 60
-
-  const drift = (0.001005 - midPrice.value) * 0.04
-  const noise = (Math.random() - 0.5) * 0.0000028
-  const next = Math.max(0.00094, Math.min(0.001065, midPrice.value + drift + noise))
+/** chartTick re-reads the series from the engine. The old version extended a local random walk,
+ *  which drifted away from every other surface within a minute. */
+async function chartTick() {
+  if (!candleSeries || !volumeSeries) return
   const prevMid = midPrice.value
-  midPrice.value = next
-
-  if (newBar) {
-    lastBarTime += 60
-    lastBarOpen = candles[candles.length - 1]!.close
-    const bar: Candle = {
-      time: lastBarTime,
-      open: lastBarOpen,
-      high: Math.max(lastBarOpen, next),
-      low:  Math.min(lastBarOpen, next),
-      close: next,
-    }
-    candles.push(bar)
-    candleSeries.update({ time: bar.time as never, open: bar.open, high: bar.high, low: bar.low, close: bar.close })
-    const vol = Math.exp(Math.random() * 1.5 + 6)
-    volumeSeries.update({
-      time: bar.time as never,
-      value: vol,
-      color: next >= lastBarOpen ? 'rgba(25,195,125,0.30)' : 'rgba(239,68,68,0.30)',
-    })
-  } else {
-    const cur = candles[candles.length - 1]!
-    cur.close = next
-    cur.high  = Math.max(cur.high, next)
-    cur.low   = Math.min(cur.low, next)
-    candleSeries.update({ time: cur.time as never, open: cur.open, high: cur.high, low: cur.low, close: cur.close })
+  if (await loadCandles()) {
+    applyCandles()
+    midFlash.value = midPrice.value >= prevMid ? 'up' : 'down'
+    setTimeout(() => { midFlash.value = null }, 700)
   }
-
-  high24h.value = Math.max(high24h.value, next)
-  low24h.value  = Math.min(low24h.value, next)
-
-  flashHeader.value = next >= prevMid ? 'up' : 'down'
-  setTimeout(() => { flashHeader.value = null }, 700)
-
-  syncPositions()
 }
 
 // =====================================================
@@ -453,9 +457,6 @@ function posMarkFmt(p: Position) {
 
 function syncPositions() {
   positions[0]!.mark = midPrice.value
-  positions[1]!.mark += (0.00120 - positions[1]!.mark) * 0.05 + (Math.random() - 0.5) * 0.000004
-  positions[2]!.mark += (0.00798 - positions[2]!.mark) * 0.05 + (Math.random() - 0.5) * 0.00003
-  positions[3]!.mark += (2.99 - positions[3]!.mark) * 0.05 + (Math.random() - 0.5) * 0.005
 }
 
 const totalPnl = computed(() => positions.reduce((s, p) => s + pnl(p), 0))
@@ -467,15 +468,18 @@ const totalValue = computed(() => 10247.83 + (totalPnl.value - 23.41))
 let chartInterval: ReturnType<typeof setInterval> | null = null
 let bookInterval:  ReturnType<typeof setInterval> | null = null
 let tapeInterval:  ReturnType<typeof setInterval> | null = null
+let positionsInterval: ReturnType<typeof setInterval> | null = null
 
-onMounted(() => {
-  seedChart()
+onMounted(async () => {
+  await loadCandles()
   initChart()
   void loadBook()
   void loadTape()
-  chartInterval = setInterval(chartTick, 3000)
+  void loadPositions()
+  chartInterval = setInterval(() => { void chartTick() }, 5000)
   bookInterval  = setInterval(() => { void loadBook() }, 2000)
   tapeInterval  = setInterval(() => { void loadTape() }, 3000)
+  positionsInterval = setInterval(() => { void loadPositions() }, 5000)
 })
 onBeforeUnmount(() => {
   if (chartInterval) clearInterval(chartInterval)
