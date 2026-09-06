@@ -77,7 +77,34 @@ async function loadPositions() {
   }
 }
 
-const posTab = ref<'open' | 'closed' | 'all'>('open')
+// The footer tabs were inert: they set this ref, but the table always rendered `positions`, so
+// "Closed" and "All" showed open positions. They now select between three real datasets the
+// engine actually serves.
+const posTab = ref<'positions' | 'orders' | 'fills'>('positions')
+
+interface OrderRow {
+  order_id: string; product_id: string; side: string; order_type: string
+  quantity: string; limit_price?: string; status: string; created_at: string
+}
+interface FillRow {
+  fill_id: string; product_id: string; side: string; price: string; quantity: string
+  notional: string; fee: string; liquidity: string; executed_at: string
+}
+
+const orders = ref<OrderRow[]>([])
+const fills = ref<FillRow[]>([])
+
+/** Open orders. Legitimately empty while the venue is paused — order entry returns 503, so none
+ *  can exist. The panel says so rather than inventing rows. */
+async function loadOrders() {
+  try { orders.value = (await $fetch<{ orders: OrderRow[] }>('/api/trading/orders')).orders ?? [] }
+  catch { /* keep the last good list; the empty state covers a cold start */ }
+}
+/** Executed paper fills, with the engine's fee and maker/taker liquidity. */
+async function loadFills() {
+  try { fills.value = (await $fetch<{ fills: FillRow[] }>('/api/trading/fills')).fills ?? [] }
+  catch { /* keep the last good list */ }
+}
 
 // =====================================================
 // Formatters
@@ -476,10 +503,12 @@ onMounted(async () => {
   void loadBook()
   void loadTape()
   void loadPositions()
+  void loadOrders()
+  void loadFills()
   chartInterval = setInterval(() => { void chartTick() }, 5000)
   bookInterval  = setInterval(() => { void loadBook() }, 2000)
   tapeInterval  = setInterval(() => { void loadTape() }, 3000)
-  positionsInterval = setInterval(() => { void loadPositions() }, 5000)
+  positionsInterval = setInterval(() => { void loadPositions(); void loadOrders(); void loadFills() }, 5000)
 })
 onBeforeUnmount(() => {
   if (chartInterval) clearInterval(chartInterval)
@@ -741,26 +770,26 @@ onBeforeUnmount(() => {
     <!-- ============ POSITIONS FOOTER ============ -->
     <section class="positions">
       <div class="pos-head">
-        <span class="pos-title">Positions</span>
+        <span class="pos-title">Account</span>
         <div class="pos-tabs">
           <button
             class="pos-tab"
-            :class="{ active: posTab === 'open' }"
+            :class="{ active: posTab === 'positions' }"
             type="button"
-            @click="posTab = 'open'"
-          >Open<span class="count">· {{ positions.length }}</span></button>
+            @click="posTab = 'positions'"
+          >Positions<span class="count">· {{ positions.length }}</span></button>
           <button
             class="pos-tab"
-            :class="{ active: posTab === 'closed' }"
+            :class="{ active: posTab === 'orders' }"
             type="button"
-            @click="posTab = 'closed'"
-          >Closed</button>
+            @click="posTab = 'orders'"
+          >Orders<span class="count">· {{ orders.length }}</span></button>
           <button
             class="pos-tab"
-            :class="{ active: posTab === 'all' }"
+            :class="{ active: posTab === 'fills' }"
             type="button"
-            @click="posTab = 'all'"
-          >All</button>
+            @click="posTab = 'fills'"
+          >Fills<span class="count">· {{ fills.length }}</span></button>
         </div>
         <div class="pos-stats">
           <div class="stat">
@@ -817,6 +846,7 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.pos-empty { text-align: center; color: var(--text-3); padding: var(--sp-5) var(--sp-4); font-size: var(--fs-sm); }
 /* Order result — the paused refusal is informational, not an error the user caused. */
 .order-msg {
   margin: var(--sp-3) 0 0; padding: var(--sp-3);
