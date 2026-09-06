@@ -174,6 +174,11 @@ func (s *Server) signup(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusCreated, map[string]any{"status": "verification_required", "email": b.Email})
 		return
 	}
+	// No verification gate (local dev): the account is usable the moment it exists, so the starter
+	// grant belongs here. Granting only on verify would leave every account in a gate-less
+	// environment with a zero balance, while onboarding told the user credits were waiting.
+	// Same idempotency key as the verify path, so an account can never be granted twice.
+	s.grantTrialCredits(r, u.TenantID, u.ID)
 	s.issue(w, http.StatusCreated, u.ID, domain.Claims{TenantID: u.TenantID, Roles: u.Roles, IsPaper: u.IsPaper})
 }
 

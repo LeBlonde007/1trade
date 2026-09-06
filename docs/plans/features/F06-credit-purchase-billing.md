@@ -69,3 +69,28 @@ Customer → POST /v1/credits/purchase { amount, credit_type, currency, idempote
 
 - M2 (Gate 2): first real Stripe purchase books to ledger.
 - M3 (Gate 3): first real ACH/wire enterprise purchase.
+
+---
+
+## Status — starter grant added (2026-09-06)
+
+**New, previously unplanned scope.** A one-time **trial grant** now mints credits without a
+purchase. It appeared in no feature doc (checked F02/F05/F06) but books to the ledger, so it is
+recorded here as F06's concern.
+
+- **What:** 25.000000 `text` credits, once per tenant (`TrialCreditAmount` /
+  `TrialCreditType` in `platform-core/internal/api/gaps.go`).
+- **When:** at the point the account becomes usable — on email verification where the gate is on,
+  on signup where it is not. Granting only on verify silently did nothing in any environment with
+  `RequireEmailVerification=false`, leaving a zero balance while onboarding announced credits.
+- **Always `is_paper: true`**, regardless of the tenant's own flag — a free grant must never reach a
+  real-money balance.
+- **Idempotent** on tenant id via the ledger's `Idempotency-Key`, so a replayed verification link
+  cannot mint twice.
+- **Best-effort:** a ledger outage logs and continues rather than failing an otherwise-valid
+  verification. Audited as `tenant.trial_credits.grant`.
+- Tests cover both grant paths, paper-only, and no-double-grant-on-replay.
+
+**Open**
+- [ ] Amount (25) is a placeholder, not a business decision — ~5,000 tokens on `llama-3.2-1b`.
+- [ ] No expiry, and no abuse control: one free grant per *tenant*, and signup creates a tenant.

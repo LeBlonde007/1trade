@@ -1,10 +1,16 @@
 <script setup lang="ts">
 /**
- * /onboarding/welcome — First-login welcome (D2-B)
+ * /onboarding/welcome — first screen after email verification.
  *
- * Light, layout-less. Lands after KYC is complete + email verified.
- * Single primary CTA → /trade. Secondary: 60-second product tour.
+ * Light, layout-less. Two paths off one persona check:
+ *   - AI company / datacenter → ACTIVATION. Starter credits are already granted (platform-core
+ *     does it on verify, or on signup when no verification gate is configured), the API key is
+ *     minted here, and the first request is shown ready to run.
+ *     The goal is that this screen is the last one before a real metered call, not a menu of
+ *     places to go next.
+ *   - trader → the paper-account + live-index showcase, then the KYC gate (exchange is paused).
  *
+ * The guided tour stays an optional link; it is not in the path to first action.
  * Brief warmth, no consumer-cheer. Trust-building via real numbers.
  */
 definePageMeta({ layout: false })
@@ -22,14 +28,64 @@ const ctaLabel = computed(() => ({
   trader: 'Continue', enterprise: 'Go to your console', partner: 'Go to your dashboard',
 }[personaCx.persona.value]))
 
-// AI-company quick-start (the live product) — three first actions, numbers-first per the design
-// system. Real values: H100 $2.99/hr, H200 $3.49/hr (credit-types.md §1); text ≈ $0.00121 / 1K.
-interface QuickStart { cap: string; big: string; sub: string; to: string; go: string }
-const quickStart: QuickStart[] = [
-  { cap: 'Inference', big: '$0.00121', sub: 'per 1K text credits · OpenAI-compatible API · curated SoTA models', to: '/inference', go: 'Open the playground →' },
-  { cap: 'GPU compute', big: '$2.99 / hr', sub: 'H100 on-demand · per-second billing · <90s start · H200 $3.49/hr', to: '/compute/new', go: 'Launch an instance →' },
-  { cap: 'Credits', big: '$0 egress', sub: 'prepaid credits · live balance + full audit trail · top up with a card', to: '/wallet/buy', go: 'Buy credits →' },
-]
+// ─── AI-company activation ───────────────────────────────────────────────────────────────
+// This screen used to be three links to other screens. Signup creates a tenant with NO key and
+// NO credits, so an AI company had to visit Settings for a key and then Wallet to pay before the
+// first API call — four screens and a card, against the sub-5-minute time-to-first-action
+// commitment. It now provisions instead: platform-core grants the starter paper balance at the
+// point the account becomes usable, and the key is minted right here, so the request below runs
+// immediately. Step 1 reports the balance it actually read back — it never asserts a grant.
+const { create: createApiKey } = useKeys()
+const creating = ref(false)
+const keyError = ref('')
+const secret = ref('')
+const copied = ref(false)
+const trialCredits = ref<string | null>(null)
+
+/** True only once a positive balance has actually been read back from the ledger. */
+const hasCredits = computed(() => {
+  const v = Number(trialCredits.value ?? 0)
+  return Number.isFinite(v) && v > 0
+})
+
+/** The starter balance granted on verification. Shown as proof they can spend before paying. */
+async function loadTrialBalance() {
+  try {
+    const r = await $fetch<{ balances: { credit_type: string; balance: string }[] }>('/api/wallet/balances')
+    trialCredits.value = r.balances?.find((b) => b.credit_type === 'text')?.balance ?? null
+  } catch { /* console shows the real balance either way — never block onboarding on this */ }
+}
+
+/** Mint the tenant's first key. The secret is returned once, so it is held only in memory here. */
+async function mintFirstKey() {
+  if (creating.value || secret.value) return
+  creating.value = true
+  keyError.value = ''
+  try {
+    const r = await createApiKey('Default key', [])
+    secret.value = r.secret
+  } catch {
+    keyError.value = 'Could not create the key. Open the console and try again from Settings.'
+  } finally {
+    creating.value = false
+  }
+}
+
+/** Copy the ready-to-run request, secret included — the point is that it works unedited. */
+async function copyCurl() {
+  try {
+    await navigator.clipboard.writeText(curlSnippet.value)
+    copied.value = true
+    setTimeout(() => { copied.value = false }, 1800)
+  } catch { /* clipboard blocked — the block is selectable */ }
+}
+
+const curlSnippet = computed(() => `curl "$TRADE1_BASE/v1/chat/completions" \\
+  -H "Authorization: Bearer ${secret.value || '<your-key>'}" \\
+  -H "Content-Type: application/json" \\
+  -d '{"model":"llama-3.1-8b","messages":[{"role":"user","content":"Say hi in three words"}]}'`)
+
+onMounted(() => { if (!isTrader.value) loadTrialBalance() })
 
 // Live AI Index (mean reversion to 1.0024)
 const indexValue = ref<number>(1.0024)
@@ -91,14 +147,64 @@ function fmtDelta(pct: number): string {
         <h1>Welcome to 1Trade, {{ firstName }}.</h1>
         <p class="sub">{{ isTrader ? 'Your paper trading account is ready.' : 'Inference and GPU compute on prepaid credits. Here\'s where to start.' }}</p>
 
-        <!-- AI company (the live product): three first actions, numbers-first -->
-        <div v-if="!isTrader" class="cards">
-          <NuxtLink v-for="(q, i) in quickStart" :key="q.cap" :to="q.to" class="card qs" :class="`c-${i + 1}`">
-            <div class="cap">{{ q.cap }}</div>
-            <div class="big mono">{{ q.big }}</div>
-            <div class="sub-line">{{ q.sub }}</div>
-            <span class="qs-go">{{ q.go }}</span>
-          </NuxtLink>
+        <!-- AI company: activation, not a menu. Everything needed for the first call is here. -->
+        <div v-if="!isTrader" class="act">
+          <ol class="steps">
+            <!-- Reports the REAL balance. Never claim credits were added without having read
+                 them back — if the grant failed, saying otherwise sends the user to a 402. -->
+            <li class="step" :class="{ done: hasCredits }">
+              <span class="s-n">{{ hasCredits ? '✓' : '1' }}</span>
+              <div class="s-body">
+                <template v-if="hasCredits">
+                  <h2 class="s-t">Starter credits added</h2>
+                  <p class="s-d">
+                    <span class="mono s-amt">{{ trialCredits }}</span> text credits, on the house —
+                    enough to run the request below. Paper balance, so nothing is charged.
+                  </p>
+                </template>
+                <template v-else>
+                  <h2 class="s-t">Credits</h2>
+                  <p class="s-d">
+                    Your starter balance isn't showing yet. It usually lands within a moment of
+                    verifying — the console has the live balance, and you can top up any time.
+                  </p>
+                  <NuxtLink to="/wallet/buy" class="s-link">Buy credits →</NuxtLink>
+                </template>
+              </div>
+            </li>
+
+            <li class="step" :class="{ done: !!secret }">
+              <span class="s-n">{{ secret ? '✓' : '2' }}</span>
+              <div class="s-body">
+                <h2 class="s-t">Your API key</h2>
+                <template v-if="!secret">
+                  <p class="s-d">One key, scoped to this account. The secret is shown once.</p>
+                  <button class="btn-key" type="button" :disabled="creating" @click="mintFirstKey">
+                    {{ creating ? 'Creating…' : 'Create my API key' }}
+                  </button>
+                  <p v-if="keyError" class="s-err">{{ keyError }}</p>
+                </template>
+                <template v-else>
+                  <p class="s-d">Copy it now — it is not retrievable again.</p>
+                  <code class="secret mono">{{ secret }}</code>
+                </template>
+              </div>
+            </li>
+
+            <li class="step">
+              <span class="s-n">3</span>
+              <div class="s-body">
+                <h2 class="s-t">Make your first call</h2>
+                <p class="s-d">
+                  OpenAI-compatible. Set <code class="ic mono">TRADE1_BASE</code> to your gateway URL and run:
+                </p>
+                <div class="code">
+                  <button class="code-copy" type="button" @click="copyCurl">{{ copied ? 'Copied' : 'Copy' }}</button>
+                  <pre class="mono"><code>{{ curlSnippet }}</code></pre>
+                </div>
+              </div>
+            </li>
+          </ol>
         </div>
 
         <!-- Trader (paused exchange): the live index + markets showcase -->
@@ -364,5 +470,78 @@ function fmtDelta(pct: number): string {
   .cards { grid-template-columns: 1fr; }
   .hero h1 { font-size: 36px; }
   .chrome, .page-foot { padding-left: 24px; padding-right: 24px; }
+}
+</style>
+
+<style scoped>
+/* ── AI-company activation ──
+   A numbered checklist rather than a card grid: these are steps with an order and a state,
+   not destinations to choose between. Step 1 lands already done, so the screen opens on
+   something the account HAS rather than something it must go do. */
+.act { text-align: left; margin: var(--sp-6) 0 var(--sp-7); }
+
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-5); }
+
+.step { display: grid; grid-template-columns: 26px 1fr; gap: var(--sp-4); align-items: start; }
+
+.s-n {
+  width: 26px; height: 26px; border-radius: 50%;
+  display: grid; place-items: center;
+  font-family: var(--font-mono); font-size: var(--fs-xs); font-weight: 600;
+  color: var(--text-3);
+  border: 1px solid var(--border-strong);
+  background: var(--elevated);
+}
+.step.done .s-n { color: var(--text-on-accent); background: var(--brand); border-color: var(--brand); }
+
+.s-t { font-size: var(--fs-md); font-weight: 600; letter-spacing: var(--ls-near); margin: 2px 0 var(--sp-2); }
+.s-d { font-size: var(--fs-sm); line-height: var(--lh-relax); color: var(--text-2); margin: 0 0 var(--sp-3); }
+.s-amt { color: var(--text); font-weight: 600; }
+.s-err { font-size: var(--fs-sm); color: var(--neg); margin: var(--sp-2) 0 0; }
+.s-link { font-size: var(--fs-sm); font-weight: 600; color: var(--brand); text-decoration: none; }
+.s-link:hover { text-decoration: underline; }
+
+.btn-key {
+  font: inherit; font-size: var(--fs-sm); font-weight: 600;
+  padding: 8px 14px; border-radius: var(--radius-sm); cursor: pointer;
+  background: var(--brand); color: var(--text-on-accent); border: 1px solid var(--brand);
+  transition: background-color var(--dur) var(--ease);
+}
+.btn-key:hover:not(:disabled) { background: var(--brand-hov); border-color: var(--brand-hov); }
+.btn-key:disabled { opacity: 0.6; cursor: default; }
+
+/* The one-time secret: full width, selectable, wrapping — it must never be visually truncated. */
+.secret {
+  display: block; width: 100%;
+  padding: 10px 12px;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  background: var(--sunken);
+  border: 1px solid var(--brand);
+  border-radius: var(--radius-sm);
+  word-break: break-all;
+  user-select: all;
+}
+
+.ic {
+  font-size: 0.92em; padding: 1px 5px;
+  background: var(--sunken); border: 1px solid var(--border); border-radius: 2px;
+}
+
+.code { position: relative; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--sunken); }
+.code pre { margin: 0; padding: 12px; overflow-x: auto; font-size: 12px; line-height: 1.65; color: var(--text); }
+.code-copy {
+  position: absolute; top: 8px; right: 8px;
+  font-family: var(--font-mono); font-size: var(--fs-tiny);
+  letter-spacing: var(--ls-tab); text-transform: uppercase;
+  padding: 3px 8px; cursor: pointer;
+  color: var(--text-2); background: var(--elevated);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+}
+.code-copy:hover { color: var(--brand); border-color: var(--brand); }
+
+@media (max-width: 560px) {
+  .step { grid-template-columns: 22px 1fr; gap: var(--sp-3); }
+  .code pre { font-size: 11px; }
 }
 </style>

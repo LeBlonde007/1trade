@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/trade1/platform-core/internal/billing"
 	"github.com/trade1/platform-core/internal/domain"
 	"github.com/trade1/platform-core/internal/email"
 	"github.com/trade1/platform-core/internal/store"
@@ -47,7 +48,47 @@ func (s *Server) verifyEmail(w http.ResponseWriter, r *http.Request) {
 	_, _ = s.st.WriteAudit(r.Context(), store.AuditEntry{
 		TenantID: tenantID, ActorID: userID, Action: "user.email.verify", TargetType: "user", TargetID: userID, IsPaper: isPaper,
 	})
+	s.grantTrialCredits(r, tenantID, userID)
 	writeJSON(w, http.StatusOK, map[string]any{"verified": true})
+}
+
+// TrialCreditType / TrialCreditAmount — the starter grant a tenant receives once, on email
+// verification. `text` is the credit type chat + code inference debits, so this is the balance that
+// makes the very first API call work.
+const (
+	TrialCreditType   = "text"
+	TrialCreditAmount = "25.000000"
+)
+
+// grantTrialCredits mints the one-time starter balance so a verified account can make a real
+// metered call without buying anything first — signup previously produced a tenant with no key and
+// no credits, which put a payment between the user and their first request.
+//
+// ALWAYS paper, regardless of the tenant's own is_paper: a free grant must never land in a
+// real-money balance. Idempotent on the tenant id, so re-verifying (or a retried request) tops up
+// nobody twice — the ledger dedupes on Idempotency-Key. Best-effort: a ledger outage must not fail
+// an otherwise-valid verification, so failures are logged and swallowed.
+func (s *Server) grantTrialCredits(r *http.Request, tenantID, userID string) {
+	err := s.booker.BookPurchase(r.Context(), billing.PurchaseBooking{
+		TenantID:       tenantID,
+		Amount:         TrialCreditAmount,
+		CreditType:     TrialCreditType,
+		IsPaper:        true,
+		ReferenceID:    "trial-grant:" + tenantID,
+		IdempotencyKey: "trial-grant:" + tenantID,
+	})
+	if err != nil {
+		slog.Error("grant trial credits", "tenant_id", tenantID, "err", err)
+		return
+	}
+	slog.Info("audit: trial credits granted",
+		"tenant_id", tenantID, "user_id", userID,
+		"credit_type", TrialCreditType, "amount", TrialCreditAmount, "is_paper", true)
+	_, _ = s.st.WriteAudit(r.Context(), store.AuditEntry{
+		TenantID: tenantID, ActorID: userID, Action: "tenant.trial_credits.grant",
+		TargetType: "tenant", TargetID: tenantID, IsPaper: true,
+		After: map[string]any{"credit_type": TrialCreditType, "amount": TrialCreditAmount},
+	})
 }
 
 // resendVerify issues a fresh email-verification token. Two modes:
