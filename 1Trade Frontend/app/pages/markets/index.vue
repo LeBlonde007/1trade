@@ -7,55 +7,55 @@
 definePageMeta({ layout: 'app', middleware: 'auth' })
 useHead({ title: 'Markets — 1Trade' })
 
+/**
+ * A market row as the BFF delivers it. Shape follows the engine's product + summary rather than a
+ * frontend invention, so the columns cannot drift from what the exchange actually publishes.
+ */
 interface Market {
-  sym: string
-  desc: string
-  family: 'Index' | 'Text' | 'Speech' | 'Image' | 'Video' | 'GPU'
-  px: number
-  precision: number
-  deltaPct: number
+  product_id: string
+  name: string
+  description: string
+  family: string
+  credit_type: string
+  product_type: string
+  quote_precision: number
+  tradeable: boolean
+  is_paper: boolean
+  last: number
+  changePct24h: number
   spreadBps: number
-  vol24h: number
-  spark: number[]
+  volume24h: number
+  high24h: number
+  low24h: number
 }
+interface ExchangeStatus { state: string; reason: string; methodology_url: string }
 
-function genSpark(base: number, vol: number, n = 32): number[] {
-  const pts: number[] = []
-  let v = 1
-  for (let i = 0; i < n; i++) {
-    v = v + (1 - v) * 0.04 + (Math.random() - 0.5) * vol
-    pts.push(base * v)
+// Live from the matching engine. Prices are simulated while the venue is paused, but simulated
+// SERVER-side — this page used to run its own Brownian motion, which meant /markets and /trade
+// could disagree about the same product. The engine is the single source of truth; the page only
+// re-fetches.
+const markets = ref<Market[]>([])
+const exchangeStatus = ref<ExchangeStatus | null>(null)
+const loading = ref(true)
+const loadError = ref('')
+
+async function loadMarkets() {
+  try {
+    const r = await $fetch<{ exchange_status: ExchangeStatus; markets: Market[] }>('/api/trading/markets')
+    markets.value = r.markets ?? []
+    exchangeStatus.value = r.exchange_status ?? null
+    loadError.value = ''
+  } catch {
+    loadError.value = 'Could not reach the exchange. Retrying…'
+  } finally {
+    loading.value = false
   }
-  return pts
 }
 
-const markets = reactive<Market[]>([
-  { sym: 'EAI-IDX',    desc: 'AI Index · spot',         family: 'Index',  px: 0.001005, precision: 6, deltaPct: 0.18,  spreadBps: 4.0,  vol24h: 12_400_000, spark: genSpark(0.001005, 0.004) },
-  { sym: 'TEXT-SPOT',  desc: 'Text credit · spot',      family: 'Text',   px: 0.001210, precision: 6, deltaPct: 1.84,  spreadBps: 5.2,  vol24h: 8_120_000,  spark: genSpark(0.001210, 0.006) },
-  { sym: 'TEXT-PERP',  desc: 'Text credit · perp',      family: 'Text',   px: 0.001215, precision: 6, deltaPct: 1.71,  spreadBps: 6.0,  vol24h: 4_320_000,  spark: genSpark(0.001215, 0.007) },
-  { sym: 'SPEECH-SPOT',desc: 'Speech credit · spot',    family: 'Speech', px: 0.001200, precision: 6, deltaPct: 0.42,  spreadBps: 6.8,  vol24h: 2_140_000,  spark: genSpark(0.001200, 0.005) },
-  { sym: 'IMAGE-SPOT', desc: 'Image credit · spot',     family: 'Image',  px: 0.008000, precision: 6, deltaPct: -0.62, spreadBps: 8.4,  vol24h: 5_810_000,  spark: genSpark(0.008000, 0.008) },
-  { sym: 'IMAGE-PERP', desc: 'Image credit · perp',     family: 'Image',  px: 0.008012, precision: 6, deltaPct: -0.78, spreadBps: 9.2,  vol24h: 3_220_000,  spark: genSpark(0.008012, 0.010) },
-  { sym: 'VIDEO-SPOT', desc: 'Video credit · spot',     family: 'Video',  px: 0.250000, precision: 4, deltaPct: 0.14,  spreadBps: 12.0, vol24h: 1_840_000,  spark: genSpark(0.250000, 0.006) },
-  { sym: 'NICHE-SPOT', desc: 'Niche models · spot',     family: 'Text',   px: 0.000400, precision: 6, deltaPct: -0.10, spreadBps: 14.0, vol24h: 420_000,    spark: genSpark(0.000400, 0.008) },
-  { sym: 'H100-SPOT',  desc: 'H100 GPU-hour · spot',    family: 'GPU',    px: 2.99,     precision: 2, deltaPct: 0.18,  spreadBps: 7.0,  vol24h: 9_800_000,  spark: genSpark(2.99,    0.004) },
-  { sym: 'H200-SPOT',  desc: 'H200 GPU-hour · spot',    family: 'GPU',    px: 3.84,     precision: 2, deltaPct: -0.27, spreadBps: 8.5,  vol24h: 6_180_000,  spark: genSpark(3.84,    0.005) },
-  { sym: 'H100-FWD',   desc: 'H100 30-day forward',     family: 'GPU',    px: 3.04,     precision: 2, deltaPct: 0.45,  spreadBps: 11.0, vol24h: 2_410_000,  spark: genSpark(3.04,    0.005) },
-])
-
-// Live tick — small Brownian per market
 let tickInterval: ReturnType<typeof setInterval> | null = null
 onMounted(() => {
-  tickInterval = setInterval(() => {
-    markets.forEach((m) => {
-      const last = m.spark[m.spark.length - 1] ?? m.px
-      const next = last + (m.px - last) * 0.05 + (Math.random() - 0.5) * (m.px * 0.0008)
-      m.spark.push(next)
-      if (m.spark.length > 32) m.spark.shift()
-      m.px = next
-      m.deltaPct = m.deltaPct + (Math.random() - 0.5) * 0.04
-    })
-  }, 2400)
+  void loadMarkets()
+  tickInterval = setInterval(() => { void loadMarkets() }, 5000)
 })
 onBeforeUnmount(() => { if (tickInterval) clearInterval(tickInterval) })
 
@@ -65,8 +65,8 @@ type Family = typeof FAMILIES[number]
 const fFamily = ref<Family>('All')
 const query = ref('')
 
-type SortKey = 'sym' | 'px' | 'deltaPct' | 'spreadBps' | 'vol24h'
-const sortKey = ref<SortKey>('vol24h')
+type SortKey = 'product_id' | 'last' | 'changePct24h' | 'spreadBps' | 'volume24h'
+const sortKey = ref<SortKey>('volume24h')
 const sortDesc = ref(true)
 
 function setSort(k: SortKey) {
@@ -76,9 +76,9 @@ function setSort(k: SortKey) {
 
 const visible = computed(() => {
   const q = query.value.trim().toLowerCase()
-  let list = markets.filter((m) => {
+  let list = markets.value.filter((m) => {
     if (fFamily.value !== 'All' && m.family !== fFamily.value) return false
-    if (q && !(m.sym.toLowerCase().includes(q) || m.desc.toLowerCase().includes(q))) return false
+    if (q && !(m.product_id.toLowerCase().includes(q) || m.description.toLowerCase().includes(q))) return false
     return true
   })
   list = [...list].sort((a, b) => {
@@ -95,7 +95,7 @@ const visible = computed(() => {
 const grouped = computed(() => {
   const groups: { family: string; rows: Market[] }[] = []
   if (fFamily.value === 'All') {
-    const order: Market['family'][] = ['Index', 'Text', 'Speech', 'Image', 'Video', 'GPU']
+    const order: string[] = ['Index', 'Text', 'Speech', 'Image', 'Video', 'GPU']
     for (const f of order) {
       const rows = visible.value.filter((m) => m.family === f)
       if (rows.length) groups.push({ family: f, rows })
@@ -108,14 +108,14 @@ const grouped = computed(() => {
 
 // Aggregate KPIs
 const totals = computed(() => {
-  const vol = markets.reduce((s, m) => s + m.vol24h, 0)
-  const pos = markets.filter((m) => m.deltaPct >= 0).length
-  const neg = markets.length - pos
+  const vol = markets.value.reduce((s, m) => s + m.volume24h, 0)
+  const pos = markets.value.filter((m) => m.changePct24h >= 0).length
+  const neg = markets.value.length - pos
   return { vol, pos, neg }
 })
 
 function fmtPx(m: Market): string {
-  return '$' + m.px.toFixed(m.precision)
+  return '$' + m.last.toFixed(m.quote_precision)
 }
 function fmtDelta(p: number): string {
   return (p >= 0 ? '▲ ' : '▼ ') + Math.abs(p).toFixed(2) + '%'
@@ -126,7 +126,17 @@ function fmtVol(n: number): string {
   return '$' + n.toFixed(0)
 }
 
-// SVG sparkline path
+/** rangePath draws the 24h low→last→high band the engine publishes. The old sparkline replayed a
+ *  client-side random walk, which was invented data dressed as history — the summary's real
+ *  low/last/high is less detailed but true. */
+function rangePath(m: Market): string {
+  const lo = m.low24h, hi = m.high24h
+  if (!(hi > lo)) return 'M0,11 L80,11'
+  const y = (v: number) => 22 - ((v - lo) / (hi - lo)) * 22
+  return `M0,${y(lo).toFixed(1)} L40,${y(m.last).toFixed(1)} L80,${y(hi).toFixed(1)}`
+}
+
+// SVG sparkline path (kept for other series)
 function sparkPath(pts: number[]): string {
   if (!pts.length) return ''
   const w = 80, h = 22
@@ -207,29 +217,29 @@ function togglePin(sym: string) { pinned[sym] = !pinned[sym] }
                 <span class="g-count mono">{{ g.rows.length }} markets</span>
               </td>
             </tr>
-            <tr v-for="m in g.rows" :key="m.sym" class="row">
+            <tr v-for="m in g.rows" :key="m.product_id" class="row">
               <td class="pin">
-                <button class="pin-btn" :class="{ pinned: pinned[m.sym] }" :title="(pinned[m.sym] ? 'Unpin' : 'Pin') + ' ' + m.sym" @click="togglePin(m.sym)">
+                <button class="pin-btn" :class="{ pinned: pinned[m.product_id] }" :title="(pinned[m.product_id] ? 'Unpin' : 'Pin') + ' ' + m.product_id" @click="togglePin(m.product_id)">
                   <svg viewBox="0 0 12 12" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M6 1l1.5 3.2 3.5.5-2.5 2.4.6 3.4L6 8.9 2.9 10.5l.6-3.4L1 4.7l3.5-.5z" />
                   </svg>
                 </button>
               </td>
               <td class="sym">
-                <NuxtLink :to="'/markets/' + m.sym.toLowerCase()" class="sym-link mono">{{ m.sym }}</NuxtLink>
+                <NuxtLink :to="'/markets/' + m.product_id.toLowerCase()" class="sym-link mono">{{ m.product_id }}</NuxtLink>
               </td>
-              <td class="desc">{{ m.desc }}</td>
+              <td class="desc">{{ m.description }}</td>
               <td class="r mono px">{{ fmtPx(m) }}</td>
-              <td class="r mono delta" :class="m.deltaPct >= 0 ? 'pos' : 'neg'">{{ fmtDelta(m.deltaPct) }}</td>
+              <td class="r mono delta" :class="m.changePct24h >= 0 ? 'pos' : 'neg'">{{ fmtDelta(m.changePct24h) }}</td>
               <td class="r mono spread">{{ m.spreadBps.toFixed(1) }} bps</td>
-              <td class="r mono vol">{{ fmtVol(m.vol24h) }}</td>
+              <td class="r mono vol">{{ fmtVol(m.volume24h) }}</td>
               <td class="r">
                 <svg :width="80" :height="22" viewBox="0 0 80 22" class="spark">
-                  <path :d="sparkPath(m.spark)" fill="none" :stroke="sparkColor(m.deltaPct)" stroke-width="1.2" />
+                  <path :d="rangePath(m)" fill="none" :stroke="sparkColor(m.changePct24h)" stroke-width="1.2" />
                 </svg>
               </td>
               <td class="r">
-                <NuxtLink :to="'/markets/' + m.sym.toLowerCase()" class="open-link">Open →</NuxtLink>
+                <NuxtLink :to="'/markets/' + m.product_id.toLowerCase()" class="open-link">Open →</NuxtLink>
               </td>
             </tr>
           </template>
@@ -240,6 +250,30 @@ function togglePin(sym: string) { pinned[sym] = !pinned[sym] }
 </template>
 
 <style scoped>
+/* Exchange status — deliberately prominent. It reports a paused venue and simulated market data;
+   burying it would misrepresent the product while the licence is pending. */
+.mk-status {
+  display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap;
+  padding: var(--sp-3) var(--sp-4); margin-bottom: var(--sp-4);
+  border: 1px solid color-mix(in srgb, var(--warn) 42%, transparent);
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm); color: var(--text-2);
+}
+.mk-status-pill {
+  font-family: var(--font-mono); font-size: var(--fs-tiny);
+  letter-spacing: var(--ls-wide); text-transform: uppercase;
+  color: var(--warn); border: 1px solid color-mix(in srgb, var(--warn) 45%, transparent);
+  border-radius: 2px; padding: 2px 7px; flex: none;
+}
+.mk-status-txt { flex: 1; min-width: 0; }
+.mk-status-link { color: var(--brand); text-decoration: none; font-weight: 600; }
+.mk-status-link:hover { text-decoration: underline; }
+.mk-status-err {
+  border-color: color-mix(in srgb, var(--neg) 45%, transparent);
+  background: color-mix(in srgb, var(--neg) 10%, transparent);
+  color: var(--neg);
+}
 .markets-page {
   padding: 16px 24px 32px;
   color: var(--text);
