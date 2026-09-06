@@ -90,3 +90,12 @@ local_resource(
 )
 
 # Future services register their own docker_build + k8s_yaml + k8s_resource blocks here.
+
+# --- matching-engine (KW03) — the exchange's order book + reference index. Phase 2 moved from
+# keep-warm to ACTIVE (2026-09): the service is built for real, but stays paper-only and the venue
+# does not open until the F22 licence clears. Writes are expected to refuse with EXCHANGE_PAUSED. ---
+docker_build('1trade/matching-engine:dev', 'services/matching-engine',
+             dockerfile='services/matching-engine/Dockerfile')
+k8s_yaml(kustomize('deploy/k8s/matching-engine/base'))
+k8s_resource('matching-engine', port_forwards='8087:8087',
+             resource_deps=['platform-auth'])   # verifies tenant JWTs with the shared secret

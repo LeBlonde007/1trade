@@ -1,0 +1,8 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# matching-engine base (KW03). The shared `platform-auth` Secret (PLATFORM_JWT_SECRET) is created
+# out-of-band (Tilt / kubectl locally; SOPS/Vault in prod) — not committed here.
+resources:
+  - configmap.yaml
+  - service.yaml
+  - deployment.yaml

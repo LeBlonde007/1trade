@@ -1,0 +1,11 @@
+# matching-engine non-secret config. PLATFORM_JWT_SECRET comes from the shared `platform-auth`
+# Secret (envFrom in the Deployment) — never here.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: matching-engine-env
+data:
+  TRADE1_ENV: "dev"
+  TRADING_ADDR: ":8087"
+  # Published index methodology (commitment #2: the methodology is public and auditable).
+  INDEX_METHODOLOGY_URL: "/benchmark"

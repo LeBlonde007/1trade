@@ -55,5 +55,17 @@ process.
 ## Constraint
 
 This track is **about the path, not the build**. Spending here is counsel fees + research time,
-not engineering work. If engineering effort starts trickling toward Phase 2 implementation in
-violation of the pivot, `tech-lead` and `security-compliance` flag it together.
+not engineering work.
+
+**Updated 2026-09 — trading restored.** The old wording told `tech-lead` and `security-compliance`
+to flag any engineering effort flowing toward Phase 2. That no longer applies: exchange
+engineering is explicitly authorised (see CLAUDE.md § current direction). What this track still
+gates is **go-live, not build**. Flag these instead:
+
+- any path to **real-money** trading, or **taking trading accounts**, before counsel signs off;
+- an exchange surface that drops its staged labelling (paper mode / "in design" / order book
+  marked illustrative) and starts reading as a live venue;
+- customer-facing copy using a banned term from the framing guide below.
+
+The framing audit is now the highest-frequency job on this track, because marketing copy changes
+far more often than the licence position does.

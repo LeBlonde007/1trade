@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: matching-engine
+  labels: { app: matching-engine }
+spec:
+  replicas: 1                       # local; HPA + N replicas in prod overlay (DEPLOYMENT.md §7)
+  selector:
+    matchLabels: { app: matching-engine }
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+  template:
+    metadata:
+      labels: { app: matching-engine }
+    spec:
+      containers:
+        - name: matching-engine
+          image: 1trade/matching-engine:dev
+          ports: [{ containerPort: 8087 }]
+          envFrom:
+            - configMapRef: { name: matching-engine-env }
+            - secretRef: { name: platform-auth }   # PLATFORM_JWT_SECRET (verify tenant JWTs)
+          livenessProbe:
+            httpGet: { path: /healthz, port: 8087 }
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: { path: /readyz, port: 8087 }
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: "1", memory: 256Mi }
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532          # distroless 'nonroot' UID — numeric so kubelet can verify non-root
+            runAsGroup: 65532
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }

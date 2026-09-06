@@ -2,15 +2,24 @@
 /**
  * / — 1TRADE landing page.
  *
- * PLATFORM-FIRST. The page leads with what a visitor can buy today — models, GPU
- * instances and prepaid credits — and treats the exchange as the closing thesis rather
- * than the opening claim, because the trading layer is paused pending a license (see
- * CLAUDE.md § current direction). The previous version led with "AI compute, but
- * tradeable" and CTA'd into /markets, i.e. it sold the one product you cannot buy.
+ * Order: thesis -> who it's for -> what you can buy -> how it works.
  *
- * It also made the three-sided-market argument twice ("Three sides. One venue." and
- * "Three audiences. One product.") plus a third section reusing the same headline
- * construction; that is now one audience section.
+ * The exchange thesis opens the page. Because that opening necessarily ends on a caveat
+ * ("we are not taking trading accounts before then"), two things immediately follow it so
+ * a visitor is not left thinking nothing here works yet:
+ *   1. a one-line definition under the headline saying plainly what is sold, so the
+ *      "new oil" metaphor lands on a fact rather than instead of one;
+ *   2. the audience section, where two of the three sides read Live.
+ * The hero ("Buy compute once") then acts as proof of the definition rather than
+ * competing with it for the opening slot.
+ *
+ * The trading layer is paused pending a licence (CLAUDE.md § current direction), so every
+ * exchange surface here stays explicitly staged — the "In design" pill, paper-mode wording
+ * and the Illustrative label on the order book. Do not quietly drop those.
+ *
+ * An earlier version made the three-sided-market argument twice ("Three sides. One venue."
+ * and "Three audiences. One product.") plus a third section reusing the same headline
+ * construction; that is now the single audience section.
  *
  * Dark by intent — gold is 1.98:1 on cream and cannot carry the brand on a light ground.
  * The layout honours `theme` from page meta, so /benchmark and /status stay light.
@@ -317,7 +326,11 @@ const audiences = [
   {
     who: 'Traders',
     live: false,
-    body: 'Price, hedge and speculate on compute as a commodity. Order book, market maker and dated contracts are designed and built in mock; the venue opens once licensed.',
+    // Wording is constrained by the F22 framing guide's banned-term list for customer-facing
+    // surfaces (see docs/plans/features/F22-licensing-track.md — the terms are listed there, not
+    // repeated here so an automated audit of this file stays meaningful). Describe price discovery
+    // and hedging only, until counsel signs the framing off.
+    body: 'Discover a public price for compute and hedge exposure to it. Order book, market maker and dated contracts are built and running in paper mode; the venue opens once licensed.',
     to: '/benchmark',
     cta: 'Read the methodology',
   },
@@ -368,6 +381,74 @@ const copySnippet = async () => {
 
 <template>
   <article class="hm" :class="{ 'reveal-on': revealReady }">
+
+    <!-- ══════════════ EXCHANGE — the thesis. Leads the page: the client sees this first. ══════════════ -->
+    <section id="exchange" class="hm-band hm-exch hm-exch-lead">
+      <div class="hm-wrap hm-exch-grid">
+        <div>
+          <p class="hm-kicker">Where this goes</p>
+          <h2 class="hm-h2 hm-h2-lg">Compute is the new oil.<br><span class="hm-gold">1TRADE is the exchange.</span></h2>
+          <!-- Says the category in one line. Without it the opening is metaphor, then a
+               caveat that the venue is not open — a visitor reaches the fold without ever
+               being told plainly what is sold. This makes the metaphor land on a fact. -->
+          <p class="hm-def">
+            1TRADE sells AI inference and GPU time for prepaid credits — and is building the
+            exchange those credits will trade on.
+          </p>
+          <p class="hm-sub">
+            Every commodity that mattered eventually got a market: a public price, someone willing
+            to quote both sides, and instruments to hedge with. Compute has none of that yet — it
+            has bilateral contracts and waiting lists.
+          </p>
+          <p class="hm-sub">
+            The platform below is the foundation: real capacity, a real unit of account, a real
+            audit trail. The venue is designed and built against a mock matching engine today.
+          </p>
+          <p class="hm-status">
+            <span class="hm-status-pill">In design</span>
+            Order book, market maker and dated contracts are specified and running in paper mode.
+            The venue opens when the licence does — we are not taking trading accounts before then.
+          </p>
+        </div>
+
+        <!-- Illustrative depth preview. Labelled, so it is not mistaken for a live book. -->
+        <aside class="hm-ob" aria-label="Illustrative order book">
+          <div class="hm-ob-head"><span>Order book</span><span class="hm-ob-tag">Illustrative</span></div>
+          <div class="hm-ob-rows">
+            <div v-for="a in obAsks" :key="'a' + a.px" class="hm-ob-r">
+              <span class="hm-ob-bar hm-ob-bar-a" :style="{ width: a.bar + '%' }" />
+              <span class="hm-ob-px hm-neg">{{ a.px }}</span><span class="hm-ob-sz">{{ a.sz }}</span>
+            </div>
+            <div class="hm-ob-mid"><span>{{ obMidLabel }}</span><span class="hm-ob-mid-l">mid</span></div>
+            <div v-for="b in obBids" :key="'b' + b.px" class="hm-ob-r">
+              <span class="hm-ob-bar hm-ob-bar-b" :style="{ width: b.bar + '%' }" />
+              <span class="hm-ob-px hm-pos">{{ b.px }}</span><span class="hm-ob-sz">{{ b.sz }}</span>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ══════════════ AUDIENCES — placed second: two of the three sides are Live, which answers the
+         "is any of this usable today?" question the opening caveat raises ══════════════ -->
+    <section class="hm-band hm-band-alt">
+      <div class="hm-wrap">
+        <header class="hm-shead reveal">
+          <p class="hm-kicker">Who it's for</p>
+          <h2 class="hm-h2">Three sides of one market.</h2>
+        </header>
+        <div class="hm-aud">
+          <article v-for="a in audiences" :key="a.who" class="hm-aud-i reveal">
+            <div class="hm-aud-top">
+              <h3 class="hm-aud-t">{{ a.who }}</h3>
+              <span class="hm-badge" :class="a.live ? 'is-live' : 'is-soon'">{{ a.live ? 'Live' : 'Paused' }}</span>
+            </div>
+            <p class="hm-aud-b">{{ a.body }}</p>
+            <NuxtLink :to="a.to" class="hm-link-cta hm-link-sm">{{ a.cta }} →</NuxtLink>
+          </article>
+        </div>
+      </div>
+    </section>
 
     <!-- ══════════════ HERO — what you can buy today ══════════════ -->
     <section class="hm-hero">
@@ -537,66 +618,6 @@ const copySnippet = async () => {
       </div>
     </section>
 
-    <!-- ══════════════ EXCHANGE — the thesis, honestly staged ══════════════ -->
-    <section id="exchange" class="hm-band hm-exch">
-      <div class="hm-wrap hm-exch-grid">
-        <div class="reveal">
-          <p class="hm-kicker">Where this goes</p>
-          <h2 class="hm-h2 hm-h2-lg">Compute is the new oil.<br><span class="hm-gold">1TRADE is the exchange.</span></h2>
-          <p class="hm-sub">
-            Every commodity that mattered eventually got a market: a public price, someone willing
-            to quote both sides, and instruments to hedge with. Compute has none of that yet — it
-            has bilateral contracts and waiting lists.
-          </p>
-          <p class="hm-sub">
-            The platform above is the foundation: real capacity, a real unit of account, a real
-            audit trail. The venue is designed and built against a mock matching engine today.
-          </p>
-          <p class="hm-status">
-            <span class="hm-status-pill">In design</span>
-            Order book, market maker and dated contracts are specified and running in paper mode.
-            The venue opens when the licence does — we are not taking trading accounts before then.
-          </p>
-        </div>
-
-        <!-- Illustrative depth preview. Labelled, so it is not mistaken for a live book. -->
-        <aside class="hm-ob reveal" aria-label="Illustrative order book">
-          <div class="hm-ob-head"><span>Order book</span><span class="hm-ob-tag">Illustrative</span></div>
-          <div class="hm-ob-rows">
-            <div v-for="a in obAsks" :key="'a' + a.px" class="hm-ob-r">
-              <span class="hm-ob-bar hm-ob-bar-a" :style="{ width: a.bar + '%' }" />
-              <span class="hm-ob-px hm-neg">{{ a.px }}</span><span class="hm-ob-sz">{{ a.sz }}</span>
-            </div>
-            <div class="hm-ob-mid"><span>{{ obMidLabel }}</span><span class="hm-ob-mid-l">mid</span></div>
-            <div v-for="b in obBids" :key="'b' + b.px" class="hm-ob-r">
-              <span class="hm-ob-bar hm-ob-bar-b" :style="{ width: b.bar + '%' }" />
-              <span class="hm-ob-px hm-pos">{{ b.px }}</span><span class="hm-ob-sz">{{ b.sz }}</span>
-            </div>
-          </div>
-        </aside>
-      </div>
-    </section>
-
-    <!-- ══════════════ AUDIENCES — one section, not three ══════════════ -->
-    <section class="hm-band hm-band-alt">
-      <div class="hm-wrap">
-        <header class="hm-shead reveal">
-          <p class="hm-kicker">Who it's for</p>
-          <h2 class="hm-h2">Three sides of one market.</h2>
-        </header>
-        <div class="hm-aud">
-          <article v-for="a in audiences" :key="a.who" class="hm-aud-i reveal">
-            <div class="hm-aud-top">
-              <h3 class="hm-aud-t">{{ a.who }}</h3>
-              <span class="hm-badge" :class="a.live ? 'is-live' : 'is-soon'">{{ a.live ? 'Live' : 'Paused' }}</span>
-            </div>
-            <p class="hm-aud-b">{{ a.body }}</p>
-            <NuxtLink :to="a.to" class="hm-link-cta hm-link-sm">{{ a.cta }} →</NuxtLink>
-          </article>
-        </div>
-      </div>
-    </section>
-
     <!-- ══════════════ TRUST ══════════════ -->
     <section class="hm-trust">
       <div class="hm-wrap hm-trust-grid">
@@ -706,11 +727,10 @@ const copySnippet = async () => {
 
 /* ── hero ── */
 .hm-hero {
-  padding: clamp(64px, 11vh, 132px) 0 clamp(48px, 8vh, 96px);
+  padding: clamp(56px, 9vh, 108px) 0 clamp(48px, 8vh, 96px);
   border-bottom: 1px solid var(--border);
-  /* faint gold wash from the top-right, the only ambient flourish on the page */
-  background:
-    radial-gradient(120% 90% at 88% -20%, color-mix(in srgb, var(--brand) 11%, transparent), transparent 62%);
+  /* The ambient wash belongs to whichever section opens the page. That is now the
+     exchange lead, so the hero carries none — two stacked glows read as noise. */
 }
 .hm-hero-grid {
   display: grid;
@@ -887,6 +907,35 @@ const copySnippet = async () => {
   background:
     radial-gradient(90% 120% at 100% 50%, color-mix(in srgb, var(--brand) 9%, transparent), transparent 60%),
     var(--canvas);
+}
+
+/* The exchange section opens the page, so it takes the opening treatment: room to
+   breathe under the sticky nav, the page's single ambient wash, and display-scale
+   type. It is the thesis the whole page argues from. */
+.hm-exch-lead {
+  padding-top: clamp(52px, 9vh, 104px);
+  padding-bottom: clamp(56px, 9vh, 104px);
+  background:
+    radial-gradient(120% 90% at 88% -20%, color-mix(in srgb, var(--brand) 13%, transparent), transparent 62%),
+    radial-gradient(90% 120% at 100% 55%, color-mix(in srgb, var(--brand) 8%, transparent), transparent 60%),
+    var(--canvas);
+}
+.hm-exch-lead .hm-h2 {
+  font-size: clamp(34px, 5.4vw, 62px);
+  letter-spacing: var(--ls-tight);
+}
+.hm-exch-lead .hm-sub { font-size: var(--fs-lg); }
+
+/* The definition sentence. Set above the supporting prose and marked with a gold rule so
+   it reads as the answer to "what is this", not as another paragraph. */
+.hm-def {
+  font-size: clamp(17px, 1.5vw, 21px);
+  line-height: var(--lh-base);
+  color: var(--text);
+  max-width: 56ch;
+  margin: 0 0 var(--sp-5);
+  padding-left: var(--sp-4);
+  border-left: 2px solid var(--brand);
 }
 .hm-exch-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr); gap: clamp(32px, 5vw, 72px); align-items: center; }
 .hm-status {

@@ -4,16 +4,29 @@
 > ground truth. If something here conflicts with an agent's instructions, this file wins,
 > except for the four immutable commitments which win over everything.
 
-> **⚠️ CURRENT DIRECTION (2026-05 GTM pivot) — read before sequencing any work.**
-> The build is **platform-first**: ship inference + compute + prepaid credits for AI startups
-> (revenue now); the **exchange/trading layer is paused** pending a license (designed, mock-built,
-> kept warm). This **supersedes the "trading layer first" sequencing** described below.
-> - The pivot: `docs/re/1trade_gtm_focus_update.md`
+> **⚠️ CURRENT DIRECTION (2026-09 — trading restored) — read before sequencing any work.**
+> Both tracks are now active:
+> - **Platform** (inference + compute + prepaid credits) — revenue now, and the foundation the
+>   exchange settles on. Keeps shipping.
+> - **Exchange / trading layer** — **no longer keep-warm.** Build it for real: matching engine,
+>   market maker, index, surveillance, trading UI. This restores commitment #1's ordering; the
+>   2026-05 pivot's "exchange paused" sequencing no longer applies.
+>
+> **BUILDING IT IS NOT THE SAME AS OPERATING IT.** The licence gate (F22) is unchanged and still
+> governs going live. Until counsel signs off:
+> - no real-money trading, no live venue, **no taking trading accounts**;
+> - every exchange surface stays explicitly staged (paper mode, "in design", order books labelled
+>   illustrative) — do not quietly drop those labels;
+> - the framing guide holds on **all** customer-facing copy. Banned words: "futures",
+>   "speculation", "investment return", "guaranteed yield". F22 audits this.
+>
+> So: engineering unblocked, go-live still gated. If those two get conflated the licence track is
+> the thing that breaks, and it is the long-lead item.
+>
+> - The 2026-05 pivot (historical context, superseded on sequencing): `docs/re/1trade_gtm_focus_update.md`
 > - The build plan (per-agent + per-feature, setup → local → deploy): `docs/plans/README.md`
 > - The engineering rulebook every agent follows: `docs/plans/ENGINEERING_STANDARDS.md`
 >
-> The four immutable commitments still hold. Commitment #1 means *when the exchange ships it is
-> the headline and must feel like a real market* — it does **not** override the pivot's ordering.
 > Product spec lives at `docs/re/phase6_v2.md` (the `docs/phase6-prd-ssd.md` path below is its
 > intended home).
 

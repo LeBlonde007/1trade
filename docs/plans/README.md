@@ -43,7 +43,7 @@ eventual exchange credible. Same vision; de-risked sequence.
 
 ---
 
-## 2. Critical path under the GTM pivot
+## 2. Critical path (trading restored, 2026-09)
 
 Build order — each step unblocks the next dollar:
 
@@ -71,15 +71,28 @@ trading-frontend (repurposed as platform console: catalog, wallet, compute, bill
 security-compliance (SOC 2 Type I + licensing track for Phase 2)
 ```
 
-**Keep-warm track (runs in parallel, lower priority):**
+**Exchange track — ACTIVE (2026-09; was keep-warm).** Runs in parallel with the platform track;
+it settles on the same ledger, so the platform sequence above is still what unblocks it.
 
 ```
-index-service (private reference index from real platform transactions; methodology published)
-matching-engine (spec + mock backend; switch-on later)
-market-maker (designed only; activates with exchange)
-surveillance (basic abuse monitoring only; full trade surveillance waits)
-trading-frontend (the trading dashboard kept as investor-facing demo, clearly labelled)
+index-service   (reference index from real platform transactions; methodology published)
+      │
+      ▼
+matching-engine (real engine behind the mock adapter's interface; price-time priority, event-sourced)
+      │
+      ▼
+market-maker    (two-sided quoting, spread/skew, inventory + risk controls)
+      │
+      ▼
+surveillance    (the 6 patterns, not just abuse monitoring)
+      │
+      ▼
+trading-frontend (the trading dashboard as a real product surface, not a demo)
 ```
+
+**Gate — F22, unchanged.** Engineering is unblocked; **going live is not.** Until counsel signs
+off: paper mode only, no trading accounts, exchange surfaces stay labelled as staged, and the
+framing guide holds on all customer-facing copy. Build the venue; do not open it.
 
 ---
 
@@ -136,15 +149,15 @@ See [`features/`](features/) for one doc per feature.
 | [F23](features/F23-console-v15-screens.md) | Console v1.5 screens (frontend depth — Tiers E–N, itemized vs backend) | `trading-frontend` | active |
 | [F24](features/F24-cli-dx.md) | CLI developer experience (streaming, interactive chat REPL, colour, productivity) | `platform-core` | active |
 
-### Phase 2 — Exchange (keep-warm)
+### Phase 2 — Exchange (ACTIVE since 2026-09; build unblocked, go-live gated on F22)
 
 | ID | Feature | Owner | Status |
 |---|---|---|---|
-| [KW01](features/KW01-private-reference-index.md) | Private internal reference index (from real platform tx) | `index-service` | keep-warm |
-| [KW02](features/KW02-trading-demo-ui.md) | Trading dashboard kept warm as investor demo | `trading-frontend` | keep-warm |
-| [KW03](features/KW03-matching-engine-mock-and-spec.md) | Matching engine mock data adapter + real-engine spec | `matching-engine` | keep-warm |
-| [KW04](features/KW04-market-maker-spec.md) | Market maker design + risk-control spec | `market-maker` | spec only |
-| [KW05](features/KW05-surveillance-v0.md) | Surveillance design (6 patterns) + basic abuse monitoring only | `surveillance` | spec + abuse-only |
+| [KW01](features/KW01-private-reference-index.md) | Reference index from real platform tx — published methodology + hash-chained prints | `index-service` | active |
+| [KW02](features/KW02-trading-demo-ui.md) | Trading dashboard as a real product surface (paper mode until F22 clears) | `trading-frontend` | active |
+| [KW03](features/KW03-matching-engine-mock-and-spec.md) | Real matching engine behind the mock adapter interface (price-time priority, event-sourced) | `matching-engine` | active |
+| [KW04](features/KW04-market-maker-spec.md) | Market maker: two-sided quoting, spread/skew, inventory + risk controls | `market-maker` | active |
+| [KW05](features/KW05-surveillance-v0.md) | Trade surveillance — the 6 patterns, not abuse monitoring alone | `surveillance` | active |
 
 ---
 
