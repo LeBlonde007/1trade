@@ -239,46 +239,53 @@ function chartTick() {
 const asks = ref<BookLevel[]>([])
 const bids = ref<BookLevel[]>([])
 const flashBook = ref(0)
+const bookErr = ref('')
+const tapeErr = ref('')
 const midFlash = ref<'up' | 'down' | null>(null)
 
-function generateBook() {
-  const mid = midPrice.value
-  const halfSpread = mid * 0.0005
-  const a: BookLevel[] = []
-  const b: BookLevel[] = []
-  for (let i = 0; i < 10; i++) {
-    const baseQty = 5000 + Math.pow(i, 1.6) * 4500
-    const jitter = (Math.random() - 0.5) * 1200
-    a.push({ price: mid + halfSpread + i * mid * 0.0008, qty: Math.round(baseQty + jitter), changed: false })
-    b.push({ price: mid - halfSpread - i * mid * 0.0008, qty: Math.round(baseQty + jitter), changed: false })
-  }
-  asks.value = a
-  bids.value = b
-}
+/** The product this ticket trades. The engine is the source of truth for its book and tape. */
+const PRODUCT_ID = 'EAI-IDX'
 
-function updateBook() {
-  const sides: ('asks' | 'bids')[] = ['asks', 'bids']
-  for (const side of sides) {
-    const arr = side === 'asks' ? asks.value : bids.value
-    const nChanged = 1 + Math.floor(Math.random() * 3)
-    for (let i = 0; i < nChanged; i++) {
-      const idx = Math.floor(Math.random() * arr.length)
-      const delta = (Math.random() - 0.5) * 3000
-      arr[idx]!.qty = Math.max(800, Math.round(arr[idx]!.qty + delta))
-      arr[idx]!.changed = true
-    }
+interface BookApiLevel { price: string; size: string; cumulative: string }
+
+/**
+ * loadBook pulls the aggregated depth from the engine.
+ *
+ * This page used to generate its own book with Math.random on a 1.5s timer, which meant /trade and
+ * /markets could show different prices for the same product and nothing on screen corresponded to
+ * anything the backend knew. The engine simulates the book server-side while the venue is paused,
+ * so every surface agrees.
+ *
+ * `changed` (the level flash) is derived by diffing against the previous snapshot rather than being
+ * invented — a level only flashes when its size actually moved.
+ */
+async function loadBook() {
+  try {
+    const r = await $fetch<{ asks: BookApiLevel[]; bids: BookApiLevel[] }>(
+      `/api/trading/products/${PRODUCT_ID}/orderbook`, { query: { depth: 10 } },
+    )
+    const prevA = new Map(asks.value.map((l) => [l.price, l.qty]))
+    const prevB = new Map(bids.value.map((l) => [l.price, l.qty]))
+    const map = (levels: BookApiLevel[], prev: Map<number, number>): BookLevel[] =>
+      (levels ?? []).map((l) => {
+        const price = Number(l.price)
+        const qty = Number(l.size)
+        const before = prev.get(price)
+        return { price, qty, changed: before !== undefined && before !== qty }
+      })
+    asks.value = map(r.asks, prevA)
+    bids.value = map(r.bids, prevB)
+    bookErr.value = ''
+    flashBook.value++
+    midFlash.value = deltaPct.value >= 0 ? 'up' : 'down'
+    setTimeout(() => {
+      asks.value = asks.value.map((l) => ({ ...l, changed: false }))
+      bids.value = bids.value.map((l) => ({ ...l, changed: false }))
+      midFlash.value = null
+    }, 700)
+  } catch {
+    bookErr.value = 'Book unavailable — retrying…'
   }
-  asks.value = [...asks.value]
-  bids.value = [...bids.value]
-  flashBook.value++
-  midFlash.value = deltaPct.value >= 0 ? 'up' : 'down'
-  setTimeout(() => {
-    asks.value.forEach(l => { l.changed = false })
-    bids.value.forEach(l => { l.changed = false })
-    asks.value = [...asks.value]
-    bids.value = [...bids.value]
-    midFlash.value = null
-  }, 700)
 }
 
 const maxBookQty = computed(() => {
@@ -315,26 +322,70 @@ const MAX_TAPE = 40
 const tape = ref<TapeRow[]>([])
 const tapePaused = ref(false)
 
-function addTrades() {
-  const burst = 1 + Math.floor(Math.random() * 3)
-  const list = [...tape.value]
-  for (let i = 0; i < burst; i++) {
-    const dir: 'up' | 'down' = Math.random() < 0.5 ? 'up' : 'down'
-    const px = dir === 'up'
-      ? midPrice.value + Math.random() * 0.0000015
-      : midPrice.value - Math.random() * 0.0000015
-    const ln = Math.exp(Math.random() * 2.6 + 4.4)
-    const isLarge = Math.random() < 0.05
-    const qty = Math.round(isLarge ? ln * 60 : ln)
-    const now = new Date()
-    const time = now.toLocaleTimeString('en-GB', { hour12: false }) + '.' + String(now.getMilliseconds()).padStart(3, '0')
-    list.unshift({ side: dir, px, qty, time, large: isLarge })
-    if (list.length > MAX_TAPE) list.pop()
+interface TradeApi { price: string; quantity: string; aggressor_side: string; executed_at: string; block: boolean }
+
+/**
+ * loadTape pulls recent prints. Direction comes from the engine's `aggressor_side`, not a coin
+ * flip, and `block` marks genuine large prints instead of a 5% random chance.
+ */
+async function loadTape() {
+  if (tapePaused.value) return
+  try {
+    const r = await $fetch<{ trades: TradeApi[] }>(
+      `/api/trading/products/${PRODUCT_ID}/trades`, { query: { limit: MAX_TAPE } },
+    )
+    tape.value = (r.trades ?? []).map((t) => {
+      const d = new Date(t.executed_at)
+      return {
+        side: t.aggressor_side === 'buy' ? 'up' : 'down',
+        px: Number(t.price),
+        qty: Number(t.quantity),
+        time: d.toLocaleTimeString('en-GB', { hour12: false }),
+        large: !!t.block,
+      } as TapeRow
+    })
+    tapeErr.value = ''
+  } catch {
+    tapeErr.value = 'Tape unavailable — retrying…'
   }
-  if (!tapePaused.value) tape.value = list
 }
 
 function toggleTapePause() { tapePaused.value = !tapePaused.value }
+
+// ── Order submission ──────────────────────────────────────────────────────────
+// The button was previously inert — it rendered a label and did nothing. It now posts to the
+// engine, which answers 503 EXCHANGE_PAUSED while the licence is pending. That refusal is shown
+// as-is: a ticket that silently does nothing, or that fakes an acknowledgement, would misrepresent
+// a venue that is not open.
+const submitting = ref(false)
+const orderMsg = ref('')
+const orderOk = ref(false)
+
+async function submitOrder() {
+  if (submitting.value) return
+  submitting.value = true
+  orderMsg.value = ''
+  try {
+    await $fetch('/api/trading/orders', {
+      method: 'POST',
+      body: {
+        product_id: PRODUCT_ID,
+        side: orderSide.value,
+        order_type: orderType.value,
+        quantity: qty.value.replace(/,/g, ''),
+        limit_price: orderType.value === 'limit' ? limitPx.value : undefined,
+      },
+    })
+    orderOk.value = true
+    orderMsg.value = 'Order accepted.'
+  } catch (e: unknown) {
+    orderOk.value = false
+    const d = (e as { data?: { message?: string; data?: { message?: string } } })?.data
+    orderMsg.value = d?.data?.message || d?.message || 'Order could not be submitted.'
+  } finally {
+    submitting.value = false
+  }
+}
 
 // =====================================================
 // Order entry
@@ -420,11 +471,11 @@ let tapeInterval:  ReturnType<typeof setInterval> | null = null
 onMounted(() => {
   seedChart()
   initChart()
-  generateBook()
-  for (let i = 0; i < MAX_TAPE; i++) addTrades()
+  void loadBook()
+  void loadTape()
   chartInterval = setInterval(chartTick, 3000)
-  bookInterval  = setInterval(updateBook, 1500)
-  tapeInterval  = setInterval(addTrades, 5000)
+  bookInterval  = setInterval(() => { void loadBook() }, 2000)
+  tapeInterval  = setInterval(() => { void loadTape() }, 3000)
 })
 onBeforeUnmount(() => {
   if (chartInterval) clearInterval(chartInterval)
@@ -631,9 +682,12 @@ onBeforeUnmount(() => {
               <span class="k">credits buying power</span>
             </div>
 
-            <button class="submit-btn" :class="orderSide" type="button">
-              {{ submitLabel }}
+            <button class="submit-btn" :class="orderSide" type="button" :disabled="submitting" @click="submitOrder">
+              {{ submitting ? 'Submitting…' : submitLabel }}
             </button>
+            <!-- The engine's refusal, verbatim. The venue is unlicensed, so an order MUST visibly
+                 fail rather than appear to be accepted. -->
+            <p v-if="orderMsg" class="order-msg" :class="orderOk ? 'ok' : 'paused'">{{ orderMsg }}</p>
           </div>
         </div>
       </section>
@@ -759,6 +813,15 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+/* Order result — the paused refusal is informational, not an error the user caused. */
+.order-msg {
+  margin: var(--sp-3) 0 0; padding: var(--sp-3);
+  font-size: var(--fs-sm); line-height: var(--lh-base);
+  border-radius: var(--radius-sm); border: 1px solid;
+}
+.order-msg.paused { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 42%, transparent); background: color-mix(in srgb, var(--warn) 10%, transparent); }
+.order-msg.ok     { color: var(--pos); border-color: color-mix(in srgb, var(--pos) 42%, transparent); background: color-mix(in srgb, var(--pos) 10%, transparent); }
+.submit-btn:disabled { opacity: 0.6; cursor: default; }
 .trade-page {
   --text-4: rgba(255, 255, 255, 0.20);
   --pos-bar: rgba(25, 195, 125, 0.16);

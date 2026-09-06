@@ -199,13 +199,13 @@ function togglePin(sym: string) { pinned[sym] = !pinned[sym] }
         <thead>
           <tr>
             <th class="pin"></th>
-            <th class="sortable" :class="{ on: sortKey === 'sym' }" @click="setSort('sym')">Symbol</th>
+            <th class="sortable" :class="{ on: sortKey === 'product_id' }" @click="setSort('product_id')">Symbol</th>
             <th>Description</th>
-            <th class="r sortable" :class="{ on: sortKey === 'px' }" @click="setSort('px')">Last</th>
-            <th class="r sortable" :class="{ on: sortKey === 'deltaPct' }" @click="setSort('deltaPct')">24h Δ</th>
+            <th class="r sortable" :class="{ on: sortKey === 'last' }" @click="setSort('last')">Last</th>
+            <th class="r sortable" :class="{ on: sortKey === 'changePct24h' }" @click="setSort('changePct24h')">24h Δ</th>
             <th class="r sortable" :class="{ on: sortKey === 'spreadBps' }" @click="setSort('spreadBps')">Spread</th>
-            <th class="r sortable" :class="{ on: sortKey === 'vol24h' }" @click="setSort('vol24h')">Vol 24h</th>
-            <th class="r">60m</th>
+            <th class="r sortable" :class="{ on: sortKey === 'volume24h' }" @click="setSort('volume24h')">Vol 24h</th>
+            <th class="r">24h range</th>
             <th></th>
           </tr>
         </thead>
