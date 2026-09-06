@@ -99,3 +99,35 @@ line against `refindex.go` rather than written from the spec.
 
 Note: `docs/plans/SEQUENCING.md` still names the gate "methodology v1.0"; the implemented and
 published version is 1.2. Left as-is rather than silently editing a milestone definition.
+
+### Design finding (2026-09-06) — do not build the consumer first
+
+Investigating "consume `credit.tx.v1` and compute real prints" turned up a blocker that changes
+the order of work:
+
+**Phase 1 observations are administered prices, not discovered ones.** Every purchase and
+consumption is priced from `billing.refUSDPerCredit`, a table 1TRADE sets. An index computed over
+them restates that table — it would move only when we move it, and appear stable for the wrong
+reason. Shipping it as a market price would be *worse than the current mock*, because the mock at
+least labels itself.
+
+**And the observations did not exist to read.** `purchases` recorded how many credits were bought
+but never what was paid: the USD was derived at checkout and discarded. So the "prepaid purchase
+prices" input in §2 of the methodology had no stored data behind it at all.
+
+Migration `0007_purchase_price.sql` fixes the second problem: `unit_price_usd` and
+`charged_usd_cents` are now recorded per purchase, verified end to end (100,000 text credits →
+`0.001210` / `12100` cents). Earlier rows are deliberately **not** back-filled — an inferred price
+is not an observation.
+
+Order of work this implies:
+1. ~~Record the price at each transaction~~ — done (0007).
+2. Accumulate real price history. It starts 2026-09-06; there is none before that.
+3. Introduce genuine price variation (negotiated/tiered/auctioned rates, or live trade prints).
+   **Until this exists, no computed index is meaningful**, regardless of how well it is engineered.
+4. Only then consume `credit.tx.v1` and compute prints — and drop `source: "mock"`.
+
+Also fixed while verifying: the migration initContainer ran a **hardcoded file list** ending at
+0006, so 0007 was mounted but silently never applied. Adding a migration required editing three
+places and missing one failed quietly. It now globs `/migrations/[0-9]*.sql` and fails loudly if
+none are mounted.

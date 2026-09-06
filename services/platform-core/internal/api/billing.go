@@ -77,8 +77,16 @@ func (s *Server) createCheckout(w http.ResponseWriter, r *http.Request) {
 		serverError(w, err)
 		return
 	}
+	// Record the price this purchase happened at. Best-effort: an unpriced credit type must not
+	// block a checkout that Stripe already accepted — the columns are nullable precisely so a
+	// missing price is visible as missing rather than guessed at later.
+	unitPrice, cents, priceErr := billing.QuoteUSD(b.CreditType, b.Amount)
+	if priceErr != nil {
+		slog.Warn("purchase price not recorded", "purchase_id", purchaseID, "credit_type", b.CreditType, "err", priceErr)
+	}
 	if err := s.st.CreatePurchase(r.Context(), store.Purchase{
 		ID: purchaseID, TenantID: p.TenantID, Amount: b.Amount, CreditType: b.CreditType, Currency: b.Currency, IsPaper: p.IsPaper,
+		UnitPriceUSD: unitPrice, ChargedUSDCents: cents,
 	}, session.ID); err != nil {
 		serverError(w, err)
 		return

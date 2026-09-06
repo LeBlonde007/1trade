@@ -242,14 +242,33 @@ type Purchase struct {
 	IsPaper    bool
 	CreatedAt  time.Time
 	PaidAt     *time.Time
+	// Price this purchase actually happened at (migration 0007). Zero/empty when unknown — rows
+	// predating 0007 are never back-filled, because an inferred price is not an observation.
+	UnitPriceUSD    string
+	ChargedUSDCents int64
 }
 
 // CreatePurchase inserts a pending purchase linked to its Stripe checkout session.
+//
+// UnitPriceUSD / ChargedUSDCents record the price this purchase actually happened at (migration
+// 0007). They are stored per-row rather than looked up later because the reference price table can
+// change: without them, "what did this customer pay per credit?" has no answer, and KW01's index
+// has no purchase observations to read. Empty/zero values are written as NULL rather than a
+// fabricated price.
 func (s *Store) CreatePurchase(ctx context.Context, p Purchase, sessionID string) error {
+	var unitPrice any
+	if p.UnitPriceUSD != "" {
+		unitPrice = p.UnitPriceUSD
+	}
+	var cents any
+	if p.ChargedUSDCents > 0 {
+		cents = p.ChargedUSDCents
+	}
 	_, err := s.pool.Exec(ctx,
-		`INSERT INTO purchases (id, tenant_id, amount, credit_type, currency, status, stripe_session_id, is_paper)
-		 VALUES ($1,$2,$3::numeric,$4,$5,'pending',$6,$7)`,
-		p.ID, p.TenantID, p.Amount, p.CreditType, p.Currency, sessionID, p.IsPaper)
+		`INSERT INTO purchases (id, tenant_id, amount, credit_type, currency, status, stripe_session_id, is_paper,
+		                        unit_price_usd, charged_usd_cents)
+		 VALUES ($1,$2,$3::numeric,$4,$5,'pending',$6,$7,$8::numeric,$9)`,
+		p.ID, p.TenantID, p.Amount, p.CreditType, p.Currency, sessionID, p.IsPaper, unitPrice, cents)
 	if err != nil {
 		return fmt.Errorf("insert purchase: %w", err)
 	}

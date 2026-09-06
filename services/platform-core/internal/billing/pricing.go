@@ -63,3 +63,24 @@ func roundRat(r *big.Rat) int64 {
 	num.Quo(num, den)
 	return num.Int64()
 }
+
+// QuoteUSD reports the unit price and the integer cents charged for a purchase, so the caller can
+// PERSIST the price a transaction actually happened at.
+//
+// The price table is administered, not observed, and it is not versioned — if it changes, any
+// purchase that did not record its own price becomes unreconstructable. KW01's index is specified
+// to observe "prepaid purchase prices"; storing the price at the transaction is what makes those
+// observations exist at all.
+func QuoteUSD(creditType, amountCredits string) (unitPriceUSD string, cents int64, err error) {
+	price, ok := refUSDPerCredit[creditType]
+	if !ok {
+		return "", 0, fmt.Errorf("no card price for credit type %q", creditType)
+	}
+	c, err := usdChargeCents(creditType, amountCredits)
+	if err != nil {
+		return "", 0, err
+	}
+	// 6dp fixed-point, matching the ledger's money format. FloatString rounds half-away-from-zero
+	// on an exact rational — no binary floating point is involved.
+	return price.FloatString(6), c, nil
+}

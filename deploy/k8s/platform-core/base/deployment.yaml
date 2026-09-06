@@ -23,7 +23,14 @@ spec:
           args:
             - |
               set -e
-              for f in /migrations/0001_init.sql /migrations/0002_billing.sql /migrations/0003_accounts.sql /migrations/0004_gaps.sql /migrations/0005_kyc.sql /migrations/0006_conversations.sql; do
+              # Glob, not a hardcoded list. Adding a migration previously meant editing three
+              # places (the file, the Tiltfile configmap, and this list); missing this one meant
+              # the migration was mounted but silently never applied — which is exactly what
+              # happened to 0007. Shell globbing sorts lexically, and the NNNN_ prefixes make that
+              # the intended order.
+              set -- /migrations/[0-9]*.sql
+              [ -e "$1" ] || { echo "no migrations mounted"; exit 1; }
+              for f in "$@"; do
                 echo "applying $f"; psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"
               done
           env:

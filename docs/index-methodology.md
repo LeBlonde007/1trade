@@ -147,6 +147,19 @@ Stated plainly, because a methodology that hides its weaknesses is not auditable
 - **Single operator.** 1TRADE computes an index over its own platform's transactions. That is a
   genuine conflict; it is mitigated by publishing this methodology, the constituent weights, the
   observation counts and the audit chain — not eliminated by them.
+- **Administered prices are not discovered prices — the most important limitation here.** Every
+  Phase 1 observation is a transaction at a price 1TRADE set, from a published reference table
+  (`billing.refUSDPerCredit`), not a price two parties negotiated. An index computed over them is
+  therefore close to a restatement of that table: it would move only when we move it, and it would
+  look stable for the wrong reason. **Publishing such a value as a market price would be
+  misleading**, which is why the index stays labelled `mock` until either prices vary by
+  transaction (negotiated, tiered, auctioned) or real trade prints exist. Storing the price at each
+  transaction (below) is the prerequisite, not the solution.
+- **Price history begins 2026-09-06.** Until then, purchases recorded how many credits were bought
+  but never what was paid: the USD was computed at checkout and discarded. Migration 0007 records
+  `unit_price_usd` and `charged_usd_cents` per purchase. Earlier rows are **not** back-filled —
+  an inferred price is not an observation, and seeding the index with reconstructed history is
+  precisely the failure this document exists to prevent.
 
 ## 10. Where it is served
 

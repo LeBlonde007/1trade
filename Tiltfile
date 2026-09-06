@@ -45,13 +45,15 @@ local_resource(
         '--from-file=0004_gaps.sql=services/platform-core/migrations/0004_gaps.sql ' +
         '--from-file=0005_kyc.sql=services/platform-core/migrations/0005_kyc.sql ' +
         '--from-file=0006_conversations.sql=services/platform-core/migrations/0006_conversations.sql ' +
+        '--from-file=0007_purchase_price.sql=services/platform-core/migrations/0007_purchase_price.sql ' +
         '--dry-run=client -o yaml | kubectl apply -f -',
     deps=['services/platform-core/migrations/0001_init.sql',
           'services/platform-core/migrations/0002_billing.sql',
           'services/platform-core/migrations/0003_accounts.sql',
           'services/platform-core/migrations/0004_gaps.sql',
           'services/platform-core/migrations/0005_kyc.sql',
-          'services/platform-core/migrations/0006_conversations.sql'],
+          'services/platform-core/migrations/0006_conversations.sql',
+          'services/platform-core/migrations/0007_purchase_price.sql'],
 )
 docker_build('1trade/platform-core:dev', 'services/platform-core',
              dockerfile='services/platform-core/Dockerfile')
