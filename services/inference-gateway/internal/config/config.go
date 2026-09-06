@@ -4,6 +4,7 @@ package config
 import (
 	"encoding/json"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -23,11 +24,11 @@ type Config struct {
 	// OpenAI provider (optional): when OpenAIAPIKey is set, the models in OpenAIModelMap route to OpenAI
 	// (frontier image / vision / text) instead of the DO runtime; everything else stays on DO. Unset →
 	// the gateway uses the DO backend directly (no behaviour change). NEVER hardcode the key — from a Secret.
-	OpenAIAPIKey   string
-	OpenAIBaseURL  string            // default https://api.openai.com/v1
-	OpenAIModelMap map[string]string // catalog-id → OpenAI model (e.g. {"gpt-image-1.5":"gpt-image-1"})
-	InferenceTimeout time.Duration   // model-call timeout (generation can take longer than control calls)
-	HTTPTimeout      time.Duration   // upstream HTTP client timeout
+	OpenAIAPIKey     string
+	OpenAIBaseURL    string            // default https://api.openai.com/v1
+	OpenAIModelMap   map[string]string // catalog-id → OpenAI model (e.g. {"gpt-image-1.5":"gpt-image-1"})
+	InferenceTimeout time.Duration     // model-call timeout (generation can take longer than control calls)
+	HTTPTimeout      time.Duration     // upstream HTTP client timeout
 }
 
 // Load reads configuration from the environment with sensible dev defaults.
@@ -43,7 +44,7 @@ func Load() Config {
 		InferenceBackend:  envOr("INFERENCE_BACKEND", "mock"),
 		VLLMBaseURL:       envOr("VLLM_BASE_URL", "http://inference-runtime:8000"),
 		InferenceAPIKey:   os.Getenv("INFERENCE_API_KEY"),
-		InferenceModelMap: mediaModelMap(os.Getenv("INFERENCE_MODEL_MAP")),
+		InferenceModelMap: mediaModelMap(os.Getenv("INFERENCE_MODEL_MAP"), envOr("VLLM_BASE_URL", "http://inference-runtime:8000")),
 		OpenAIAPIKey:      os.Getenv("OPENAI_API_KEY"),
 		OpenAIBaseURL:     envOr("OPENAI_BASE_URL", "https://api.openai.com/v1"),
 		OpenAIModelMap:    openaiModelMap(os.Getenv("OPENAI_MODEL_MAP")),
@@ -95,10 +96,17 @@ var defaultMediaMap = map[string]string{
 
 // mediaModelMap merges the built-in media defaults with the operator's INFERENCE_MODEL_MAP, with the
 // env map taking precedence so any mapping can be overridden per deployment.
-func mediaModelMap(env string) map[string]string {
+//
+// The defaults are DigitalOcean slugs, so they are merged ONLY when the backend actually is DO.
+// Merging them everywhere made image/speech/video models look routable on a backend that cannot
+// serve them — a self-hosted text-only runtime would advertise wan-t2v and then fail the call at
+// the upstream. Anywhere else, the operator's map is the whole truth.
+func mediaModelMap(env, baseURL string) map[string]string {
 	merged := make(map[string]string, len(defaultMediaMap)+8)
-	for k, v := range defaultMediaMap {
-		merged[k] = v
+	if strings.Contains(baseURL, "do-ai.run") {
+		for k, v := range defaultMediaMap {
+			merged[k] = v
+		}
 	}
 	for k, v := range jsonMap(env) {
 		merged[k] = v

@@ -15,12 +15,12 @@ type Pricing struct {
 // Model is one catalog entry, OpenAI-shaped (`id`/`object`/`owned_by`) plus a human display `name` and
 // the 1Trade pricing extension. `Created` is a fixed catalog-epoch timestamp (not per-request).
 type Model struct {
-	ID       string  `json:"id"`
-	Object   string  `json:"object"`
-	Name     string  `json:"name"`
-	Created  int64   `json:"created"`
-	OwnedBy  string  `json:"owned_by"`
-	Trade1 Pricing `json:"trade1"`
+	ID      string  `json:"id"`
+	Object  string  `json:"object"`
+	Name    string  `json:"name"`
+	Created int64   `json:"created"`
+	OwnedBy string  `json:"owned_by"`
+	Trade1  Pricing `json:"trade1"`
 }
 
 // catalogEpoch is a stable `created` value for catalog entries (2026-01-01T00:00:00Z).
@@ -38,6 +38,17 @@ var models = []Model{
 	{
 		ID: "llama-3.1-8b", Name: "Llama 3.1 8B", Object: "model", Created: catalogEpoch, OwnedBy: "1trade",
 		Trade1: Pricing{Modality: "text", CreditType: "text", Unit: "1K tokens", Price: "5.000000"},
+	},
+	// Self-hosted small models — the first entries actually served on our own GPUs rather than a
+	// hosted provider. They are listed under their real size so the playground never labels a 1B
+	// model as something larger; priced below the hosted tiers because they cost us far less to run.
+	{
+		ID: "llama-3.2-1b", Name: "Llama 3.2 1B", Object: "model", Created: catalogEpoch, OwnedBy: "1trade",
+		Trade1: Pricing{Modality: "text", CreditType: "text", Unit: "1K tokens", Price: "1.000000"},
+	},
+	{
+		ID: "qwen2.5-1.5b", Name: "Qwen2.5 1.5B", Object: "model", Created: catalogEpoch, OwnedBy: "1trade",
+		Trade1: Pricing{Modality: "text", CreditType: "text", Unit: "1K tokens", Price: "1.500000"},
 	},
 	{
 		ID: "claude-opus-4.8", Name: "Claude Opus 4.8", Object: "model", Created: catalogEpoch, OwnedBy: "1trade",
@@ -131,6 +142,38 @@ func List() []Model {
 	out := make([]Model, len(models))
 	copy(out, models)
 	return out
+}
+
+// ListServable returns only the entries the configured backend can actually route, given the
+// gateway's INFERENCE_MODEL_MAP. The catalog is one static list shared by every deployment, but
+// what each can serve differs — a self-hosted GPU runs two small models while a hosted provider
+// covers most of the list. Advertising the whole catalog everywhere meant a customer could pick a
+// model that had no upstream and get a 500 from the provider's 404.
+//
+// An EMPTY map means pass-through (the CPU stub, or a provider whose slugs already equal our ids),
+// so everything is servable and the full list is returned — never filter down to nothing.
+func ListServable(modelMap map[string]string) []Model {
+	if len(modelMap) == 0 {
+		return List()
+	}
+	out := make([]Model, 0, len(modelMap))
+	for _, m := range models {
+		if _, ok := modelMap[m.ID]; ok {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+// IsServable reports whether this deployment can route a model id. Same empty-map rule as
+// ListServable. Used to refuse an unroutable model with a clear 404 rather than letting the
+// request reach an upstream that will reject it.
+func IsServable(id string, modelMap map[string]string) bool {
+	if len(modelMap) == 0 {
+		return true
+	}
+	_, ok := modelMap[id]
+	return ok
 }
 
 // Lookup returns the catalog entry for a model id and whether it exists.

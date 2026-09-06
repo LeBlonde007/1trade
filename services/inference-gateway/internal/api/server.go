@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/trade1/inference-gateway/internal/auth"
 	"github.com/trade1/inference-gateway/internal/catalog"
 	"github.com/trade1/inference-gateway/internal/config"
@@ -21,7 +22,6 @@ import (
 	"github.com/trade1/inference-gateway/internal/metrics"
 	"github.com/trade1/inference-gateway/internal/model"
 	"github.com/trade1/inference-gateway/internal/pricing"
-	"github.com/google/uuid"
 )
 
 // buyCreditsURL is returned in a 402 so the customer knows where to top up.
@@ -62,8 +62,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /v1/chat/vision", s.visionChat) // VLM: prompt + image → text (bills text)
 	s.mux.HandleFunc("POST /v1/images/generations", s.imageGenerations)
 	s.mux.HandleFunc("POST /v1/audio/speech", s.audioSpeech)
-	s.mux.HandleFunc("POST /v1/videos", s.submitVideo)            // async text-to-video: submit
-	s.mux.HandleFunc("GET /v1/videos/{id}", s.getVideo)           // poll job status
+	s.mux.HandleFunc("POST /v1/videos", s.submitVideo)                 // async text-to-video: submit
+	s.mux.HandleFunc("GET /v1/videos/{id}", s.getVideo)                // poll job status
 	s.mux.HandleFunc("GET /v1/videos/{id}/content", s.getVideoContent) // stream the finished mp4
 }
 
@@ -72,7 +72,7 @@ func (s *Server) listModels(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.requireAuth(w, r); !ok {
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"object": "list", "data": catalog.List()})
+	writeJSON(w, http.StatusOK, map[string]any{"object": "list", "data": catalog.ListServable(s.cfg.InferenceModelMap)})
 }
 
 // requireAuth resolves the caller from the bearer credential (API key or tenant JWT); on failure it
@@ -122,6 +122,12 @@ func (s *Server) chatCompletions(w http.ResponseWriter, r *http.Request) {
 	m, found := catalog.Lookup(req.Model)
 	if !found {
 		writeErr(w, http.StatusNotFound, "model_not_found", "unknown model: "+req.Model)
+		return
+	}
+	// In the catalogue but with no upstream on this deployment — say so, rather than forwarding a
+	// request the provider will 404 and surfacing it as an opaque 500.
+	if !catalog.IsServable(req.Model, s.cfg.InferenceModelMap) {
+		writeErr(w, http.StatusNotFound, "model_not_available", req.Model+" is not available on this deployment")
 		return
 	}
 	if m.Trade1.Modality != "text" && m.Trade1.Modality != "docs" && m.Trade1.Modality != "code" { // chat path: text + doc-writer + code-writer; refuse the rest so we never bill the wrong sub-credit
@@ -232,6 +238,12 @@ func (s *Server) imageGenerations(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "model_not_found", "unknown model: "+req.Model)
 		return
 	}
+	// In the catalogue but with no upstream on this deployment — say so, rather than forwarding a
+	// request the provider will 404 and surfacing it as an opaque 500.
+	if !catalog.IsServable(req.Model, s.cfg.InferenceModelMap) {
+		writeErr(w, http.StatusNotFound, "model_not_available", req.Model+" is not available on this deployment")
+		return
+	}
 	if m.Trade1.Modality != "image" { // refuse non-image models so we never bill the wrong sub-credit
 		writeErr(w, http.StatusNotFound, "model_not_found", req.Model+" is not an image model")
 		return
@@ -337,6 +349,12 @@ func (s *Server) audioSpeech(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "model_not_found", "unknown model: "+req.Model)
 		return
 	}
+	// In the catalogue but with no upstream on this deployment — say so, rather than forwarding a
+	// request the provider will 404 and surfacing it as an opaque 500.
+	if !catalog.IsServable(req.Model, s.cfg.InferenceModelMap) {
+		writeErr(w, http.StatusNotFound, "model_not_available", req.Model+" is not available on this deployment")
+		return
+	}
 	if m.Trade1.Modality != "speech" {
 		writeErr(w, http.StatusNotFound, "model_not_found", req.Model+" is not a speech model")
 		return
@@ -410,6 +428,12 @@ func (s *Server) visionChat(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "model_not_found", "unknown model: "+req.Model)
 		return
 	}
+	// In the catalogue but with no upstream on this deployment — say so, rather than forwarding a
+	// request the provider will 404 and surfacing it as an opaque 500.
+	if !catalog.IsServable(req.Model, s.cfg.InferenceModelMap) {
+		writeErr(w, http.StatusNotFound, "model_not_available", req.Model+" is not available on this deployment")
+		return
+	}
 	if m.Trade1.Modality != "vision" {
 		writeErr(w, http.StatusNotFound, "model_not_found", req.Model+" is not a vision model")
 		return
@@ -475,6 +499,12 @@ func (s *Server) submitVideo(w http.ResponseWriter, r *http.Request) {
 	m, found := catalog.Lookup(req.Model)
 	if !found {
 		writeErr(w, http.StatusNotFound, "model_not_found", "unknown model: "+req.Model)
+		return
+	}
+	// In the catalogue but with no upstream on this deployment — say so, rather than forwarding a
+	// request the provider will 404 and surfacing it as an opaque 500.
+	if !catalog.IsServable(req.Model, s.cfg.InferenceModelMap) {
+		writeErr(w, http.StatusNotFound, "model_not_available", req.Model+" is not available on this deployment")
 		return
 	}
 	if m.Trade1.Modality != "video" {

@@ -286,12 +286,13 @@ async function persistConversation() {
   if (!transcript.length) return
   const title = convTitle()
   if (!currentConvId.value) {
-    const c = await convs.create(title, selectedId.value, transcript)
+    const c = await convs.create(title, transcriptModelField(), transcript)
     if (c) { currentConvId.value = c.id; saveChat(); await convs.refresh() }
   } else {
-    await convs.save(currentConvId.value, title, selectedId.value, transcript)
+    const modelField = transcriptModelField()
+    await convs.save(currentConvId.value, title, modelField, transcript)
     const it = convs.list.value.find((x) => x.id === currentConvId.value)
-    if (it) { it.title = title; it.model = selectedId.value; it.updated_at = new Date().toISOString() }
+    if (it) { it.title = title; it.model = modelField; it.updated_at = new Date().toISOString() }
   }
 }
 /** openConversation loads a saved conversation into the playground. */
@@ -301,7 +302,9 @@ async function openConversation(id: string) {
   if (!c) return
   turns.splice(0, turns.length, ...((c.transcript as Turn[]) ?? []))
   currentConvId.value = c.id
-  if (c.model && models.value.some((m) => m.id === c.model)) selectedId.value = c.model
+  // Only restore the picker for a single-model thread; a mixed one has no single right answer,
+  // so leave the current selection alone rather than silently picking one of them.
+  if (c.model && !c.model.includes(',') && models.value.some((m) => m.id === c.model)) selectedId.value = c.model
   saveChat()
   await nextTick(); scrollToBottom()
 }
@@ -353,6 +356,44 @@ function newChatFromHistory() { clearChat(); draft.value = ''; historyOpen.value
 async function openFromHistory(id: string) { await openConversation(id); historyOpen.value = false }
 /** modelLabel resolves a catalog id to its display name for the history list. */
 function modelLabel(id: string): string { return models.value.find((m) => m.id === id)?.name ?? humanizeId(id) }
+
+/**
+ * transcriptModelIds — the distinct models that actually produced this thread's replies, in the
+ * order they were first used.
+ *
+ * The picker can change mid-thread (switching model to compare answers is the point of a
+ * playground), so `selectedId` is only ever "what is selected right now" — not what generated the
+ * transcript. Saving that as the conversation's model mislabelled any mixed thread, and because
+ * models are priced differently (llama-3.2-1b 1.000000 vs qwen2.5-1.5b 1.500000 per 1K), reading
+ * cost back out of history attributed it to the wrong model.
+ */
+function transcriptModelIds(): string[] {
+  const seen: string[] = []
+  for (const t of turns) {
+    if (t.role !== 'assistant' || !t.model) continue
+    if (!seen.includes(t.model)) seen.push(t.model)
+  }
+  return seen
+}
+
+/** The value stored in the conversation's `model` column: one id, or a comma-separated list for a
+ *  mixed thread. Falls back to the picker only when nothing has been generated yet. */
+function transcriptModelField(): string {
+  const ids = transcriptModelIds()
+  return ids.length ? ids.join(',') : selectedId.value
+}
+
+/** Renders a stored model field, which may name several models after a mid-thread switch. */
+function conversationModelLabel(field: string): string {
+  const ids = field.split(',').filter(Boolean)
+  if (ids.length <= 1) return modelLabel(field)
+  return `${ids.length} models`
+}
+
+/** Full model names for a mixed thread, for the history row's tooltip. */
+function conversationModelTitle(field: string): string {
+  return field.split(',').filter(Boolean).map(modelLabel).join(' · ')
+}
 
 // =====================================================
 // Input + cost preview + send
@@ -406,12 +447,15 @@ onMounted(async () => {
   watch([turns, params, selectedId], () => { saveChat(); scheduleServerSave() }, { deep: true })
 })
 
-// The DO tier serves these open models directly (Llama-4 / Llama-3.3-70B / DeepSeek-V3.2 / Qwen3);
-// the premium-labelled picks (GPT/Claude) are tier-gated there, so they route to DeepSeek-V3.2 — the
-// strongest available — for a high-quality, long-form live answer. (Swaps to the real model once an
-// OpenAI/Anthropic key is wired.)
-const LIVE_TEXT_MODELS = ['llama-3.1-8b', 'llama-3.1-70b', 'deepseek-v3.2', 'qwen3-32b']
-const liveServedId = computed(() => (LIVE_TEXT_MODELS.includes(selectedId.value) ? selectedId.value : 'deepseek-v3.2'))
+// The playground sends the model the user actually picked. There used to be a hardcoded
+// substitution here (anything outside a fixed DigitalOcean list was silently sent as
+// deepseek-v3.2, because GPT/Claude were tier-gated on that provider). It caused three problems:
+// the turn was labelled with the picked model while a different one answered, the cost estimate
+// used the substitute's price, and once the gateway stopped serving DO models it produced
+// "deepseek-v3.2 is not available on this deployment" for a model the user never chose.
+//
+// Routing belongs to the gateway (INFERENCE_MODEL_MAP), and unroutable models are no longer
+// offered in the catalogue — so the frontend has no business swapping one model for another.
 
 // Session meter — only live turns (those carrying a real creditCost) count toward credit spend.
 const liveTurns = computed(() => turns.filter((t) => t.creditCost !== undefined))
@@ -431,7 +475,7 @@ const estimateInputTokens = computed(() => baseContextTokens.value + draftTokens
 
 // Live credit estimate for the served model (input context + the max-out budget) × catalog price.
 const estimateCredits = computed(() => {
-  const p = catalogPrice.value[liveServedId.value]
+  const p = catalogPrice.value[selectedId.value]
   if (!p || !p.unit.includes('1K')) return 0
   return ((estimateInputTokens.value + params.maxTokens) / 1000) * p.price
 })
@@ -488,7 +532,7 @@ async function send() {
   attachments.value = []
   sending.value = true
   const startedAt = Date.now()
-  const liveModel = liveServedId.value
+  const liveModel = selectedId.value
   // Push a streaming placeholder and grab the reactive element (not the raw object) so token mutations
   // re-render live.
   turns.push({ id: nextId(), role: 'assistant', text: '', streaming: true, model: selectedId.value })
@@ -1363,7 +1407,7 @@ async function copyText(text: string, label: string) {
               <li v-for="c in convList" :key="c.id" :class="{ active: c.id === currentConvId }">
                 <button type="button" class="history-open" @click="openFromHistory(c.id)">
                   <span class="history-name">{{ c.title || 'Untitled chat' }}</span>
-                  <span v-if="c.model" class="history-model mono">{{ modelLabel(c.model) }}</span>
+                  <span v-if="c.model" class="history-model mono" :title="conversationModelTitle(c.model)">{{ conversationModelLabel(c.model) }}</span>
                 </button>
                 <button type="button" class="history-del" title="Delete conversation" @click.stop="deleteConversation(c.id)">×</button>
               </li>

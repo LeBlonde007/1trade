@@ -7,11 +7,12 @@
 #   INFERENCE_API_KEY=sk-or-... scripts/inference-provider.sh        # → OpenRouter, default Llama model map
 #   INFERENCE_API_KEY=... VLLM_BASE_URL=https://api.groq.com/openai/v1 \
 #     INFERENCE_MODEL_MAP='{"llama-3.1-8b":"llama-3.1-8b-instant"}' scripts/inference-provider.sh   # another provider
+#   PROVIDER=local scripts/inference-provider.sh                     # → self-hosted small models on our own GPU (Ollama)
 #   PROVIDER=stub scripts/inference-provider.sh                      # revert to the keyless in-cluster CPU stub
 #
 # The key is written ONLY into the in-cluster `platform-auth` Secret (the gateway loads it via envFrom);
 # it is never committed. The non-secret URL + model map patch the `inference-gateway-env` ConfigMap.
-# Env: NAMESPACE(default current) · VLLM_BASE_URL · INFERENCE_MODEL_MAP · PROVIDER(provider|stub)
+# Env: NAMESPACE(default current) · VLLM_BASE_URL · LOCAL_LLM_URL · INFERENCE_MODEL_MAP · PROVIDER(provider|local|stub)
 set -euo pipefail
 
 PROVIDER="${PROVIDER:-provider}"
@@ -22,7 +23,36 @@ command -v kubectl >/dev/null || { echo "ERROR: kubectl not found"; exit 1; }
 kubectl get deploy inference-gateway $NS_ARG >/dev/null 2>&1 \
   || { echo "ERROR: inference-gateway not found in this cluster/context ($(kubectl config current-context 2>/dev/null))"; exit 1; }
 
-if [ "$PROVIDER" = "stub" ]; then
+if [ "$PROVIDER" = "local" ]; then
+  # SELF-HOSTED: serve real models from our own GPU instead of a hosted provider. The server is any
+  # OpenAI-compatible runtime on the host (Ollama by default, or vLLM on :8000); the cluster reaches
+  # it through k3d's host alias. No API key — a local runtime does not authenticate, and the gateway
+  # skips the Authorization header when the key is empty.
+  #
+  #   scripts/inference-provider.sh PROVIDER=local                      # Ollama on the host
+  #   LOCAL_LLM_URL=http://host.k3d.internal:8000 PROVIDER=local ...    # a local vLLM instead
+  #
+  # NOTE the URL must NOT end in /v1 — the gateway appends /v1/chat/completions itself.
+  LOCAL_URL="${LOCAL_LLM_URL:-http://host.k3d.internal:11434}"
+  # Only the models we actually serve locally. Catalog ids map 1:1 to the runtime's own tags, so the
+  # playground shows the true model — no pretending a 1B is a 70B. Ids absent here are simply not
+  # served by this backend.
+  LOCAL_DEFAULT_MAP='{"llama-3.2-1b":"llama3.2:1b","qwen2.5-1.5b":"qwen2.5:1.5b"}'
+  LOCAL_MAP="${INFERENCE_MODEL_MAP:-$LOCAL_DEFAULT_MAP}"
+  say "inference-gateway → self-hosted runtime $LOCAL_URL (real models, our GPU)"
+  kubectl patch secret platform-auth $NS_ARG --type merge -p "$(cat <<'EOF'
+stringData:
+  INFERENCE_API_KEY: ''
+EOF
+)"
+  kubectl patch configmap inference-gateway-env $NS_ARG --type merge -p "$(cat <<EOF
+data:
+  INFERENCE_BACKEND: "vllm"
+  VLLM_BASE_URL: "$LOCAL_URL"
+  INFERENCE_MODEL_MAP: '$LOCAL_MAP'
+EOF
+)"
+elif [ "$PROVIDER" = "stub" ]; then
   # Revert: keyless in-cluster CPU stub. Empty key → gateway runs the keyless path; empty map → pass-through.
   say "reverting inference-gateway → keyless CPU stub (http://inference-runtime:8000)"
   kubectl patch secret platform-auth $NS_ARG --type merge -p "$(cat <<'EOF'

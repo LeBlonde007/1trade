@@ -77,3 +77,31 @@ Customer (Authorization: Bearer <api_key>)
 ## Milestone
 
 - M2 (Gate 2): first inference dollar.
+
+---
+
+## Status — serving real models; catalogue is now deployment-scoped (2026-09-06)
+
+The gateway serves live model output through the `model.Backend` seam against any OpenAI-compatible
+runtime — a hosted provider, or our own GPU (F09). No gateway code changed to switch between them:
+`INFERENCE_BACKEND` + `VLLM_BASE_URL` + `INFERENCE_MODEL_MAP` cover it.
+
+**Built this pass**
+- `catalog.ListServable(modelMap)` / `catalog.IsServable(id, modelMap)` — `GET /v1/models` now
+  advertises only what the configured backend can actually route. The catalogue is one static list
+  shared by every deployment, but each can serve a different subset; advertising all of it let a
+  customer pick a model with no upstream and receive a **500 from the provider's 404**. An empty map
+  means pass-through (CPU stub) and still lists everything — never filter to nothing.
+- Chat + all media handlers reject an unroutable id with **`404 model_not_available`** instead of
+  forwarding a doomed request.
+- The built-in media map (`defaultMediaMap`) is DigitalOcean slugs; it now merges **only** when the
+  backend is DO. It was merging everywhere, so a text-only self-hosted runtime advertised
+  `wan-t2v` / `stable-diffusion-3.5` and failed at the upstream.
+- Tests: servable filtering, the empty-map pass-through rule, the 404 guard, DO-only media scoping.
+
+**⚠ Contract drift — needs `tech-lead`, do not treat as done**
+Two interface changes are NOT reflected in `docs/contracts/openapi/inference.yaml`:
+- the new `404 model_not_available` error code (only `INSUFFICIENT_CREDIT` is specified), and
+- `/v1/models` is described as "List the curated catalog" but is now deployment-scoped.
+
+Per the contract-first rule these must be authored by `tech-lead` before this counts as shipped.
