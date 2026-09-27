@@ -89,9 +89,9 @@ doc), re-verify WCAG-AA contrast, and record an ADR only if the *structure* chan
 
 ---
 
-## ADR-0004 — What a trade settles in (the quote / cash leg) *(Open — blocks exchange settlement)*
+## ADR-0004 — What a trade settles in (the quote / cash leg) *(Accepted — option 2, paper only)*
 
-**Status:** Open (raised 2026-09-27) · **Owner:** tech-lead + founder, with counsel (security-compliance)
+**Status:** Accepted 2026-09-27 (founder approved option 2; real-money cash still pending counsel) · **Owner:** tech-lead + founder, with counsel (security-compliance)
 
 **Context.** The matching engine (KW03) now produces real trades: *buyer receives `quantity` of the
 product's credit type; seller receives `price × quantity`.* The first leg lands on the ledger. **The
@@ -122,6 +122,11 @@ credit-types.md, schemas), so it is tech-lead's call, not the engine's.
 **Recommendation.** Option 2, **paper only now**. Add a paper-USD quote balance and a
 `POST /v1/credits/settle-trade` (service-token, idempotent on `trade_id`) that moves both legs and
 both fees in one DB transaction. Real-money cash stays unbuilt until counsel answers.
+
+**Decision (2026-09-27).** Option 2, paper only, as recommended. Authored as `openapi/credit.yaml`
+v1.1.0 (cash balances + transactions, paper-cash grant, `settle-trade`), the new event
+`events/cash.tx.v1.yaml`, and `credit-types.md` §6 (the quote currency is not a credit type).
+Real-money cash is refused in the contract itself (`REAL_MONEY_DISABLED`), not just unbuilt.
 
 **Unblocks.** KW03 settlement (SPEC.md §7.3), the real risk hook (§7.4: "can the buyer pay?"
 needs a cash balance), paper P&L on `/portfolio`, and the "$10,000 paper" onboarding promise.

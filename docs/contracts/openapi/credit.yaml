@@ -1,14 +1,19 @@
 openapi: 3.0.3
 info:
   title: 1Trade Credit Ledger API
-  version: 1.0.0
+  version: 1.1.0
   description: >
     Per-tenant prepaid credit balances, append-only hash-chained transactions, purchases, and
     conversions. Owned by `credit-ledger`; see docs/contracts/credit-types.md and
     docs/plans/features/F05-prepaid-credit-ledger.md. ALL amounts are fixed-point decimals
     serialized as STRINGS (never JSON numbers) to avoid float error. Every mutating call takes an
-    Idempotency-Key. Every balance/transaction carries is_paper. Trading settlement (debit on
-    fill) is Phase 2 and not in v1.
+    Idempotency-Key. Every balance/transaction carries is_paper.
+
+    v1.1.0 (ADR-0004, 2026-09-27) adds the exchange's quote leg: a PAPER-ONLY cash balance
+    (currency USD — a quote currency, not a credit type; credit-types.md §6), a paper-cash grant,
+    and atomic trade settlement (`/v1/credits/settle-trade`). Real-money cash is not built: every
+    cash surface is `is_paper: true` only, and a real-money request is refused with
+    REAL_MONEY_DISABLED until counsel clears custody (F22).
 
 servers:
   - url: https://api.1trade.io
@@ -20,7 +25,7 @@ tags:
   - name: customer
     description: Customer-facing, called via the gateway with a tenant JWT.
   - name: internal
-    description: Service-to-service, called with a service token (inference-gateway, compute-control, platform-core, settlement-trust). Not exposed to customers.
+    description: Service-to-service, called with a service token (inference-gateway, compute-control, platform-core, settlement-trust, matching-engine). Not exposed to customers.
 
 paths:
   /v1/credits/balances:
@@ -176,6 +181,111 @@ paths:
         '200': { description: Burned., content: { application/json: { schema: { $ref: '#/components/schemas/Transaction' } } } }
         '409': { $ref: '#/components/responses/IdempotencyConflict' }
 
+  /v1/credits/cash/balances:
+    get:
+      tags: [customer]
+      summary: List the tenant's paper cash balances (one per quote currency). Paper only (ADR-0004).
+      operationId: listCashBalances
+      responses:
+        '200':
+          description: Cash balances. Empty until the tenant's paper-cash grant.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  balances:
+                    type: array
+                    items: { $ref: '#/components/schemas/CashBalance' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/credits/cash/transactions:
+    get:
+      tags: [customer]
+      summary: List the tenant's paper cash transactions (newest first, paginated).
+      operationId: listCashTransactions
+      parameters:
+        - { name: limit,  in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: cursor, in: query, schema: { type: string }, description: opaque pagination cursor }
+      responses:
+        '200':
+          description: A page of cash transactions.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transactions:
+                    type: array
+                    items: { $ref: '#/components/schemas/CashTransaction' }
+                  next_cursor: { type: string, nullable: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/credits/paper-cash/grant:
+    post:
+      tags: [internal]
+      summary: >
+        Grant starting paper cash to a tenant (the "$10,000 paper" onboarding allocation). Called by
+        platform-core during activation. Paper only. One grant per Idempotency-Key; platform-core
+        uses `paper-grant:<tenant_id>` so a tenant is granted once however often activation retries.
+      operationId: grantPaperCash
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/PaperCashGrantRequest' } } }
+      responses:
+        '200': { description: "Granted (or the original grant, on replay).", content: { application/json: { schema: { $ref: '#/components/schemas/CashTransaction' } } } }
+        '409': { $ref: '#/components/responses/IdempotencyConflict' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /v1/credits/settle-trade:
+    post:
+      tags: [internal]
+      summary: >
+        Settle one matched trade atomically. Called by matching-engine only (service token), once per
+        trade in trades.executed.v1 order. Paper only until counsel clears real-money custody.
+      description: >
+        In ONE database transaction:
+          notional = floor_6dp(price × quantity)   (the engine's rule; the ledger recomputes it)
+          buyer:  credit_type +quantity · cash −notional (op trade) · cash −buyer.fee (op fee)
+          seller: credit_type −quantity · cash +notional (op trade) · cash −seller.fee (op fee)
+        Zero-fee legs write no row. Every row extends its balance's hash chain and emits credit.tx.v1
+        (credit legs, operation `trade`) or cash.tx.v1 (cash legs) after commit. Paper fees are
+        debited and not credited anywhere: paper flow earns no revenue.
+
+        All-or-nothing: if the seller lacks the credits (INSUFFICIENT_CREDIT) or the buyer lacks the
+        cash (INSUFFICIENT_CASH), nothing is written and the trade is unsettled — the engine must
+        bust it. The engine's pre-trade risk check is expected to make this rare; the ledger is the
+        backstop, never the other way round.
+
+        Idempotency: the Idempotency-Key header MUST equal `trade_id`. A replay returns the original
+        result; the same trade_id with a different body is 409.
+
+        Caller restriction (security): the body names BOTH tenants, so this endpoint moves one tenant's
+        credits and cash to another. It MUST accept only the matching-engine's own service identity,
+        not any internal service token; any other caller is 403. Otherwise a compromised internal
+        service could settle a fabricated trade against a victim tenant.
+      operationId: settleTrade
+      security: [ { serviceToken: [] } ]
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/SettleTradeRequest' } } }
+      responses:
+        '200': { description: "Settled (or the original settlement, on replay).", content: { application/json: { schema: { $ref: '#/components/schemas/SettleTradeResult' } } } }
+        '402':
+          description: Seller lacks the credits (INSUFFICIENT_CREDIT) or buyer lacks the cash (INSUFFICIENT_CASH). Nothing written.
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '403':
+          description: Caller is not the matching-engine service identity.
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '409': { $ref: '#/components/responses/IdempotencyConflict' }
+        '422':
+          description: >
+            Invalid trade: is_paper false (REAL_MONEY_DISABLED), same tenant on both sides, an internal
+            account on a paper trade, a non-tradeable credit type, or Idempotency-Key ≠ trade_id.
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+
   /v1/credits/audit/chain-verify:
     get:
       tags: [internal]
@@ -285,11 +395,78 @@ components:
         amount:       { $ref: '#/components/schemas/Decimal' }
         reference_id: { type: string, description: "capacity/attestation reference" }
         is_paper:     { type: boolean }
+    Currency:
+      type: string
+      description: Quote currency. Not a credit type (credit-types.md §6). USD only in v1.1.
+      enum: [USD]
+    CashBalance:
+      type: object
+      required: [currency, balance, locked_amount, is_paper]
+      properties:
+        currency:      { $ref: '#/components/schemas/Currency' }
+        balance:       { $ref: '#/components/schemas/Decimal' }
+        locked_amount: { $ref: '#/components/schemas/Decimal', description: "reserved for resting buy orders" }
+        is_paper:      { type: boolean, enum: [true], description: "paper only until counsel clears custody (ADR-0004)" }
+    CashTransaction:
+      type: object
+      required: [tx_id, tenant_id, currency, operation, amount, balance_after, is_paper, created_at, chain_hash]
+      properties:
+        tx_id:          { type: string, format: uuid }
+        tenant_id:      { type: string, format: uuid }
+        sub_account_id: { type: string, format: uuid, nullable: true }
+        currency:       { $ref: '#/components/schemas/Currency' }
+        operation:      { type: string, enum: [paper_grant, trade, fee] }
+        amount:         { $ref: '#/components/schemas/Decimal', description: "signed delta applied to the balance" }
+        reference_id:   { type: string, nullable: true, description: "trade_id for trade/fee; the grant key for paper_grant" }
+        balance_after:  { $ref: '#/components/schemas/Decimal' }
+        is_paper:       { type: boolean, enum: [true] }
+        created_at:     { type: string, format: date-time }
+        chain_hash:     { type: string }
+    PaperCashGrantRequest:
+      type: object
+      required: [tenant_id, currency, amount, is_paper]
+      properties:
+        tenant_id: { type: string, format: uuid }
+        currency:  { $ref: '#/components/schemas/Currency' }
+        amount:    { $ref: '#/components/schemas/Decimal', description: "positive; the onboarding default is 10000.000000" }
+        is_paper:  { type: boolean, enum: [true] }
+    SettleParty:
+      type: object
+      required: [tenant_id, order_id, fee, is_internal]
+      properties:
+        tenant_id:      { type: string, format: uuid }
+        sub_account_id: { type: string, format: uuid, nullable: true }
+        order_id:       { type: string, format: uuid }
+        fee:            { $ref: '#/components/schemas/Decimal', description: "non-negative, in the trade's currency" }
+        is_internal:    { type: boolean }
+    SettleTradeRequest:
+      type: object
+      description: The settlement subset of a trades.executed.v1 payload, plus the quote currency.
+      required: [trade_id, product_id, credit_type, price, quantity, currency, buyer, seller, is_paper, chain_hash]
+      properties:
+        trade_id:    { type: string, format: uuid }
+        product_id:  { type: string }
+        credit_type: { $ref: '#/components/schemas/CreditType' }
+        price:       { $ref: '#/components/schemas/Decimal' }
+        quantity:    { $ref: '#/components/schemas/Decimal' }
+        currency:    { $ref: '#/components/schemas/Currency' }
+        buyer:       { $ref: '#/components/schemas/SettleParty' }
+        seller:      { $ref: '#/components/schemas/SettleParty' }
+        is_paper:    { type: boolean, description: "must be true in v1.1; false is 422 REAL_MONEY_DISABLED" }
+        chain_hash:  { type: string, description: "the trade's engine chain hash, stored as the settlement reference" }
+    SettleTradeResult:
+      type: object
+      required: [trade_id, notional, credit_transactions, cash_transactions]
+      properties:
+        trade_id:            { type: string, format: uuid }
+        notional:            { $ref: '#/components/schemas/Decimal' }
+        credit_transactions: { type: array, items: { $ref: '#/components/schemas/Transaction' }, description: "buyer +qty, seller −qty" }
+        cash_transactions:   { type: array, items: { $ref: '#/components/schemas/CashTransaction' }, description: "trade and non-zero fee legs" }
     ApiError:
       type: object
       required: [code, message]
       properties:
-        code:    { type: string, example: INSUFFICIENT_CREDIT }
+        code:    { type: string, example: INSUFFICIENT_CREDIT, description: "v1.1 adds INSUFFICIENT_CASH and REAL_MONEY_DISABLED" }
         message: { type: string }
         details: { type: object, additionalProperties: true }
 

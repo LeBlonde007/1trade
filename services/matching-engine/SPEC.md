@@ -131,10 +131,10 @@ and executing at the taker's price. Both mutations were caught.
    `journal.Recover` call before the listener starts.
 2. **Snapshots.** Every 5 minutes, snapshot books and sequences so replay starts from the snapshot
    rather than genesis. Redis as a read cache of depth for the API.
-3. **Settlement. Blocked on ADR-0004** (`docs/plans/DECISIONS.md`): the ledger has no balance for
-   the cash leg (`price × quantity`), and choosing one is a shared-contract decision. Once decided:
-   call credit-ledger to settle both legs and both fees atomically, idempotent on `trade_id`, then
-   publish `trades.executed.v1` and `orders.state.v1` to NATS. The payload encoders are done.
+3. **Settlement.** ADR-0004 was accepted (paper-only USD cash). Call `POST /v1/credits/settle-trade`
+   (`credit.yaml` v1.1.0) for each trade, in order, with Idempotency-Key = `trade_id`. A 402 means
+   the trade is unsettled and must be busted. Then publish `trades.executed.v1` and `orders.state.v1`
+   to NATS. The payload encoders are done.
 4. **Risk hook implementation.** Balance and position-limit checks against the ledger, plus
    surveillance holds (KW05).
 5. **API wiring.** Behind the licence gate: order entry, cancel, and orders/fills reads served from

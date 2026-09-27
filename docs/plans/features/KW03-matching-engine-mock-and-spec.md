@@ -126,11 +126,12 @@ per order locally. It is not deployed yet: the service opens no database until o
 `trades.executed.v1`. It is validated against the contract YAML schemas, and the trade chain can be
 re-verified from the payloads alone.
 
-**Settlement — blocked on ADR-0004** (Open): trades have no cash leg in the ledger. See
-`docs/plans/DECISIONS.md`.
+**Settlement — unblocked.** ADR-0004 was accepted (option 2, paper only) and authored as
+`credit.yaml` v1.1.0 `POST /v1/credits/settle-trade` plus `events/cash.tx.v1`. Next come the ledger
+side (F05) and then the engine's settlement client.
 
-**Not done** (SPEC.md §7): snapshots, settlement plus NATS publishing (ADR-0004), the real risk hook
-(also needs ADR-0004 to know whether the buyer can pay), and API wiring. The API wiring is the
+**Not done** (SPEC.md §7): snapshots, settlement plus NATS publishing (contract now authored), the
+real risk hook (can now check the buyer's paper cash), and API wiring. The API wiring is the
 licence-gated cutover.
 
 **Open for tech-lead** (SPEC.md §8): sequence scope per `(product, is_paper)`, how paper liquidity

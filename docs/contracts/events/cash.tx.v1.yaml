@@ -1,0 +1,46 @@
+# 1Trade event contract — cash.tx.v1
+# One event per committed paper-cash movement (ADR-0004). Owned by credit-ledger; consumed by the
+# realtime wallet / portfolio (frontend fan-out), surveillance (P&L and position context), and
+# observability. The credit legs of a trade stay on credit.tx.v1 (operation `trade`) — this subject
+# carries only the quote-currency legs, which have no credit_type and so cannot fit credit.tx.v1.
+# See docs/contracts/openapi/credit.yaml v1.1.0 and docs/plans/DECISIONS.md ADR-0004.
+
+subject: cash.tx.v1
+transport: NATS JetStream
+version: 1.0.0
+description: Emitted AFTER a cash transaction commits (atomically with the cash balance update).
+
+payload_schema:
+  $schema: "https://json-schema.org/draft/2020-12/schema"
+  title: CashTxV1
+  type: object
+  additionalProperties: false
+  required: [tx_id, tenant_id, currency, operation, amount, balance_after, is_paper, created_at, chain_hash]
+  properties:
+    tx_id:          { type: string, format: uuid }
+    tenant_id:      { type: string, format: uuid }
+    sub_account_id: { type: [string, "null"], format: uuid }
+    currency:       { type: string, enum: [USD], description: "quote currency — not a credit type" }
+    operation:      { type: string, enum: [paper_grant, trade, fee] }
+    amount:         { type: string, description: "signed fixed-point decimal delta (NUMERIC(20,6)) as a string" }
+    reference_id:   { type: [string, "null"], description: "trade_id for trade/fee legs; the grant key for paper_grant" }
+    balance_after:  { type: string, description: "fixed-point decimal string" }
+    is_paper:
+      type: boolean
+      enum: [true]
+      description: "paper only until counsel clears real-money custody (ADR-0004); consumers MUST still filter"
+    created_at:     { type: string, format: date-time }
+    chain_hash:     { type: string, description: "sha256(prev_chain_hash || canonical_json(row)) — per cash balance" }
+
+example:
+  tx_id: "3c1d0000-0000-4000-8000-000000000001"
+  tenant_id: "1f2e0000-0000-4000-8000-000000000001"
+  sub_account_id: null
+  currency: USD
+  operation: trade
+  amount: "-29.900000"
+  reference_id: "7c2a1e64-0000-4000-8000-000000000001"
+  balance_after: "9970.100000"
+  is_paper: true
+  created_at: "2026-09-27T12:00:00Z"
+  chain_hash: "a91c…"

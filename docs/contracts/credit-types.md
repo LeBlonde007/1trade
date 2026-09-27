@@ -5,7 +5,7 @@
 > change + a coordinated rollout across `credit-ledger` + `inference-ml` + `compute-platform` +
 > `platform-core` (billing/UI) + `trading-frontend`. Owned by `tech-lead`.
 >
-> Status: **v1.0**, 2026-05-29. Consumed by: all services. See `docs/plans/CONTRACTS.md`.
+> Status: **v1.0.1**, 2026-09-27 (§6 added — clarification, no enum change). Consumed by: all services. See `docs/plans/CONTRACTS.md`.
 
 ---
 
@@ -77,3 +77,18 @@ If counsel requires the simpler one-way model (sub/gpu → `ai_index` only, no b
 
 No additional credit types are introduced for the exchange — the same enum trades. The only change
 at switch-on is the `tradeable` flag going live per product (`matching-engine` + `index-service`).
+
+## 6. Quote currency is not a credit type (ADR-0004, 2026-09-27)
+
+Exchange products are priced in USD per credit. The USD a buyer pays (and a seller receives) is a
+**quote-currency cash balance**, held by `credit-ledger` in its own append-only, hash-chained table,
+beside credit balances, not in this enum:
+
+- It is not a `credit_type`, so §5 ("no additional credit types for the exchange") still holds.
+- It is **paper only** until counsel clears real-money custody (F22). Every cash surface is
+  `is_paper: true`.
+- Currency is `USD` in v1.1 (`openapi/credit.yaml` `Currency`). JPY follows the purchase flow only
+  when real-money cash is cleared.
+- It is never convertible into credits through `/v1/credits/convert`. Credits and cash meet only at
+  trade settlement (`/v1/credits/settle-trade`).
+

@@ -94,3 +94,34 @@ CREATE INDEX idx_credit_tx_ref ON credit_transactions (reference_id);
 - M1 (Gate 1): schema + balances + transactions visible.
 - M2 (Gate 2): purchase + first debit working.
 - M4 (Gate 4): mint/burn live for partner-DC payout cycle.
+
+---
+
+## Contract change — paper cash + trade settlement (credit.yaml v1.1.0, 2026-09-27)
+
+ADR-0004 (Accepted, option 2) adds the exchange's quote leg to the ledger. It is **authored in the
+contract, not yet implemented here**.
+
+- **Paper-only USD cash balance.** Kept in its own append-only, hash-chained table beside credit
+  balances. It is not a credit type (`credit-types.md` §6).
+- **Endpoints:**
+  - `GET /v1/credits/cash/balances` and `GET /v1/credits/cash/transactions` (customer).
+  - `POST /v1/credits/paper-cash/grant` (internal, platform-core at activation; idempotent per
+    tenant). This is the "$10,000 paper" allocation.
+  - `POST /v1/credits/settle-trade` (internal, matching-engine only; Idempotency-Key = `trade_id`).
+    It moves the credit leg, the cash leg and both fees in **one** DB transaction. Seller-short is
+    402 `INSUFFICIENT_CREDIT` and buyer-short is 402 `INSUFFICIENT_CASH`; in both cases nothing is
+    written. `is_paper: false` is 422 `REAL_MONEY_DISABLED`.
+- **Events.** Credit legs emit `credit.tx.v1` (operation `trade`, already in the enum). Cash legs
+  emit the new `cash.tx.v1`.
+- **Acceptance for the implementation:**
+  - [ ] Migration for the cash balances and transactions, with append-only triggers.
+  - [ ] Settlement is atomic: a property test shows credits and cash are conserved across buyer and
+        seller, net of fees.
+  - [ ] Replaying the same `trade_id` returns the original result; a different body is 409.
+  - [ ] Real money is refused; a same-tenant trade and an internal account on a paper trade are
+        refused.
+  - [ ] Chain-verify covers the cash chains.
+  - [ ] `settle-trade` accepts only the matching-engine service identity; any other caller is 403,
+        including other internal services.
+  - [ ] `/security-review` is clean.

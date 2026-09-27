@@ -106,6 +106,7 @@ These are authored alongside Phase 1 so the switch-on is a config flip, not a re
 | `events/trades.executed.v1.yaml` | specced |
 | `events/orders.state.v1.yaml` | specced |
 | `events/surveillance.alert.v1.yaml` | specced |
+| `openapi/credit.yaml` v1.1 cash + `settle-trade` · `events/cash.tx.v1.yaml` | authored 2026-09-27 (ADR-0004); paper only; not yet implemented |
 
 ---
 
@@ -116,12 +117,12 @@ This table is the explicit cross-service coupling map. Every cell is a contract.
 | Producer ↓ / Consumer → | platform-core | credit-ledger | inference-ml | compute-platform | settlement-trust | index-service | trading-frontend | CLI |
 |---|---|---|---|---|---|---|---|---|
 | `platform-core` (auth) | — | jwt | jwt | jwt | jwt | jwt | jwt | jwt |
-| `credit-ledger` | balance API | — | debit API | debit API | mint/burn API | (none) | balance API | balance API |
+| `credit-ledger` | balance API · paper-cash grant | — | debit API | debit API | mint/burn API | (none) | balance API · cash balances · cash.tx.v1 | balance API · cash balances |
 | `inference-ml` | usage events | inference.usage.v1 → debit | — | (none) | (none) | (none) | catalog API | catalog API |
 | `compute-platform` | quota API | compute.usage.v1 → debit | (schedules pods) | — | partner.capacity.v1 | (none) | instances API | instances API |
 | `settlement-trust` | partner DC mgmt | mint/burn calls | (none) | capacity attestation | — | (none) | partner portal | (none) |
 | `index-service` | (none) | (none) | (none) | (none) | (none) | — | index API | index API |
-| `matching-engine` (Phase 2) | (none) | settle on fill | (none) | (none) | (none) | trades feed | trading API | trading API |
+| `matching-engine` (Phase 2) | (none) | settle-trade API (credit.yaml v1.1) | (none) | (none) | (none) | trades feed | trading API | trading API |
 | `market-maker` (Phase 2) | (none) | (none) | (none) | (none) | (none) | (none) | (none) | (none) |
 | `surveillance` (Phase 2) | (none) | (none) | (none) | (none) | (none) | mark-to-close flags | alert events | (none) |
 
