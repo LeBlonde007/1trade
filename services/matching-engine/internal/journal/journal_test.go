@@ -314,3 +314,23 @@ func TestEpochIsStableAndDistinct(t *testing.T) {
 		}
 	}
 }
+
+// TestReadAfterVerifiesContinuity checks the relay's reader: it follows the chain from a known head,
+// and refuses a head that does not match what is stored.
+func TestReadAfterVerifiesContinuity(t *testing.T) {
+	dsn := freshSchema(t)
+	s, e := open(t, dsn)
+	defer s.Close()
+	drive(t, e)
+	all, err := s.ReadAfter(context.Background(), 0, "", 0)
+	if err != nil || len(all) != len(e.Journal()) {
+		t.Fatalf("read all = %d entries, %v; want %d", len(all), err, len(e.Journal()))
+	}
+	tail, err := s.ReadAfter(context.Background(), 3, all[2].ChainHash, 0)
+	if err != nil || len(tail) != len(all)-3 || tail[0].Seq != 4 {
+		t.Fatalf("read after 3 = %d entries starting %v, %v", len(tail), tail, err)
+	}
+	if _, err := s.ReadAfter(context.Background(), 3, "not-the-head", 0); !errors.Is(err, ErrCorrupt) {
+		t.Errorf("wrong head err = %v, want ErrCorrupt", err)
+	}
+}

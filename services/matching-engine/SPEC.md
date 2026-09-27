@@ -152,7 +152,21 @@ and executing at the taker's price. Both mutations were caught.
      `engine_meta` and loaded by `journal.Recover`. Without it, every fresh journal's first trade
      reused the same trade_id and the ledger refused it as a conflict. The cross-service test found
      this.
-   - **Remaining:** NATS publishing of the encoded events.
+   - **Event publishing — built.** `internal/outbox`: **the journal is the outbox.** A relay follows
+     the journal command by command (`journal.ReadAfter`, chain-verified). It re-derives each
+     command's events on a shadow engine (`Engine.Apply` — replay is exact) and publishes them in
+     emission order to the `TRADING_EVENTS` JetStream stream.
+     - The Nats-Msg-Id is the event_id / trade_id, and the dedupe window is 10 min.
+     - A Postgres cursor (`engine_outbox_cursor`, migration 0003) records (seq, idx) after each
+       command.
+     - Nothing in the order path waits on the network, and a crash loses nothing.
+     - Tests:
+       - the output is byte-identical to the live engine's emission;
+       - resume after restart, and after a failure mid-command, gives no gap and no duplicate
+         (mutation-checked);
+       - the relay follows new entries;
+       - the real path runs Postgres journal → relay → embedded JetStream in order, and a full
+         republish after losing the cursor adds zero messages.
    - **Cutover wiring** (licence-gated):
      - `DATABASE_URL`, plus both migrations in an initContainer;
      - the `ledger-settle` Secret mounted in the engine;

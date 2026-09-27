@@ -144,7 +144,15 @@ re-verified from the payloads alone.
   - a price-improved fill settles out of its reservation;
   - every leftover is released, ending with nothing locked.
 
-Remaining: NATS publishing, and the licence-gated cutover wiring (SPEC §7.3).
+**Event publishing: done (2026-09-27).** The journal is the outbox. A relay re-derives events on a
+shadow engine and publishes them to JetStream in order: at-least-once, with dedupe ids and a Postgres
+cursor. Proven end to end on real Postgres and JetStream.
+
+Remaining: only the licence-gated cutover wiring (SPEC §7.3):
+- DATABASE_URL and the migrations;
+- `journal.Recover` with `ReserveRisk`;
+- running the relay and the settlement worker;
+- serving order entry from the engine.
 
 **Not done** (SPEC.md §7): snapshots, settlement plus NATS publishing (contract now authored), the
 real risk hook (can now check the buyer's paper cash), and API wiring. The API wiring is the

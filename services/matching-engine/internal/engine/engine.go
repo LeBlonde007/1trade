@@ -476,6 +476,22 @@ func (e *Engine) record(c Command) error {
 	return nil
 }
 
+// Apply runs one journaled command and returns its events — the single dispatch used by Replay and by
+// anything that follows the journal command by command (the event relay's shadow engine).
+func (e *Engine) Apply(c Command) ([]Event, error) {
+	switch {
+	case c.Submit != nil:
+		r, err := e.Submit(*c.Submit)
+		return r.Events, err
+	case c.Cancel != nil:
+		r, err := e.Cancel(*c.Cancel)
+		return r.Events, err
+	case c.ExpireDay != nil:
+		return e.ExpireDay(*c.ExpireDay)
+	}
+	return nil, errors.New("engine: empty command")
+}
+
 // Replay rebuilds an engine from a journal and returns it with every event re-emitted. Recorded risk
 // decisions are reused, so cfg.Risk is never consulted for journaled submits, and cfg.Persist is not
 // called for the replayed commands (they are already durable) — it is attached to the returned engine
@@ -487,24 +503,7 @@ func Replay(cfg Config, journal []Command) (*Engine, []Event, error) {
 	e := New(cfg)
 	var all []Event
 	for i, c := range journal {
-		var (
-			evs []Event
-			err error
-		)
-		switch {
-		case c.Submit != nil:
-			var r Result
-			r, err = e.Submit(*c.Submit)
-			evs = r.Events
-		case c.Cancel != nil:
-			var r Result
-			r, err = e.Cancel(*c.Cancel)
-			evs = r.Events
-		case c.ExpireDay != nil:
-			evs, err = e.ExpireDay(*c.ExpireDay)
-		default:
-			err = errors.New("empty command")
-		}
+		evs, err := e.Apply(c)
 		if err != nil {
 			return nil, nil, fmt.Errorf("engine: replay command %d: %w", i, err)
 		}

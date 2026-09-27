@@ -149,6 +149,59 @@ func (s *Store) Load(ctx context.Context) ([]engine.Command, error) {
 	return out, nil
 }
 
+// Entry is one verified journal row, for readers that follow the journal (the event relay).
+type Entry struct {
+	Seq       uint64
+	Command   engine.Command
+	ChainHash string
+}
+
+// ReadAfter returns the entries after seq afterSeq, verified to continue the chain from prevHash (the
+// chain_hash of entry afterSeq, "" for the start). It is read-only and never repositions the writer, so
+// a separate process can follow the journal. A gap, broken link or bad hash is ErrCorrupt.
+func (s *Store) ReadAfter(ctx context.Context, afterSeq uint64, prevHash string, limit int) ([]Entry, error) {
+	if afterSeq > math.MaxInt64 {
+		return nil, fmt.Errorf("%w: seq %d exceeds BIGINT", ErrOutOfOrder, afterSeq)
+	}
+	if limit <= 0 {
+		limit = 1000
+	}
+	rows, err := s.pool.Query(ctx,
+		`SELECT seq, command_json, prev_hash, chain_hash FROM engine_journal WHERE seq > $1 ORDER BY seq LIMIT $2`,
+		int64(afterSeq), limit) //nolint:gosec // bounded above
+	if err != nil {
+		return nil, fmt.Errorf("journal: read: %w", err)
+	}
+	defer rows.Close()
+	var out []Entry
+	head, want := prevHash, afterSeq+1
+	for rows.Next() {
+		var (
+			seq             int64
+			raw, prev, hash string
+		)
+		if err := rows.Scan(&seq, &raw, &prev, &hash); err != nil {
+			return nil, fmt.Errorf("journal: scan: %w", err)
+		}
+		if uint64(seq) != want { //nolint:gosec // seq > 0 by CHECK
+			return nil, fmt.Errorf("%w: expected seq %d, found %d", ErrCorrupt, want, seq)
+		}
+		if prev != head || link(prev, raw) != hash {
+			return nil, fmt.Errorf("%w: chain broken at seq %d", ErrCorrupt, seq)
+		}
+		var c engine.Command
+		if err := json.Unmarshal([]byte(raw), &c); err != nil {
+			return nil, fmt.Errorf("%w: seq %d does not decode: %w", ErrCorrupt, seq, err)
+		}
+		out = append(out, Entry{Seq: want, Command: c, ChainHash: hash})
+		head, want = hash, want+1
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("journal: read: %w", err)
+	}
+	return out, nil
+}
+
 // Epoch returns the journal's epoch, creating it on first use. It is write-once: concurrent first
 // callers race on the insert and all read back the single winner.
 func (s *Store) Epoch(ctx context.Context) (string, error) {
