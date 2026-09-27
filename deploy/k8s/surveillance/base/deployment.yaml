@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: surveillance
+  labels: { app: surveillance }
+spec:
+  # ONE replica, deliberately: the detectors keep per-tenant state from a single ordered replay of the
+  # engine stream. Two replicas would each see the whole stream (harmless — alert ids are
+  # deterministic and stored idempotently) but double the work; scale-out means partitioning by
+  # product, which is a later design.
+  replicas: 1
+  selector:
+    matchLabels: { app: surveillance }
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels: { app: surveillance }
+    spec:
+      initContainers:
+        - name: migrate
+          image: postgres:16-alpine
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              # Glob, never a hardcoded list (the trap platform-core hit with 0007).
+              set -- /migrations/[0-9]*.sql
+              [ -e "$1" ] || { echo "no migrations mounted"; exit 1; }
+              for f in "$@"; do
+                echo "applying $f"; psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"
+              done
+          env:
+            - { name: DATABASE_URL, valueFrom: { configMapKeyRef: { name: surveillance-env, key: DATABASE_URL } } }
+          volumeMounts:
+            - { name: migrations, mountPath: /migrations }
+      containers:
+        - name: surveillance
+          image: 1trade/surveillance:dev
+          ports: [{ containerPort: 8088 }]
+          envFrom:
+            - configMapRef: { name: surveillance-env }
+            - secretRef: { name: platform-auth }   # SERVICE_TOKEN guards the review API
+          livenessProbe:
+            httpGet: { path: /healthz, port: 8088 }
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: { path: /readyz, port: 8088 }
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: "1", memory: 512Mi }
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+      volumes:
+        - name: migrations
+          configMap: { name: surveillance-migrations }

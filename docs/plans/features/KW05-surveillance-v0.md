@@ -126,9 +126,34 @@ false wash alerts. Tightening them still left one chance match on a third seed. 
 at once only on an exact round trip, and needs a near round trip to repeat between the same pair.
 A redelivery bug (a replayed trade paired with its own later neighbours) was also found and fixed.
 
+**Service — built (2026-09-27).** `services/surveillance` now runs the detectors.
+- **Stream.** One JetStream stream (`TRADING_EVENTS`) captures both `orders.state.v1` and
+  `trades.executed.v1`, so the detectors see an order's events and its trades in emission order.
+- **Replay.** It is read by an ordered consumer **from the beginning on every start**: net positions
+  accumulate from the first trade and detector state lives in memory.
+- **Store, then publish.** Each alert is stored first (`surveillance_alerts`, append-only,
+  `ON CONFLICT DO NOTHING` on the deterministic id). It is published on `surveillance.alert.v1` only
+  if it is new, so a restart replays silently.
+- **Review API.** `GET /v1/surveillance/alerts` is internal and service-token only, with filters for
+  rule, tenant, product, is_paper and limit.
+- **Deploy.** Dockerfile, `deploy/k8s/surveillance/base` (a single replica, and a migration
+  initContainer that globs), and a Tilt entry.
+- **Tests.**
+  - Pipeline: store-then-publish-once, and a silent replay after a restart.
+  - A poison message is skipped.
+  - An **embedded JetStream server**: events published before the service starts are replayed, live
+    events are followed, and a spoof spanning both subjects is detected.
+  - Store against real Postgres: idempotent inserts, filters, append-only.
+  - API auth and filters.
+- **Smoke test on the real binary.** A real nats-server plus Postgres: a published round trip →
+  one stored alert → the review API returns it (401 without a token). After a restart, still one
+  alert.
+- **Not verified:** the k8s manifests were not rendered or applied (no kubectl or cluster here), and
+  the image was not built.
+
 **Not done.**
-- The service binary: the NATS consumer for the two subjects, publishing `surveillance.alert.v1`,
-  an alerts table plus a query API for review, and deployment.
+- Nothing publishes to the engine subjects yet. The engine's event encoders exist; publishing lands
+  with the licence-gated cutover.
 - Consuming `exclude_from_index` in index-service.
 - Wiring `rate_limit` / `suspend_recommended` into the engine's risk hook.
 - Phase 1 abuse monitoring (consumption anomalies, auth abuse).

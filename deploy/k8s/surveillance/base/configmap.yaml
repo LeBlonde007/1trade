@@ -1,0 +1,11 @@
+# surveillance non-secret config. SERVICE_TOKEN (review API) comes from the shared platform-auth
+# Secret; DB password is dev-only here (SOPS/Vault in staging/prod, ADR-0001).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: surveillance-env
+data:
+  TRADE1_ENV: "dev"
+  SURVEILLANCE_ADDR: ":8088"
+  DATABASE_URL: "postgres://1trade:1trade@postgres.data.svc.cluster.local:5432/1trade"
+  NATS_URL: "nats://nats.data.svc.cluster.local:4222"

@@ -101,6 +101,21 @@ local_resource(
 
 # Future services register their own docker_build + k8s_yaml + k8s_resource blocks here.
 
+# --- surveillance (KW05) — replays + follows the engine's order/trade stream, raises
+# surveillance.alert.v1, serves the internal review API. Detects and recommends; never acts. ---
+local_resource(
+    'surveillance-migrations',
+    cmd='kubectl create configmap surveillance-migrations ' +
+        '--from-file=services/surveillance/migrations/ ' +
+        '--dry-run=client -o yaml | kubectl apply -f -',
+    deps=['services/surveillance/migrations'],
+)
+docker_build('1trade/surveillance:dev', 'services/surveillance',
+             dockerfile='services/surveillance/Dockerfile')
+k8s_yaml(kustomize('deploy/k8s/surveillance/base'))
+k8s_resource('surveillance', port_forwards='8088:8088',
+             resource_deps=['surveillance-migrations', 'platform-auth'])
+
 # --- matching-engine (KW03) — the exchange's order book + reference index. Phase 2 moved from
 # keep-warm to ACTIVE (2026-09): the service is built for real, but stays paper-only and the venue
 # does not open until the F22 licence clears. Writes are expected to refuse with EXCHANGE_PAUSED. ---
