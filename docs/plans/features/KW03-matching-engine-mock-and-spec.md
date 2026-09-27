@@ -90,3 +90,38 @@ implement in Phase 2:
 
 - M1 (Gate 1): mock adapter live.
 - M6 (Gate 6): spec finalized.
+
+---
+
+## Status — real engine core built; order entry still closed (2026-09-27)
+
+`services/matching-engine/internal/engine/` is the real matching engine. It is pure, deterministic
+Go with no clock, network or randomness inside. It covers:
+
+- one book per `(product, is_paper)`, with price-time priority at the maker's price;
+- market, limit (gtc/day), IOC and FOK orders;
+- self-trade prevention (cancel newest) and the insider-risk rule (no internal orders on paper
+  books);
+- fixed-point `int64` micro-units, with overflow-checked notional;
+- taker/maker fees, a pre-trade risk seam, idempotent submits, and tenant-scoped cancel;
+- day expiry and a hash-chained trade log;
+- a command journal that `Replay` reproduces exactly.
+
+`services/matching-engine/SPEC.md` is written.
+
+**Evidence.** Scenario tests cover each order type and rule, and every validation error. Property
+tests run 200 random streams of 400 commands each; they check no crossed book, no self or
+paper/internal trades, prices within limits, filled-quantity conservation, strictly increasing
+sequences, and valid trade chains. Replay determinism is checked after a JSON round trip, and there
+is a concurrent `-race` run. The suite was mutation-checked: breaking self-trade prevention or the
+execution price fails it.
+
+**Not done** (SPEC.md §7): durable journal, snapshots, ledger settlement plus NATS emission, the real
+risk hook, and API wiring. The API wiring is the licence-gated cutover.
+
+**Open for tech-lead** (SPEC.md §8): sequence scope per `(product, is_paper)`, how paper liquidity
+works given the insider-risk rule (blocks KW04 paper quoting), and enumerating cancel reasons.
+
+Acceptance (Phase 2): ✅ deterministic, replayable, race-free under concurrent load · ✅ paper/real
+isolation enforced · ✅ property-based tests pass · ⬜ matches the trading contract end to end (API
+not wired) · ⬜ performance targets measured.
