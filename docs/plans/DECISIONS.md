@@ -86,6 +86,46 @@ zero component edits, and reviewers have an objective bar ("conforms to DESIGN_S
 doc), re-verify WCAG-AA contrast, and record an ADR only if the *structure* changes. Affected docs:
 `DESIGN_SYSTEM.md`, `ENGINEERING_STANDARDS.md` §4, `agents/trading-frontend.md`, the `/ex-*` commands.
 
+
+---
+
+## ADR-0004 — What a trade settles in (the quote / cash leg) *(Open — blocks exchange settlement)*
+
+**Status:** Open (raised 2026-09-27) · **Owner:** tech-lead + founder, with counsel (security-compliance)
+
+**Context.** The matching engine (KW03) now produces real trades: *buyer receives `quantity` of the
+product's credit type; seller receives `price × quantity`.* The first leg lands on the ledger. **The
+second has no home.**
+- `credit-types.md` has only the eight credit types. Nothing holds USD, and §5 forbids a new type
+  for the exchange.
+- Every product is priced in USD per credit (`H100-SPOT` at 2.99, `EAI-IDX` at 0.001005).
+- The "$10,000 paper credits allocated automatically" (phase6_v2 onboarding) is not stored anywhere
+  either.
+- phase6_v2 open question #8, "cash vs. physical settlement?", was never answered.
+
+Settlement cannot be built without choosing, and choosing changes shared contracts (credit.yaml,
+credit-types.md, schemas), so it is tech-lead's call, not the engine's.
+
+**Options.**
+1. **Quote everything in `ai_index`** (credits-for-credits). No new balance type. But the index spot
+   `EAI-IDX` cannot be priced in itself, prices would stop being USD, and the published product
+   prices, the UI and the index methodology all change.
+2. **A quote-currency balance in the ledger, separate from credit types.** For example a
+   `cash_balances` table keyed by `(tenant, currency, is_paper)`, same append-only chain. Trades
+   settle credit ↔ USD atomically in one ledger transaction.
+   - *Paper:* seeds the $10,000 paper balance and makes the paper exchange whole.
+   - *Real money:* holding customer cash is custody / money transmission. That is squarely a counsel
+     question (F22), and it stays off until they answer.
+3. **Cash settled outside the ledger** (Stripe balance / bank). This splits the atomic
+   settlement-and-audit invariant across two systems. Not recommended.
+
+**Recommendation.** Option 2, **paper only now**. Add a paper-USD quote balance and a
+`POST /v1/credits/settle-trade` (service-token, idempotent on `trade_id`) that moves both legs and
+both fees in one DB transaction. Real-money cash stays unbuilt until counsel answers.
+
+**Unblocks.** KW03 settlement (SPEC.md §7.3), the real risk hook (§7.4: "can the buyer pay?"
+needs a cash balance), paper P&L on `/portfolio`, and the "$10,000 paper" onboarding promise.
+
 ---
 
 > Template for new ADRs:

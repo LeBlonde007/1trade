@@ -63,8 +63,14 @@ Every command returns its events in emission order:
   roles and `is_internal`.
   - Trade ids are UUID v8s derived from `(book, sequence)`, so they are identical on replay. They are
     also the ledger's settlement idempotency key.
-  - Trades on a book are hash-chained: `chain_hash = SHA-256(prev_chain_hash || canonical_json(trade))`,
-    with a fixed key order. `VerifyTradeChain` checks a book's series.
+  - Trades on a book are hash-chained: `chain_hash = SHA-256(prev_chain_hash || canonical_json(trade))`.
+    The hashed row is exactly the `trades.executed.v1` payload fields, minus the two hash fields, in
+    contract key order, with an empty `sub_account_id` rendered as `null`. So any consumer can
+    re-verify the chain from the events alone (`TestTradeChainVerifiableFromPayloads`). `sequence`
+    is not hashed: the contract does not carry it, and the prev links already fix the order.
+- **Encoding.** `internal/events` encodes both contracts. `TestPayloadsMatchContracts` validates
+  real engine output against the schemas read from `docs/contracts/events/*.yaml`, so contract drift
+  fails the build. Nothing publishes yet.
 - **Sequence.** Each book keeps one sequence across its order events and trades. It strictly
   increases, so a consumer can detect gaps.
 
@@ -125,8 +131,10 @@ and executing at the taker's price. Both mutations were caught.
    `journal.Recover` call before the listener starts.
 2. **Snapshots.** Every 5 minutes, snapshot books and sequences so replay starts from the snapshot
    rather than genesis. Redis as a read cache of depth for the API.
-3. **Settlement.** On each trade, call credit-ledger to settle both sides atomically, idempotent on
-   `trade_id`. Then publish `trades.executed.v1` and `orders.state.v1` to NATS.
+3. **Settlement. Blocked on ADR-0004** (`docs/plans/DECISIONS.md`): the ledger has no balance for
+   the cash leg (`price × quantity`), and choosing one is a shared-contract decision. Once decided:
+   call credit-ledger to settle both legs and both fees atomically, idempotent on `trade_id`, then
+   publish `trades.executed.v1` and `orders.state.v1` to NATS. The payload encoders are done.
 4. **Risk hook implementation.** Balance and position-limit checks against the ledger, plus
    surveillance holds (KW05).
 5. **API wiring.** Behind the licence gate: order entry, cancel, and orders/fills reads served from

@@ -122,8 +122,16 @@ the engine on start. Integration-tested against real Postgres: crash and recover
 detection, second-writer refusal, and refusing commands while the DB is down. Cost is about 0.4 ms
 per order locally. It is not deployed yet: the service opens no database until order entry is wired.
 
-**Not done** (SPEC.md §7): snapshots, ledger settlement plus NATS emission, the real risk hook, and
-API wiring. The API wiring is the licence-gated cutover.
+**Event encoding — done (2026-09-27).** `internal/events` encodes `orders.state.v1` and
+`trades.executed.v1`. It is validated against the contract YAML schemas, and the trade chain can be
+re-verified from the payloads alone.
+
+**Settlement — blocked on ADR-0004** (Open): trades have no cash leg in the ledger. See
+`docs/plans/DECISIONS.md`.
+
+**Not done** (SPEC.md §7): snapshots, settlement plus NATS publishing (ADR-0004), the real risk hook
+(also needs ADR-0004 to know whether the buyer can pay), and API wiring. The API wiring is the
+licence-gated cutover.
 
 **Open for tech-lead** (SPEC.md §8): sequence scope per `(product, is_paper)`, how paper liquidity
 works given the insider-risk rule (blocks KW04 paper quoting), and enumerating cancel reasons.
