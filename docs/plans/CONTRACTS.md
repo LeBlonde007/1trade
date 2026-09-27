@@ -106,7 +106,8 @@ These are authored alongside Phase 1 so the switch-on is a config flip, not a re
 | `events/trades.executed.v1.yaml` | specced |
 | `events/orders.state.v1.yaml` | specced |
 | `events/surveillance.alert.v1.yaml` | specced |
-| `openapi/credit.yaml` v1.1 cash + `settle-trade` · `events/cash.tx.v1.yaml` | authored 2026-09-27 (ADR-0004); paper only; not yet implemented |
+| `openapi/credit.yaml` v1.1 cash + `settle-trade` · `events/cash.tx.v1.yaml` | authored + implemented 2026-09-27 (ADR-0004); paper only |
+| `openapi/credit.yaml` v1.2 order reservations (`reserve` / `release`; available = balance − locked on every debit) | authored + implemented in credit-ledger 2026-09-27; engine side next |
 
 ---
 
@@ -122,7 +123,7 @@ This table is the explicit cross-service coupling map. Every cell is a contract.
 | `compute-platform` | quota API | compute.usage.v1 → debit | (schedules pods) | — | partner.capacity.v1 | (none) | instances API | instances API |
 | `settlement-trust` | partner DC mgmt | mint/burn calls | (none) | capacity attestation | — | (none) | partner portal | (none) |
 | `index-service` | (none) | (none) | (none) | (none) | (none) | — | index API | index API |
-| `matching-engine` (Phase 2) | (none) | settle-trade API (credit.yaml v1.1) | (none) | (none) | (none) | trades feed | trading API | trading API |
+| `matching-engine` (Phase 2) | (none) | reserve / release / settle-trade API (credit.yaml v1.2) | (none) | (none) | (none) | trades feed | trading API | trading API |
 | `market-maker` (Phase 2) | (none) | (none) | (none) | (none) | (none) | (none) | (none) | (none) |
 | `surveillance` (Phase 2) | (none) | (none) | (none) | (none) | (none) | mark-to-close flags | alert events | (none) |
 

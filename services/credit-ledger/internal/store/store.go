@@ -46,6 +46,10 @@ type Movement struct {
 	ReferenceID    string
 	IdempotencyKey string
 	IsPaper        bool
+	// ConsumeOrderID, on a debit, names the order whose open reservation pays for it (settlement):
+	// the reservation, the balance and locked_amount all drop by the debit. Empty for every other
+	// movement, which must then fit within available (balance − locked_amount).
+	ConsumeOrderID string
 }
 
 // ApplyMovement applies one movement atomically: lock the balance row, dedupe on the idempotency
@@ -84,12 +88,12 @@ func applyLeg(ctx context.Context, dbtx pgx.Tx, m Movement) (domain.Transaction,
 	}
 
 	// Lock the balance row; serialises writes to this balance so the chain tip is consistent.
-	var balStr, prevHash string
+	var balStr, lockStr, prevHash string
 	if err := dbtx.QueryRow(ctx,
-		`SELECT balance::text, last_chain_hash FROM credit_balances
+		`SELECT balance::text, locked_amount::text, last_chain_hash FROM credit_balances
 		 WHERE tenant_id=$1 AND sub_account_id IS NOT DISTINCT FROM $2 AND credit_type=$3 AND is_paper=$4
 		 FOR UPDATE`,
-		m.TenantID, sub, string(m.CreditType), m.IsPaper).Scan(&balStr, &prevHash); err != nil {
+		m.TenantID, sub, string(m.CreditType), m.IsPaper).Scan(&balStr, &lockStr, &prevHash); err != nil {
 		return domain.Transaction{}, fmt.Errorf("lock balance: %w", err)
 	}
 
@@ -106,6 +110,14 @@ func applyLeg(ctx context.Context, dbtx pgx.Tx, m Movement) (domain.Transaction,
 	if err != nil {
 		return domain.Transaction{}, fmt.Errorf("parse balance %q: %w", balStr, err)
 	}
+	locked, err := domain.ParseMoney(lockStr)
+	if err != nil {
+		return domain.Transaction{}, fmt.Errorf("parse locked %q: %w", lockStr, err)
+	}
+	locked, err = consumeReservation(ctx, dbtx, m.ConsumeOrderID, "credit", m.TenantID, string(m.CreditType), m.Amount, m.ReferenceID, locked, domain.ErrInsufficientCredit)
+	if err != nil {
+		return domain.Transaction{}, err
+	}
 
 	applied, err := domain.Apply(bal, prevHash, domain.Transaction{
 		TxID: uuid.NewString(), TenantID: m.TenantID, SubAccountID: m.SubAccountID,
@@ -117,6 +129,9 @@ func applyLeg(ctx context.Context, dbtx pgx.Tx, m Movement) (domain.Transaction,
 	})
 	if err != nil {
 		return domain.Transaction{}, err // e.g. ErrInsufficientCredit
+	}
+	if m.Amount.IsNegative() && applied.BalanceAfter.Cmp(locked) < 0 {
+		return domain.Transaction{}, domain.ErrInsufficientCredit // would spend value reserved for an open order
 	}
 
 	if _, err := dbtx.Exec(ctx,
@@ -136,10 +151,10 @@ func applyLeg(ctx context.Context, dbtx pgx.Tx, m Movement) (domain.Transaction,
 	metrics.TransactionsTotal.WithLabelValues(string(applied.Operation), string(applied.CreditType)).Inc()
 
 	if _, err := dbtx.Exec(ctx,
-		`UPDATE credit_balances SET balance=$1::numeric, last_chain_hash=$2, updated_at=now()
+		`UPDATE credit_balances SET balance=$1::numeric, locked_amount=$7::numeric, last_chain_hash=$2, updated_at=now()
 		 WHERE tenant_id=$3 AND sub_account_id IS NOT DISTINCT FROM $4 AND credit_type=$5 AND is_paper=$6`,
 		applied.BalanceAfter.String(), applied.ChainHash,
-		m.TenantID, sub, string(m.CreditType), m.IsPaper); err != nil {
+		m.TenantID, sub, string(m.CreditType), m.IsPaper, locked.String()); err != nil {
 		return domain.Transaction{}, fmt.Errorf("update balance: %w", err)
 	}
 	return applied, nil
@@ -298,4 +313,16 @@ func nullable(s string) any {
 func IsUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "23505"
+}
+
+// isForeignKeyViolation reports a Postgres foreign-key violation (SQLSTATE 23503).
+func isForeignKeyViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23503"
+}
+
+// isCheckViolation reports a Postgres CHECK-constraint violation (SQLSTATE 23514).
+func isCheckViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23514"
 }

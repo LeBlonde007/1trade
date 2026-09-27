@@ -87,6 +87,9 @@ type CreditLeg struct {
 	CreditType   CreditType
 	Amount       Money // signed
 	Key          string
+	// PayingOrderID is the order whose reservation funds this debit ("" for credits into a balance
+	// and for the seller's fee, which is paid out of the proceeds that land just before it).
+	PayingOrderID string
 }
 
 // CashLeg is one cash movement of a settlement.
@@ -97,6 +100,8 @@ type CashLeg struct {
 	Operation    CashOperation
 	Amount       Money // signed
 	Key          string
+	// PayingOrderID — see CreditLeg.PayingOrderID.
+	PayingOrderID string
 }
 
 // SettlePlan is every movement a trade causes, in the order they must be applied.
@@ -121,19 +126,20 @@ func PlanSettlement(r SettleRequest) (SettlePlan, error) {
 	n := Notional(r.Price, r.Quantity)
 	neg := func(m Money) Money { return Zero().Sub(m) }
 	p := SettlePlan{Notional: n}
+	b, sl := r.Buyer, r.Seller
 	p.Credit = []CreditLeg{
-		{r.Buyer.TenantID, r.Buyer.SubAccountID, r.CreditType, r.Quantity, r.TradeID + ":buy"},
-		{r.Seller.TenantID, r.Seller.SubAccountID, r.CreditType, neg(r.Quantity), r.TradeID + ":sell"},
+		{TenantID: b.TenantID, SubAccountID: b.SubAccountID, CreditType: r.CreditType, Amount: r.Quantity, Key: r.TradeID + ":buy"},
+		{TenantID: sl.TenantID, SubAccountID: sl.SubAccountID, CreditType: r.CreditType, Amount: neg(r.Quantity), Key: r.TradeID + ":sell", PayingOrderID: sl.OrderID},
 	}
 	p.Cash = []CashLeg{
-		{r.Buyer.TenantID, r.Buyer.SubAccountID, r.Currency, CashTrade, neg(n), r.TradeID + ":buy"},
-		{r.Seller.TenantID, r.Seller.SubAccountID, r.Currency, CashTrade, n, r.TradeID + ":sell"},
+		{TenantID: b.TenantID, SubAccountID: b.SubAccountID, Currency: r.Currency, Operation: CashTrade, Amount: neg(n), Key: r.TradeID + ":buy", PayingOrderID: b.OrderID},
+		{TenantID: sl.TenantID, SubAccountID: sl.SubAccountID, Currency: r.Currency, Operation: CashTrade, Amount: n, Key: r.TradeID + ":sell"},
 	}
-	if r.Buyer.Fee.Sign() > 0 {
-		p.Cash = append(p.Cash, CashLeg{r.Buyer.TenantID, r.Buyer.SubAccountID, r.Currency, CashFee, neg(r.Buyer.Fee), r.TradeID + ":fee"})
+	if b.Fee.Sign() > 0 {
+		p.Cash = append(p.Cash, CashLeg{TenantID: b.TenantID, SubAccountID: b.SubAccountID, Currency: r.Currency, Operation: CashFee, Amount: neg(b.Fee), Key: r.TradeID + ":fee", PayingOrderID: b.OrderID})
 	}
-	if r.Seller.Fee.Sign() > 0 {
-		p.Cash = append(p.Cash, CashLeg{r.Seller.TenantID, r.Seller.SubAccountID, r.Currency, CashFee, neg(r.Seller.Fee), r.TradeID + ":fee"})
+	if sl.Fee.Sign() > 0 {
+		p.Cash = append(p.Cash, CashLeg{TenantID: sl.TenantID, SubAccountID: sl.SubAccountID, Currency: r.Currency, Operation: CashFee, Amount: neg(sl.Fee), Key: r.TradeID + ":fee"})
 	}
 	sort.SliceStable(p.Credit, func(i, j int) bool {
 		a, b := p.Credit[i], p.Credit[j]

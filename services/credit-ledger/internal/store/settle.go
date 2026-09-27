@@ -83,6 +83,7 @@ func (s *Store) SettleTrade(ctx context.Context, req domain.SettleRequest) (Sett
 		tx, err := applyLeg(ctx, dbtx, Movement{
 			TenantID: l.TenantID, SubAccountID: l.SubAccountID, CreditType: l.CreditType, Operation: domain.OpTrade,
 			Amount: l.Amount, ReferenceID: req.TradeID, IdempotencyKey: l.Key, IsPaper: true,
+			ConsumeOrderID: l.PayingOrderID,
 		})
 		if err != nil {
 			return SettleResult{}, false, err
@@ -93,6 +94,7 @@ func (s *Store) SettleTrade(ctx context.Context, req domain.SettleRequest) (Sett
 		tx, _, err := applyCashLeg(ctx, dbtx, CashMovement{
 			TenantID: l.TenantID, SubAccountID: l.SubAccountID, Currency: l.Currency, Operation: l.Operation,
 			Amount: l.Amount, ReferenceID: req.TradeID, IdempotencyKey: l.Key,
+			ConsumeOrderID: l.PayingOrderID,
 		})
 		if err != nil {
 			return SettleResult{}, false, err

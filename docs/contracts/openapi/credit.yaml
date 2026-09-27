@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: 1Trade Credit Ledger API
-  version: 1.1.0
+  version: 1.2.0
   description: >
     Per-tenant prepaid credit balances, append-only hash-chained transactions, purchases, and
     conversions. Owned by `credit-ledger`; see docs/contracts/credit-types.md and
@@ -14,6 +14,14 @@ info:
     and atomic trade settlement (`/v1/credits/settle-trade`). Real-money cash is not built: every
     cash surface is `is_paper: true` only, and a real-money request is refused with
     REAL_MONEY_DISABLED until counsel clears custody (F22).
+
+    v1.2.0 (2026-09-27, KW03 SPEC §8) adds order RESERVATIONS so a matched trade can never fail
+    settlement for lack of funds. The engine reserves what an order could spend when it accepts it
+    (`/v1/credits/reserve`), settlement consumes that reservation, and the engine releases what is
+    left when the order closes (`/v1/credits/release`). A reservation raises the balance's
+    `locked_amount`, and from v1.2 EVERY debit on every endpoint (consumption, conversion, burn,
+    settlement) must leave `balance >= locked_amount` — reserved value cannot be spent elsewhere.
+    Available = balance − locked_amount.
 
 servers:
   - url: https://api.1trade.io
@@ -253,6 +261,13 @@ paths:
         (credit legs, operation `trade`) or cash.tx.v1 (cash legs) after commit. Paper fees are
         debited and not credited anywhere: paper flow earns no revenue.
 
+        Reservations (v1.2): each debit leg first consumes the paying order's open reservation —
+        the buyer's cash legs (trade + fee) consume the reservation of buyer.order_id, the seller's
+        credit leg consumes the reservation of seller.order_id. Consuming lowers the reservation's
+        remaining amount, the balance and locked_amount by the same amount, so available is
+        unchanged. A leg larger than the remaining reservation is 402. A leg with no reservation
+        must fit within available (balance − locked_amount).
+
         All-or-nothing: if the seller lacks the credits (INSUFFICIENT_CREDIT) or the buyer lacks the
         cash (INSUFFICIENT_CASH), nothing is written and the trade is unsettled — the engine must
         bust it. The engine's pre-trade risk check is expected to make this rare; the ledger is the
@@ -284,6 +299,64 @@ paths:
           description: >
             Invalid trade: is_paper false (REAL_MONEY_DISABLED), same tenant on both sides, an internal
             account on a paper trade, a non-tradeable credit type, or Idempotency-Key ≠ trade_id.
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+
+  /v1/credits/reserve:
+    post:
+      tags: [internal]
+      summary: >
+        Reserve what an order could spend, at order acceptance. matching-engine only (its own
+        settlement token). Paper only in v1.2.
+      description: >
+        One reservation per order_id: a buy reserves cash (notional at its limit, or the exact sweep
+        cost for an immediate order, plus the taker fee); a sell reserves the credits it offers.
+        The reserved amount must fit within AVAILABLE (balance − locked_amount); it then raises
+        locked_amount by that much. Idempotency-Key MUST equal order_id: a replay returns the
+        original reservation, and the same order_id with a different body is 409.
+      operationId: reserve
+      security: [ { serviceToken: [] } ]
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/ReserveRequest' } } }
+      responses:
+        '200': { description: "Reserved (or the original reservation, on replay).", content: { application/json: { schema: { $ref: '#/components/schemas/Reservation' } } } }
+        '402':
+          description: Not enough available balance (INSUFFICIENT_CREDIT for credits, INSUFFICIENT_CASH for cash). Nothing reserved.
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '403':
+          description: Caller is not the matching-engine service identity.
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '409': { $ref: '#/components/responses/IdempotencyConflict' }
+        '422':
+          description: Invalid request (REAL_MONEY_DISABLED, bad asset, non-positive amount, key ≠ order_id).
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+
+  /v1/credits/release:
+    post:
+      tags: [internal]
+      summary: >
+        Release whatever an order's reservation still holds, when the order closes (filled,
+        cancelled, expired, rejected). matching-engine only. Idempotent: releasing a released
+        reservation returns it unchanged.
+      operationId: release
+      security: [ { serviceToken: [] } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [order_id]
+              properties:
+                order_id: { type: string, format: uuid }
+      responses:
+        '200': { description: Released (or already released)., content: { application/json: { schema: { $ref: '#/components/schemas/Reservation' } } } }
+        '403':
+          description: Caller is not the matching-engine service identity.
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+        '404':
+          description: No reservation for this order_id.
           content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
 
   /v1/credits/audit/chain-verify:
@@ -339,7 +412,7 @@ components:
       properties:
         credit_type:   { $ref: '#/components/schemas/CreditType' }
         balance:       { $ref: '#/components/schemas/Decimal' }
-        locked_amount: { $ref: '#/components/schemas/Decimal', description: "reserved for resting orders (Phase 2); 0 in Phase 1" }
+        locked_amount: { $ref: '#/components/schemas/Decimal', description: "held by open order reservations (v1.2); available = balance − locked_amount" }
         is_paper:      { type: boolean }
         sub_account_id: { type: string, format: uuid, nullable: true }
     Transaction:
@@ -462,6 +535,30 @@ components:
         notional:            { $ref: '#/components/schemas/Decimal' }
         credit_transactions: { type: array, items: { $ref: '#/components/schemas/Transaction' }, description: "buyer +qty, seller −qty" }
         cash_transactions:   { type: array, items: { $ref: '#/components/schemas/CashTransaction' }, description: "trade and non-zero fee legs" }
+    ReserveRequest:
+      type: object
+      required: [order_id, tenant_id, asset_kind, asset, amount, is_paper]
+      properties:
+        order_id:       { type: string, format: uuid }
+        tenant_id:      { type: string, format: uuid }
+        sub_account_id: { type: string, format: uuid, nullable: true }
+        asset_kind:     { type: string, enum: [credit, cash], description: "credit for a sell, cash for a buy" }
+        asset:          { type: string, description: "a CreditType when asset_kind=credit; a Currency when asset_kind=cash" }
+        amount:         { $ref: '#/components/schemas/Decimal', description: "positive" }
+        is_paper:       { type: boolean, description: "must be true in v1.2; false is 422 REAL_MONEY_DISABLED" }
+    Reservation:
+      type: object
+      required: [order_id, tenant_id, asset_kind, asset, amount, remaining, state, is_paper]
+      properties:
+        order_id:       { type: string, format: uuid }
+        tenant_id:      { type: string, format: uuid }
+        sub_account_id: { type: string, format: uuid, nullable: true }
+        asset_kind:     { type: string, enum: [credit, cash] }
+        asset:          { type: string }
+        amount:         { $ref: '#/components/schemas/Decimal', description: "originally reserved" }
+        remaining:      { $ref: '#/components/schemas/Decimal', description: "still locked; 0 once released or fully consumed" }
+        state:          { type: string, enum: [open, released] }
+        is_paper:       { type: boolean }
     ApiError:
       type: object
       required: [code, message]

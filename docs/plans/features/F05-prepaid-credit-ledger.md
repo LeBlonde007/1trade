@@ -145,3 +145,29 @@ verification gate) now grants **$10,000.000000 paper USD** through `GrantPaperCa
 - Independent of the trial-credit grant: one failing never skips the other.
 - Verified live against the ledger binary: two identical grants leave exactly 10000.000000.
 
+## Contract change — order reservations (credit.yaml v1.2.0, 2026-09-27) — implemented
+
+Settlement can no longer fail for lack of funds when the engine reserves at order acceptance.
+
+- **`POST /v1/credits/reserve` and `/release`.** matching-engine only (the same dedicated token as
+  settle-trade). Idempotent on `order_id`; a different body is 409. A reserve must fit within
+  **available = balance − locked_amount**. Release is idempotent; an unknown order is 404.
+- **Settlement consumes the paying order's reservation.** This is the buyer's cash legs and the
+  seller's credit leg. Remaining, balance and locked all drop together. A leg larger than its
+  reservation is 402, and nothing is written.
+- **Every debit on every endpoint** (consumption, conversion, burn, settlement) now refuses to take a
+  balance below its locked amount. Backstops: a DB CHECK (`balance >= locked_amount`) on both
+  balance tables, and an append-only `reservation_events` audit log.
+- **Lock order** is always balance row, then reservation row, so reserve, release and settle cannot
+  deadlock.
+- **Tests** (real Postgres, `-race`):
+  - reserved credits can't be spent by an inference debit;
+  - the full life of a price-improved trade: reserve 30.30, spend 30.199, 0.101 freed only by
+    release;
+  - a leg beyond its reservation is refused and writes nothing;
+  - replay, conflict, engine-only caller, real money, unknown assets;
+  - 20 concurrent reserves against funds for 10 grant exactly 10;
+  - the DB backstop.
+- **Mutation-checked:** without the row lock, 20 of 20 reserves are granted and `locked` is
+  corrupted. Without the application check, the DB CHECK still refuses the overspend.
+

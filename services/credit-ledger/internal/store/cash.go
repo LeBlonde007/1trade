@@ -22,6 +22,7 @@ type CashMovement struct {
 	Amount         domain.Money
 	ReferenceID    string
 	IdempotencyKey string
+	ConsumeOrderID string // see Movement.ConsumeOrderID
 }
 
 // applyCashLeg is the cash twin of applyLeg, inside an existing DB transaction: ensure the balance row
@@ -36,12 +37,12 @@ func applyCashLeg(ctx context.Context, dbtx pgx.Tx, m CashMovement) (domain.Cash
 		uuid.NewString(), m.TenantID, sub, string(m.Currency)); err != nil {
 		return domain.CashTx{}, false, fmt.Errorf("ensure cash balance: %w", err)
 	}
-	var balStr, prevHash string
+	var balStr, lockStr, prevHash string
 	if err := dbtx.QueryRow(ctx,
-		`SELECT balance::text, last_chain_hash FROM cash_balances
+		`SELECT balance::text, locked_amount::text, last_chain_hash FROM cash_balances
 		 WHERE tenant_id=$1 AND sub_account_id IS NOT DISTINCT FROM $2 AND currency=$3 AND is_paper
 		 FOR UPDATE`,
-		m.TenantID, sub, string(m.Currency)).Scan(&balStr, &prevHash); err != nil {
+		m.TenantID, sub, string(m.Currency)).Scan(&balStr, &lockStr, &prevHash); err != nil {
 		return domain.CashTx{}, false, fmt.Errorf("lock cash balance: %w", err)
 	}
 	if m.IdempotencyKey != "" {
@@ -55,6 +56,14 @@ func applyCashLeg(ctx context.Context, dbtx pgx.Tx, m CashMovement) (domain.Cash
 	if err != nil {
 		return domain.CashTx{}, false, fmt.Errorf("parse cash balance %q: %w", balStr, err)
 	}
+	locked, err := domain.ParseMoney(lockStr)
+	if err != nil {
+		return domain.CashTx{}, false, fmt.Errorf("parse cash locked %q: %w", lockStr, err)
+	}
+	locked, err = consumeReservation(ctx, dbtx, m.ConsumeOrderID, "cash", m.TenantID, string(m.Currency), m.Amount, m.ReferenceID, locked, domain.ErrInsufficientCash)
+	if err != nil {
+		return domain.CashTx{}, false, err
+	}
 	applied, err := domain.ApplyCash(bal, prevHash, domain.CashTx{
 		TxID: uuid.NewString(), TenantID: m.TenantID, SubAccountID: m.SubAccountID, Currency: m.Currency,
 		Operation: m.Operation, Amount: m.Amount, ReferenceID: m.ReferenceID, IdempotencyKey: m.IdempotencyKey,
@@ -62,6 +71,9 @@ func applyCashLeg(ctx context.Context, dbtx pgx.Tx, m CashMovement) (domain.Cash
 	})
 	if err != nil {
 		return domain.CashTx{}, false, err // ErrInsufficientCash
+	}
+	if m.Amount.IsNegative() && applied.BalanceAfter.Cmp(locked) < 0 {
+		return domain.CashTx{}, false, domain.ErrInsufficientCash // would spend cash reserved for an open order
 	}
 	if _, err := dbtx.Exec(ctx,
 		`INSERT INTO cash_transactions
@@ -74,9 +86,9 @@ func applyCashLeg(ctx context.Context, dbtx pgx.Tx, m CashMovement) (domain.Cash
 		return domain.CashTx{}, false, fmt.Errorf("insert cash tx: %w", err)
 	}
 	if _, err := dbtx.Exec(ctx,
-		`UPDATE cash_balances SET balance=$1::numeric, last_chain_hash=$2, updated_at=now()
+		`UPDATE cash_balances SET balance=$1::numeric, locked_amount=$6::numeric, last_chain_hash=$2, updated_at=now()
 		 WHERE tenant_id=$3 AND sub_account_id IS NOT DISTINCT FROM $4 AND currency=$5 AND is_paper`,
-		applied.BalanceAfter.String(), applied.ChainHash, m.TenantID, sub, string(m.Currency)); err != nil {
+		applied.BalanceAfter.String(), applied.ChainHash, m.TenantID, sub, string(m.Currency), locked.String()); err != nil {
 		return domain.CashTx{}, false, fmt.Errorf("update cash balance: %w", err)
 	}
 	return applied, false, nil
