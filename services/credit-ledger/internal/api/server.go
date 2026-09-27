@@ -8,6 +8,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"github.com/trade1/credit-ledger/internal/config"
 	"github.com/trade1/credit-ledger/internal/domain"
@@ -86,12 +87,31 @@ func (s *Server) listTransactions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	isPaper := r.URL.Query().Get("is_paper") != "false"
-	txs, err := s.st.ListTransactions(r.Context(), p.TenantID, isPaper, 50)
+	limit, ok := parseTxLimit(r.URL.Query().Get("limit"))
+	if !ok {
+		writeErr(w, http.StatusUnprocessableEntity, "bad_request", "limit must be an integer from 1 to 200")
+		return
+	}
+	txs, err := s.st.ListTransactions(r.Context(), p.TenantID, isPaper, limit)
 	if err != nil {
 		serverError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"transactions": toTxDTOs(txs)})
+}
+
+// parseTxLimit reads the ?limit page size from credit.yaml listTransactions (1–200, default 50). An
+// absent value means the default; anything else out of range is rejected rather than silently clamped,
+// so a caller asking for 500 learns it got a bounded page instead of assuming it saw everything.
+func parseTxLimit(raw string) (int, bool) {
+	if raw == "" {
+		return 50, true
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n < 1 || n > 200 {
+		return 0, false
+	}
+	return n, true
 }
 
 // movementBody is the union of the single-leg movement request bodies (purchase/debit/mint/burn).

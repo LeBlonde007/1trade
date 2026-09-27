@@ -15,7 +15,7 @@ Source: `1trade_mvp_screens_prompts.md` · Checked against files in `/mnt/f/ex` 
 - [x] C1. Signup — `1Trade Signup.html`
 - [x] C2. KYC light flow — `Trader KYC.html`
 - [x] C3. Portfolio — `Portfolio.html`
-- [ ] C4. Trade history
+- [x] C4. Trade history — `app/pages/history.vue` (live: engine paper fills + credit-ledger entries, 2026-09-27)
 - [x] C5. Buy credits flow
 - [x] C6. Enterprise onboarding — `app/pages/enterprise/onboarding.vue`
 - [x] C7. Team and sub-accounts — `app/pages/enterprise/teams.vue`
@@ -39,4 +39,4 @@ Source: `1trade_mvp_screens_prompts.md` · Checked against files in `/mnt/f/ex` 
 
 ---
 
-**Progress: 24 / 26 done** (Tier 1 complete · Tier 2: C4 open · Tier 3 complete.)
+**Progress: 26 / 26 done** (all tiers complete. C4 shipped live — no mock rows; trades are labelled paper while the venue is paused.)
