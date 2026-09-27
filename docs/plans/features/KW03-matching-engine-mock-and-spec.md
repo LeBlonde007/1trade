@@ -116,8 +116,14 @@ sequences, and valid trade chains. Replay determinism is checked after a JSON ro
 is a concurrent `-race` run. The suite was mutation-checked: breaking self-trade prevention or the
 execution price fails it.
 
-**Not done** (SPEC.md §7): durable journal, snapshots, ledger settlement plus NATS emission, the real
-risk hook, and API wiring. The API wiring is the licence-gated cutover.
+**Durable journal — done (2026-09-27).** `internal/journal` plus `migrations/0001_journal.sql` give a
+write-ahead, append-only, hash-chained Postgres journal. `journal.Recover` verifies it and rebuilds
+the engine on start. Integration-tested against real Postgres: crash and recover, tamper and gap
+detection, second-writer refusal, and refusing commands while the DB is down. Cost is about 0.4 ms
+per order locally. It is not deployed yet: the service opens no database until order entry is wired.
+
+**Not done** (SPEC.md §7): snapshots, ledger settlement plus NATS emission, the real risk hook, and
+API wiring. The API wiring is the licence-gated cutover.
 
 **Open for tech-lead** (SPEC.md §8): sequence scope per `(product, is_paper)`, how paper liquidity
 works given the insider-risk rule (blocks KW04 paper quoting), and enumerating cancel reasons.

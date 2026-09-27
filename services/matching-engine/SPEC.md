@@ -71,12 +71,38 @@ Every command returns its events in emission order:
 ## 5. Event sourcing and replay
 
 The **journal** is the ordered list of every command that changed state: valid submits (including
-duplicates-to-be), successful cancels, and every day-expiry. Each submit carries its recorded risk
-decision.
+risk-rejected ones), successful cancels, and every day-expiry. Each submit carries its recorded risk
+decision. Validation failures and idempotent duplicates are not journaled; they change nothing.
 
 `Replay(cfg, journal)` rebuilds the engine and re-emits every event. Tests prove replay reproduces the
 original event stream and final books exactly, including after a JSON round trip of the journal
 (`TestReplayIsDeterministic`). No iteration in the matching path uses map order.
+
+### Durable journal (`internal/journal`, migration `migrations/0001_journal.sql`)
+
+- **Write-ahead.** `Config.Persist` is called with the command and its 1-based seq *before* any state
+  changes. If the write fails, the command is refused with `ErrJournal` and the engine is untouched
+  (not even an empty book is created). The books can never hold state the journal cannot reproduce.
+- **Table.** `engine_journal(seq PK, kind, command_json, prev_hash, chain_hash, recorded_at)`.
+  - Append-only: triggers refuse UPDATE, DELETE and TRUNCATE.
+  - Hash-chained over the exact stored text: `chain_hash = SHA-256(prev_hash || command_json)`. The
+    column is TEXT, not JSONB, so the hashed bytes are the stored bytes.
+- **Single writer.** The seq primary key makes a second engine appending the same seq fail. Its
+  command is refused rather than forking the books.
+- **Recovery.** `journal.Recover` verifies the whole journal before replaying: contiguous seq, every
+  link, every hash. A gap or edit returns `ErrCorrupt`, and the engine refuses to start rather than
+  build different books. After recovery, new commands continue at n+1.
+- **Cost.** A synchronous append is about 0.4 ms per order on local Postgres (fsync on;
+  `BenchmarkSubmitJournaled`). That is within the 10 ms acceptance budget; a networked database adds
+  its round trip. Group commit is the lever if it is ever needed.
+- **Tests.** Integration tests run against real Postgres when `DATABASE_URL` is set, and skip
+  otherwise. They cover:
+  - crash then recover, giving identical books, orders and journal, with new work surviving a second
+    restart;
+  - DB-level refusal of UPDATE, DELETE and TRUNCATE;
+  - detection of a superuser edit and of a gap;
+  - a second writer being refused;
+  - a database outage refusing commands.
 
 ## 6. Invariants (property-tested, 200 random streams × 400 commands)
 
@@ -94,8 +120,9 @@ and executing at the taker's price. Both mutations were caught.
 
 ## 7. Not built yet (in order)
 
-1. **Durable journal.** Append commands to Postgres (or JetStream) before acknowledging, and rebuild
-   the engine on start by `Replay`. The in-memory journal is the format; persistence is the next step.
+1. ~~**Durable journal.**~~ Done (§5). **Not yet deployed.** The service does not open a database
+   until order entry is wired. At that point, add `DATABASE_URL`, the migration initContainer, and a
+   `journal.Recover` call before the listener starts.
 2. **Snapshots.** Every 5 minutes, snapshot books and sequences so replay starts from the snapshot
    rather than genesis. Redis as a read cache of depth for the API.
 3. **Settlement.** On each trade, call credit-ledger to settle both sides atomically, idempotent on

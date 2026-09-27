@@ -92,6 +92,7 @@ var (
 	ErrOrderNotFound    = errors.New("engine: order not found")
 	ErrOrderNotOpen     = errors.New("engine: order is not open")
 	ErrMissingTimestamp = errors.New("engine: command timestamp is required")
+	ErrJournal          = errors.New("engine: journal write failed; command not applied")
 )
 
 // Order is one order and its live state. Values are copies; the engine never hands out a pointer
@@ -246,4 +247,10 @@ type RiskCheck func(o Order) string
 type Config struct {
 	Fees FeeSchedule
 	Risk RiskCheck // nil accepts everything
+
+	// Persist is the write-ahead hook: it durably records a command before the engine applies it.
+	// seq is the command's 1-based position in the journal. If Persist fails the command is refused
+	// and nothing changes, so the books never hold state the journal cannot reproduce. Nil keeps the
+	// journal in memory only (tests, replay).
+	Persist func(seq uint64, c Command) error
 }

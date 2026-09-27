@@ -77,7 +77,10 @@ func (e *Engine) submit(c SubmitCmd) (Result, error) {
 		}
 		c.RiskChecked = true
 	}
-	e.journal = append(e.journal, Command{Submit: &c})
+	if err := e.record(Command{Submit: &c}); err != nil {
+		return Result{}, err
+	}
+	e.books[b.key] = b
 
 	e.arrival++
 	o.arrival = e.arrival
@@ -111,8 +114,8 @@ func (e *Engine) submit(c SubmitCmd) (Result, error) {
 }
 
 // validate checks a submit against the contract and the product catalog, defaults its TIF, and
-// returns the target book (created on first use) and a new order. It changes no engine state except
-// creating an empty book.
+// returns the target book (a new, unregistered one on first use) and a new order. It changes no
+// engine state.
 func (e *Engine) validate(c *SubmitCmd) (*book, *Order, error) {
 	if c.OrderID == "" || c.TenantID == "" {
 		return nil, nil, ErrMissingID
@@ -160,11 +163,11 @@ func (e *Engine) validate(c *SubmitCmd) (*book, *Order, error) {
 		return nil, nil, ErrInternalPaper
 	}
 
-	k := bookKey{product: p.ID, paper: c.IsPaper}
-	b := e.books[k]
+	b := e.books[bookKey{product: p.ID, paper: c.IsPaper}]
 	if b == nil {
-		b = newBook(k, p.CreditType, tick)
-		e.books[k] = b
+		// Not registered yet: the caller adds it only after the command is journaled, so a refused
+		// command leaves no trace.
+		b = newBook(bookKey{product: p.ID, paper: c.IsPaper}, p.CreditType, tick)
 	}
 	o := &Order{
 		OrderID: c.OrderID, TenantID: c.TenantID, SubAccountID: c.SubAccountID, ProductID: p.ID,
@@ -319,10 +322,12 @@ func (e *Engine) cancel(c CancelCmd) (Result, error) {
 	if !o.Open() {
 		return Result{Order: *o}, ErrOrderNotOpen
 	}
+	if err := e.record(Command{Cancel: &c}); err != nil {
+		return Result{}, err
+	}
 	b := e.books[bookKey{product: o.ProductID, paper: o.IsPaper}]
 	b.own(o.Side).remove(o)
 	o.State, o.Reason, o.UpdatedAt = Cancelled, ReasonUserCancel, c.TS
-	e.journal = append(e.journal, Command{Cancel: &c})
 	return Result{Order: *o, Events: []Event{b.orderEvent(o, c.TS)}}, nil
 }
 
@@ -331,7 +336,9 @@ func (e *Engine) expireDay(c ExpireDayCmd) ([]Event, error) {
 	if c.TS.IsZero() {
 		return nil, ErrMissingTimestamp
 	}
-	e.journal = append(e.journal, Command{ExpireDay: &c})
+	if err := e.record(Command{ExpireDay: &c}); err != nil {
+		return nil, err
+	}
 	var evs []Event
 	for _, b := range e.sortedBooks() {
 		for _, l := range []*ladder{&b.bids, &b.asks} {
@@ -427,10 +434,26 @@ func cloneCommand(c Command) Command {
 	return c
 }
 
+// record writes a command ahead of applying it: first to the Persist hook (durable), then to the
+// in-memory journal. Callers must not have mutated any state yet — a failed write aborts the command.
+func (e *Engine) record(c Command) error {
+	if e.cfg.Persist != nil {
+		if err := e.cfg.Persist(uint64(len(e.journal))+1, cloneCommand(c)); err != nil {
+			return fmt.Errorf("%w: %w", ErrJournal, err)
+		}
+	}
+	e.journal = append(e.journal, c)
+	return nil
+}
+
 // Replay rebuilds an engine from a journal and returns it with every event re-emitted. Recorded risk
-// decisions are reused, so cfg.Risk is never consulted for journaled submits. Replaying a journal
-// produced by an engine with the same fee schedule reproduces its events exactly.
+// decisions are reused, so cfg.Risk is never consulted for journaled submits, and cfg.Persist is not
+// called for the replayed commands (they are already durable) — it is attached to the returned engine
+// for the commands that follow. Replaying a journal produced by an engine with the same fee schedule
+// reproduces its events exactly.
 func Replay(cfg Config, journal []Command) (*Engine, []Event, error) {
+	persist := cfg.Persist
+	cfg.Persist = nil
 	e := New(cfg)
 	var all []Event
 	for i, c := range journal {
@@ -457,6 +480,7 @@ func Replay(cfg Config, journal []Command) (*Engine, []Event, error) {
 		}
 		all = append(all, evs...)
 	}
+	e.cfg.Persist = persist
 	return e, all, nil
 }
 
