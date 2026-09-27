@@ -184,15 +184,14 @@ const traderTour: TourStep[] = [
     route: '/portfolio',
     section: 'Portfolio',
     element: 'h1, .page-head, main',
-    title: 'Portfolio — performance vs the index',
+    title: 'Portfolio — your paper account',
     body: `
-      <p>Performance attribution is built in — you always know whether you're <em>beating beta</em> or just riding it.</p>
+      <p>Everything here is live: paper cash from the credit ledger, positions from the matching engine.</p>
       <ul>
-        <li><strong>Hero KPI card</strong>: total P&amp;L, today's delta, benchmark-relative bar vs AI Index.</li>
-        <li><strong>Performance chart</strong>: range tabs <kbd>1D</kbd> · <kbd>1W</kbd> · <kbd>1M</kbd> · <kbd>3M</kbd> · <kbd>YTD</kbd> · <kbd>ALL</kbd>. Dashed AI-INDEX overlay toggleable.</li>
-        <li><strong>Positions table</strong>: sortable, 5 rows in mock; row → position drawer (close / reduce / convert-to-limit / set stop).</li>
-        <li><strong>Allocation donut</strong> and <strong>asset-class bar</strong> on the right rail.</li>
-        <li><strong>Recent activity feed</strong>: fills, alerts, deposits, in reverse chrono.</li>
+        <li><strong>KPI strip</strong>: paper cash (and what open orders hold), position value, unrealized and realized P&amp;L.</li>
+        <li><strong>Open positions</strong>: click a row to see its recent fills.</li>
+        <li><strong>Exposure by market</strong> and <strong>recent activity</strong> (fills + cash movements) on the right rail.</li>
+        <li>Positions are simulated while the venue is paused — the page says so.</li>
       </ul>
     `,
     side: 'bottom',
