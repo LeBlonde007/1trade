@@ -19,7 +19,7 @@ spec:
     matchExpressions:
       - key: app
         operator: In
-        values: [credit-ledger, platform-core, inference-gateway, compute-control]
+        values: [credit-ledger, platform-core, inference-gateway, compute-control, matching-engine, surveillance]
   endpoints:
     - port: http        # the named service port; /metrics is served on the same port as the API
       path: /metrics

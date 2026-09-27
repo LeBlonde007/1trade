@@ -80,3 +80,4 @@ backups/
 
 # Generated CLI distribution (built into the web image at release; never committed)
 1Trade Frontend/public/cli/
+deploy/k8s/observability/rules.generated.yaml

@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/trade1/surveillance/internal/detect"
+	"github.com/trade1/surveillance/internal/metrics"
 )
 
 // Subjects consumed and produced (docs/contracts/events).
@@ -50,12 +51,14 @@ func (p *Pipeline) Handle(ctx context.Context, subject string, data []byte) (int
 	case SubjectOrders:
 		var o detect.Order
 		if err := json.Unmarshal(data, &o); err != nil {
+			metrics.EventsTotal.WithLabelValues(subject, "undecodable").Inc()
 			return 0, fmt.Errorf("pipeline: undecodable %s: %w", subject, err)
 		}
 		alerts = p.det.OnOrder(o)
 	case SubjectTrades:
 		var t detect.Trade
 		if err := json.Unmarshal(data, &t); err != nil {
+			metrics.EventsTotal.WithLabelValues(subject, "undecodable").Inc()
 			return 0, fmt.Errorf("pipeline: undecodable %s: %w", subject, err)
 		}
 		alerts = p.det.OnTrade(t)
@@ -66,16 +69,19 @@ func (p *Pipeline) Handle(ctx context.Context, subject string, data []byte) (int
 	for _, a := range alerts {
 		isNew, err := p.store.SaveAlert(ctx, a)
 		if err != nil {
+			metrics.EventsTotal.WithLabelValues(subject, "error").Inc()
 			return published, fmt.Errorf("pipeline: save %s: %w", a.AlertID, err)
 		}
 		if !isNew {
 			continue // raised before this restart; already announced
 		}
+		metrics.AlertsTotal.WithLabelValues(a.Rule, a.Severity).Inc()
 		if err := p.pub.PublishAlert(a); err != nil {
 			// Stored is what counts; the review API serves it. Publishing is best-effort.
 			return published, fmt.Errorf("pipeline: publish %s (stored): %w", a.AlertID, err)
 		}
 		published++
 	}
+	metrics.EventsTotal.WithLabelValues(subject, "ok").Inc()
 	return published, nil
 }

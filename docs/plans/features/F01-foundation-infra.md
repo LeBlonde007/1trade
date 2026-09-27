@@ -21,8 +21,28 @@
 >
 > **`make test-e2e` live (v0.2.13):** timed sub-5-min time-to-first-action loop.
 >
-> **Pending:** observability (Prometheus/Loki/Tempo — the `OBS=1` tier), staging/prod-paper/prod-real
-> clusters, SOPS-sealed secrets, CI-green, backup/restore drill.
+> **Observability (2026-09-27): metrics + alerting + dashboard done, verified offline.**
+> - **Scraping.** Every Go service exposes `/metrics`. Surveillance was added, and the ServiceMonitor
+>   now covers matching-engine and surveillance too.
+> - **Alert rules.** `deploy/k8s/observability/alerts.yaml` (a PrometheusRule) holds 7 rules:
+>   - service down, 5xx ratio (with a traffic floor), and p99 latency;
+>   - **billing stalled** for inference and for GPU — usage served but not debited, i.e. unbilled
+>     usage;
+>   - high-severity surveillance alerts, and surveillance skipping undecodable events.
+> - **Dashboard.** `dashboards/1trade-overview.json` has RED metrics per service, billing usage
+>   against debits, and surveillance. It is loaded by the Grafana sidecar.
+> - **`make obs-check`.**
+>   - promtool checks and **unit-tests** every rule, with firing and silent cases.
+>   - Every query in the rules and the dashboard must use only metrics the code declares.
+>   - Both checks were mutation-checked: a metric typo and a broken billing rule each fail.
+> - **Loud failures.** `OBS=1` now applies the rules and the dashboard, and says out loud when Loki or
+>   Tempo fail (they used to be swallowed with `|| true`).
+> - **Not done.**
+>   - Tracing instrumentation: no service emits OpenTelemetry spans yet, so Tempo has nothing to show.
+>   - The stack has not been installed on a cluster from here.
+>   - The billing-stalled alerts need NATS consumers running to be meaningful.
+>
+> **Pending:** tracing (OTel), staging/prod-paper/prod-real clusters, SOPS-sealed secrets, CI-green.
 
 ## Spec
 

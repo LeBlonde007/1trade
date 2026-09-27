@@ -57,11 +57,22 @@ if [ "$OBS" = "1" ]; then
   helm repo update >/dev/null
   ns observability
   helm upgrade --install kube-prom prometheus-community/kube-prometheus-stack -n observability --wait
-  helm upgrade --install loki grafana/loki-stack -n observability --wait || true
-  helm upgrade --install tempo grafana/tempo -n observability --wait || true
+  # Logs and traces are useful but not load-bearing for local dev, so a failure does not abort the
+  # install — but it is said out loud (it used to be swallowed with `|| true`).
+  helm upgrade --install loki grafana/loki-stack -n observability --wait \
+    || echo "WARN: Loki did not install — logs will not be queryable in Grafana"
+  helm upgrade --install tempo grafana/tempo -n observability --wait \
+    || echo "WARN: Tempo did not install — traces will not be available"
+  OBSDIR="$HERE/../observability"
   # Scrape the Go services' /metrics (CRDs now exist from kube-prometheus-stack). Harmless before the
   # app services are deployed — the ServiceMonitor just matches nothing until they exist.
-  kubectl apply -f "$HERE/../observability/servicemonitors.yaml"
+  kubectl apply -f "$OBSDIR/servicemonitors.yaml"
+  # Alert rules (unit-tested offline: make obs-check) and the platform dashboard. The Grafana sidecar
+  # in kube-prometheus-stack loads any ConfigMap labelled grafana_dashboard=1.
+  kubectl apply -f "$OBSDIR/alerts.yaml"
+  kubectl -n observability create configmap 1trade-dashboards --from-file="$OBSDIR/dashboards/" \
+    --dry-run=client -o yaml | kubectl apply -f -
+  kubectl -n observability label configmap 1trade-dashboards grafana_dashboard=1 --overwrite
 fi
 
 if [ "$GPU" = "1" ]; then

@@ -21,14 +21,22 @@ type Lister interface {
 	Ping(ctx context.Context) error
 }
 
-// New returns the routed handler. An empty token refuses every alerts request.
-func New(st Lister, serviceToken string) http.Handler {
+// New returns the routed handler. An empty token refuses every alerts request. watching reports
+// whether the event pipeline is running (nil error); /readyz fails while it is not, so an unwatched
+// market shows as a not-ready pod instead of a log line nobody reads.
+func New(st Lister, serviceToken string, watching func() error) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
 		if err := st.Ping(r.Context()); err != nil {
 			writeErr(w, http.StatusServiceUnavailable, "not_ready", "database unreachable")
 			return
+		}
+		if watching != nil {
+			if err := watching(); err != nil {
+				writeErr(w, http.StatusServiceUnavailable, "not_watching", err.Error())
+				return
+			}
 		}
 		w.WriteHeader(http.StatusOK)
 	})

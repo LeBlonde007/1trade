@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -26,7 +27,7 @@ func (f *fakeLister) Ping(context.Context) error { return nil }
 // TestAlertsAPI: service token required (constant-time), filters and limit parsed, bad limit refused.
 func TestAlertsAPI(t *testing.T) {
 	fl := &fakeLister{}
-	h := New(fl, "svc")
+	h := New(fl, "svc", nil)
 	call := func(path, tok string) *httptest.ResponseRecorder {
 		req := httptest.NewRequest(http.MethodGet, path, nil)
 		if tok != "" {
@@ -42,7 +43,7 @@ func TestAlertsAPI(t *testing.T) {
 	if w := call("/v1/surveillance/alerts", "wrong"); w.Code != 401 {
 		t.Errorf("wrong token: %d", w.Code)
 	}
-	unset := New(fl, "")
+	unset := New(fl, "", nil)
 	req := httptest.NewRequest(http.MethodGet, "/v1/surveillance/alerts", nil)
 	req.Header.Set("Authorization", "Bearer ")
 	rec := httptest.NewRecorder()
@@ -58,5 +59,22 @@ func TestAlertsAPI(t *testing.T) {
 	}
 	if w := call("/v1/surveillance/alerts?limit=9999", "svc"); w.Code != 422 {
 		t.Errorf("bad limit: %d", w.Code)
+	}
+}
+
+// TestReadyzReflectsThePipeline: the pod is not ready while the market is unwatched.
+func TestReadyzReflectsThePipeline(t *testing.T) {
+	watching := errors.New("event pipeline not connected")
+	h := New(&fakeLister{}, "svc", func() error { return watching })
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/readyz", nil))
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("readyz while unwatched = %d, want 503", rec.Code)
+	}
+	watching = nil
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/readyz", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("readyz once watching = %d, want 200", rec.Code)
 	}
 }

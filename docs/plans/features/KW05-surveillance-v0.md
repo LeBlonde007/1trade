@@ -165,3 +165,14 @@ Acceptance (Phase 2): ✅ all six patterns with tunable thresholds (plus positio
 engine's risk hook) · ◐ alerts auditable (evidence plus ids in every alert; the store and API are
 next).
 
+**Hardening (2026-09-27).** Found by an ordering accident in a smoke test: if NATS was not up when
+surveillance started, it logged "not started" and **never retried**, leaving the market unwatched.
+Now:
+- the pipeline starts in the background with exponential backoff;
+- `/readyz` returns 503 until it is running;
+- `surveillance_events_total{subject,outcome}` and `surveillance_alerts_total{rule,severity}` are
+  exported, feeding the page-level alerts.
+
+Reproduced on the real binary: surveillance started first → 503 → NATS starts → it retries → 200 →
+the wash trade is caught and the metrics appear.
+

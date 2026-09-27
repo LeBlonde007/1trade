@@ -1,0 +1,87 @@
+# 1Trade alert rules. A PrometheusRule (kube-prometheus-stack, OBS=1) — the `release: kube-prom` label
+# is what its Prometheus selects. The same groups are unit-tested with promtool: `make obs-check`
+# (deploy/k8s/observability/check.sh) extracts spec.groups and runs alerts.test.yaml against them.
+#
+# severity: page = wake someone now; ticket = look during working hours.
+# Every expression uses only metrics the services actually export — check.sh enforces that.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: 1trade-alerts
+  namespace: default
+  labels:
+    release: kube-prom
+spec:
+  groups:
+    - name: 1trade.availability
+      rules:
+        - alert: OneTradeServiceDown
+          expr: up{namespace="default"} == 0
+          for: 2m
+          labels: { severity: page }
+          annotations:
+            summary: "{{ $labels.job }} is down"
+            description: "Prometheus cannot scrape {{ $labels.job }} ({{ $labels.instance }}) for 2 minutes."
+        - alert: OneTradeHighErrorRate
+          # 5xx share of responses per service. Needs real traffic (> 0.1 rps) so a single failed
+          # health probe on an idle service cannot page anyone.
+          expr: |
+            (
+              sum by (job) (rate(http_requests_total{code=~"5.."}[5m]))
+              /
+              sum by (job) (rate(http_requests_total[5m]))
+            ) > 0.05
+            and
+            sum by (job) (rate(http_requests_total[5m])) > 0.1
+          for: 5m
+          labels: { severity: page }
+          annotations:
+            summary: "{{ $labels.job }}: {{ $value | humanizePercentage }} of requests failing"
+        - alert: OneTradeHighLatencyP99
+          expr: |
+            histogram_quantile(0.99, sum by (job, le) (rate(http_request_duration_seconds_bucket[5m]))) > 1
+          for: 10m
+          labels: { severity: ticket }
+          annotations:
+            summary: "{{ $labels.job }}: p99 latency {{ $value | humanizeDuration }}"
+
+    - name: 1trade.billing
+      rules:
+        # Usage is being served but the ledger is not debiting it: customers are consuming for free.
+        # The debit loop (usage event → NATS → ledger consumer) is broken somewhere. This is a money
+        # alert, so it pages.
+        - alert: OneTradeInferenceBillingStalled
+          expr: |
+            sum(rate(inference_requests_total[15m])) > 0
+            and
+            (sum(rate(ledger_transactions_total{operation="consumption", credit_type!~"gpu_.*"}[15m])) or vector(0)) == 0
+          for: 15m
+          labels: { severity: page }
+          annotations:
+            summary: "Inference is being served but no inference usage is being debited"
+            description: "inference_requests_total is rising while the ledger records no non-GPU consumption debits. Check NATS and the credit-ledger inference consumer."
+        - alert: OneTradeComputeBillingStalled
+          expr: |
+            sum(rate(compute_usage_events_total[15m])) > 0
+            and
+            (sum(rate(ledger_transactions_total{operation="consumption", credit_type=~"gpu_.*"}[15m])) or vector(0)) == 0
+          for: 15m
+          labels: { severity: page }
+          annotations:
+            summary: "GPU usage is being metered but no GPU usage is being debited"
+            description: "compute_usage_events_total is rising while the ledger records no gpu_* consumption debits. Check NATS and the credit-ledger compute consumer."
+
+    - name: 1trade.market-integrity
+      rules:
+        - alert: OneTradeSurveillanceHighSeverity
+          expr: sum by (rule) (increase(surveillance_alerts_total{severity="high"}[5m])) > 0
+          labels: { severity: page }
+          annotations:
+            summary: "Surveillance raised a high-severity {{ $labels.rule }} alert"
+            description: "Review it: GET /v1/surveillance/alerts?rule={{ $labels.rule }} (internal)."
+        - alert: OneTradeSurveillanceUndecodableEvents
+          # Surveillance skips an event it cannot decode — so the market is partly unwatched.
+          expr: sum(increase(surveillance_events_total{outcome="undecodable"}[10m])) > 0
+          labels: { severity: ticket }
+          annotations:
+            summary: "Surveillance is skipping undecodable engine events"

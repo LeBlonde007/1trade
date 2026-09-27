@@ -5,14 +5,17 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
+	"sync/atomic"
 	"time"
 
 	"github.com/trade1/surveillance/internal/api"
 	"github.com/trade1/surveillance/internal/config"
 	"github.com/trade1/surveillance/internal/detect"
+	"github.com/trade1/surveillance/internal/obs"
 	"github.com/trade1/surveillance/internal/pipeline"
 	"github.com/trade1/surveillance/internal/store"
 )
@@ -32,20 +35,40 @@ func main() {
 	}
 	defer st.Close()
 
+	// The event pipeline starts in the background and keeps retrying: pods start in any order, and
+	// surveillance must not give up on the market because NATS came up a second later. Until it is
+	// running, /readyz reports not-ready.
+	// status wraps the error: atomic.Value refuses to store a nil interface, which "watching" is.
+	type status struct{ err error }
+	var watching atomic.Value
+	watching.Store(status{errors.New("event pipeline not started")})
 	if cfg.NATSURL == "" {
 		slog.Warn("NATS_URL unset: surveillance is NOT watching the market (review API only)")
+		watching.Store(status{errors.New("NATS_URL unset")})
 	} else {
-		r, err := pipeline.Start(cfg.NATSURL, func(pub pipeline.Publisher) *pipeline.Pipeline {
-			return pipeline.New(detect.DefaultConfig(), st, pub)
-		})
-		if err != nil {
-			slog.Error("surveillance pipeline not started — the market is unwatched", "err", err)
-		} else {
-			defer r.Close()
-		}
+		go func() {
+			for delay := time.Second; ; delay = min(delay*2, 30*time.Second) {
+				r, err := pipeline.Start(cfg.NATSURL, func(pub pipeline.Publisher) *pipeline.Pipeline {
+					return pipeline.New(detect.DefaultConfig(), st, pub)
+				})
+				if err == nil {
+					watching.Store(status{})
+					_ = r // runs for the life of the process
+					return
+				}
+				watching.Store(status{fmt.Errorf("event pipeline not connected: %w", err)})
+				slog.Error("surveillance pipeline not started; retrying — the market is unwatched until it does", "err", err, "retry_in", delay)
+				time.Sleep(delay)
+			}
+		}()
 	}
+	isWatching := func() error { return watching.Load().(status).err }
 
-	srv := &http.Server{Addr: cfg.Addr, Handler: api.New(st, cfg.ServiceToken), ReadHeaderTimeout: 5 * time.Second}
+	// /metrics beside the API on the same port (cluster-internal), API behind RED instrumentation.
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", obs.Handler())
+	mux.Handle("/", obs.Instrument(api.New(st, cfg.ServiceToken, isWatching)))
+	srv := &http.Server{Addr: cfg.Addr, Handler: mux, ReadHeaderTimeout: 5 * time.Second}
 	slog.Info("surveillance listening", "addr", cfg.Addr, "env", cfg.Env)
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		slog.Error("server", "err", err)

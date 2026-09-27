@@ -11,7 +11,7 @@ OBS     ?= 0          # set OBS=1 to also install Prometheus/Loki/Tempo/Grafana
 .DEFAULT_GOAL := help
 
 ## help: list available targets
-.PHONY: help
+.PHONY: help obs-check
 help:
 	@grep -E '^## ' $(MAKEFILE_LIST) | sed 's/^## //' | awk -F': ' '{printf "  \033[1m%-14s\033[0m %s\n", $$1, $$2}'
 
@@ -38,6 +38,10 @@ cluster:
 		echo "==> creating k3d cluster '$(CLUSTER)'"; k3d cluster create --config deploy/k8s/local/k3d.yaml; \
 	fi
 	@kubectl config use-context k3d-$(CLUSTER) >/dev/null
+
+## obs-check: verify alert rules (promtool unit tests) + that every alert/dashboard query uses real metrics
+obs-check:
+	@bash deploy/k8s/observability/check.sh
 
 ## data-plane: install the data plane (core; FULL=1/SCHED=1/OBS=1/GPU=1 add tiers)
 .PHONY: data-plane

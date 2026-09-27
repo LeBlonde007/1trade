@@ -1,0 +1,131 @@
+# promtool unit tests for alerts.yaml (spec.groups extracted to rules.generated.yaml by check.sh).
+# Each alert has a firing case and at least one case that must stay silent.
+rule_files: [rules.generated.yaml]
+evaluation_interval: 1m
+
+tests:
+  - name: service down fires after 2m, not before
+    interval: 1m
+    input_series:
+      - series: 'up{namespace="default", job="credit-ledger", instance="a"}'
+        values: '1 0 0 0 0'
+      - series: 'up{namespace="default", job="platform-core", instance="b"}'
+        values: '1 1 1 1 1'
+    alert_rule_test:
+      - { eval_time: 2m, alertname: OneTradeServiceDown, exp_alerts: [] }
+      - eval_time: 4m
+        alertname: OneTradeServiceDown
+        exp_alerts:
+          - exp_labels: { severity: page, namespace: default, job: credit-ledger, instance: a }
+            exp_annotations:
+              summary: "credit-ledger is down"
+              description: "Prometheus cannot scrape credit-ledger (a) for 2 minutes."
+
+  - name: error rate needs both a high ratio and real traffic
+    interval: 1m
+    input_series:
+      # busy service: 60 req/min, 12 of them 5xx (20%)
+      - series: 'http_requests_total{job="inference-gateway", code="200"}'
+        values: '0+48x20'
+      - series: 'http_requests_total{job="inference-gateway", code="502"}'
+        values: '0+12x20'
+      # idle service: one failed probe a minute is 50% — but only 2 req/min, below the traffic floor
+      - series: 'http_requests_total{job="compute-control", code="200"}'
+        values: '0+1x20'
+      - series: 'http_requests_total{job="compute-control", code="500"}'
+        values: '0+1x20'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: OneTradeHighErrorRate
+        exp_alerts:
+          - exp_labels: { severity: page, job: inference-gateway }
+            exp_annotations: { summary: "inference-gateway: 20% of requests failing" }
+
+  - name: p99 latency above 1s for 10m
+    interval: 1m
+    input_series:
+      - series: 'http_request_duration_seconds_bucket{job="platform-core", le="0.5"}'
+        values: '0+10x20'
+      - series: 'http_request_duration_seconds_bucket{job="platform-core", le="2.5"}'
+        values: '0+100x20'
+      - series: 'http_request_duration_seconds_bucket{job="platform-core", le="+Inf"}'
+        values: '0+100x20'
+    alert_rule_test:
+      - { eval_time: 8m, alertname: OneTradeHighLatencyP99, exp_alerts: [] }
+      - eval_time: 18m
+        alertname: OneTradeHighLatencyP99
+        exp_alerts:
+          - exp_labels: { severity: ticket, job: platform-core }
+            exp_annotations: { summary: "platform-core: p99 latency 2.478s" }  # 0.5 + (89/90) × 2, interpolated in the 0.5–2.5 bucket
+
+  - name: inference billing stalled — usage without debits pages; usage with debits does not
+    interval: 1m
+    input_series:
+      - series: 'inference_requests_total{model="llama-3.1-8b", modality="text"}'
+        values: '0+10x40'
+      - series: 'ledger_transactions_total{operation="consumption", credit_type="gpu_h100"}'
+        values: '0+5x40'   # GPU debits alone must not mask missing inference debits
+    alert_rule_test:
+      - { eval_time: 10m, alertname: OneTradeInferenceBillingStalled, exp_alerts: [] }   # still inside the 15m "for"
+      - eval_time: 35m
+        alertname: OneTradeInferenceBillingStalled
+        exp_alerts:
+          - exp_labels: { severity: page }
+            exp_annotations:
+              summary: "Inference is being served but no inference usage is being debited"
+              description: "inference_requests_total is rising while the ledger records no non-GPU consumption debits. Check NATS and the credit-ledger inference consumer."
+
+  - name: inference billing healthy
+    interval: 1m
+    input_series:
+      - series: 'inference_requests_total{model="llama-3.1-8b", modality="text"}'
+        values: '0+10x40'
+      - series: 'ledger_transactions_total{operation="consumption", credit_type="text"}'
+        values: '0+10x40'
+    alert_rule_test:
+      - { eval_time: 35m, alertname: OneTradeInferenceBillingStalled, exp_alerts: [] }
+
+  - name: compute billing stalled
+    interval: 1m
+    input_series:
+      - series: 'compute_usage_events_total{credit_type="gpu_h100"}'
+        values: '0+2x40'
+      - series: 'ledger_transactions_total{operation="consumption", credit_type="text"}'
+        values: '0+5x40'   # text debits must not mask missing GPU debits
+    alert_rule_test:
+      - eval_time: 35m
+        alertname: OneTradeComputeBillingStalled
+        exp_alerts:
+          - exp_labels: { severity: page }
+            exp_annotations:
+              summary: "GPU usage is being metered but no GPU usage is being debited"
+              description: "compute_usage_events_total is rising while the ledger records no gpu_* consumption debits. Check NATS and the credit-ledger compute consumer."
+
+  - name: surveillance high severity pages per rule; medium does not
+    interval: 1m
+    input_series:
+      - series: 'surveillance_alerts_total{rule="spoofing", severity="high"}'
+        values: '0 0 0 1 1 1'
+      - series: 'surveillance_alerts_total{rule="excessive_cancellation", severity="medium"}'
+        values: '0 0 5 9 9 9'
+    alert_rule_test:
+      - { eval_time: 2m, alertname: OneTradeSurveillanceHighSeverity, exp_alerts: [] }
+      - eval_time: 4m
+        alertname: OneTradeSurveillanceHighSeverity
+        exp_alerts:
+          - exp_labels: { severity: page, rule: spoofing }
+            exp_annotations:
+              summary: "Surveillance raised a high-severity spoofing alert"
+              description: "Review it: GET /v1/surveillance/alerts?rule=spoofing (internal)."
+
+  - name: undecodable surveillance events
+    interval: 1m
+    input_series:
+      - series: 'surveillance_events_total{subject="trades.executed.v1", outcome="undecodable"}'
+        values: '0 0 1 1'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: OneTradeSurveillanceUndecodableEvents
+        exp_alerts:
+          - exp_labels: { severity: ticket }
+            exp_annotations: { summary: "Surveillance is skipping undecodable engine events" }
