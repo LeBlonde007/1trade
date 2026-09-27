@@ -19,6 +19,30 @@ export interface WalletTx {
   created_at: string
 }
 
+/**
+ * CashBalance is a PAPER quote-currency balance (credit.yaml v1.1). locked_amount is held by open
+ * paper orders; available = balance − locked_amount. Cash is never convertible into credits.
+ */
+export interface CashBalance {
+  currency: string
+  balance: string
+  locked_amount: string
+  is_paper: boolean
+}
+
+/** CashTx is one paper cash movement: the activation grant, a trade leg, or a fee. */
+export interface CashTx {
+  tx_id: string
+  currency: string
+  operation: 'paper_grant' | 'trade' | 'fee'
+  amount: string
+  balance_after: string
+  reference_id: string | null
+  is_paper: boolean
+  created_at: string
+  chain_hash: string
+}
+
 /** ConversionRate is one published pair: `rate` is 'to' units per 1 'from' unit, pre-spread. */
 export interface ConversionRate {
   from: string
@@ -38,6 +62,7 @@ export function useWallet() {
   const rates = useState<ConversionRate[]>('wallet:rates', () => [])
   const spread = useState<string>('wallet:spread', () => '0.010000')
   const converting = useState<boolean>('wallet:converting', () => false)
+  const cashBalances = useState<CashBalance[]>('wallet:cash', () => [])
 
   /** loadBalances fetches current balances. */
   async function loadBalances() {
@@ -49,6 +74,12 @@ export function useWallet() {
   async function loadTransactions() {
     transactions.value = (await $fetch<{ transactions: WalletTx[] }>('/api/wallet/transactions')).transactions
     return transactions.value
+  }
+
+  /** loadCashBalances fetches the tenant's paper cash balances. */
+  async function loadCashBalances() {
+    cashBalances.value = (await $fetch<{ balances: CashBalance[] }>('/api/wallet/cash-balances')).balances ?? []
+    return cashBalances.value
   }
 
   /** loadConversionRates fetches the current per-pair rates + house spread for the convert drawer. */
@@ -82,7 +113,7 @@ export function useWallet() {
   }
 
   return {
-    balances, transactions, rates, spread, converting,
-    loadBalances, loadTransactions, loadConversionRates, rateFor, convert,
+    balances, transactions, rates, spread, converting, cashBalances,
+    loadBalances, loadTransactions, loadConversionRates, loadCashBalances, rateFor, convert,
   }
 }

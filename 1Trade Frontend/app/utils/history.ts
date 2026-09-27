@@ -39,12 +39,12 @@ export interface LedgerTx {
 }
 
 /** Row kinds shown in the type filter. Ledger operations collapse onto these. */
-export type HistoryKind = 'Trade' | 'Purchase' | 'Conversion' | 'Usage' | 'Adjustment'
+export type HistoryKind = 'Trade' | 'Purchase' | 'Conversion' | 'Usage' | 'Adjustment' | 'Cash'
 
 /** One row of the history table — either a paper fill or a ledger entry. */
 export interface HistoryRow {
   id: string
-  source: 'engine' | 'ledger'
+  source: 'engine' | 'ledger' | 'cash'
   kind: HistoryKind
   ts: string
   market: string
@@ -115,13 +115,47 @@ export function fromLedger(t: LedgerTx): HistoryRow {
   }
 }
 
+/** A paper cash movement as served by credit-ledger /v1/credits/cash/transactions (credit.yaml v1.1). */
+export interface LedgerCashTx {
+  tx_id: string
+  currency: string
+  operation: string // paper_grant | trade | fee
+  amount: string
+  balance_after: string
+  reference_id?: string | null
+  is_paper: boolean
+  created_at: string
+  chain_hash?: string
+}
+
+/** fromCash turns a paper cash movement into a history row. Cash rows are always paper. */
+export function fromCash(t: LedgerCashTx): HistoryRow {
+  return {
+    id: t.tx_id,
+    source: 'cash',
+    kind: 'Cash',
+    ts: t.created_at,
+    market: t.currency,
+    side: null,
+    quantity: t.amount,
+    price: null,
+    total: null,
+    fee: null,
+    isPaper: t.is_paper,
+    operation: t.operation,
+    balanceAfter: t.balance_after,
+    referenceId: t.reference_id ?? null,
+    chainHash: t.chain_hash,
+  }
+}
+
 /**
  * mergeHistory combines both sources, newest first. Timestamps are compared as instants, not strings —
  * the two services may render RFC 3339 differently (offset vs Z, fractional seconds). Ties break on id so
  * the order is stable.
  */
-export function mergeHistory(fills: EngineFill[], txs: LedgerTx[]): HistoryRow[] {
-  const rows = [...fills.map(fromFill), ...txs.map(fromLedger)]
+export function mergeHistory(fills: EngineFill[], txs: LedgerTx[], cash: LedgerCashTx[] = []): HistoryRow[] {
+  const rows = [...fills.map(fromFill), ...txs.map(fromLedger), ...cash.map(fromCash)]
   const at = (r: HistoryRow) => Date.parse(r.ts) || 0
   return rows.sort((a, b) => at(b) - at(a) || a.id.localeCompare(b.id))
 }

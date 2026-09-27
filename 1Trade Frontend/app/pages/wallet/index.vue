@@ -30,8 +30,6 @@ interface Asset {
   featured?: boolean
   empty?: boolean
   description?: string
-  secondary?: string
-  cls?: 'cash'
   spark: number[]
 }
 
@@ -91,6 +89,14 @@ const creditTypeFor: Record<string, string> = {
   ai: 'ai_index', text: 'text', speech: 'speech', image: 'image', video: 'video', embed: 'embeddings', h100: 'gpu_h100', h200: 'gpu_h200',
 }
 
+// Paper cash (credit.yaml v1.1): a separate, always-paper USD balance. Shown on its own card and
+// never folded into credit totals. available = balance − locked (locked is held by open paper orders).
+const paperCash = computed(() => wallet.cashBalances.value.find((b) => b.currency === 'USD') ?? null)
+const paperCashAvailable = computed(() => {
+  const c = paperCash.value
+  return c ? Math.max(0, Number(c.balance) - Number(c.locked_amount)) : 0
+})
+
 /** refreshLiveBalances overlays the tenant's real ledger balances onto the asset cards. */
 async function refreshLiveBalances() {
   try {
@@ -107,6 +113,7 @@ async function refreshLiveBalances() {
 onMounted(async () => {
   await Promise.all([
     refreshLiveBalances(),
+    wallet.loadCashBalances().catch(() => { /* no cash card until the ledger answers */ }),
     wallet.loadConversionRates().catch(() => { /* drawer falls back to the cross-rate */ }),
     wallet.loadTransactions().catch(() => { /* movements show empty */ }),
   ])
@@ -269,7 +276,6 @@ function openDrawer(fromKey: string) {
   convFromKey.value = fromKey
   // Default destination: if user selects AI, send to text; otherwise default to AI
   if (fromKey === 'ai') convToKey.value = 'text'
-  else if (fromKey === 'cash') convToKey.value = 'ai'
   else convToKey.value = 'ai'
   drawerOpen.value = true
 }
@@ -366,8 +372,30 @@ const todayPct = computed(() => startTotal.value === 0 ? 0 : todayPnl.value / st
         </div>
 
         <div class="balance-grid" :class="{ 'two-col': drawerOpen }">
-          <!-- CASH -->
-          <div v-for="a in assets" :key="a.key" class="bcard" :class="{ featured: a.featured, empty: a.empty, cash: a.cls === 'cash' }" :data-key="a.key">
+          <!-- PAPER CASH — the quote-currency balance paper trades settle in (credit.yaml v1.1).
+               Its own card, not an asset row: it is always paper, never convertible, and must not be
+               summed into credit totals that may be real money. -->
+          <div v-if="paperCash" class="bcard cash" data-key="cash">
+            <div class="accent" :style="{ background: COLOR.cash }" />
+            <div class="head-row">
+              <span class="ttl">— Paper cash</span>
+              <span class="badge paper">PAPER</span>
+            </div>
+            <div class="qty-row">
+              <span class="qty" :title="paperCash.balance">{{ fmtUsd(Number(paperCash.balance)) }}</span>
+            </div>
+            <span class="usd">
+              {{ fmtUsd(paperCashAvailable) }} available
+              <span class="secondary-tag">USD · for paper trading only</span>
+            </span>
+            <span v-if="Number(paperCash.locked_amount) > 0" class="lock" :title="paperCash.locked_amount">
+              <svg viewBox="0 0 16 16"><rect x="3.5" y="7" width="9" height="6.5" /><path d="M5.5 7V5a2.5 2.5 0 015 0v2" /></svg>
+              {{ fmtUsd(Number(paperCash.locked_amount)) }} held by open orders
+            </span>
+            <p class="cash-note">Granted at activation. Not convertible into credits and not withdrawable.</p>
+          </div>
+
+          <div v-for="a in assets" :key="a.key" class="bcard" :class="{ featured: a.featured, empty: a.empty }" :data-key="a.key">
             <div class="accent" :style="{ background: COLOR[a.color], opacity: a.empty ? 0.3 : 1 }" />
 
             <div class="head-row">
@@ -382,27 +410,8 @@ const todayPct = computed(() => startTotal.value === 0 ? 0 : todayPnl.value / st
               </span>
             </div>
 
-            <!-- Cash special -->
-            <template v-if="a.cls === 'cash'">
-              <div class="qty-row">
-                <span class="qty">{{ fmtUsd(a.qty) }}</span>
-                <span class="secondary-qty">{{ a.secondary }}</span>
-              </div>
-              <span class="usd">USD primary · JPY available</span>
-              <div class="actions">
-                <NuxtLink to="/wallet/buy?credit=cash" class="act primary">
-                  <svg viewBox="0 0 16 16"><path d="M8 3v10M3 8h10" /></svg>
-                  Add cash
-                </NuxtLink>
-                <button class="act">
-                  <svg viewBox="0 0 16 16"><path d="M4 12L12 4M6 4h6v6" /></svg>
-                  Send
-                </button>
-              </div>
-            </template>
-
             <!-- Empty (H200) -->
-            <template v-else-if="a.empty">
+            <template v-if="a.empty">
               <span class="qty">0</span>
               <span class="usd">No balance · Acquire to begin</span>
               <div class="actions">
@@ -866,6 +875,8 @@ const todayPct = computed(() => startTotal.value === 0 ? 0 : todayPnl.value / st
 .bcard .act svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 1.6; }
 
 .bcard.cash .qty-row { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.bcard .badge.paper { background: rgba(245,158,11,0.16); color: var(--warn); }
+.bcard .cash-note { margin: 8px 0 0; font-size: 11.5px; color: var(--text-3); }
 .bcard.cash .secondary-qty {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;

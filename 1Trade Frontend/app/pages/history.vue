@@ -5,7 +5,8 @@
  * One dense, time-ordered table over two real sources (merged in utils/history.ts):
  *   - paper fills from the matching engine — the venue is paused (F22), so these are simulated paper
  *     fills and are labelled that way on screen;
- *   - ledger transactions from credit-ledger — real, append-only, each with its own chain hash.
+ *   - ledger transactions from credit-ledger — real, append-only, each with its own chain hash;
+ *   - paper cash movements from credit-ledger (activation grant, trade legs, fees) — always paper.
  *
  * Filters, pagination and CSV/JSON export all operate on the loaded rows. Totals are summed in
  * fixed-point (utils/history.ts sumDecimal), never floats.
@@ -27,24 +28,27 @@ const errors = ref<string[]>([])
 /** load fetches both sources in parallel and merges whatever succeeded. */
 async function load() {
   loading.value = true
-  const [fills, txs] = await Promise.allSettled([
+  const [fills, txs, cash] = await Promise.allSettled([
     $fetch<{ fills: EngineFill[] }>('/api/trading/fills', { query: { limit: FETCH_LIMIT } }),
     $fetch<{ transactions: LedgerTx[] }>('/api/wallet/transactions', { query: { limit: FETCH_LIMIT } }),
+    $fetch<{ transactions: LedgerCashTx[] }>('/api/wallet/cash-transactions', { query: { limit: FETCH_LIMIT } }),
   ])
   const errs: string[] = []
   if (fills.status === 'rejected') errs.push('Paper fills could not be loaded from the matching engine.')
   if (txs.status === 'rejected') errs.push('Ledger transactions could not be loaded from the credit ledger.')
+  if (cash.status === 'rejected') errs.push('Paper cash movements could not be loaded from the credit ledger.')
   errors.value = errs
   rows.value = mergeHistory(
     fills.status === 'fulfilled' ? fills.value.fills ?? [] : [],
     txs.status === 'fulfilled' ? txs.value.transactions ?? [] : [],
+    cash.status === 'fulfilled' ? cash.value.transactions ?? [] : [],
   )
   loading.value = false
 }
 onMounted(load)
 
 // ─── Filters ────────────────────────────────────────────────
-const KINDS: HistoryKind[] = ['Trade', 'Purchase', 'Conversion', 'Usage', 'Adjustment']
+const KINDS: HistoryKind[] = ['Trade', 'Purchase', 'Conversion', 'Usage', 'Cash', 'Adjustment']
 const DATE_RANGES: { key: string; label: string; days: number | null }[] = [
   { key: '7d', label: 'Last 7 days', days: 7 },
   { key: '30d', label: 'Last 30 days', days: 30 },
@@ -96,6 +100,7 @@ const filtersActive = computed(() =>
 // ─── Summary (over the filtered rows, fixed-point) ──────────
 const stats = computed(() => {
   const trades = filtered.value.filter((r) => r.source === 'engine')
+  // "Ledger entries" counts credit and cash rows alike; both are real ledger rows.
   return {
     trades: trades.length,
     notional: sumDecimal(trades.map((r) => r.total)),
@@ -184,6 +189,7 @@ function kindTone(k: HistoryKind): string {
   if (k === 'Conversion') return 'info'
   if (k === 'Purchase') return 'pos'
   if (k === 'Usage') return 'warn'
+  if (k === 'Cash') return 'pos'
   return 'mute'
 }
 </script>
@@ -220,7 +226,8 @@ function kindTone(k: HistoryKind): string {
     <p class="notice">
       <span class="notice-tag mono">PAPER</span>
       Order entry is paused pending exchange licensing. Trades below are simulated paper fills; ledger
-      entries (purchases, conversions, usage) are real and hash-chained.
+      entries (purchases, conversions, usage) are real and hash-chained, and cash rows are your paper
+      cash balance.
     </p>
 
     <p v-for="e in errors" :key="e" class="err">{{ e }} <button type="button" class="link" @click="load">Retry</button></p>
@@ -331,7 +338,7 @@ function kindTone(k: HistoryKind): string {
                   <span v-if="item.row!.side" class="side mono" :class="item.row!.side">{{ item.row!.side.toUpperCase() }}</span>
                   <span v-else class="dim">—</span>
                 </td>
-                <td class="r mono">{{ item.row!.source === 'ledger' ? fmtSigned(item.row!.quantity) : fmtNum(item.row!.quantity) }}</td>
+                <td class="r mono">{{ item.row!.source !== 'engine' ? fmtSigned(item.row!.quantity) : fmtNum(item.row!.quantity) }}</td>
                 <td class="r mono">{{ item.row!.price ?? '—' }}</td>
                 <td class="r mono">{{ item.row!.total ? '$' + fmtNum(item.row!.total, 2) : '—' }}</td>
                 <td class="r mono dim">{{ item.row!.fee ? '$' + fmtNum(item.row!.fee) : '—' }}</td>
@@ -367,11 +374,11 @@ function kindTone(k: HistoryKind): string {
                       </p>
                     </div>
                     <div v-else class="d-left">
-                      <div class="d-eyebrow">Ledger entry · credit ledger</div>
+                      <div class="d-eyebrow">{{ item.row!.source === 'cash' ? 'Paper cash entry · credit ledger' : 'Ledger entry · credit ledger' }}</div>
                       <dl class="kv">
                         <dt>Tx ID</dt><dd class="mono">{{ item.row!.id }}</dd>
                         <dt>Operation</dt><dd class="mono">{{ item.row!.operation }}</dd>
-                        <dt>Credit type</dt><dd class="mono">{{ item.row!.market }}</dd>
+                        <dt>{{ item.row!.source === 'cash' ? 'Currency' : 'Credit type' }}</dt><dd class="mono">{{ item.row!.market }}</dd>
                         <dt>Amount</dt><dd class="mono">{{ item.row!.quantity }}</dd>
                         <dt>Balance after</dt><dd class="mono">{{ item.row!.balanceAfter }}</dd>
                         <dt>Reference</dt><dd class="mono">{{ item.row!.referenceId || '—' }}</dd>
