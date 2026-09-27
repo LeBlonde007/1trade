@@ -1,0 +1,71 @@
+# 1Trade event contract — surveillance.alert.v1
+# One event per market-integrity alert raised by the surveillance service (KW05, phase6_v2 §8.5).
+# Consumed by: index-service (rule marking_the_close with action exclude_from_index — tainted
+# observations are dropped from the print), the review queue / admin console, and the audit trail.
+# Owned by surveillance. Authored 2026-09-27 (tech-lead); additive, new subject.
+#
+# Surveillance DETECTS and RECOMMENDS. It never mutates another service: `action` is what it asks the
+# owner of that control to do (the engine rate-limits, the index excludes, a human reviews).
+
+subject: surveillance.alert.v1
+transport: NATS JetStream
+version: 1.0.0
+description: A detected market-integrity pattern, with the evidence and the ids needed to review it.
+
+payload_schema:
+  $schema: "https://json-schema.org/draft/2020-12/schema"
+  title: SurveillanceAlertV1
+  type: object
+  additionalProperties: false
+  required: [alert_id, rule, severity, action, tenant_id, product_id, is_paper, window_start, window_end, detected_at, evidence, trade_ids, order_ids]
+  properties:
+    alert_id:
+      type: string
+      description: >
+        Deterministic: derived from (rule, tenant, product, is_paper, window bucket). The same pattern
+        in the same window always yields the same id, so a replayed stream never double-alerts and
+        consumers dedupe on it.
+    rule:
+      type: string
+      enum: [wash_trade, spoofing, layering, marking_the_close, cross_product, excessive_cancellation, position_limit]
+    severity: { type: string, enum: [low, medium, high] }
+    action:
+      type: string
+      enum: [review, rate_limit, exclude_from_index, suspend_recommended]
+      description: "what surveillance recommends; the owning service decides and acts"
+    tenant_id:  { type: string, description: "the tenant whose behaviour matched (for wash trades: the buyer side)" }
+    counterparty_tenant_id: { type: [string, "null"], description: "wash trades: the other side" }
+    product_id: { type: string }
+    related_product_id: { type: [string, "null"], description: "cross_product: the product the manipulation benefits" }
+    is_paper:
+      type: boolean
+      description: "paper and real-money surveillance state never mix; consumers MUST filter"
+    window_start: { type: string, format: date-time }
+    window_end:   { type: string, format: date-time }
+    detected_at:  { type: string, format: date-time, description: "event time of the triggering event, not wall clock" }
+    evidence:
+      type: object
+      description: >
+        Rule-specific measurements and the thresholds they crossed, as fixed-point strings / integers
+        (e.g. {"order_to_trade_ratio":"41.000000","threshold":"20.000000","orders":41,"trades":1}).
+        Enough to re-check the decision without re-running the detector.
+      additionalProperties: true
+    trade_ids: { type: array, items: { type: string } }
+    order_ids: { type: array, items: { type: string } }
+
+example:
+  alert_id: "sva_3f1c9e0a7b2d4e6f8a1b2c3d"
+  rule: excessive_cancellation
+  severity: medium
+  action: rate_limit
+  tenant_id: "1f2e0000-0000-4000-8000-000000000001"
+  counterparty_tenant_id: null
+  product_id: "EAI-IDX"
+  related_product_id: null
+  is_paper: true
+  window_start: "2026-09-27T12:00:00Z"
+  window_end: "2026-09-27T12:05:00Z"
+  detected_at: "2026-09-27T12:04:31Z"
+  evidence: { orders: 41, trades: 1, order_to_trade_ratio: "41.000000", threshold: "20.000000" }
+  trade_ids: ["7c2a1e64-0000-4000-8000-000000000001"]
+  order_ids: []

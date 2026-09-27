@@ -105,7 +105,7 @@ These are authored alongside Phase 1 so the switch-on is a config flip, not a re
 | `openapi/trading.yaml` | specced; backed by mock data adapter in `matching-engine` |
 | `events/trades.executed.v1.yaml` | specced |
 | `events/orders.state.v1.yaml` | specced |
-| `events/surveillance.alert.v1.yaml` | specced |
+| `events/surveillance.alert.v1.yaml` | authored 2026-09-27 (it was listed as specced but missing); detectors emit it, publishing not yet wired |
 | `openapi/credit.yaml` v1.1 cash + `settle-trade` · `events/cash.tx.v1.yaml` | authored + implemented 2026-09-27 (ADR-0004); paper only |
 | `openapi/credit.yaml` v1.2 order reservations (`reserve` / `release`; available = balance − locked on every debit) | authored + implemented in credit-ledger 2026-09-27; engine side next |
 
