@@ -126,9 +126,16 @@ per order locally. It is not deployed yet: the service opens no database until o
 `trades.executed.v1`. It is validated against the contract YAML schemas, and the trade chain can be
 re-verified from the payloads alone.
 
-**Settlement — unblocked.** ADR-0004 was accepted (option 2, paper only) and authored as
-`credit.yaml` v1.1.0 `POST /v1/credits/settle-trade` plus `events/cash.tx.v1`. Next come the ledger
-side (F05) and then the engine's settlement client.
+**Settlement — ledger live, engine client done (2026-09-27).**
+- The ledger implements `credit.yaml` v1.1 (F05).
+- `internal/settle` settles engine trades with the engine's own token.
+- The request body is pinned to the contract schema, and outcomes are split into settled /
+  unsettleable / conflict / transient.
+- A cross-service test settles a real engine trade on the real ledger binary. Balances are exact,
+  a replay is a no-op, and the shared token is refused.
+
+Remaining: the in-order settlement worker plus NATS publishing, and the §8 decision on refused
+settlements. Reserving funds before matching is recommended.
 
 **Not done** (SPEC.md §7): snapshots, settlement plus NATS publishing (contract now authored), the
 real risk hook (can now check the buyer's paper cash), and API wiring. The API wiring is the
