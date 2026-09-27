@@ -137,3 +137,11 @@ ADR-0004 (Accepted, option 2) adds the exchange's quote leg to the ledger. **Imp
       money only; revisit before real-money cash.
   - Also: legs are applied in one global order (tenant, then trade before fee). 40 concurrent
     opposite-direction trades complete with no deadlock; the test fails if the ordering is removed.
+
+**Consumer: platform-core — done (2026-09-27).** Activation (on verify, or at signup with no
+verification gate) now grants **$10,000.000000 paper USD** through `GrantPaperCash`.
+- Keyed `paper-grant:<tenant_id>`, so a retry never grants twice.
+- Best-effort and audited (`tenant.paper_cash.grant`).
+- Independent of the trial-credit grant: one failing never skips the other.
+- Verified live against the ledger binary: two identical grants leave exactly 10000.000000.
+

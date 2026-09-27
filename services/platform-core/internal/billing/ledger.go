@@ -71,3 +71,38 @@ func (c *LedgerClient) BookPurchase(ctx context.Context, b PurchaseBooking) erro
 	}
 	return nil
 }
+
+// PaperCashGranter grants a tenant's starting paper cash (credit.yaml v1.1, ADR-0004). It is a
+// separate interface from PurchaseBooker because it is not a purchase: nothing was paid, and the cash
+// is paper-only by contract.
+type PaperCashGranter interface {
+	GrantPaperCash(ctx context.Context, tenantID, amount, idempotencyKey string) error
+}
+
+// GrantPaperCash POSTs /v1/credits/paper-cash/grant with the service token. The ledger dedupes on
+// the Idempotency-Key, so a retried activation never grants twice.
+func (c *LedgerClient) GrantPaperCash(ctx context.Context, tenantID, amount, idempotencyKey string) error {
+	body, _ := json.Marshal(map[string]any{
+		"tenant_id": tenantID,
+		"currency":  "USD",
+		"amount":    amount,
+		"is_paper":  true,
+	})
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url+"/v1/credits/paper-cash/grant", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.serviceToken)
+	req.Header.Set("Idempotency-Key", idempotencyKey)
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("grant paper cash: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("grant paper cash: ledger returned %d", resp.StatusCode)
+	}
+	return nil
+}

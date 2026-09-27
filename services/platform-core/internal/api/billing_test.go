@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -24,8 +25,27 @@ const webhookSecret = "whsec_test_f06_abc"
 
 // stubBooker records BookPurchase calls instead of hitting the ledger.
 type stubBooker struct {
-	mu    sync.Mutex
-	calls []billing.PurchaseBooking
+	mu     sync.Mutex
+	calls  []billing.PurchaseBooking
+	grants []paperGrant
+}
+
+// paperGrant is one recorded GrantPaperCash call.
+type paperGrant struct{ tenantID, amount, key string }
+
+// GrantPaperCash records the paper-cash grant (billing.PaperCashGranter).
+func (b *stubBooker) GrantPaperCash(_ context.Context, tenantID, amount, key string) error {
+	b.mu.Lock()
+	b.grants = append(b.grants, paperGrant{tenantID, amount, key})
+	b.mu.Unlock()
+	return nil
+}
+
+// grantSnapshot returns the recorded paper-cash grants.
+func (b *stubBooker) grantSnapshot() []paperGrant {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return append([]paperGrant(nil), b.grants...)
 }
 
 // BookPurchase records the booking.
@@ -34,6 +54,18 @@ func (b *stubBooker) BookPurchase(_ context.Context, pb billing.PurchaseBooking)
 	b.calls = append(b.calls, pb)
 	b.mu.Unlock()
 	return nil
+}
+
+// purchases returns the recorded bookings that are purchases — excluding the one-time trial-credit
+// grant every new account now receives at signup, which is not what the billing tests measure.
+func (b *stubBooker) purchases() []billing.PurchaseBooking {
+	var out []billing.PurchaseBooking
+	for _, c := range b.snapshot() {
+		if !strings.HasPrefix(c.IdempotencyKey, "trial-grant:") {
+			out = append(out, c)
+		}
+	}
+	return out
 }
 
 // snapshot returns the recorded bookings.
@@ -130,7 +162,7 @@ func TestBillingCheckoutAndWebhook(t *testing.T) {
 	if code := postWebhook(payload, sign(payload)); code != 200 {
 		t.Fatalf("webhook status %d", code)
 	}
-	calls := booker.snapshot()
+	calls := booker.purchases()
 	if len(calls) != 1 || calls[0].Amount != "500.000000" || calls[0].CreditType != "text" || calls[0].IdempotencyKey != eventID || calls[0].TenantID == "" {
 		t.Fatalf("unexpected booking: %+v", calls)
 	}
@@ -139,7 +171,7 @@ func TestBillingCheckoutAndWebhook(t *testing.T) {
 	if code := postWebhook(payload, sign(payload)); code != 200 {
 		t.Fatalf("replay webhook status %d", code)
 	}
-	calls = booker.snapshot()
+	calls = booker.purchases()
 	if len(calls) != 2 || calls[1].IdempotencyKey != eventID {
 		t.Fatalf("replay should re-book under the same idempotency key: %+v", calls)
 	}
@@ -219,7 +251,7 @@ func TestMockCheckoutAutoSettles(t *testing.T) {
 		t.Fatalf("expected settled=true on a mock auto-settle checkout: %+v", co)
 	}
 	purchaseID, _ := co["purchase_id"].(string)
-	calls := booker.snapshot()
+	calls := booker.purchases()
 	if len(calls) != 1 || calls[0].Amount != "1000.000000" || calls[0].CreditType != "text" || calls[0].IdempotencyKey != "evt_mock_"+purchaseID {
 		t.Fatalf("auto-settle should book exactly once with the synthetic key: %+v", calls)
 	}

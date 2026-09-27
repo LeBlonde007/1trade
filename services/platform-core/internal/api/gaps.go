@@ -48,7 +48,7 @@ func (s *Server) verifyEmail(w http.ResponseWriter, r *http.Request) {
 	_, _ = s.st.WriteAudit(r.Context(), store.AuditEntry{
 		TenantID: tenantID, ActorID: userID, Action: "user.email.verify", TargetType: "user", TargetID: userID, IsPaper: isPaper,
 	})
-	s.grantTrialCredits(r, tenantID, userID)
+	s.grantStarterBalances(r, tenantID, userID)
 	writeJSON(w, http.StatusOK, map[string]any{"verified": true})
 }
 
@@ -88,6 +88,42 @@ func (s *Server) grantTrialCredits(r *http.Request, tenantID, userID string) {
 		TenantID: tenantID, ActorID: userID, Action: "tenant.trial_credits.grant",
 		TargetType: "tenant", TargetID: tenantID, IsPaper: true,
 		After: map[string]any{"credit_type": TrialCreditType, "amount": TrialCreditAmount},
+	})
+}
+
+// PaperCashAmount is the starting paper cash every tenant receives once, at activation (phase6_v2
+// onboarding: "$10,000 paper allocated automatically"; credit.yaml v1.1). It is what the paper exchange
+// settles trades against, so a new account can place a paper order without funding anything.
+const PaperCashAmount = "10000.000000"
+
+// grantStarterBalances gives a newly usable account everything it starts with: the trial credits (so
+// a first inference call works) and the paper cash (so a first paper trade works). The two grants are
+// independent — one failing never skips the other — and each is idempotent on the tenant id.
+func (s *Server) grantStarterBalances(r *http.Request, tenantID, userID string) {
+	s.grantTrialCredits(r, tenantID, userID)
+	s.grantPaperCash(r, tenantID, userID)
+}
+
+// grantPaperCash grants the one-time starting paper cash through the ledger. Paper by contract (the
+// ledger refuses anything else). Idempotent on the tenant id, like the trial grant. Best-effort: a
+// ledger outage must not fail an otherwise-valid activation, so failures are logged and swallowed —
+// the same key makes a later retry safe. Skipped when the configured booker cannot grant cash.
+func (s *Server) grantPaperCash(r *http.Request, tenantID, userID string) {
+	g, ok := s.booker.(billing.PaperCashGranter)
+	if !ok {
+		slog.Warn("paper cash not granted: ledger client cannot grant cash", "tenant_id", tenantID)
+		return
+	}
+	if err := g.GrantPaperCash(r.Context(), tenantID, PaperCashAmount, "paper-grant:"+tenantID); err != nil {
+		slog.Error("grant paper cash", "tenant_id", tenantID, "err", err)
+		return
+	}
+	slog.Info("audit: paper cash granted",
+		"tenant_id", tenantID, "user_id", userID, "currency", "USD", "amount", PaperCashAmount, "is_paper", true)
+	_, _ = s.st.WriteAudit(r.Context(), store.AuditEntry{
+		TenantID: tenantID, ActorID: userID, Action: "tenant.paper_cash.grant",
+		TargetType: "tenant", TargetID: tenantID, IsPaper: true,
+		After: map[string]any{"currency": "USD", "amount": PaperCashAmount},
 	})
 }
 

@@ -61,6 +61,9 @@ func TestVerifyGrantsTrialCreditsOnce(t *testing.T) {
 	if got := booker.snapshot(); len(got) != 0 {
 		t.Fatalf("bookings after signup = %d, want 0", len(got))
 	}
+	if g := booker.grantSnapshot(); len(g) != 0 {
+		t.Fatalf("paper-cash grants after signup = %d, want 0 (gate on)", len(g))
+	}
 
 	au, ok, err := st.GetUserByEmail(context.Background(), email)
 	if err != nil || !ok {
@@ -100,6 +103,20 @@ func TestVerifyGrantsTrialCreditsOnce(t *testing.T) {
 	}
 	if after := booker.snapshot(); len(after) != 1 {
 		t.Fatalf("bookings after replay = %d, want 1 (no double grant)", len(after))
+	}
+	assertOnePaperCashGrant(t, booker, au.TenantID)
+}
+
+// assertOnePaperCashGrant checks exactly one starting paper-cash grant was made for the tenant, for
+// the documented amount, keyed on the tenant so a retried activation cannot grant twice.
+func assertOnePaperCashGrant(t *testing.T, booker *stubBooker, tenantID string) {
+	t.Helper()
+	g := booker.grantSnapshot()
+	if len(g) != 1 {
+		t.Fatalf("paper-cash grants = %d, want 1", len(g))
+	}
+	if g[0].tenantID != tenantID || g[0].amount != api.PaperCashAmount || g[0].key != "paper-grant:"+tenantID {
+		t.Errorf("paper-cash grant = %+v, want %s %s key paper-grant:%s", g[0], tenantID, api.PaperCashAmount, tenantID)
 	}
 }
 
@@ -147,4 +164,5 @@ func TestSignupGrantsTrialCreditsWhenNoVerificationGate(t *testing.T) {
 		t.Errorf("grant = %s %s, want %s %s",
 			got[0].Amount, got[0].CreditType, api.TrialCreditAmount, api.TrialCreditType)
 	}
+	assertOnePaperCashGrant(t, booker, got[0].TenantID)
 }
