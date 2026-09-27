@@ -21,19 +21,27 @@ local_resource(
 # sources files from two repo locations; the Deployment's initContainer applies them.
 local_resource(
     'credit-ledger-migrations',
+    # The whole migrations directory, not a per-file list — a new NNNN_*.sql is picked up without
+    # editing this file (the initContainer globs them).
     cmd='kubectl create configmap credit-ledger-migrations ' +
         '--from-file=types.sql=docs/contracts/schemas/types.sql ' +
-        '--from-file=0001_init.sql=services/credit-ledger/migrations/0001_init.sql ' +
-        '--from-file=0002_conversion.sql=services/credit-ledger/migrations/0002_conversion.sql ' +
+        '--from-file=services/credit-ledger/migrations/ ' +
         '--dry-run=client -o yaml | kubectl apply -f -',
-    deps=['docs/contracts/schemas/types.sql', 'services/credit-ledger/migrations/0001_init.sql',
-          'services/credit-ledger/migrations/0002_conversion.sql'],
+    deps=['docs/contracts/schemas/types.sql', 'services/credit-ledger/migrations'],
+)
+# --- ledger-settle — the matching-engine's own token for /v1/credits/settle-trade (ADR-0004). Kept
+# out of the shared platform-auth so no other service can settle trades between tenants. ---
+local_resource(
+    'ledger-settle',
+    cmd='kubectl get secret ledger-settle >/dev/null 2>&1 || ' +
+        'kubectl create secret generic ledger-settle ' +
+        '--from-literal=SETTLE_SERVICE_TOKEN=$(openssl rand -base64 32)',
 )
 docker_build('1trade/credit-ledger:dev', 'services/credit-ledger',
              dockerfile='services/credit-ledger/Dockerfile')
 k8s_yaml(kustomize('deploy/k8s/credit-ledger/base'))
 k8s_resource('credit-ledger', port_forwards='8002:8002',
-             resource_deps=['credit-ledger-migrations', 'platform-auth'])
+             resource_deps=['credit-ledger-migrations', 'platform-auth', 'ledger-settle'])
 
 # --- platform-core (F02) — identity for the fleet; issues the JWT credit-ledger verifies ---
 local_resource(

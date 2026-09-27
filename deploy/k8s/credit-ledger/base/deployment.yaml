@@ -15,7 +15,8 @@ spec:
       labels: { app: credit-ledger }
     spec:
       # Apply migrations before the service starts (idempotent: CREATE ... IF NOT EXISTS).
-      # SQL comes from the credit-ledger-migrations ConfigMap (shared types.sql + 0001_init.sql).
+      # SQL comes from the credit-ledger-migrations ConfigMap: the shared types.sql plus every
+      # services/credit-ledger/migrations/NNNN_*.sql.
       initContainers:
         - name: migrate
           image: postgres:16-alpine
@@ -23,7 +24,14 @@ spec:
           args:
             - |
               set -e
-              for f in /migrations/types.sql /migrations/0001_init.sql /migrations/0002_conversion.sql; do
+              # types.sql first (the service migrations FK to credit_types), then a glob — not a
+              # hardcoded list. A hardcoded list is how platform-core's 0007 was mounted but silently
+              # never applied; the same trap would have skipped 0003_cash.sql here. Shell globbing
+              # sorts lexically, which the NNNN_ prefixes make the intended order.
+              [ -e /migrations/types.sql ] || { echo "types.sql not mounted"; exit 1; }
+              set -- /migrations/types.sql /migrations/[0-9]*.sql
+              [ -e "$2" ] || { echo "no service migrations mounted"; exit 1; }
+              for f in "$@"; do
                 echo "applying $f"; psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"
               done
           env:
@@ -37,6 +45,11 @@ spec:
           envFrom:
             - configMapRef: { name: credit-ledger-env }
             - secretRef: { name: platform-auth }   # shared PLATFORM_JWT_SECRET — verifies platform-core JWTs (F02↔F05)
+            # SETTLE_SERVICE_TOKEN — the matching-engine's own bearer for /v1/credits/settle-trade.
+            # Its own Secret, mounted only here and in matching-engine: putting it in the shared
+            # platform-auth would hand every service the power to settle trades between tenants.
+            # Optional: absent means settlement refuses every caller (403), which is the safe default.
+            - secretRef: { name: ledger-settle, optional: true }
           livenessProbe:
             httpGet: { path: /healthz, port: 8002 }
             periodSeconds: 10

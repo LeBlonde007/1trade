@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/trade1/credit-ledger/internal/domain"
 	"github.com/nats-io/nats.go"
+	"github.com/trade1/credit-ledger/internal/domain"
 )
 
 // NatsPublisher emits credit.tx.v1 to NATS. Publishing is best-effort: the committed ledger row is
@@ -46,6 +46,35 @@ func (p *NatsPublisher) PublishTx(t domain.Transaction) {
 	}
 	if err := p.nc.Publish(p.subject, b); err != nil {
 		slog.Error("publish credit.tx.v1", "err", err, "tx_id", t.TxID)
+	}
+}
+
+// CashTxPayload renders a cash row as a cash.tx.v1 payload (docs/contracts/events/cash.tx.v1.yaml).
+func CashTxPayload(t domain.CashTx) map[string]any {
+	return map[string]any{
+		"tx_id":          t.TxID,
+		"tenant_id":      t.TenantID,
+		"sub_account_id": nilIfEmpty(t.SubAccountID),
+		"currency":       string(t.Currency),
+		"operation":      string(t.Operation),
+		"amount":         t.Amount.String(),
+		"reference_id":   nilIfEmpty(t.ReferenceID),
+		"balance_after":  t.BalanceAfter.String(),
+		"is_paper":       t.IsPaper,
+		"created_at":     t.CreatedAt.UTC().Format(time.RFC3339Nano),
+		"chain_hash":     t.ChainHash,
+	}
+}
+
+// PublishCashTx publishes one cash.tx.v1 event. Best-effort, like PublishTx.
+func (p *NatsPublisher) PublishCashTx(t domain.CashTx) {
+	b, err := json.Marshal(CashTxPayload(t))
+	if err != nil {
+		slog.Error("marshal cash.tx.v1", "err", err)
+		return
+	}
+	if err := p.nc.Publish("cash.tx.v1", b); err != nil {
+		slog.Error("publish cash.tx.v1", "err", err, "tx_id", t.TxID)
 	}
 }
 

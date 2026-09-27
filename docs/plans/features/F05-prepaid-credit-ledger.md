@@ -99,8 +99,9 @@ CREATE INDEX idx_credit_tx_ref ON credit_transactions (reference_id);
 
 ## Contract change — paper cash + trade settlement (credit.yaml v1.1.0, 2026-09-27)
 
-ADR-0004 (Accepted, option 2) adds the exchange's quote leg to the ledger. It is **authored in the
-contract, not yet implemented here**.
+ADR-0004 (Accepted, option 2) adds the exchange's quote leg to the ledger. **Implemented
+2026-09-27** (`migrations/0003_cash.sql`, `internal/domain/{cash,settle}.go`,
+`internal/store/{cash,settle}.go`, `internal/api/cash.go`).
 
 - **Paper-only USD cash balance.** Kept in its own append-only, hash-chained table beside credit
   balances. It is not a credit type (`credit-types.md` §6).
@@ -115,13 +116,24 @@ contract, not yet implemented here**.
 - **Events.** Credit legs emit `credit.tx.v1` (operation `trade`, already in the enum). Cash legs
   emit the new `cash.tx.v1`.
 - **Acceptance for the implementation:**
-  - [ ] Migration for the cash balances and transactions, with append-only triggers.
-  - [ ] Settlement is atomic: a property test shows credits and cash are conserved across buyer and
-        seller, net of fees.
-  - [ ] Replaying the same `trade_id` returns the original result; a different body is 409.
-  - [ ] Real money is refused; a same-tenant trade and an internal account on a paper trade are
+  - [x] Migration for the cash balances and transactions, with append-only triggers. `is_paper` is
+        CHECKed true, so a real-money cash row cannot exist.
+  - [x] Settlement is atomic: a property test (5,000 random trades) shows credits net to 0 and cash
+        nets to −fees. Integration tests show a short seller or a short buyer writes nothing.
+  - [x] Replaying the same `trade_id` returns the original result; a different body is 409. 20
+        concurrent copies of one trade settle exactly once, via a per-trade advisory lock.
+  - [x] Real money is refused; a same-tenant trade and an internal account on a paper trade are
         refused.
-  - [ ] Chain-verify covers the cash chains.
-  - [ ] `settle-trade` accepts only the matching-engine service identity; any other caller is 403,
-        including other internal services.
-  - [ ] `/security-review` is clean.
+  - [x] Chain-verify covers the cash chains.
+  - [x] `settle-trade` accepts only the matching-engine service identity; any other caller is 403,
+        including other internal services. It uses its own `SETTLE_SERVICE_TOKEN` in the
+        `ledger-settle` Secret, with no dev shortcut and no fallback to the shared token.
+  - [x] Security review is clean (inline, 2026-09-27).
+    - Settlement caller: dedicated token, constant-time compare, unset refuses everyone.
+    - Every query is parameterized; cash reads are tenant-scoped.
+    - Paper-only is enforced by DB CHECKs.
+    - Negative or zero prices, quantities and fees, and non-UUID ids, are refused.
+    - Accepted residual: any holder of the shared SERVICE_TOKEN can grant *paper* cash. It is paper
+      money only; revisit before real-money cash.
+  - Also: legs are applied in one global order (tenant, then trade before fee). 40 concurrent
+    opposite-direction trades complete with no deadlock; the test fails if the ordering is removed.

@@ -23,20 +23,22 @@ type chainPayload struct {
 	CreatedAt     string `json:"created_at"`
 }
 
-// canonicalJSON renders the deterministic byte representation of a transaction row for hashing.
-func canonicalJSON(p chainPayload) []byte {
-	b, _ := json.Marshal(p) // cannot fail for this fixed struct of strings/bool
-	return b
-}
-
 // computeChainHash extends the audit hash chain (credit-types.md §4 / CLAUDE.md):
 //
 //	chain_hash = sha256( prev_chain_hash || canonical_json(row) )
 //
 // hex-encoded. The genesis link uses an agreed seed string as prev_chain_hash.
 func computeChainHash(prevChainHash string, p chainPayload) string {
+	return hashJSON(prevChainHash, p)
+}
+
+// hashJSON is the shared chain construction for any fixed-field-order payload struct (credit rows and
+// cash rows). encoding/json marshals struct fields in declaration order, so the bytes are
+// deterministic — the same row always produces the same hash.
+func hashJSON(prevChainHash string, payload any) string {
+	b, _ := json.Marshal(payload) // cannot fail for the fixed structs of strings/bool passed here
 	h := sha256.New()
 	_, _ = h.Write([]byte(prevChainHash)) // hash.Hash.Write never returns an error
-	_, _ = h.Write(canonicalJSON(p))
+	_, _ = h.Write(b)
 	return hex.EncodeToString(h.Sum(nil))
 }

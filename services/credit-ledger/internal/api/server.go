@@ -47,6 +47,10 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /v1/credits/audit/chain-verify", s.chainVerify)
 	s.mux.HandleFunc("POST /v1/credits/convert", s.convert)
 	s.mux.HandleFunc("GET /v1/credits/conversion-rates", s.conversionRates)
+	s.mux.HandleFunc("GET /v1/credits/cash/balances", s.cashBalances)
+	s.mux.HandleFunc("GET /v1/credits/cash/transactions", s.cashTransactions)
+	s.mux.HandleFunc("POST /v1/credits/paper-cash/grant", s.grantPaperCash)
+	s.mux.HandleFunc("POST /v1/credits/settle-trade", s.settleTrade)
 }
 
 // readyz checks the DB is reachable.
@@ -196,6 +200,17 @@ func (s *Server) chainVerify(w http.ResponseWriter, r *http.Request) {
 		serverError(w, err)
 		return
 	}
+	// Cash chains are audited by the same call (credit.yaml v1.1): one broken chain of either kind
+	// makes the tenant's ledger not ok.
+	if ok {
+		var cashChecked int
+		ok, cashChecked, firstBad, err = s.st.VerifyCashChain(r.Context(), tenantID)
+		if err != nil {
+			serverError(w, err)
+			return
+		}
+		checked += cashChecked
+	}
 	resp := map[string]any{"ok": ok, "checked": checked}
 	if !ok {
 		resp["first_bad_tx_id"] = firstBad
@@ -215,6 +230,7 @@ type balanceDTO struct {
 
 type txDTO struct {
 	TxID         string `json:"tx_id"`
+	TenantID     string `json:"tenant_id,omitempty"`
 	CreditType   string `json:"credit_type"`
 	Operation    string `json:"operation"`
 	Amount       string `json:"amount"`
@@ -228,7 +244,7 @@ type txDTO struct {
 // toTxDTO maps a domain transaction to its contract shape.
 func toTxDTO(t domain.Transaction) txDTO {
 	return txDTO{
-		TxID: t.TxID, CreditType: string(t.CreditType), Operation: string(t.Operation),
+		TxID: t.TxID, TenantID: t.TenantID, CreditType: string(t.CreditType), Operation: string(t.Operation),
 		Amount: t.Amount.String(), ReferenceID: t.ReferenceID, BalanceAfter: t.BalanceAfter.String(),
 		IsPaper: t.IsPaper, CreatedAt: t.CreatedAt.UTC().Format("2006-01-02T15:04:05.999999999Z07:00"),
 		ChainHash: t.ChainHash,

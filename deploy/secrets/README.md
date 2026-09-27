@@ -19,6 +19,7 @@ so diffs stay meaningful.
 |---|---|
 | `../../.sops.yaml` | Creation rules: which paths are encrypted, for which age recipients, and that only `data`/`stringData` are encrypted. |
 | `platform-auth.example.yaml` | Plaintext **template** of the shared `platform-auth` Secret (`PLATFORM_JWT_SECRET`, `SERVICE_TOKEN`). No real values. |
+| `ledger-settle.example.yaml` | Plaintext **template** of the `ledger-settle` Secret (`SETTLE_SERVICE_TOKEN`) — the matching-engine's own token for ledger trade settlement. Mounted only by credit-ledger + matching-engine. No real values. |
 | `platform-auth.sops.yaml` | The real Secret, **encrypted**. Committed. Decrypt needs the age key. |
 | `age.key` | The age **private** key. **Gitignored** — obtain from the team vault. |
 

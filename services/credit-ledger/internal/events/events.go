@@ -13,6 +13,8 @@ import (
 type Publisher interface {
 	// PublishTx emits one credit.tx.v1 event for a committed transaction. Best-effort.
 	PublishTx(t domain.Transaction)
+	// PublishCashTx emits one cash.tx.v1 event for a committed paper-cash row. Best-effort.
+	PublishCashTx(t domain.CashTx)
 }
 
 // LogPublisher is the default no-op publisher: it only logs (NATS publisher lands next).
@@ -22,5 +24,12 @@ type LogPublisher struct{}
 func (LogPublisher) PublishTx(t domain.Transaction) {
 	slog.Debug("credit.tx.v1",
 		"tx_id", t.TxID, "tenant_id", t.TenantID, "credit_type", t.CreditType,
+		"operation", t.Operation, "amount", t.Amount.String(), "is_paper", t.IsPaper)
+}
+
+// PublishCashTx logs the cash event at debug level.
+func (LogPublisher) PublishCashTx(t domain.CashTx) {
+	slog.Debug("cash.tx.v1",
+		"tx_id", t.TxID, "tenant_id", t.TenantID, "currency", t.Currency,
 		"operation", t.Operation, "amount", t.Amount.String(), "is_paper", t.IsPaper)
 }

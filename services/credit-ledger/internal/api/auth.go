@@ -61,6 +61,17 @@ func servicePrincipal(cfg config.Config, r *http.Request) (principal, error) {
 	return principal{}, fmt.Errorf("service authorization required")
 }
 
+// settlePrincipal authorises /v1/credits/settle-trade: ONLY the matching-engine's dedicated token.
+// No dev shortcut and no fallback to the shared ServiceToken — the body names both tenants, so any
+// other caller could move a victim's value. Constant-time compare; an unset token refuses everyone.
+func settlePrincipal(cfg config.Config, r *http.Request) error {
+	tok := bearer(r)
+	if cfg.SettleToken == "" || tok == "" || subtle.ConstantTimeCompare([]byte(tok), []byte(cfg.SettleToken)) != 1 {
+		return fmt.Errorf("settlement is restricted to the matching engine")
+	}
+	return nil
+}
+
 // bearer extracts the token from an Authorization: Bearer <token> header.
 func bearer(r *http.Request) string {
 	h := r.Header.Get("Authorization")
