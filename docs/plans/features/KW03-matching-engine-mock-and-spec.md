@@ -134,8 +134,17 @@ re-verified from the payloads alone.
 - A cross-service test settles a real engine trade on the real ledger binary. Balances are exact,
   a replay is a no-op, and the shared token is refused.
 
-Remaining: the in-order settlement worker plus NATS publishing, and the §8 decision on refused
-settlements. Reserving funds before matching is recommended.
+**Reservations: done end to end (2026-09-27).**
+- The engine computes each order's hold and reserves it through the ledger as its risk check, which
+  fails closed.
+- The in-order worker settles each trade, then releases leftovers.
+- Trade ids carry a per-journal epoch.
+- The cross-service lifecycle test against the real ledger shows:
+  - oversized and double-spend orders are rejected;
+  - a price-improved fill settles out of its reservation;
+  - every leftover is released, ending with nothing locked.
+
+Remaining: NATS publishing, and the licence-gated cutover wiring (SPEC §7.3).
 
 **Not done** (SPEC.md §7): snapshots, settlement plus NATS publishing (contract now authored), the
 real risk hook (can now check the buyer's paper cash), and API wiring. The API wiring is the

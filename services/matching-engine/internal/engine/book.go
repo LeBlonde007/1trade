@@ -123,11 +123,12 @@ type book struct {
 	bids, asks ladder
 	seq        uint64 // per-book monotonic sequence over order events and trades (orders.state.v1)
 	chainHead  string // ChainHash of the last trade on this book
+	epoch      string // the journal's epoch (Config.Epoch), mixed into every derived id
 }
 
 // newBook returns an empty book.
-func newBook(k bookKey, creditType string, tick Fixed) *book {
-	return &book{key: k, creditType: creditType, tick: tick, bids: ladder{bids: true}, asks: ladder{}}
+func newBook(k bookKey, creditType string, tick Fixed, epoch string) *book {
+	return &book{key: k, creditType: creditType, tick: tick, bids: ladder{bids: true}, asks: ladder{}, epoch: epoch}
 }
 
 // own returns the ladder an order of side s rests on; opposite returns the one it matches against.

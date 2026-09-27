@@ -8,6 +8,7 @@ package journal
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -148,14 +149,39 @@ func (s *Store) Load(ctx context.Context) ([]engine.Command, error) {
 	return out, nil
 }
 
+// Epoch returns the journal's epoch, creating it on first use. It is write-once: concurrent first
+// callers race on the insert and all read back the single winner.
+func (s *Store) Epoch(ctx context.Context) (string, error) {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return "", fmt.Errorf("journal: epoch entropy: %w", err)
+	}
+	if _, err := s.pool.Exec(ctx,
+		`INSERT INTO engine_meta (key, value) VALUES ('epoch', $1) ON CONFLICT (key) DO NOTHING`,
+		hex.EncodeToString(b[:])); err != nil {
+		return "", fmt.Errorf("journal: create epoch: %w", err)
+	}
+	var epoch string
+	if err := s.pool.QueryRow(ctx, `SELECT value FROM engine_meta WHERE key = 'epoch'`).Scan(&epoch); err != nil {
+		return "", fmt.Errorf("journal: read epoch: %w", err)
+	}
+	return epoch, nil
+}
+
 // Recover loads and verifies the journal, replays it into a fresh engine, and attaches the store as
-// that engine's write-ahead hook. cfg.Persist is overwritten. Use it at process start, before the
-// engine accepts any command.
+// that engine's write-ahead hook. cfg.Persist and cfg.Epoch are overwritten: the epoch always comes
+// from the journal, so replayed ids match the originals. Use it at process start, before the engine
+// accepts any command.
 func Recover(ctx context.Context, s *Store, cfg engine.Config) (*engine.Engine, error) {
+	epoch, err := s.Epoch(ctx)
+	if err != nil {
+		return nil, err
+	}
 	cmds, err := s.Load(ctx)
 	if err != nil {
 		return nil, err
 	}
+	cfg.Epoch = epoch
 	cfg.Persist = s.Append
 	e, _, err := engine.Replay(cfg, cmds)
 	if err != nil {

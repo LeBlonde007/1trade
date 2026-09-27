@@ -131,19 +131,36 @@ and executing at the taker's price. Both mutations were caught.
    `journal.Recover` call before the listener starts.
 2. **Snapshots.** Every 5 minutes, snapshot books and sequences so replay starts from the snapshot
    rather than genesis. Redis as a read cache of depth for the API.
-3. **Settlement.** The ledger side is live (`credit.yaml` v1.1, ADR-0004). The engine's client is
-   done: `internal/settle` sends each trade to `POST /v1/credits/settle-trade` with its own
-   `SETTLE_SERVICE_TOKEN` and Idempotency-Key = `trade_id`, and sorts the ledger's answer into four
-   outcomes:
-   - settled;
-   - `ErrUnsettleable` (402/422: permanent);
-   - `ErrConflict` (409: never retry);
-   - transient (retry the same trade; settlement is idempotent).
+3. **Settlement and reservations — built.** Driven end to end against the real ledger.
+   - **Holds.** At acceptance the engine computes each order's *hold* (`Order.Hold`):
+     - a sell holds its credits;
+     - a limit buy holds `floor(limit × qty)` plus the taker fee;
+     - a market buy holds the exact cost of sweeping the current book, plus the taker fee.
 
-   The body is pinned to the contract schema, and a cross-service test settles a real engine trade
-   on the real ledger binary. **Remaining:** a settlement worker that feeds trades in order,
-   publishing `trades.executed.v1` / `orders.state.v1` to NATS, and deciding what happens on
-   `ErrUnsettleable` (§8).
+     Property-tested: no order ever spends beyond its hold.
+   - **Reserving.** `settle.ReserveRisk` is the risk hook: it reserves the hold via
+     `/v1/credits/reserve` (credit.yaml v1.2). An order is rejected with `insufficient_credit` or
+     `insufficient_cash`, or with `risk_unavailable` when the ledger can't answer — it fails closed.
+     The decision is journaled.
+   - **The worker.** `settle.Worker` applies the event stream in order: it settles each trade, and
+     when a held order closes it releases the remainder. An order's terminal event always follows its
+     trades, so fills settle before the leftover is freed.
+     - Transient failures are retried.
+     - A conflict halts at that event; it is idempotent to resume.
+     - A refused trade is alerted, not stopped on. With reservations it should never happen.
+   - **Epochs.** Trade and event ids mix in the journal's **epoch**, which is persisted write-once in
+     `engine_meta` and loaded by `journal.Recover`. Without it, every fresh journal's first trade
+     reused the same trade_id and the ledger refused it as a conflict. The cross-service test found
+     this.
+   - **Remaining:** NATS publishing of the encoded events.
+   - **Cutover wiring** (licence-gated):
+     - `DATABASE_URL`, plus both migrations in an initContainer;
+     - the `ledger-settle` Secret mounted in the engine;
+     - `journal.Recover` with `ReserveRisk`;
+     - a `Worker` fed from the journal's events.
+   - **Known gap:** a reserve that succeeds but whose journal write then fails leaves a reservation
+     with no order. A client retry with the same `order_id` re-uses it, since reserve is idempotent.
+     Otherwise a reconciler must release reservations for order_ids the journal doesn't know.
 4. **Risk hook implementation.** Balance and position-limit checks against the ledger, plus
    surveillance holds (KW05).
 5. **API wiring.** Behind the licence gate: order entry, cancel, and orders/fills reads served from
@@ -161,15 +178,8 @@ and executing at the taker's price. Both mutations were caught.
   customer paper books. So paper liquidity cannot come from the internal market maker as specced.
   Options: a non-internal paper liquidity account that is clearly labelled, or accept thin paper
   books. KW04 needs this decided before it builds paper quoting.
-- **What if settlement is refused (402)?** The trade has already printed. There are two designs:
-  - *Reserve before matching* (recommended). Extend the risk hook to lock funds in the ledger when an
-    order is accepted: `locked_amount` already exists on both balance tables. Resting orders then
-    can never over-commit, and settlement cannot fail for lack of funds. This needs a
-    reserve/release endpoint pair in `credit.yaml` (MINOR).
-  - *Bust after the fact.* Reverse the fills in the engine and emit a busted-trade event. That means
-    a new event contract and engine state rollback, and customers see trades vanish.
-
-  Reservation is the institutional norm and keeps commitment #4 (visible settlement) honest.
+- ~~**What if settlement is refused (402)?**~~ **Decided and built:** reserve at acceptance
+  (credit.yaml v1.2). See §7.3.
 - **Cancel reasons.** The engine emits `user_cancel`, `self_trade`, `unfilled_remainder`,
   `fok_unfilled` and `day_expired`. The contract's `reason` is free text with examples; proposed:
   enumerate these.

@@ -114,6 +114,7 @@ type Order struct {
 	Reason       string
 	AcceptedAt   time.Time
 	UpdatedAt    time.Time
+	Hold         Hold // what was reserved for this order at acceptance (zero if nothing)
 
 	arrival uint64 // global arrival order: the "time" in price-time priority
 }
@@ -142,6 +143,9 @@ type OrderEvent struct {
 	IsInternal     bool
 	Sequence       uint64
 	TS             time.Time
+	// Held reports the order had a non-zero reservation, so its terminal transition must release
+	// what is left (after its trades settle). Internal: not part of the orders.state.v1 payload.
+	Held bool
 }
 
 // Counterparty is one side of a trade, shaped for trades.executed.v1.
@@ -239,14 +243,34 @@ type FeeSchedule struct {
 // the same schedule the Phase 1 paper portfolio simulates.
 var DefaultFees = FeeSchedule{TakerPPM: 10_000, MakerPPM: 5_000}
 
-// RiskCheck is the pre-trade risk seam (credit sufficiency, position limits, surveillance holds). It
-// returns a non-empty reason to reject the order. It runs once per order; its answer is journaled.
-type RiskCheck func(o Order) string
+// Hold is what an order could spend, computed by the engine at acceptance so it can be reserved in
+// the ledger before the order can trade (credit.yaml v1.2 /reserve). A sell holds its credits; a
+// buy holds cash: floor(limit × qty) plus the taker fee, or — for a market buy — the exact cost of
+// sweeping the book it is about to match against, plus the taker fee. Per-fill flooring means actual
+// spend never exceeds the hold. Amount zero means nothing needs reserving (e.g. a market buy into an
+// empty book, which will simply cancel).
+type Hold struct {
+	Kind   string // "credit" | "cash"
+	Asset  string // the credit type, or the quote currency
+	Amount Fixed
+}
+
+// QuoteCurrency is what every product is priced in (credit-types.md §6).
+const QuoteCurrency = "USD"
+
+// RiskCheck is the pre-trade risk seam: reserve the hold in the ledger, apply position limits,
+// surveillance holds. It returns a non-empty reason to reject the order. It runs once per order; its
+// answer is journaled, so replay never calls it again.
+type RiskCheck func(o Order, h Hold) string
 
 // Config configures an Engine.
 type Config struct {
-	Fees FeeSchedule
-	Risk RiskCheck // nil accepts everything
+	// Epoch identifies the journal this engine belongs to. It is mixed into every derived trade and
+	// event id, so two journals (a reset environment, a second venue) never mint the same trade_id.
+	// It must be stable for a journal's lifetime — journal.Recover persists and reloads it.
+	Epoch string
+	Fees  FeeSchedule
+	Risk  RiskCheck // nil accepts everything
 
 	// Persist is the write-ahead hook: it durably records a command before the engine applies it.
 	// seq is the command's 1-based position in the journal. If Persist fails the command is refused

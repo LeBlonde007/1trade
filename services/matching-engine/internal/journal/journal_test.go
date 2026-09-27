@@ -47,17 +47,19 @@ func freshSchema(t testing.TB) string {
 		sep = "&"
 	}
 	dsn := base + sep + "search_path=" + schema
-	sql, err := os.ReadFile("../../migrations/0001_journal.sql")
-	if err != nil {
-		t.Fatal(err)
-	}
 	p, err := pgxpool.New(ctx, dsn)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer p.Close()
-	if _, err := p.Exec(ctx, string(sql)); err != nil {
-		t.Fatalf("migrate: %v", err)
+	for _, f := range []string{"../../migrations/0001_journal.sql", "../../migrations/0002_meta.sql"} {
+		sql, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := p.Exec(ctx, string(sql)); err != nil {
+			t.Fatalf("migrate %s: %v", f, err)
+		}
 	}
 	return dsn
 }
@@ -253,6 +255,62 @@ func BenchmarkSubmitJournaled(b *testing.B) {
 		}
 		if _, err := e.Submit(order(fmt.Sprintf("b%d", i), fmt.Sprintf("t%d", i%5), side, price, "1", i+1)); err != nil {
 			b.Fatal(err)
+		}
+	}
+}
+
+// TestEpochIsStableAndDistinct checks a journal keeps one epoch across restarts (so replayed trade ids
+// match the originals) and two journals get different epochs (so their trade ids never collide).
+func TestEpochIsStableAndDistinct(t *testing.T) {
+	dsnA, dsnB := freshSchema(t), freshSchema(t)
+	sa, ea := open(t, dsnA)
+	if _, err := ea.Submit(order("s", "t1", engine.Sell, "0.001000", "1", 1)); err != nil {
+		t.Fatal(err)
+	}
+	r, err := ea.Submit(order("b", "t2", engine.Buy, "0.001000", "1", 2))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var tradeA string
+	for _, ev := range r.Events {
+		if ev.Trade != nil {
+			tradeA = ev.Trade.TradeID
+		}
+	}
+	epochA, _ := sa.Epoch(context.Background())
+	sa.Close()
+
+	sa2, ea2 := open(t, dsnA)
+	defer sa2.Close()
+	if again, _ := sa2.Epoch(context.Background()); again != epochA || epochA == "" {
+		t.Fatalf("epoch changed across restart: %q → %q", epochA, again)
+	}
+	var replayed string
+	_, evs, err := engine.Replay(engine.Config{Epoch: epochA}, ea2.Journal())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, ev := range evs {
+		if ev.Trade != nil {
+			replayed = ev.Trade.TradeID
+		}
+	}
+	if replayed != tradeA {
+		t.Errorf("replayed trade id %s, original %s", replayed, tradeA)
+	}
+
+	sb, eb := open(t, dsnB)
+	defer sb.Close()
+	if _, err := eb.Submit(order("s", "t1", engine.Sell, "0.001000", "1", 1)); err != nil {
+		t.Fatal(err)
+	}
+	r, err = eb.Submit(order("b", "t2", engine.Buy, "0.001000", "1", 2))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, ev := range r.Events {
+		if ev.Trade != nil && ev.Trade.TradeID == tradeA {
+			t.Error("a second journal minted the same trade id for the same history")
 		}
 	}
 }

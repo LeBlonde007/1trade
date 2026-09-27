@@ -289,7 +289,7 @@ func TestExpireDay(t *testing.T) {
 // TestRiskRejectIsJournaled checks a risk rejection emits a rejected event and that replay reuses the
 // recorded decision instead of asking the risk hook again.
 func TestRiskRejectIsJournaled(t *testing.T) {
-	e := New(Config{Risk: func(o Order) string {
+	e := New(Config{Risk: func(o Order, _ Hold) string {
 		if o.Quantity > qty("100") {
 			return "position_limit"
 		}
@@ -300,7 +300,7 @@ func TestRiskRejectIsJournaled(t *testing.T) {
 		t.Fatalf("risk reject = %+v", r)
 	}
 	called := false
-	_, evs, err := Replay(Config{Risk: func(Order) string { called = true; return "" }}, e.Journal())
+	_, evs, err := Replay(Config{Risk: func(Order, Hold) string { called = true; return "" }}, e.Journal())
 	if err != nil || called {
 		t.Fatalf("replay consulted the risk hook (called=%v, err=%v)", called, err)
 	}
@@ -326,8 +326,44 @@ func TestFees(t *testing.T) {
 
 // TestTradeIDsAreUUIDs checks derived trade ids have the UUID shape the contract requires.
 func TestTradeIDsAreUUIDs(t *testing.T) {
-	id := uuidFrom("trade", bookKey{product: "EAI-IDX", paper: true}, 1)
+	id := uuidFrom("trade", "epoch-a", bookKey{product: "EAI-IDX", paper: true}, 1)
 	if len(id) != 36 || id[14] != '8' || (id[19] != '8' && id[19] != '9' && id[19] != 'a' && id[19] != 'b') {
 		t.Errorf("id %q is not a v8 RFC 9562 UUID", id)
+	}
+	if uuidFrom("trade", "epoch-b", bookKey{product: "EAI-IDX", paper: true}, 1) == id {
+		t.Error("two journals (epochs) derived the same trade id for the same book and sequence")
+	}
+}
+
+// TestHolds pins the hold for each order shape: a sell holds its credits; a limit buy holds
+// floor(limit × qty) + taker fee; a market buy holds the exact sweep cost + taker fee, and nothing when
+// the book is empty.
+func TestHolds(t *testing.T) {
+	var got []Hold
+	e := New(Config{Risk: func(_ Order, h Hold) string { got = append(got, h); return "" }})
+	h100 := func(id, tenant string, side Side, typ OrderType, price, q string, n int) SubmitCmd {
+		return SubmitCmd{OrderID: id, TenantID: tenant, ProductID: "H100-SPOT", Side: side, Type: typ, Price: px(price), Quantity: qty(q), IsPaper: true, TS: at(n)}
+	}
+	mustSubmit(t, e, h100("m0", "c", Buy, Market, "0", "5", 1))       // empty book
+	mustSubmit(t, e, h100("s1", "mm1", Sell, Limit, "2.99", "4", 2))  // sell
+	mustSubmit(t, e, h100("s2", "mm2", Sell, Limit, "3.00", "10", 3)) // sell
+	mustSubmit(t, e, h100("b1", "c", Buy, Limit, "3.00", "10", 4))    // limit buy
+	mustSubmit(t, e, h100("s3", "mm3", Sell, Limit, "3.10", "10", 5)) // refill asks
+	mustSubmit(t, e, h100("m1", "c", Buy, Market, "0", "12", 6))      // sweeps 4 @ 3.00 then 8 @ 3.10
+	want := []struct{ kind, amt string }{
+		{"cash", "0.000000"},
+		{"credit", "4.000000"},
+		{"credit", "10.000000"},
+		{"cash", "30.300000"}, // 30.00 + 1% 0.30
+		{"credit", "10.000000"},
+		{"cash", "37.168000"}, // b1 left 4 @ 3.00: (4 × 3.00 = 12.00) + (8 × 3.10 = 24.80) = 36.80, + 1% 0.368
+	}
+	if len(got) != len(want) {
+		t.Fatalf("got %d holds, want %d", len(got), len(want))
+	}
+	for i, w := range want {
+		if got[i].Kind != w.kind || got[i].Amount.String() != w.amt {
+			t.Errorf("hold %d = %s %s, want %s %s", i, got[i].Kind, got[i].Amount, w.kind, w.amt)
+		}
 	}
 }

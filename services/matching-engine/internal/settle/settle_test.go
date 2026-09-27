@@ -24,7 +24,9 @@ func uid(n int) string { return fmt.Sprintf("00000000-0000-4000-8000-%012d", n) 
 // matchOne runs a real engine to produce one trade: seller rests 10 H100 @ 2.99, buyer lifts it.
 func matchOne(t *testing.T, buyer, seller string) engine.Trade {
 	t.Helper()
-	e := engine.New(engine.Config{})
+	// A fresh epoch per engine, as journal.Recover gives each journal: trade ids are unique across runs
+	// against a long-lived ledger.
+	e := engine.New(engine.Config{Epoch: fmt.Sprint(time.Now().UnixNano())})
 	ts := time.Date(2026, 9, 27, 12, 0, 0, 0, time.UTC)
 	if _, err := e.Submit(engine.SubmitCmd{OrderID: "00000000-0000-4000-8003-" + seller[24:], TenantID: seller, ProductID: "H100-SPOT",
 		Side: engine.Sell, Type: engine.Limit, Price: engine.MustFixed("2.99"), Quantity: engine.MustFixed("10"), IsPaper: true, TS: ts}); err != nil {
@@ -219,5 +221,118 @@ func TestSettleAgainstRealLedger(t *testing.T) {
 		if got[k] != v {
 			t.Errorf("%s = %s, want %s", k, got[k], v)
 		}
+	}
+}
+
+// TestFullLifecycleAgainstRealLedger is the end-to-end proof of the reservation design against the
+// real credit-ledger (runs when LEDGER_E2E_URL etc. are set): the engine reserves through the ledger as
+// its risk check, orders the ledger cannot fund are rejected, a price-improved trade settles out of
+// the reservations, and the worker releases every leftover — ending with nothing locked.
+func TestFullLifecycleAgainstRealLedger(t *testing.T) {
+	base, svc, settleTok := os.Getenv("LEDGER_E2E_URL"), os.Getenv("LEDGER_SERVICE_TOKEN"), os.Getenv("LEDGER_SETTLE_TOKEN")
+	if base == "" || svc == "" || settleTok == "" {
+		t.Skip("LEDGER_E2E_URL / LEDGER_SERVICE_TOKEN / LEDGER_SETTLE_TOKEN not set")
+	}
+	stamp := time.Now().UnixNano() % 1_000_000_000_000
+	id := func(k int) string { return fmt.Sprintf("00000000-0000-4000-%04d-%012d", 9000+k, stamp) }
+	buyer, seller := id(1), id(2)
+	fundTenant := func(path, key string, body map[string]any) {
+		b, _ := json.Marshal(body)
+		req, _ := http.NewRequest(http.MethodPost, base+path, bytes.NewReader(b))
+		req.Header.Set("Authorization", "Bearer "+svc)
+		req.Header.Set("Idempotency-Key", key)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil || resp.StatusCode != 200 {
+			t.Fatalf("fund %s: %v %v", path, err, resp)
+		}
+		resp.Body.Close()
+	}
+	fundTenant("/v1/credits/paper-cash/grant", "paper-grant:"+buyer, map[string]any{"tenant_id": buyer, "currency": "USD", "amount": "100", "is_paper": true})
+	fundTenant("/v1/credits/purchase", "seed:"+seller, map[string]any{"tenant_id": seller, "credit_type": "gpu_h100", "amount": "10", "reference_id": "seed:" + seller, "is_paper": true})
+
+	c := New(base, settleTok, 5*time.Second)
+	e := engine.New(engine.Config{Epoch: fmt.Sprint(stamp), Risk: ReserveRisk(c, 5*time.Second)})
+	ts := time.Date(2026, 9, 27, 12, 0, 0, 0, time.UTC)
+	var evs []engine.Event
+	submit := func(order, tenant string, side engine.Side, price, q string) engine.Order {
+		ts = ts.Add(time.Millisecond)
+		r, err := e.Submit(engine.SubmitCmd{OrderID: order, TenantID: tenant, ProductID: "H100-SPOT", Side: side,
+			Type: engine.Limit, Price: engine.MustFixed(price), Quantity: engine.MustFixed(q), IsPaper: true, TS: ts})
+		if err != nil {
+			t.Fatal(err)
+		}
+		evs = append(evs, r.Events...)
+		return r.Order
+	}
+
+	// Funding limits are enforced before an order can rest.
+	if o := submit(id(10), seller, engine.Sell, "2.99", "11"); o.State != engine.Rejected || o.Reason != ReasonInsufficientCredit {
+		t.Fatalf("oversized sell = %s/%s, want rejected/insufficient_credit", o.State, o.Reason)
+	}
+	if o := submit(id(11), buyer, engine.Buy, "10.00", "10"); o.State != engine.Rejected || o.Reason != ReasonInsufficientCash {
+		t.Fatalf("unfundable buy = %s/%s, want rejected/insufficient_cash", o.State, o.Reason)
+	}
+	// Seller reserves 10 credits; a second sell cannot reuse them.
+	submit(id(12), seller, engine.Sell, "2.99", "10")
+	if o := submit(id(13), seller, engine.Sell, "2.99", "1"); o.Reason != ReasonInsufficientCredit {
+		t.Fatalf("double-spend sell = %s/%s", o.State, o.Reason)
+	}
+	// Buyer reserves 30.30 at limit 3.00, fills 10 @ 2.99 (price improvement): spends 30.199.
+	if o := submit(id(14), buyer, engine.Buy, "3.00", "10"); o.State != engine.Filled {
+		t.Fatalf("buy = %s/%s", o.State, o.Reason)
+	}
+
+	if n, err := (&Worker{Ledger: c}).Process(context.Background(), evs); err != nil || n != len(evs) {
+		t.Fatalf("worker = %d, %v", n, err)
+	}
+
+	read := func(path, tenant, asset string) (string, string) {
+		req, _ := http.NewRequest(http.MethodGet, base+path, nil)
+		req.Header.Set("X-Dev-Tenant", tenant)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		var out struct {
+			Balances []map[string]any `json:"balances"`
+		}
+		_ = json.NewDecoder(resp.Body).Decode(&out)
+		for _, b := range out.Balances {
+			if b["credit_type"] == asset || b["currency"] == asset {
+				return b["balance"].(string), b["locked_amount"].(string)
+			}
+		}
+		return "none", "none"
+	}
+	got := map[string][2]string{}
+	for k, q := range map[string][3]string{
+		"buyer USD": {"/v1/credits/cash/balances", buyer, "USD"}, "buyer gpu": {"/v1/credits/balances", buyer, "gpu_h100"},
+		"seller USD": {"/v1/credits/cash/balances", seller, "USD"}, "seller gpu": {"/v1/credits/balances", seller, "gpu_h100"},
+	} {
+		b, l := read(q[0], q[1], q[2])
+		got[k] = [2]string{b, l}
+	}
+	want := map[string][2]string{
+		"buyer USD":  {"69.801000", "0.000000"}, // 100 − 29.90 − 0.299; 0.101 leftover released
+		"buyer gpu":  {"10.000000", "0.000000"},
+		"seller USD": {"29.750500", "0.000000"}, // 29.90 − 0.1495 maker fee
+		"seller gpu": {"0.000000", "0.000000"},
+	}
+	for k, w := range want {
+		if got[k] != w {
+			t.Errorf("%s = balance %s locked %s, want %s / %s", k, got[k][0], got[k][1], w[0], w[1])
+		}
+	}
+}
+
+// TestRiskFailsClosed checks an unreachable ledger rejects orders instead of accepting them unfunded.
+func TestRiskFailsClosed(t *testing.T) {
+	c := New("http://127.0.0.1:1", "t", 200*time.Millisecond)
+	e := engine.New(engine.Config{Risk: ReserveRisk(c, 200*time.Millisecond)})
+	r, err := e.Submit(engine.SubmitCmd{OrderID: uid(900), TenantID: uid(901), ProductID: "H100-SPOT", Side: engine.Sell,
+		Type: engine.Limit, Price: engine.MustFixed("3"), Quantity: engine.MustFixed("1"), IsPaper: true, TS: time.Now()})
+	if err != nil || r.Order.State != engine.Rejected || r.Order.Reason != ReasonRiskUnavailable {
+		t.Fatalf("order with ledger down = %s/%s, %v; want rejected/risk_unavailable", r.Order.State, r.Order.Reason, err)
 	}
 }

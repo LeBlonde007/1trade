@@ -71,9 +71,10 @@ func (e *Engine) submit(c SubmitCmd) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
+	o.Hold = b.hold(o, e.cfg.Fees)
 	if !c.RiskChecked {
 		if e.cfg.Risk != nil {
-			c.RiskReason = e.cfg.Risk(*o)
+			c.RiskReason = e.cfg.Risk(*o, o.Hold)
 		}
 		c.RiskChecked = true
 	}
@@ -167,7 +168,7 @@ func (e *Engine) validate(c *SubmitCmd) (*book, *Order, error) {
 	if b == nil {
 		// Not registered yet: the caller adds it only after the command is journaled, so a refused
 		// command leaves no trace.
-		b = newBook(bookKey{product: p.ID, paper: c.IsPaper}, p.CreditType, tick)
+		b = newBook(bookKey{product: p.ID, paper: c.IsPaper}, p.CreditType, tick, e.cfg.Epoch)
 	}
 	o := &Order{
 		OrderID: c.OrderID, TenantID: c.TenantID, SubAccountID: c.SubAccountID, ProductID: p.ID,
@@ -270,13 +271,41 @@ func (e *Engine) trade(b *book, taker, maker *Order, qty Fixed, ts time.Time) *T
 	}
 	b.seq++
 	t := &Trade{
-		TradeID: uuidFrom("trade", b.key, b.seq), ProductID: b.key.product, CreditType: b.creditType,
+		TradeID: uuidFrom("trade", b.epoch, b.key, b.seq), ProductID: b.key.product, CreditType: b.creditType,
 		Price: maker.Price, Quantity: qty, Buyer: buyer, Seller: seller, AggressorSide: taker.Side,
 		IsPaper: b.key.paper, Sequence: b.seq, PrevChainHash: b.chainHead, ExecutedAt: ts.UTC(),
 	}
 	t.ChainHash = tradeChainHash(t.PrevChainHash, t)
 	b.chainHead = t.ChainHash
 	return t
+}
+
+// hold computes what o could spend if it traded now (see Hold). It reads the book but changes nothing.
+func (b *book) hold(o *Order, fees FeeSchedule) Hold {
+	if o.Side == Sell {
+		return Hold{Kind: "credit", Asset: b.creditType, Amount: o.Quantity}
+	}
+	var cost Fixed
+	if o.Type == Market {
+		// The exact cost of the sweep the order is about to make: matching runs immediately, on this
+		// book, under the same lock. Priced per resting order, exactly as trade() prices each fill.
+		left := o.Quantity
+	sweep:
+		for _, lv := range b.asks.levels {
+			for _, r := range lv.orders {
+				take := min(left, r.Remaining())
+				n, _ := Notional(lv.price, take) // bounded: the maker's notional was checked at entry
+				cost += n
+				if left -= take; left == 0 {
+					break sweep
+				}
+			}
+		}
+	} else {
+		cost, _ = Notional(o.Price, o.Quantity) // bounded at validation
+	}
+	fee, _ := mulDiv(cost, Fixed(fees.TakerPPM), unit)
+	return Hold{Kind: "cash", Asset: QuoteCurrency, Amount: cost + fee}
 }
 
 // fillable reports whether a FOK order can fill completely right now without hitting a self-trade.
@@ -303,10 +332,11 @@ func (b *book) fillable(o *Order) bool {
 func (b *book) orderEvent(o *Order, ts time.Time) Event {
 	b.seq++
 	return Event{Order: &OrderEvent{
-		EventID: "oev_" + digest("order", b.key, b.seq)[:24], OrderID: o.OrderID, TenantID: o.TenantID,
+		EventID: "oev_" + digest("order", b.epoch, b.key, b.seq)[:24], OrderID: o.OrderID, TenantID: o.TenantID,
 		SubAccountID: o.SubAccountID, ProductID: o.ProductID, Side: o.Side, Type: o.Type, State: o.State,
 		Reason: o.Reason, Quantity: o.Quantity, FilledQuantity: o.Filled, LimitPrice: o.Price,
 		IsPaper: o.IsPaper, IsInternal: o.IsInternal, Sequence: b.seq, TS: ts.UTC(),
+		Held: o.Hold.Amount > 0,
 	}}
 }
 
@@ -484,16 +514,18 @@ func Replay(cfg Config, journal []Command) (*Engine, []Event, error) {
 	return e, all, nil
 }
 
-// digest returns the hex SHA-256 of a kind, book, and sequence — the seed for deterministic ids.
-func digest(kind string, k bookKey, seq uint64) string {
-	sum := sha256.Sum256(fmt.Appendf(nil, "%s|%s|%d", kind, k.String(), seq))
+// digest returns the hex SHA-256 of (kind, epoch, book, sequence) — the seed for deterministic ids.
+// The epoch makes ids unique across journals: without it, every fresh engine's first trade on a book
+// would reuse the same trade_id, and the ledger (idempotent on trade_id) would refuse it as a conflict.
+func digest(kind, epoch string, k bookKey, seq uint64) string {
+	sum := sha256.Sum256(fmt.Appendf(nil, "%s|%s|%s|%d", kind, epoch, k.String(), seq))
 	return hex.EncodeToString(sum[:])
 }
 
-// uuidFrom derives a stable RFC 9562 version-8 UUID from (kind, book, seq). Trade ids must be UUIDs
-// (trades.executed.v1) and must be identical on replay, so they are derived, not random.
-func uuidFrom(kind string, k bookKey, seq uint64) string {
-	sum := sha256.Sum256(fmt.Appendf(nil, "%s|%s|%d", kind, k.String(), seq))
+// uuidFrom derives a stable RFC 9562 version-8 UUID from (kind, epoch, book, seq). Trade ids must be
+// UUIDs (trades.executed.v1) and must be identical on replay, so they are derived, not random.
+func uuidFrom(kind, epoch string, k bookKey, seq uint64) string {
+	sum := sha256.Sum256(fmt.Appendf(nil, "%s|%s|%s|%d", kind, epoch, k.String(), seq))
 	sum[6] = (sum[6] & 0x0f) | 0x80 // version 8
 	sum[8] = (sum[8] & 0x3f) | 0x80 // RFC 9562 variant
 	h := hex.EncodeToString(sum[:16])

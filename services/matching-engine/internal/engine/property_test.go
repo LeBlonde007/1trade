@@ -129,7 +129,21 @@ func TestInvariants(t *testing.T) {
 			filled[tr.Seller.OrderID] += tr.Quantity
 			chains[key] = append(chains[key], *tr)
 		}
+		// The hold covers the spend: a buyer never pays (notional + its fee) beyond its cash hold, and
+		// a seller never delivers beyond its credit hold. This is what makes settlement unable to fail
+		// for lack of funds once the hold is reserved in the ledger.
+		spent := map[string]Fixed{}
+		for _, ev := range evs {
+			if tr := ev.Trade; tr != nil {
+				n, _ := Notional(tr.Price, tr.Quantity)
+				spent[tr.Buyer.OrderID] += n + tr.Buyer.Fee
+				spent[tr.Seller.OrderID] += tr.Quantity
+			}
+		}
 		for id, o := range e.orders {
+			if spent[id] > o.Hold.Amount {
+				t.Fatalf("seed %d: order %s (%s %s) spent %s beyond its hold %s", seed, id, o.Side, o.Type, spent[id], o.Hold.Amount)
+			}
 			if o.Filled != filled[id] || o.Filled > o.Quantity {
 				t.Fatalf("seed %d: order %s filled %s, trades sum %s, qty %s", seed, id, o.Filled, filled[id], o.Quantity)
 			}
