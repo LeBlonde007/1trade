@@ -36,8 +36,9 @@ type Releaser interface {
 //     the engine seeing it), the void collides on seq and is refused. So a reservation the journal
 //     relies on is never released.
 //
-// Suspects are held in memory. One reported just before the process dies is lost on restart; finding
-// those needs the ledger to list open reservations (proposed as credit.yaml v1.3, SPEC.md §8).
+// Suspects are held in memory. A tombstone survives a crash and is re-released after recovery (Resume),
+// but a suspect lost before its void is not recovered; finding those needs the ledger to list open
+// reservations (proposed as credit.yaml v1.3, SPEC.md §8).
 type Reconciler struct {
 	Engine Voider
 	Ledger Releaser
@@ -87,6 +88,22 @@ func (r *Reconciler) Suspect(o engine.Order) {
 	}
 	if _, ok := r.suspects[o.OrderID]; !ok {
 		r.suspects[o.OrderID] = suspect{tenantID: o.TenantID, isPaper: o.IsPaper, since: r.now()}
+	}
+}
+
+// Resume re-registers tombstones recovered from the journal (engine.Voided) so their reservations are
+// released on the next pass, with no grace period: the ids are already void. Release is idempotent, so
+// a reservation whose release landed before a crash is a no-op. Call it after journal.Recover.
+func (r *Reconciler) Resume(voided []engine.Order) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.suspects == nil {
+		r.suspects = map[string]suspect{}
+	}
+	for _, o := range voided {
+		if _, ok := r.suspects[o.OrderID]; !ok {
+			r.suspects[o.OrderID] = suspect{tenantID: o.TenantID, isPaper: o.IsPaper} // zero since: due now
+		}
 	}
 }
 

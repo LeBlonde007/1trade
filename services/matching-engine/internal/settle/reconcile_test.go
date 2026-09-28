@@ -291,6 +291,38 @@ func TestReconcilerRetriesAFailedRelease(t *testing.T) {
 	}
 }
 
+// TestResumeReleasesAfterACrashBetweenVoidAndRelease: the release failed, the process died, and the
+// recovered engine's tombstone is enough to finish the job with no grace period.
+func TestResumeReleasesAfterACrashBetweenVoidAndRelease(t *testing.T) {
+	rg := newRig(t)
+	rg.orphan(t, "o1", "t1")
+	rg.orphan(t, "o2", "t1")
+	rg.advance(time.Minute)
+	rg.led.mu.Lock()
+	rg.led.failRelease = 2
+	rg.led.mu.Unlock()
+	if rep := rg.rec.RunOnce(context.Background()); rep != (Report{Voided: 2, Failed: 2}) {
+		t.Fatalf("before the crash: %+v", rep)
+	}
+	// Restart: a new engine from the journal, a fresh reconciler with no suspects.
+	e2, _, err := engine.Replay(engine.Config{Epoch: "reconcile-test"}, rg.e.Journal())
+	if err != nil {
+		t.Fatal(err)
+	}
+	voided := e2.Voided()
+	if len(voided) != 2 || voided[0].OrderID != "o1" || voided[1].OrderID != "o2" || !voided[0].IsPaper {
+		t.Fatalf("recovered tombstones = %+v", voided)
+	}
+	rec2 := &Reconciler{Engine: e2, Ledger: rg.c, Now: rg.clock}
+	rec2.Resume(voided)
+	if rep := rec2.RunOnce(context.Background()); rep != (Report{Released: 2}) || rg.led.isOpen("o1") || rg.led.isOpen("o2") {
+		t.Fatalf("after resume: %+v, open o1=%v o2=%v", rep, rg.led.isOpen("o1"), rg.led.isOpen("o2"))
+	}
+	if n := len(e2.Journal()); n != 2 {
+		t.Fatalf("resume journaled %d commands, want the 2 original voids only", n)
+	}
+}
+
 // TestReconcilerReleasesARejectedRetry: a retry that is rejected at entry closes the id for good, so
 // the orphaned reservation is released without a void.
 func TestReconcilerReleasesARejectedRetry(t *testing.T) {

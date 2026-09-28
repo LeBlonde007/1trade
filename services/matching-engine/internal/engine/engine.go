@@ -426,6 +426,22 @@ func (e *Engine) void(c VoidCmd) (Order, bool, error) {
 	return *o, true, nil
 }
 
+// Voided returns every tombstone, in order_id order. After recovery the reconciler re-releases their
+// reservations (settle.Reconciler.Resume): a crash between a void and its release would otherwise
+// leave that reservation locked.
+func (e *Engine) Voided() []Order {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	var out []Order
+	for _, o := range e.orders {
+		if o.State == Rejected && o.Reason == ReasonVoided {
+			out = append(out, *o)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].OrderID < out[j].OrderID })
+	return out
+}
+
 // sortedBooks returns books in a fixed order (product, then real before paper), never map order.
 func (e *Engine) sortedBooks() []*book {
 	out := make([]*book, 0, len(e.books))

@@ -172,7 +172,7 @@ and executing at the taker's price. Both mutations were caught.
      - `DATABASE_URL`, plus every migration (glob, in file order) in an initContainer;
      - the `ledger-settle` Secret mounted in the engine;
      - `journal.Recover` with `ReserveRisk`, and `OnUnjournaled: rec.Suspect` for a `Reconciler`
-       running every 30 s (below);
+       running every 30 s (below), with `rec.Resume(e.Voided())` right after recovery;
      - a `Worker` fed from the journal's events.
    - **Orphaned reservations — built (engine side).** The engine reserves an order's hold *before*
      writing the order to its journal. If that write fails, the ledger holds a reservation for an order
@@ -223,9 +223,13 @@ and executing at the taker's price. Both mutations were caught.
      - letting a submit through a tombstone;
      - restarting the grace period on a repeat report.
 
-     **Still open.** Suspects are held in memory. If the engine crashes after a failed journal write
-     but before its reconciler pass, the suspect is lost, and the reservation stays locked until an
-     operator releases it. Finding those needs the ledger to list open reservations. That is proposed
+     **Crash recovery.** Suspects are held in memory, but tombstones are journaled. After recovery,
+     `Reconciler.Resume(e.Voided())` re-releases every tombstone's reservation with no grace period.
+     Release is idempotent, so one that landed before the crash is a no-op. That covers a crash
+     between the void and the release.
+
+     **Still open.** A crash after a failed journal write but *before* the void loses the suspect.
+     That reservation stays locked until an operator releases it. Finding those needs the ledger to list open reservations. That is proposed
      in §8 (credit.yaml v1.3) and not yet approved.
 4. **Risk hook implementation.** Balance and position-limit checks against the ledger, plus
    surveillance holds (KW05).
