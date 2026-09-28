@@ -47,3 +47,32 @@ POST /v1/compute/clusters/{id}/jobs
 ## Milestone
 
 - M5 (Gate 5).
+
+---
+
+## Status — cluster API and console, all-or-nothing on one fabric (2026-09-28)
+
+**Built** (`compute.yaml` v1.2):
+- `POST/GET/DELETE /v1/compute/clusters`: whole 8-GPU nodes, 16–256 GPUs, `network: infiniband`,
+  `topology: fat-tree | rail-optimized`.
+- **Gang placement:** the whole cluster goes on **one** datacenter (one fabric) at once, or the request
+  is refused (402) with nothing held. It is never split across sites and never partly placed. Reserved
+  GPUs are used first.
+- **Sales path:** tenants self-serve up to 32 GPUs; larger gets 403 `contact_sales`, and operations
+  create it for the tenant (service token + X-Tenant-Id).
+- A cluster is metered like an instance (`compute.usage.v1`), is deleted as a whole, has no
+  stop/start, and is invisible to the instance endpoints. Each node has its own SSH address; node-0 is
+  the head node.
+- **Console:** `/compute/clusters` creates (16 / 24 / 32), lists nodes, and terminates.
+
+**Verified:**
+- **API tests:** lifecycle, replay, isolation, and kept apart from instances; 40 GPUs over two 32-GPU
+  sites refused with nothing held, and 32 placed on one site; shape validation (whole nodes, one node,
+  ethernet, topology, tier, unknown fields); self-serve over 32 refused; a 33-GPU instance refused.
+- **Live stack:** a 24-GPU cluster comes up with 3 nodes; 40 GPUs self-serve gets `contact_sales`; a
+  crafted id gets 404 at the BFF. Screenshot: `docs/screenshots/compute-clusters.png`.
+
+**Not built (needs hardware):** a real InfiniBand fabric and all-reduce benchmarks, Volcano gang
+scheduling on Kubernetes (the mock scheduler enforces the same all-or-nothing rule), Slurm-on-K8s
+submission (`/clusters/{id}/jobs`), topology-aware placement inside a fabric, and fabric metadata on
+partner sources.

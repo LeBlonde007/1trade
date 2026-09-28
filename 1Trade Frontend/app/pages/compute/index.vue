@@ -6,6 +6,8 @@
  * page is for monitoring and quick actions. Dark, terminal-adjacent.
  */
 
+import type { Reservation, ReservedCapacity } from '~/composables/useCompute'
+
 definePageMeta({ layout: 'app', middleware: 'auth' })
 useHead({ title: 'Compute · Instances — 1Trade' })
 
@@ -401,15 +403,23 @@ const sortIndicator = (k: SortKey) => {
   return sortDir.value === 'asc' ? '↑' : '↓'
 }
 
-// Reservation card
-const RESERVATION = {
-  gpus: 8,
-  type: 'H100 80GB SXM5',
-  term: '1-year',
-  endsAt: '2027-02-15',
-  rate: 1.79,  // discounted reserved rate
-  utilization: 96,
+// Reserved capacity card (F14) — live from compute-control; empty until the tenant buys some.
+const resv = ref<{ data: Reservation[]; capacity: ReservedCapacity[] } | null>(null)
+const TIER_NAME: Record<string, string> = { gpu_h100: 'H100 80GB', gpu_h200: 'H200 141GB' }
+const TERM_NAME: Record<string, string> = { '1mo': '1-month', '6mo': '6-month', '12mo': '1-year' }
+const activeResv = computed(() => (resv.value?.data ?? []).filter(r => r.state === 'active'))
+/** resvUse is reserved GPUs occupied / set aside, across tiers. */
+const resvUse = computed(() => {
+  const c = resv.value?.capacity ?? []
+  const reserved = c.reduce((a, x) => a + x.reserved_gpus, 0)
+  const used = c.reduce((a, x) => a + x.in_use_gpus, 0)
+  return { reserved, used, pct: reserved ? Math.round((used / reserved) * 100) : 0 }
+})
+/** loadReservations fetches reservations; a 503 (not enabled here) leaves the card empty. */
+async function loadReservations() {
+  try { resv.value = await compute.reservations() } catch { resv.value = null }
 }
+onMounted(loadReservations)
 </script>
 
 <template>
@@ -452,6 +462,12 @@ const RESERVATION = {
           </span>
           <NuxtLink to="/compute/catalog" class="btn">
             Browse GPUs
+          </NuxtLink>
+          <NuxtLink to="/compute/clusters" class="btn">
+            Clusters
+          </NuxtLink>
+          <NuxtLink to="/compute/reserve" class="btn">
+            Reserve
           </NuxtLink>
           <NuxtLink to="/compute/new" class="btn primary">
             Provision new
@@ -771,27 +787,29 @@ const RESERVATION = {
           <div class="side-card">
             <div class="side-head">
               <span class="eyebrow"><span class="dot" /> Reserved capacity</span>
-              <a href="#" class="side-head-link">Manage →</a>
+              <NuxtLink to="/compute/reserve" class="side-head-link">{{ activeResv.length ? 'Manage →' : 'Reserve →' }}</NuxtLink>
             </div>
-            <div class="reserve-num mono">{{ RESERVATION.gpus }} × {{ RESERVATION.type }}</div>
-            <div class="reserve-meta mono">
-              {{ RESERVATION.term }} · ends {{ RESERVATION.endsAt }}
-            </div>
-            <div class="reserve-rate">
-              <span class="rr-k">Rate</span>
-              <span class="rr-v mono">{{ fmtUsd(RESERVATION.rate) }}<span class="dim">/hr</span></span>
-              <span class="rr-discount">−40% vs on-demand</span>
-            </div>
-            <div class="reserve-util">
-              <div class="ru-row">
-                <span class="ru-k">Utilization · 30d</span>
-                <span class="ru-v mono">{{ RESERVATION.utilization }}%</span>
+            <template v-if="activeResv.length">
+              <div v-for="r in activeResv" :key="r.id" class="reserve-item">
+                <div class="reserve-num mono">{{ r.gpus }} × {{ TIER_NAME[r.gpu_type] ?? r.gpu_type }}</div>
+                <div class="reserve-meta mono">
+                  {{ TERM_NAME[r.term] }} · ends {{ r.ends_at?.slice(0, 10) }} · −{{ r.discount_pct }}% vs on-demand
+                </div>
               </div>
-              <div class="ru-bar">
-                <div class="ru-fill" :style="{ width: RESERVATION.utilization + '%' }" />
+              <div class="reserve-util">
+                <div class="ru-row">
+                  <span class="ru-k">In use now</span>
+                  <span class="ru-v mono">{{ resvUse.used }} / {{ resvUse.reserved }} GPUs</span>
+                </div>
+                <div class="ru-bar">
+                  <div class="ru-fill" :style="{ width: resvUse.pct + '%' }" />
+                </div>
+                <div class="ru-foot dim">Your instances use reserved GPUs first; that time is prepaid.</div>
               </div>
-              <div class="ru-foot dim">≥ 80% target · rolling</div>
-            </div>
+            </template>
+            <p v-else class="reserve-meta dim">
+              No reserved capacity. Prepay GPUs for 1, 6 or 12 months at 17–33% off on-demand; they are set aside for you.
+            </p>
           </div>
 
           <div class="side-card help">

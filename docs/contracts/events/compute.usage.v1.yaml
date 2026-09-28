@@ -24,8 +24,8 @@ payload_schema:
       description: "the GPU tier to debit"
       enum: [gpu_h100, gpu_h200]
     gpu_seconds:    { type: string, description: "GPU-seconds consumed in this interval, fixed-point string" }
-    units:          { type: string, description: "billable amount to debit (gpu_seconds → GPU-hours × rate), fixed-point string" }
-    reserved:       { type: boolean, description: "true if served from the tenant's reserved capacity (discounted)" }
+    units:          { type: string, description: "billable amount to debit (gpu_seconds → GPU-hours × rate), fixed-point string. \"0.000000\" when reserved: the reservation was prepaid (compute.yaml v1.2, F14); the ledger books nothing for it" }
+    reserved:       { type: boolean, description: "true if served from the tenant's prepaid reserved capacity (units is then zero; gpu_seconds still reports the time, for payouts and audit)" }
     supply_source_id: { type: string, description: "owned DC or partner id that provided the GPU (drives payout)" }
     is_paper:       { type: boolean }
     ts:             { type: string, format: date-time }

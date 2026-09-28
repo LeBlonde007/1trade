@@ -17,6 +17,7 @@ import (
 	"github.com/trade1/compute-control/internal/config"
 	"github.com/trade1/compute-control/internal/domain"
 	"github.com/trade1/compute-control/internal/instance"
+	"github.com/trade1/compute-control/internal/reserve"
 	"github.com/trade1/compute-control/internal/scheduler"
 )
 
@@ -30,6 +31,8 @@ type Server struct {
 	mux   *http.ServeMux
 	// supply is set by EnableSupply; nil answers the supply endpoints with 503.
 	supply *SupplyDeps
+	// reserve is set by EnableReservations; nil answers the reservation endpoints with 503.
+	reserve *reserve.Service
 	// now is the clock for payout windows (nil = time.Now); tests set it.
 	now func() time.Time
 }
@@ -61,6 +64,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /v1/compute/instances/{id}/stop", s.stopInstance)
 	s.mux.HandleFunc("POST /v1/compute/instances/{id}/start", s.startInstance)
 	s.supplyRoutes()
+	s.reservationRoutes()
+	s.clusterRoutes()
 }
 
 // listTypes serves the GPU-tier catalog with live availability. Public read (no auth) — it leaks no
@@ -369,6 +374,7 @@ func instanceJSON(inst domain.Instance) map[string]any {
 			"ssh": orNil(inst.Connect.SSH), "jupyter": orNil(inst.Connect.Jupyter), "http": orNil(inst.Connect.HTTP),
 		},
 		"supply_source_id": inst.SupplySourceID, "idle_stop_minutes": idle, "is_paper": inst.IsPaper,
+		"reserved":   inst.Reserved,
 		"created_at": inst.CreatedAt.Format("2006-01-02T15:04:05Z07:00"), "started_at": startedAt,
 	}
 }

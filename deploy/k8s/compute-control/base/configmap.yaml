@@ -16,3 +16,4 @@ data:
   COMPUTE_METER_INTERVAL_SEC: "60"          # how often running instances meter → compute.usage.v1
   # Partner supply registry (supply.yaml, F16) — compute-control's own tables in the shared database.
   DATABASE_URL: "postgres://1trade:1trade@postgres.data.svc.cluster.local:5432/1trade"
+  CREDIT_LEDGER_URL: "http://credit-ledger:8002"   # reservations are prepaid through the ledger (F14)

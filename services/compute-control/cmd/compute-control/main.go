@@ -18,8 +18,10 @@ import (
 	"github.com/trade1/compute-control/internal/domain"
 	"github.com/trade1/compute-control/internal/events"
 	"github.com/trade1/compute-control/internal/instance"
+	"github.com/trade1/compute-control/internal/ledger"
 	"github.com/trade1/compute-control/internal/obs"
 	"github.com/trade1/compute-control/internal/pool"
+	"github.com/trade1/compute-control/internal/reserve"
 	"github.com/trade1/compute-control/internal/scheduler"
 	"github.com/trade1/compute-control/internal/supply"
 )
@@ -110,6 +112,26 @@ func main() {
 	server := api.New(cfg, resolver, sched, mgr)
 	if supplyDeps != nil {
 		server.EnableSupply(supplyDeps)
+	}
+	// Reserved capacity (F14): prepaid in GPU credits through the ledger, recorded in the database,
+	// and held in the same pool. Sync rebuilds the holds at start, then retries unconfirmed payments
+	// and expires ended terms.
+	if cfg.DatabaseURL != "" && cfg.LedgerURL != "" {
+		rs, err := reserve.Open(context.Background(), cfg.DatabaseURL, gpuPool, ledger.New(cfg.LedgerURL, cfg.ServiceToken, cfg.HTTPTimeout))
+		if err != nil {
+			slog.Error("reservations unavailable", "err", err)
+			os.Exit(1)
+		}
+		defer rs.Close()
+		if err := rs.Sync(context.Background()); err != nil {
+			slog.Error("reservation holds could not be rebuilt", "err", err)
+			os.Exit(1)
+		}
+		go rs.Run(context.Background(), time.Minute)
+		server.EnableReservations(rs)
+		slog.Info("reserved capacity enabled")
+	} else {
+		slog.Warn("DATABASE_URL or CREDIT_LEDGER_URL unset; reserved capacity disabled")
 	}
 	mux.Handle("/", obs.Instrument(server))
 	srv := &http.Server{

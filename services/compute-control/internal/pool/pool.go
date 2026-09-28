@@ -9,6 +9,12 @@
 // A source that stops accepting (suspended, retired, unhealthy) takes no new work but keeps what it
 // is running until it is released: that is the drain.
 //
+// F14: a tenant's reserved capacity is a HOLD on the pool — GPUs of a tier set aside for that
+// tenant (and paper/real side) for the reservation's term. Holds are pool-wide, not per source, so a
+// drain on one datacenter does not void a reservation. On-demand placement only uses GPUs beyond the
+// unused holds, so reserved capacity is always there for its owner; the owner's work draws from its
+// hold first (ReserveFor) and only then from on-demand capacity.
+//
 // Counts are per credit-type tier (gpu_h100 / gpu_h200). Safe for concurrent use.
 package pool
 
@@ -25,10 +31,19 @@ type source struct {
 	accepting bool
 }
 
+// HoldKey names whose reserved capacity a hold is: one tenant, one side (paper or real), one tier.
+type HoldKey struct {
+	Tenant  string
+	IsPaper bool
+	Tier    string
+}
+
 // Pool tracks capacity and reservations across supply sources.
 type Pool struct {
 	mu      sync.Mutex
 	sources map[string]*source
+	holds   map[HoldKey]int // GPUs set aside for the key (sum of its active reservations)
+	held    map[HoldKey]int // of those, how many its running work currently occupies
 }
 
 // SourceStat is a snapshot of one source, for the API and the datacenter dashboard.
@@ -42,7 +57,7 @@ type SourceStat struct {
 // New builds a pool with one accepting source (normally 1Trade's own datacenter) of the given
 // per-tier capacity, e.g. New("dc-owned-1", {"gpu_h100": 8}).
 func New(ownedID string, perTier map[string]int) *Pool {
-	p := &Pool{sources: map[string]*source{}}
+	p := &Pool{sources: map[string]*source{}, holds: map[HoldKey]int{}, held: map[HoldKey]int{}}
 	p.SetSource(ownedID, perTier, true)
 	return p
 }
@@ -110,6 +125,15 @@ func (p *Pool) Reserve(tier string, n int) (sourceID string, ok bool) {
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	if p.totalFree(tier)-p.unusedHolds(tier) < n {
+		return "", false // what is left is set aside for reservations
+	}
+	return p.place(tier, n)
+}
+
+// place takes n GPUs of a tier from the accepting source with the most free, ignoring holds. Caller
+// holds p.mu and has already checked the holds allow it.
+func (p *Pool) place(tier string, n int) (string, bool) {
 	best, bestFree := "", 0
 	for _, id := range p.ids() {
 		s := p.sources[id]
@@ -122,6 +146,136 @@ func (p *Pool) Reserve(tier string, n int) (sourceID string, ok bool) {
 	}
 	p.sources[best].reserved[tier] += n
 	return best, true
+}
+
+// totalFree is the free GPUs of a tier across accepting sources. Caller holds p.mu.
+func (p *Pool) totalFree(tier string) int {
+	n := 0
+	for _, s := range p.sources {
+		if s.accepting {
+			n += s.free(tier)
+		}
+	}
+	return n
+}
+
+// unusedHolds is the GPUs of a tier set aside for reservations and not occupied by their owners'
+// work. Caller holds p.mu.
+func (p *Pool) unusedHolds(tier string) int {
+	n := 0
+	for k, h := range p.holds {
+		if k.Tier == tier {
+			n += max(0, h-p.held[k])
+		}
+	}
+	return n
+}
+
+// Hold sets aside n more GPUs for key (a new reservation). It fails, changing nothing, unless n GPUs
+// are free beyond every existing hold: a reservation is only sold against capacity that exists.
+func (p *Pool) Hold(key HoldKey, n int) bool {
+	if n <= 0 {
+		return false
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.totalFree(key.Tier)-p.unusedHolds(key.Tier) < n {
+		return false
+	}
+	p.holds[key] += n
+	return true
+}
+
+// ReleaseHold gives n GPUs of key's hold back to the pool (a reservation that was never paid).
+func (p *Pool) ReleaseHold(key HoldKey, n int) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.holds[key] = max(0, p.holds[key]-n)
+	if p.holds[key] == 0 {
+		delete(p.holds, key)
+	}
+}
+
+// SetHold sets key's hold to exactly n (rebuilding holds from the reservation records at startup or
+// when reservations expire). It does not check capacity: the reservations were sold already.
+func (p *Pool) SetHold(key HoldKey, n int) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if n <= 0 {
+		delete(p.holds, key)
+		return
+	}
+	p.holds[key] = n
+}
+
+// Holds snapshots every hold and how much of it is occupied.
+func (p *Pool) Holds() map[HoldKey][2]int {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	out := make(map[HoldKey][2]int, len(p.holds))
+	for k, h := range p.holds {
+		out[k] = [2]int{h, p.held[k]}
+	}
+	for k, u := range p.held {
+		if _, ok := out[k]; !ok && u > 0 {
+			out[k] = [2]int{0, u}
+		}
+	}
+	return out
+}
+
+// ReserveFor places n GPUs for key's owner: from its hold when enough of the hold is unoccupied
+// (fromHold=true — prepaid), else as on-demand. A gang still needs one source that fits it.
+func (p *Pool) ReserveFor(key HoldKey, n int) (sourceID string, fromHold, ok bool) {
+	if n <= 0 {
+		return "", false, true
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.holds[key]-p.held[key] >= n {
+		if src, ok := p.place(key.Tier, n); ok {
+			p.held[key] += n
+			return src, true, true
+		}
+	}
+	if p.totalFree(key.Tier)-p.unusedHolds(key.Tier) < n {
+		return "", false, false
+	}
+	src, ok := p.place(key.Tier, n)
+	return src, false, ok
+}
+
+// ReleaseFor returns n GPUs to the source that supplied them and, when they came from key's hold,
+// frees that part of the hold for the owner's next work.
+func (p *Pool) ReleaseFor(key HoldKey, sourceID string, n int, fromHold bool) {
+	p.Release(sourceID, key.Tier, n)
+	if !fromHold || n <= 0 {
+		return
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.held[key] = max(0, p.held[key]-n)
+	if p.held[key] == 0 {
+		delete(p.held, key)
+	}
+}
+
+// Overdrawn is how many GPUs key's work occupies beyond its hold (after a reservation ended): that
+// much running work must go back to on-demand billing.
+func (p *Pool) Overdrawn(key HoldKey) int {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return max(0, p.held[key]-p.holds[key])
+}
+
+// Detach moves n GPUs of key's running work off its hold (it is billed on-demand from now on).
+func (p *Pool) Detach(key HoldKey, n int) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.held[key] = max(0, p.held[key]-n)
+	if p.held[key] == 0 {
+		delete(p.held, key)
+	}
 }
 
 // ReserveOn takes n GPUs of a tier from a specific source (e.g. a reservation pinned to a partner). It
@@ -155,21 +309,16 @@ func (p *Pool) Release(sourceID, tier string, n int) {
 	s.reserved[tier] = max(0, s.reserved[tier]-n)
 }
 
-// Available is the free GPUs of a tier across accepting sources.
+// Available is the free GPUs of a tier across accepting sources that on-demand work may take:
+// capacity set aside for reservations is not available.
 func (p *Pool) Available(tier string) int {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	n := 0
-	for _, s := range p.sources {
-		if s.accepting {
-			n += s.free(tier)
-		}
-	}
-	return n
+	return max(0, p.totalFree(tier)-p.unusedHolds(tier))
 }
 
-// MaxPlaceable is the largest request of a tier that one source could take right now (a gang must
-// fit on a single source, so this can be less than Available).
+// MaxPlaceable is the largest on-demand request of a tier that one source could take right now (a
+// gang must fit on a single source, so this can be less than Available).
 func (p *Pool) MaxPlaceable(tier string) int {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -179,7 +328,7 @@ func (p *Pool) MaxPlaceable(tier string) int {
 			best = max(best, s.free(tier))
 		}
 	}
-	return best
+	return max(0, min(best, p.totalFree(tier)-p.unusedHolds(tier)))
 }
 
 // Capacity is the total GPUs of a tier across accepting sources.

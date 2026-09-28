@@ -6,6 +6,7 @@ package instance
 
 import (
 	"errors"
+	"fmt"
 	"sort"
 	"sync"
 	"time"
@@ -30,6 +31,39 @@ var (
 	ErrTerminated   = errors.New("instance is terminated")
 )
 
+// MaxCount is the most GPUs one self-serve instance may have (compute.yaml InstanceRequest.count).
+const MaxCount = 32
+
+// holdKey is the reservation hold an instance of this tenant, side and tier draws from.
+func holdKey(tenant string, isPaper bool, tier string) pool.HoldKey {
+	return pool.HoldKey{Tenant: tenant, IsPaper: isPaper, Tier: tier}
+}
+
+// release returns an instance's GPUs (and, if they came from its reservation, the hold).
+func (m *Manager) release(inst domain.Instance) {
+	m.pool.ReleaseFor(holdKey(inst.TenantID, inst.IsPaper, inst.GPUType), inst.SupplySourceID, inst.Count, inst.Reserved)
+}
+
+// validShape checks an instance's or cluster's GPU count and, for a cluster, its fabric.
+func validShape(spec Spec) error {
+	switch spec.Kind {
+	case domain.KindInstance:
+		if spec.Count > MaxCount {
+			return ErrBadRequest
+		}
+	case domain.KindCluster:
+		if spec.Count < domain.MinClusterGPUs || spec.Count > domain.MaxClusterGPUs || spec.Count%domain.GPUsPerNode != 0 {
+			return fmt.Errorf("%w: a cluster is %d-%d GPUs in whole %d-GPU nodes", ErrBadRequest, domain.MinClusterGPUs, domain.MaxClusterGPUs, domain.GPUsPerNode)
+		}
+		if spec.Network != "infiniband" || (spec.Topology != "fat-tree" && spec.Topology != "rail-optimized") {
+			return fmt.Errorf("%w: network must be infiniband; topology fat-tree or rail-optimized", ErrBadRequest)
+		}
+	default:
+		return ErrBadRequest
+	}
+	return nil
+}
+
 // Spec is a validated request to create an instance.
 type Spec struct {
 	TenantID        string
@@ -40,6 +74,10 @@ type Spec struct {
 	Image           string // alias ("stable"/"latest") or a pinned id
 	Region          string
 	IdleStopMinutes *int
+	// Clusters (F15): Kind = domain.KindCluster with a network and topology; Count is the GPUs.
+	Kind     string
+	Network  string
+	Topology string
 }
 
 // idemKey scopes idempotency to a tenant so two tenants can reuse the same key value.
@@ -93,6 +131,7 @@ func (m *Manager) Create(spec Spec, idempotencyKey string) (domain.Instance, err
 	defer m.mu.Unlock()
 
 	if idempotencyKey != "" {
+		idempotencyKey = spec.Kind + ":" + idempotencyKey // an instance key never replays a cluster
 		if id, ok := m.idem[idemKey{spec.TenantID, idempotencyKey}]; ok {
 			if inst, ok := m.instances[id]; ok {
 				return *inst, nil
@@ -100,13 +139,22 @@ func (m *Manager) Create(spec Spec, idempotencyKey string) (domain.Instance, err
 		}
 	}
 
-	source, ok := m.pool.Reserve(spec.GPUType, spec.Count)
+	if spec.Kind == "" {
+		spec.Kind = domain.KindInstance
+	}
+	if err := validShape(spec); err != nil {
+		return domain.Instance{}, err
+	}
+	source, reserved, ok := m.pool.ReserveFor(holdKey(spec.TenantID, spec.IsPaper, spec.GPUType), spec.Count)
 	if !ok {
 		return domain.Instance{}, ErrCapacity
 	}
 
 	now := m.now().UTC()
 	id := "i-" + uuid.NewString()[:8]
+	if spec.Kind == domain.KindCluster {
+		id = "c-" + uuid.NewString()[:8]
+	}
 	inst := &domain.Instance{
 		ID:              id,
 		TenantID:        spec.TenantID,
@@ -120,9 +168,16 @@ func (m *Manager) Create(spec Spec, idempotencyKey string) (domain.Instance, err
 		SupplySourceID:  source, // whichever datacenter took it (F16): drives the partner payout
 		IdleStopMinutes: spec.IdleStopMinutes,
 		IsPaper:         spec.IsPaper,
+		Reserved:        reserved,
+		Kind:            spec.Kind,
+		Network:         spec.Network,
+		Topology:        spec.Topology,
 		CreatedAt:       now,
 		StartedAt:       now,
 		LastMeteredAt:   now,
+	}
+	if spec.Kind == domain.KindCluster {
+		inst.Nodes = domain.BuildNodes(id, region, spec.Count)
 	}
 	m.instances[id] = inst
 	if idempotencyKey != "" {
@@ -131,27 +186,34 @@ func (m *Manager) Create(spec Spec, idempotencyKey string) (domain.Instance, err
 	return *inst, nil
 }
 
-// Get returns one tenant-scoped instance.
+// Get returns one tenant-scoped instance (not a cluster).
 func (m *Manager) Get(tenantID, id string) (domain.Instance, error) {
+	return m.GetKind(tenantID, id, domain.KindInstance)
+}
+
+// GetKind returns one tenant-scoped instance or cluster.
+func (m *Manager) GetKind(tenantID, id, kind string) (domain.Instance, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	inst, ok := m.instances[id]
-	if !ok {
-		return domain.Instance{}, ErrNotFound
-	}
-	if inst.TenantID != tenantID {
-		return domain.Instance{}, ErrForbidden
+	inst, err := m.ownedKind(tenantID, id, kind)
+	if err != nil {
+		return domain.Instance{}, err
 	}
 	return *inst, nil
 }
 
 // List returns the tenant's instances newest-first, optionally filtered to one state ("" = all).
 func (m *Manager) List(tenantID, state string) []domain.Instance {
+	return m.ListKind(tenantID, state, domain.KindInstance)
+}
+
+// ListKind returns the tenant's instances or clusters newest-first, optionally filtered by state.
+func (m *Manager) ListKind(tenantID, state, kind string) []domain.Instance {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	out := make([]domain.Instance, 0)
 	for _, inst := range m.instances {
-		if inst.TenantID != tenantID {
+		if inst.TenantID != tenantID || inst.Kind != kind {
 			continue
 		}
 		if state != "" && inst.State != state {
@@ -182,7 +244,7 @@ func (m *Manager) Stop(tenantID, id string) (domain.Instance, error) {
 	snapshot := *inst
 	m.mu.Unlock()
 
-	m.pool.Release(snapshot.SupplySourceID, snapshot.GPUType, snapshot.Count)
+	m.release(snapshot)
 	m.emit(snapshot, elapsed)
 	return snapshot, nil
 }
@@ -198,12 +260,13 @@ func (m *Manager) Start(tenantID, id string) (domain.Instance, error) {
 	if !domain.CanStart(inst.State) {
 		return domain.Instance{}, ErrNotStartable
 	}
-	source, ok := m.pool.Reserve(inst.GPUType, inst.Count)
+	source, reserved, ok := m.pool.ReserveFor(holdKey(inst.TenantID, inst.IsPaper, inst.GPUType), inst.Count)
 	if !ok {
 		return domain.Instance{}, ErrCapacity
 	}
 	now := m.now().UTC()
 	inst.SupplySourceID = source // a restart may land on a different datacenter
+	inst.Reserved = reserved     // … and on or off the tenant's reservation
 	inst.State = domain.InstanceRunning
 	inst.Connect = domain.BuildConnect(inst.ID, inst.Region)
 	inst.StartedAt = now
@@ -214,8 +277,13 @@ func (m *Manager) Start(tenantID, id string) (domain.Instance, error) {
 // Delete terminates an instance. If it was live, its GPUs are released and the final running interval
 // is metered. Terminating an already-terminated instance is a no-op success.
 func (m *Manager) Delete(tenantID, id string) (domain.Instance, error) {
+	return m.DeleteKind(tenantID, id, domain.KindInstance)
+}
+
+// DeleteKind terminates an instance or a cluster (all its nodes at once).
+func (m *Manager) DeleteKind(tenantID, id, kind string) (domain.Instance, error) {
 	m.mu.Lock()
-	inst, err := m.owned(tenantID, id)
+	inst, err := m.ownedKind(tenantID, id, kind)
 	if err != nil {
 		m.mu.Unlock()
 		return domain.Instance{}, err
@@ -227,11 +295,12 @@ func (m *Manager) Delete(tenantID, id string) (domain.Instance, error) {
 	}
 	inst.State = domain.InstanceTerminated
 	inst.Connect = domain.ConnectInfo{}
+	inst.Nodes = nil
 	snapshot := *inst
 	m.mu.Unlock()
 
 	if wasLive {
-		m.pool.Release(snapshot.SupplySourceID, snapshot.GPUType, snapshot.Count)
+		m.release(snapshot)
 		m.emit(snapshot, elapsed)
 	}
 	return snapshot, nil
@@ -247,13 +316,28 @@ func (m *Manager) MeterTick() {
 		elapsed int64
 	}
 	var batch []pending
-	for _, inst := range m.instances {
+	ids := make([]string, 0, len(m.instances))
+	for id := range m.instances {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids) // which instances leave an ended reservation first is deterministic
+	for _, id := range ids {
+		inst := m.instances[id]
 		if inst.State != domain.InstanceRunning {
 			continue
 		}
 		elapsed := m.meterSince(inst)
 		if elapsed > 0 {
 			batch = append(batch, pending{inst: *inst, elapsed: elapsed})
+		}
+		// A reservation that ended (or shrank) leaves its running work overdrawn: from the next
+		// interval that work is billed on-demand. The interval just metered stays prepaid. An instance
+		// moves only when the whole of it is overdrawn, so the customer is never billed on-demand for
+		// GPUs a reservation still covers.
+		key := holdKey(inst.TenantID, inst.IsPaper, inst.GPUType)
+		if inst.Reserved && m.pool.Overdrawn(key) >= inst.Count {
+			m.pool.Detach(key, inst.Count)
+			inst.Reserved = false
 		}
 	}
 	m.mu.Unlock()
@@ -263,10 +347,17 @@ func (m *Manager) MeterTick() {
 	}
 }
 
-// owned returns the tenant's instance or an error. Caller must hold m.mu.
+// owned returns the tenant's instance (not a cluster: those are not stopped or started) or an error.
+// Caller must hold m.mu.
 func (m *Manager) owned(tenantID, id string) (*domain.Instance, error) {
+	return m.ownedKind(tenantID, id, domain.KindInstance)
+}
+
+// ownedKind returns the tenant's instance or cluster of the given kind; another kind is not found.
+// Caller must hold m.mu.
+func (m *Manager) ownedKind(tenantID, id, kind string) (*domain.Instance, error) {
 	inst, ok := m.instances[id]
-	if !ok {
+	if !ok || inst.Kind != kind {
 		return nil, ErrNotFound
 	}
 	if inst.TenantID != tenantID {
@@ -295,6 +386,10 @@ func (m *Manager) emit(inst domain.Instance, elapsedSeconds int64) {
 		sub = &inst.SubAccountID
 	}
 	gpuSeconds := domain.TotalGPUSeconds(elapsedSeconds, inst.Count)
+	units := domain.BillableGPUHours(elapsedSeconds, inst.Count)
+	if inst.Reserved {
+		units = "0.000000" // prepaid by the reservation; the GPU time is still reported
+	}
 	m.pub.PublishUsage(events.ComputeUsage{
 		UsageID:        uuid.NewString(),
 		TenantID:       inst.TenantID,
@@ -302,11 +397,18 @@ func (m *Manager) emit(inst domain.Instance, elapsedSeconds int64) {
 		InstanceID:     inst.ID,
 		CreditType:     inst.GPUType,
 		GPUSeconds:     gpuSeconds,
-		Units:          domain.BillableGPUHours(elapsedSeconds, inst.Count),
-		Reserved:       false, // on-demand
+		Units:          units,
+		Reserved:       inst.Reserved,
 		SupplySourceID: inst.SupplySourceID,
 		IsPaper:        inst.IsPaper,
 		TS:             events.NewTimestamp(),
 	})
-	metrics.RecordComputeUsage(inst.GPUType, gpuSeconds, false)
+	metrics.RecordComputeUsage(inst.GPUType, gpuSeconds, inst.Reserved)
 }
+
+// Available is the on-demand GPUs of a tier free right now (capacity set aside for reservations is
+// not counted).
+func (m *Manager) Available(tier string) int { return m.pool.Available(tier) }
+
+// Holds snapshots the pool's reservation holds: GPUs set aside and GPUs occupied, per key.
+func (m *Manager) Holds() map[pool.HoldKey][2]int { return m.pool.Holds() }

@@ -23,6 +23,7 @@ type Config struct {
 	MeterInterval time.Duration // how often running instances are metered → compute.usage.v1
 	DatabaseURL   string        // partner supply registry (supply.yaml); unset = owned capacity only
 	AttestKeys    string        // ATTESTATION_TRUST_KEYS: base64 Ed25519 keys trusted to sign GPU reports (F19)
+	LedgerURL     string        // CREDIT_LEDGER_URL: where reservations are paid (F14); unset = no reservations
 }
 
 // Load reads configuration from the environment with sensible dev defaults.
@@ -42,6 +43,7 @@ func Load() Config {
 		MeterInterval: time.Duration(intEnv("COMPUTE_METER_INTERVAL_SEC", 60)) * time.Second,
 		DatabaseURL:   os.Getenv("DATABASE_URL"),
 		AttestKeys:    os.Getenv("ATTESTATION_TRUST_KEYS"),
+		LedgerURL:     os.Getenv("CREDIT_LEDGER_URL"),
 	}
 }
 

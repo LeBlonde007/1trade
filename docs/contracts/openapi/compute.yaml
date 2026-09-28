@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: 1Trade Compute API (GPU types, quota, scheduled jobs, instances)
-  version: 1.1.0
+  version: 1.2.0
   description: >
     **The 1Trade compute control-plane API.** Owned by `compute-platform` (the `compute-control`
     service). It wraps the Kubernetes scheduling stack (Kueue queues per workload class + Volcano gang
@@ -13,7 +13,28 @@ info:
     return connection info (ssh / jupyter / http). Target: <90s P95 time-to-running. Per-second GPU
     usage meters to `events/compute.usage.v1` while an instance runs; stop releases its GPUs back to
     the pool and ends billing. The M2 internal scheduling + quota surface and the GPU-type catalog are
-    unchanged and back-compatible. Clusters (multi-node / InfiniBand) land in M5.
+    unchanged and back-compatible.
+
+    **v1.2.0 (F14 reserved capacity, F15 clusters).**
+
+    *Reservations* prepay N GPUs of one tier for a term — `1mo` (730 h, 17% off), `6mo` (4,380 h,
+    27% off) or `12mo` (8,760 h, 33% off) — in that tier's GPU credits: price = gpus × hours ×
+    (100 − discount) / 100, exact. A reservation is sold only against GPUs free right now; they are
+    set aside in the pool for the whole term, so on-demand work (instances and internal jobs) can
+    never take them. The owner's instances draw from the reservation first (`reserved: true` on the
+    instance) and their compute.usage.v1 carries `units: "0.000000"` (prepaid); beyond it, instances
+    are on-demand. Buying needs the admin or billing role and an Idempotency-Key; the debit is
+    idempotent on the reservation, so a retry never charges twice. 409 capacity_unavailable (nothing
+    recorded or charged), 402 insufficient_credit (recorded as failed; the GPUs go back), 503
+    payment_pending (the ledger did not answer: the GPUs stay set aside and the payment is retried
+    by the same key or automatically). When a term ends the GPUs go back and running work is billed
+    on-demand from the next interval. Reservations are not cancellable (prepaid commitment).
+
+    *Clusters* are multi-node gangs: whole 8-GPU nodes, 16–256 GPUs, on one InfiniBand fabric (one
+    datacenter), placed all at once or not at all — never partly. A tenant creates up to 32 GPUs
+    itself; larger clusters are arranged with sales and created by operations (service token +
+    X-Tenant-Id). A cluster is metered like an instance (per node GPU-seconds, compute.usage.v1)
+    and is deleted as a whole; it has no stop/start.
 
     Auth: a first-party tenant **JWT** for customer reads (quota, types, instances); the internal
     **service token** for scheduling (`POST /v1/compute/jobs`, called by the gateway/runtime).
@@ -30,6 +51,8 @@ tags:
   - { name: quota, description: "Per-tenant / per-sub-account GPU quota." }
   - { name: scheduling, description: "Internal: place workloads via Kueue + Volcano." }
   - { name: instances, description: "Customer on-demand GPU instances (create / stop / start / delete)." }
+  - { name: reservations, description: "v1.2: prepaid reserved GPU capacity (F14)." }
+  - { name: clusters, description: "v1.2: multi-node InfiniBand clusters (F15)." }
 
 paths:
   /healthz:
@@ -189,6 +212,142 @@ paths:
         '404': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }   # not in a startable state
 
+  /v1/compute/reservations/quote:
+    get:
+      tags: [reservations]
+      summary: "v1.2: price a reservation (tenant JWT). Nothing is held or charged."
+      operationId: quoteReservation
+      parameters:
+        - { name: gpu_type, in: query, required: true, schema: { type: string, enum: [gpu_h100, gpu_h200] } }
+        - { name: gpus, in: query, required: true, schema: { type: integer, minimum: 1, maximum: 256 } }
+        - { name: term, in: query, required: true, schema: { type: string, enum: [1mo, 6mo, 12mo] } }
+      responses:
+        '200':
+          description: Quote, and the on-demand GPUs free now.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  quote:     { $ref: '#/components/schemas/ReservationQuote' }
+                  available: { type: integer }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /v1/compute/reservations:
+    get:
+      tags: [reservations]
+      summary: "v1.2: the tenant's reservations (newest first) and, per tier, reserved vs occupied GPUs now."
+      operationId: listReservations
+      responses:
+        '200':
+          description: Reservations.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/Reservation' } }
+                  capacity:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        gpu_type:      { type: string }
+                        is_paper:      { type: boolean }
+                        reserved_gpus: { type: integer }
+                        in_use_gpus:   { type: integer }
+        '401': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [reservations]
+      summary: "v1.2: buy reserved capacity (admin or billing role). Prepaid in the tier's GPU credits."
+      operationId: buyReservation
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [gpu_type, gpus, term]
+              additionalProperties: false
+              properties:
+                gpu_type: { type: string, enum: [gpu_h100, gpu_h200] }
+                gpus:     { type: integer, minimum: 1, maximum: 256 }
+                term:     { type: string, enum: [1mo, 6mo, 12mo] }
+      responses:
+        '201': { description: Paid and active., content: { application/json: { schema: { $ref: '#/components/schemas/Reservation' } } } }
+        '402': { $ref: '#/components/responses/Error' }   # insufficient_credit
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }   # capacity_unavailable | IDEMPOTENCY_CONFLICT
+        '422': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }   # payment_pending — retry with the same key
+
+  /v1/compute/reservations/{id}:
+    parameters: [ { name: id, in: path, required: true, schema: { type: string, format: uuid } } ]
+    get:
+      tags: [reservations]
+      summary: "v1.2: one of the tenant's reservations."
+      operationId: getReservation
+      responses:
+        '200': { description: Reservation., content: { application/json: { schema: { $ref: '#/components/schemas/Reservation' } } } }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /v1/compute/clusters:
+    get:
+      tags: [clusters]
+      summary: "v1.2: the tenant's clusters (newest first), optionally filtered by state."
+      operationId: listClusters
+      parameters:
+        - { name: state, in: query, required: false, schema: { $ref: '#/components/schemas/InstanceState' } }
+      responses:
+        '200':
+          description: Clusters.
+          content: { application/json: { schema: { type: object, properties: { clusters: { type: array, items: { $ref: '#/components/schemas/Cluster' } } } } } }
+    post:
+      tags: [clusters]
+      summary: >
+        v1.2: create a cluster — all nodes at once on one fabric, or nothing. Tenant JWT up to 32 GPUs;
+        larger with the service token + X-Tenant-Id (arranged with sales).
+      operationId: createCluster
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [gpu_type, gpus, network, topology]
+              additionalProperties: false
+              properties:
+                gpu_type: { type: string, enum: [gpu_h100, gpu_h200] }
+                gpus:     { type: integer, minimum: 16, maximum: 256, multipleOf: 8 }
+                network:  { type: string, enum: [infiniband] }
+                topology: { type: string, enum: [fat-tree, rail-optimized] }
+                image:    { type: string, default: stable }
+                region:   { type: string, default: us-east-1 }
+      responses:
+        '201': { description: Running., content: { application/json: { schema: { $ref: '#/components/schemas/Cluster' } } } }
+        '402': { $ref: '#/components/responses/Error' }   # no single fabric has the GPUs free
+        '403': { $ref: '#/components/responses/Error' }   # contact_sales (over 32 GPUs, self-serve)
+        '422': { $ref: '#/components/responses/Error' }
+
+  /v1/compute/clusters/{id}:
+    parameters: [ { name: id, in: path, required: true, schema: { type: string } } ]
+    get:
+      tags: [clusters]
+      summary: "v1.2: one cluster, with its nodes."
+      operationId: getCluster
+      responses:
+        '200': { description: Cluster., content: { application/json: { schema: { $ref: '#/components/schemas/Cluster' } } } }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [clusters]
+      summary: "v1.2: terminate every node together and free the GPUs (irreversible)."
+      operationId: deleteCluster
+      responses:
+        '200': { description: Terminated., content: { application/json: { schema: { $ref: '#/components/schemas/Cluster' } } } }
+        '404': { $ref: '#/components/responses/Error' }
+
 components:
   parameters:
     IdempotencyKey:
@@ -296,8 +455,60 @@ components:
         supply_source_id: { type: string, description: "owned DC or partner that provided the GPUs (drives payout)" }
         idle_stop_minutes: { type: [integer, "null"] }
         is_paper:         { type: boolean }
+        reserved:         { type: boolean, description: "v1.2: drawn from the tenant's reservation (usage prepaid, units 0)" }
         created_at:       { type: string, format: date-time }
         started_at:       { type: [string, "null"], format: date-time, description: "when it last entered running" }
+
+    ReservationQuote:
+      type: object
+      properties:
+        gpu_type:          { type: string }
+        gpus:              { type: integer }
+        term:              { type: string, enum: [1mo, 6mo, 12mo] }
+        hours:             { type: integer, description: "term length in hours (730 / 4380 / 8760)" }
+        discount_pct:      { type: integer }
+        gpu_hours:         { $ref: '#/components/schemas/Decimal' }
+        on_demand_credits: { $ref: '#/components/schemas/Decimal' }
+        price_credits:     { $ref: '#/components/schemas/Decimal', description: "GPU credits of gpu_type debited" }
+        saving_credits:    { $ref: '#/components/schemas/Decimal' }
+
+    Reservation:
+      type: object
+      properties:
+        id:             { type: string, format: uuid }
+        sub_account_id: { type: [string, "null"] }
+        is_paper:       { type: boolean }
+        gpu_type:       { type: string, enum: [gpu_h100, gpu_h200] }
+        gpus:           { type: integer }
+        term:           { type: string, enum: [1mo, 6mo, 12mo] }
+        discount_pct:   { type: integer }
+        gpu_hours:      { $ref: '#/components/schemas/Decimal' }
+        price_credits:  { $ref: '#/components/schemas/Decimal' }
+        state:          { type: string, enum: [pending_payment, active, expired, failed] }
+        starts_at:      { type: [string, "null"], format: date-time }
+        ends_at:        { type: [string, "null"], format: date-time }
+        ledger_tx_id:   { type: [string, "null"] }
+        failure:        { type: [string, "null"] }
+        created_at:     { type: string, format: date-time }
+
+    Cluster:
+      type: object
+      properties:
+        id:               { type: string, example: "c-7c2a91d0" }
+        gpu_type:         { type: string, enum: [gpu_h100, gpu_h200] }
+        gpus:             { type: integer }
+        network:          { type: string, enum: [infiniband] }
+        topology:         { type: string, enum: [fat-tree, rail-optimized] }
+        state:            { $ref: '#/components/schemas/InstanceState' }
+        nodes:            { type: array, items: { type: object, properties: { name: { type: string }, ssh: { type: string } } }, description: "one per 8-GPU node while running; node-0 is the head node" }
+        connect:          { $ref: '#/components/schemas/ConnectInfo' }
+        image:            { type: string }
+        region:           { type: string }
+        reserved:         { type: boolean, description: "drawn from the tenant's reservation (usage prepaid)" }
+        supply_source_id: { type: string, description: "the one datacenter (fabric) it runs in" }
+        is_paper:         { type: boolean }
+        created_at:       { type: string, format: date-time }
+        started_at:       { type: [string, "null"], format: date-time }
 
     ApiError:
       type: object

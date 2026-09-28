@@ -50,6 +50,8 @@ each step marked done / showcase / paused. Pair with [STATUS.md](STATUS.md) (tre
 | **Run inference** (chat) → **real per-token debit** + session meter | `/inference` | ✅ | F08/F09 (v0.2.7) |
 | Convert credits (AI-index ↔ text), 1% spread | `/wallet` convert | ✅ | F07 (v0.2.5) |
 | **Rent + manage GPU instances** — provision / stop / start / delete | `/compute` · `/compute/new` | ✅ | **F13 (v0.3.0)** |
+| **Reserve GPUs** for 1 / 6 / 12 months (17 / 27 / 33% off), prepaid in GPU credits; set aside, used first | `/compute/reserve` | ✅ live | F14 (2026-09-28) |
+| **Multi-node clusters** — whole 8-GPU nodes on one InfiniBand fabric, all-or-nothing; >32 GPUs via sales | `/compute/clusters` | ✅ live (mock-GPU fabric) | F15 (2026-09-28) |
 | Wallet — live balances + transaction movements | `/wallet` | ✅ | F05 (v0.2.6) |
 | Mint an **API key** (shown once) | `/settings` | ✅ | F02 (v0.2.8) |
 | Drive it all from the **CLI** — `login / infer / gpu / credits / keys` | `1trade …` | ✅ | F04 + F13 |

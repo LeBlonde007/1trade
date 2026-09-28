@@ -168,6 +168,12 @@ func (c *UsageConsumer) handle(msg *nats.Msg) {
 		_ = msg.Term()
 		return
 	}
+	if amt.Sign() == 0 {
+		// Nothing to bill: compute served from a prepaid reservation reports its GPU time with zero
+		// units (compute.usage.v1). A zero movement would only add an empty row to the chain.
+		_ = msg.Ack()
+		return
+	}
 	sub := ""
 	if e.SubAccountID != nil {
 		sub = *e.SubAccountID

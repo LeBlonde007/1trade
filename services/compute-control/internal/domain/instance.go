@@ -40,6 +40,35 @@ type ConnectInfo struct {
 	HTTP    string `json:"http"`
 }
 
+// Kinds of instance.
+const (
+	KindInstance = "instance"
+	KindCluster  = "cluster"
+)
+
+// Cluster shape (F15). A node is 8 GPUs; a cluster is 2 or more nodes on one fabric.
+const (
+	GPUsPerNode          = 8
+	MinClusterGPUs       = 16
+	MaxClusterGPUs       = 256
+	SelfServeClusterGPUs = 32 // larger clusters are arranged with sales
+)
+
+// Node is one machine of a running cluster.
+type Node struct {
+	Name string `json:"name"`
+	SSH  string `json:"ssh"`
+}
+
+// BuildNodes names a running cluster's nodes and how to reach each (node 0 is the head node).
+func BuildNodes(id, region string, gpus int) []Node {
+	out := make([]Node, 0, gpus/GPUsPerNode)
+	for i := range gpus / GPUsPerNode {
+		out = append(out, Node{Name: fmt.Sprintf("node-%d", i), SSH: fmt.Sprintf("ssh ubuntu@node-%d.%s.%s.gpu.1trade.io", i, id, region)})
+	}
+	return out
+}
+
 // Instance is one customer on-demand GPU instance.
 type Instance struct {
 	ID              string
@@ -54,6 +83,11 @@ type Instance struct {
 	SupplySourceID  string
 	IdleStopMinutes *int // auto-stop after this many idle minutes; nil = none
 	IsPaper         bool
+	Reserved        bool   // its GPUs come from the tenant's prepaid reservation (F14): usage bills zero
+	Kind            string // KindInstance, or KindCluster (F15: multi-node, one fabric)
+	Network         string // clusters: "infiniband"
+	Topology        string // clusters: "fat-tree" | "rail-optimized"
+	Nodes           []Node // clusters: one entry per 8-GPU node, while running
 	CreatedAt       time.Time
 	StartedAt       time.Time // last time it entered running (zero if never)
 	LastMeteredAt   time.Time // watermark for per-second metering

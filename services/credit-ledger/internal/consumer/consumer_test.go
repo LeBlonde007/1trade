@@ -51,3 +51,12 @@ func TestSuperviseStartsOnceNATSIsUp(t *testing.T) {
 	stop()
 	stop() // idempotent
 }
+
+// TestZeroUnitsBookNothing: compute served from a prepaid reservation reports zero units; the
+// consumer acknowledges it without a ledger movement (the consumer here has no store, so any
+// movement would panic).
+func TestZeroUnitsBookNothing(t *testing.T) {
+	c := &UsageConsumer{}
+	c.handle(&nats.Msg{Subject: "compute.usage.v1", Data: []byte(`{"usage_id":"u-1","tenant_id":"00000000-0000-4000-8000-000000000001",
+		"credit_type":"gpu_h100","gpu_seconds":"3600.000000","units":"0.000000","reserved":true,"is_paper":true}`)})
+}
