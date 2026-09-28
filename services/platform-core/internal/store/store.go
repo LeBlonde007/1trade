@@ -91,6 +91,7 @@ type AuthUser struct {
 	IsPaper       bool
 	EmailVerified bool
 	SubAccountID  string // "" = the tenant's main balance
+	MFAEnabled    bool
 }
 
 // GetUserByEmail loads the login record (joined with the tenant for is_paper). ok=false if no such user.
@@ -100,9 +101,9 @@ func (s *Store) GetUserByEmail(ctx context.Context, email string) (AuthUser, boo
 	var org, sub *string
 	var roles []string
 	err := s.pool.QueryRow(ctx,
-		`SELECT u.id, u.tenant_id, u.org_id, u.password_hash, u.roles, t.is_paper, u.email_verified, u.sub_account_id::text
+		`SELECT u.id, u.tenant_id, u.org_id, u.password_hash, u.roles, t.is_paper, u.email_verified, u.sub_account_id::text, u.mfa_enabled
 		 FROM users u JOIN tenants t ON t.id = u.tenant_id WHERE u.email = $1`, email).
-		Scan(&u.UserID, &u.TenantID, &org, &u.PasswordHash, &roles, &u.IsPaper, &u.EmailVerified, &sub)
+		Scan(&u.UserID, &u.TenantID, &org, &u.PasswordHash, &roles, &u.IsPaper, &u.EmailVerified, &sub, &u.MFAEnabled)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return AuthUser{}, false, nil
 	}
@@ -123,6 +124,7 @@ func (s *Store) GetUserByEmail(ctx context.Context, email string) (AuthUser, boo
 // real-money gate without a second round trip (the gate reads it off the /me user object).
 type Identity struct {
 	UserID, Email, TenantID, OrgID, SubAccountID string
+	MFAEnabled                                   bool
 	Roles                          []domain.Role
 	IsPaper                        bool
 	KYCStatus                      domain.KYCStatus
@@ -135,9 +137,9 @@ func (s *Store) GetUserByID(ctx context.Context, id string) (Identity, bool, err
 	var roles []string
 	var kyc string
 	err := s.pool.QueryRow(ctx,
-		`SELECT u.id, u.email, u.tenant_id, u.org_id, u.roles, t.is_paper, t.kyc_status, coalesce(u.sub_account_id::text, '')
+		`SELECT u.id, u.email, u.tenant_id, u.org_id, u.roles, t.is_paper, t.kyc_status, coalesce(u.sub_account_id::text, ''), u.mfa_enabled
 		 FROM users u JOIN tenants t ON t.id = u.tenant_id WHERE u.id = $1`, id).
-		Scan(&idn.UserID, &idn.Email, &idn.TenantID, &org, &roles, &idn.IsPaper, &kyc, &idn.SubAccountID)
+		Scan(&idn.UserID, &idn.Email, &idn.TenantID, &org, &roles, &idn.IsPaper, &kyc, &idn.SubAccountID, &idn.MFAEnabled)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Identity{}, false, nil
 	}

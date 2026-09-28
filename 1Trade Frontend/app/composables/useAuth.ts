@@ -17,9 +17,20 @@ export interface Identity {
 export function useAuth() {
   const user = useState<Identity | null>('auth:user', () => null)
 
-  /** login verifies credentials and loads the identity. */
-  async function login(email: string, password: string) {
-    user.value = await $fetch<Identity>('/api/auth/login', { method: 'POST', body: { email, password } })
+  /**
+   * login verifies credentials and loads the identity. With two-factor on it returns
+   * { mfa_required: true } and no session yet — finish with verifySecondFactor.
+   */
+  async function login(email: string, password: string): Promise<Identity | { mfa_required: true }> {
+    const res = await $fetch<Identity | { mfa_required: true }>('/api/auth/login', { method: 'POST', body: { email, password } })
+    if ('mfa_required' in res) return res
+    user.value = res
+    return res
+  }
+
+  /** verifySecondFactor redeems the pending sign-in with an authenticator code or a recovery code. */
+  async function verifySecondFactor(code: string, recoveryCode = '') {
+    user.value = await $fetch<Identity>('/api/auth/login/2fa', { method: 'POST', body: { code, recovery_code: recoveryCode } })
     return user.value
   }
 
@@ -65,5 +76,5 @@ export function useAuth() {
     return await $fetch<{ sent: boolean }>('/api/auth/resend', { method: 'POST', body: { email } })
   }
 
-  return { user, login, signup, refresh, logout, resendVerification }
+  return { user, login, verifySecondFactor, signup, refresh, logout, resendVerification }
 }

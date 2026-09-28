@@ -104,7 +104,6 @@ const SESSIONS = [
   { id: 's2',    device: 'iPhone 15 Pro · iOS 17',     location: 'New York, US',  ip: '172.58.232.40', last: '2 hours ago',    current: false },
   { id: 's3',    device: 'Windows 11 · Edge 124',      location: 'Tokyo, JP',     ip: '210.140.92.18', last: '3 days ago',     current: false },
 ]
-const TWOFA = { method: 'TOTP · authenticator app', enrolled: '2026-03-14', backupCodes: 8 }
 
 // =====================================================
 // API Keys
@@ -506,26 +505,7 @@ onMounted(() => {
             </div>
           </div>
 
-          <div class="card">
-            <div class="card-head">
-              <span class="eyebrow"><span class="dot" /> Two-factor authentication</span>
-              <span class="status-tag verified">
-                <span class="dot" />
-                Enabled
-              </span>
-            </div>
-            <div class="card-body">
-              <dl class="kv-grid">
-                <dt>Method</dt><dd>{{ TWOFA.method }}</dd>
-                <dt>Enrolled</dt><dd>{{ TWOFA.enrolled }}</dd>
-                <dt>Backup codes</dt><dd>{{ TWOFA.backupCodes }} of 10 unused</dd>
-              </dl>
-              <div class="row-actions-end">
-                <button type="button" class="btn ghost">Regenerate backup codes</button>
-                <button type="button" class="btn secondary">Reset 2FA</button>
-              </div>
-            </div>
-          </div>
+          <TwoFactorCard />
 
           <div class="card">
             <div class="card-head">

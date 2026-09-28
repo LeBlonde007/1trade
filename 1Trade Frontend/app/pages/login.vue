@@ -24,11 +24,12 @@ const emailInitials = computed(() => {
   return (local.slice(0, 2) || 'EX').toUpperCase()
 })
 const showPw = ref(false)
-const code = ref('428')
-const rememberDevice = ref(false)
+const code = ref('')
+const useRecovery = ref(false)
+const recoveryCode = ref('')
 const codeInputs = ref<Array<HTMLInputElement | null>>([])
 
-// Real login via the BFF. (2FA is an M4 step; not reached until the backend supports it.)
+// Real login via the BFF. With two-factor on, the password step moves to the 2FA step.
 async function onCreds(e: Event) {
   e.preventDefault()
   authError.value = ''
@@ -37,7 +38,12 @@ async function onCreds(e: Event) {
   if (!email.value || !password.value) return
   submitting.value = true
   try {
-    await useAuth().login(email.value, password.value)
+    const res = await useAuth().login(email.value, password.value)
+    if ('mfa_required' in res) {
+      code.value = ''
+      step.value = '2fa'
+      return
+    }
     await navigateTo('/console')
   } catch (err: unknown) {
     const ex = err as { statusCode?: number; data?: { code?: string; message?: string } }
@@ -64,6 +70,27 @@ async function resendVerification() {
     /* the endpoint always 200s by design; ignore transport hiccups */
   } finally {
     resending.value = false
+  }
+}
+
+/** verify2fa finishes the sign-in with the authenticator code (or a recovery code). */
+async function verify2fa() {
+  authError.value = ''
+  if (useRecovery.value ? !recoveryCode.value.trim() : code.value.length !== 6) return
+  submitting.value = true
+  try {
+    await useAuth().verifySecondFactor(useRecovery.value ? '' : code.value, useRecovery.value ? recoveryCode.value.trim() : '')
+    await navigateTo('/console')
+  } catch (err: unknown) {
+    const ex = err as { data?: { code?: string; message?: string } }
+    const c = ex?.data?.code
+    authError.value = c === 'mfa_locked' ? 'Too many wrong codes — try again in 15 minutes.'
+      : c === 'invalid_challenge' ? 'That took too long — sign in again.'
+        : 'That code is not valid.'
+    if (c === 'invalid_challenge') step.value = 'creds'
+    code.value = ''
+  } finally {
+    submitting.value = false
   }
 }
 
@@ -286,10 +313,18 @@ onBeforeUnmount(() => {
             <span class="email-switch" @click="step = 'creds'">Not you?</span>
           </div>
 
-          <div class="field">
+          <p v-if="authError" class="form-error" role="alert">{{ authError }}</p>
+          <div v-if="useRecovery" class="field">
+            <div class="field-label">
+              <span>— Recovery code</span>
+              <a href="#" @click.prevent="useRecovery = false">Use the authenticator code →</a>
+            </div>
+            <input v-model="recoveryCode" class="input mono-input" placeholder="xxxxx-xxxxx" autocomplete="off" aria-label="Recovery code" />
+          </div>
+          <div v-else class="field">
             <div class="field-label">
               <span>— Authenticator code</span>
-              <a href="#">Use a backup code instead →</a>
+              <a href="#" @click.prevent="useRecovery = true">Use a recovery code instead →</a>
             </div>
             <div class="code-input" @paste="onPasteCode">
               <input
@@ -307,19 +342,10 @@ onBeforeUnmount(() => {
                 @keydown="e => onCodeKey(i - 1, e)"
               />
             </div>
-            <div class="code-meta">
-              <span class="resend">Didn't get a code? Re-sync authenticator →</span>
-              <span class="timer">Code refreshes in 00:18</span>
-            </div>
           </div>
 
-          <label class="remember-row">
-            <input v-model="rememberDevice" type="checkbox" />
-            Remember this device for 30 days
-          </label>
-
-          <button class="btn" type="button" @click="navigateTo('/trade')">
-            Verify and continue
+          <button class="btn" type="button" :disabled="submitting" @click="verify2fa">
+            {{ submitting ? 'Verifying…' : 'Verify and continue' }}
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square">
               <path d="M3 8h10M9 4l4 4-4 4" />
             </svg>

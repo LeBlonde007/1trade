@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: 1Trade Platform-Core API (auth, accounts, RBAC, keys, billing)
-  version: 1.6.0
+  version: 1.7.0
   description: >
     Identity for the whole platform. Owned by `platform-core`. Every other service authenticates
     inbound requests by verifying the JWT this service issues (see JwtClaims) — that's how each
@@ -16,6 +16,15 @@ info:
     balances: members placed in one carry `sub_account_id` in their JWT and are billed to it; admin
     or billing funds or drains it from the main balance through credit.yaml v1.4 transfer). Every
     change is audited. `/v1/auth/me` returns `sub_account_id`.
+
+    **v1.7.0 (2026-09-28, two-factor authentication).** TOTP (RFC 6238: SHA-1, 6 digits, 30 s, ±1
+    step). `setup` issues a secret (sealed with AES-256-GCM at rest) that only takes effect once a
+    code from it is confirmed at `enable`, which returns ten single-use recovery codes once (stored
+    as sha256). With 2FA on, `/v1/auth/login` answers `{mfa_required: true, mfa_token}` instead of a
+    session: a 5-minute challenge with no tenant_id, so no service accepts it as a session; redeem
+    it at `/v1/auth/login/2fa`. Every code works once (the time step is claimed atomically). Five
+    wrong codes lock the second step for 15 minutes (429 `mfa_locked`). Turning 2FA off needs a
+    current code or a recovery code. `/v1/auth/me` and members return `mfa_enabled`.
 
 servers:
   - { url: "https://api.1trade.io", description: prod }
@@ -286,6 +295,57 @@ paths:
       responses:
         '200': { description: Updated. }
         '403': { description: Insufficient role., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+
+  /v1/auth/2fa:
+    get:
+      tags: [auth]
+      summary: "v1.7: two-factor status."
+      operationId: mfaStatus
+      security: [{ tenantJwt: [] }]
+      responses:
+        '200': { description: Status., content: { application/json: { schema: { type: object, properties: { enabled: { type: boolean }, recovery_codes_left: { type: integer } } } } } }
+  /v1/auth/2fa/setup:
+    post:
+      tags: [auth]
+      summary: "v1.7: a fresh authenticator secret (pending until enabled). 409 mfa_enabled when already on."
+      operationId: mfaSetup
+      security: [{ tenantJwt: [] }]
+      responses:
+        '200': { description: Secret., content: { application/json: { schema: { type: object, properties: { secret: { type: string, description: "base32" }, otpauth_uri: { type: string } } } } } }
+        '409': { description: mfa_enabled., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+  /v1/auth/2fa/enable:
+    post:
+      tags: [auth]
+      summary: "v1.7: confirm a code from the pending secret; returns ten recovery codes, once."
+      operationId: mfaEnable
+      security: [{ tenantJwt: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [code], properties: { code: { type: string } } } } } }
+      responses:
+        '200': { description: On., content: { application/json: { schema: { type: object, properties: { enabled: { type: boolean }, recovery_codes: { type: array, items: { type: string } } } } } } }
+        '409': { description: no_setup., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+        '422': { description: bad_code., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+  /v1/auth/2fa/disable:
+    post:
+      tags: [auth]
+      summary: "v1.7: turn 2FA off with a current code or a recovery code."
+      operationId: mfaDisable
+      security: [{ tenantJwt: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { code: { type: string }, recovery_code: { type: string } } } } } }
+      responses:
+        '204': { description: Off. }
+        '409': { description: mfa_off., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+        '422': { description: bad_code., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+        '429': { description: mfa_locked., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+  /v1/auth/login/2fa:
+    post:
+      tags: [auth]
+      summary: "v1.7: redeem the login challenge with a code or a recovery code (no bearer: the challenge is the credential)."
+      operationId: loginSecondFactor
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [mfa_token], properties: { mfa_token: { type: string }, code: { type: string }, recovery_code: { type: string } } } } } }
+      responses:
+        '200': { description: Session., content: { application/json: { schema: { type: object, properties: { token: { type: string }, expires_at: { type: string, format: date-time } } } } } }
+        '401': { description: invalid_challenge | bad_code., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+        '429': { description: mfa_locked., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
 
   /v1/account/members:
     get:

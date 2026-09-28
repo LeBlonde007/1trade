@@ -38,6 +38,7 @@ type Config struct {
 	AppBaseURL               string        // public base URL of the web app, for links in emails
 	RequireEmailVerification bool          // gate login on a verified email; opt-in (default off), enabled by the deploy only when real SMTP is wired
 	TokenTTL                 time.Duration // issued-token lifetime
+	MFAKey                   string        // MFA_ENC_KEY: base64 32-byte key sealing TOTP secrets (default: derived from the JWT secret)
 }
 
 // Load reads configuration from the environment with sensible dev defaults.
@@ -53,6 +54,7 @@ func Load() Config {
 		Addr:                envOr("PLATFORM_ADDR", ":8001"),
 		DatabaseURL:         os.Getenv("DATABASE_URL"),
 		JWTSecret:           os.Getenv("PLATFORM_JWT_SECRET"),
+		MFAKey:              os.Getenv("MFA_ENC_KEY"),
 		ServiceToken:        os.Getenv("SERVICE_TOKEN"),
 		CreditLedgerURL:     envOr("CREDIT_LEDGER_URL", "http://credit-ledger:8002"),
 		StripeWebhookSecret: os.Getenv("STRIPE_WEBHOOK_SECRET"),

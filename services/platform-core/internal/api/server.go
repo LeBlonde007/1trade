@@ -30,6 +30,8 @@ type Server struct {
 	mux     *http.ServeMux
 	// transfer funds and drains sub-accounts through the ledger (nil = not configured).
 	transfer billing.BudgetMover
+	// mfaBox seals TOTP secrets at rest.
+	mfaBox domain.SecretBox
 }
 
 // New builds the routed handler with the default billing collaborators (mock Stripe until a key is
@@ -57,6 +59,7 @@ func NewWithBilling(cfg config.Config, st *store.Store, stripe billing.StripeCli
 		objStore = &storage.Store{}
 	}
 	s := &Server{cfg: cfg, st: st, stripe: stripe, booker: booker, mailer: mailer, storage: objStore, mux: http.NewServeMux()}
+	s.mfaBox = mfaBox(cfg)
 	if t, ok := booker.(billing.BudgetMover); ok {
 		s.transfer = t // the real ledger client books purchases and moves team budgets
 	}
@@ -114,6 +117,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /v1/account/kyc/{tenant_id}/decision", s.reviewKYC) // F22 — internal compliance decision (service token)
 	// OAuth is scaffolded; real provider wiring (client secrets via Vault) is a follow-up.
 	s.teamRoutes()
+	s.mfaRoutes()
 	s.mux.HandleFunc("GET /v1/auth/oauth/{provider}", notConfigured)
 	s.mux.HandleFunc("GET /v1/auth/oauth/{provider}/callback", notConfigured)
 }
@@ -219,6 +223,16 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusForbidden, "email_unverified", "verify your email to sign in — check your inbox")
 		return
 	}
+	// Two-factor: the password alone earns only a 5-minute challenge, redeemed at /v1/auth/login/2fa.
+	if au.MFAEnabled {
+		ch, err := domain.IssueMFAChallenge(s.cfg.JWTSecret, au.UserID)
+		if err != nil {
+			serverError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"mfa_required": true, "mfa_token": ch})
+		return
+	}
 	s.issue(w, http.StatusOK, au.UserID, domain.Claims{
 		TenantID: au.TenantID, OrgID: au.OrgID, SubAccountID: au.SubAccountID, Roles: au.Roles, IsPaper: au.IsPaper,
 	})
@@ -255,7 +269,7 @@ func (s *Server) me(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"user_id": idn.UserID, "email": idn.Email, "tenant_id": idn.TenantID,
 		"org_id": idn.OrgID, "roles": idn.Roles, "is_paper": idn.IsPaper, "kyc_status": idn.KYCStatus,
-		"sub_account_id": nilIfEmpty(idn.SubAccountID),
+		"sub_account_id": nilIfEmpty(idn.SubAccountID), "mfa_enabled": idn.MFAEnabled,
 	})
 }
 

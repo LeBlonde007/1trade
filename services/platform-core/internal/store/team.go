@@ -35,12 +35,13 @@ type Member struct {
 	Roles         []domain.Role
 	SubAccountID  *string
 	EmailVerified bool
+	MFAEnabled    bool
 	CreatedAt     time.Time
 }
 
 // ListMembers returns a tenant's users, oldest first.
 func (s *Store) ListMembers(ctx context.Context, tenantID string) ([]Member, error) {
-	rows, err := s.pool.Query(ctx, `SELECT id::text, email, roles, sub_account_id::text, email_verified, created_at
+	rows, err := s.pool.Query(ctx, `SELECT id::text, email, roles, sub_account_id::text, email_verified, mfa_enabled, created_at
 		FROM users WHERE tenant_id=$1 ORDER BY created_at, id`, tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("list members: %w", err)
@@ -50,7 +51,7 @@ func (s *Store) ListMembers(ctx context.Context, tenantID string) ([]Member, err
 	for rows.Next() {
 		var m Member
 		var roles []string
-		if err := rows.Scan(&m.ID, &m.Email, &roles, &m.SubAccountID, &m.EmailVerified, &m.CreatedAt); err != nil {
+		if err := rows.Scan(&m.ID, &m.Email, &roles, &m.SubAccountID, &m.EmailVerified, &m.MFAEnabled, &m.CreatedAt); err != nil {
 			return nil, err
 		}
 		m.Roles = toRoles(roles)

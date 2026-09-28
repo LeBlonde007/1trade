@@ -72,7 +72,7 @@ func writeTeamErr(w http.ResponseWriter, err error) {
 func memberJSON(m store.Member) map[string]any {
 	return map[string]any{
 		"id": m.ID, "email": m.Email, "roles": m.Roles, "sub_account_id": m.SubAccountID,
-		"email_verified": m.EmailVerified, "created_at": m.CreatedAt.UTC().Format(time.RFC3339),
+		"email_verified": m.EmailVerified, "mfa_enabled": m.MFAEnabled, "created_at": m.CreatedAt.UTC().Format(time.RFC3339),
 	}
 }
 
