@@ -74,9 +74,9 @@ is **M4** (the Team & SSO screens are live today and label exactly what's M4).
 |---|---|---|---|---|
 | 1 | Sign up (pick **Datacenter** account type) | `/signup` | ✅ | F02 |
 | 2 | Verify email | `/onboarding/verify` | ✅ | F02 |
-| 3 | DC dashboard — capacity / utilization overview | `/datacenter` | ⬜ showcase | F16 (M3/M4) |
-| 4 | Register GPU capacity (tier · count · region) | `/datacenter/register` | ⬜ showcase | F17 (M4) |
-| 5 | Capacity joins the **one supply pool** (owned + partner) | supply abstraction | ⬜ not built | F16 (M3) |
+| 3 | DC dashboard — capacity, health, in-use, GPU-hours served | `/datacenter` | ✅ live | F17 (2026-09-28) |
+| 4 | Register GPU capacity (tier · count · region · SLA) | `/datacenter/register` | ✅ live (activation by 1Trade review) | F17 (2026-09-28) |
+| 5 | Capacity joins the **one supply pool** (owned + partner), drains on suspend | supply abstraction | ✅ built | F16 (2026-09-28) |
 | 6 | GPU attestation / proof-of-authenticity | — | ⬜ not built | F19 (M5) |
 | 7 | Get paid — escrow + streamed payout per usage | — | ⬜ not built | F18 (M4) |
 | 8 | Wallet + settings (shared account layer) | `/wallet` · `/settings` | ✅ | F05 / F02 |

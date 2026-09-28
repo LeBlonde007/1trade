@@ -83,3 +83,28 @@ CREATE TABLE partner_capacity (
 
 - M4 (Gate 4): first partner DC.
 - M5 (Gate 5): second partner DC.
+
+## Status — self-serve registration and a live supply dashboard (2026-09-28)
+
+**Built** (on `supply.yaml` v1.0, F16):
+- **`/datacenter`**, live from compute-control:
+  - totals: registered GPUs, healthy GPUs, GPUs in use, sources taking work;
+  - per source: healthy / registered, in use, utilisation, heartbeat age, GPU-hours served over 30
+    days (from the payout-basis usage records), and a plain-language status;
+  - suspend / resume / retire (retire asks for confirmation);
+  - a 30-second refresh, the agent heartbeat snippet, and honest notes: activation by 1Trade review,
+    payout statements with F18.
+- **`/datacenter/register`**:
+  - a validated form, submitted under one idempotency key for the form's life, so a double submit
+    registers once;
+  - on success it shows the source id and the agent command.
+- **BFF** `/api/supply/**`: only the contract's fields are forwarded, and source ids are validated as
+  UUIDs before they reach the upstream path.
+- The mock rack grid, invented revenue and fake payout table are removed.
+
+**Verified live** (screenshots `docs/screenshots/datacenter*.png`): real services, a signup, the
+empty state, register through the form, operations activate, the agent heartbeats (12 of 16
+healthy), and the dashboard shows it active and taking work.
+
+**Open:** a partner-specific onboarding path (KYB, contract e-sign); the payout statement (F18);
+automated activation via attestation (F19); the agent binary with mTLS bootstrap.
