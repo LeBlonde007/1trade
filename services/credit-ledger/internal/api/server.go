@@ -46,6 +46,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /v1/credits/burn", s.movement(domain.OpBurn, -1))
 	s.mux.HandleFunc("GET /v1/credits/audit/chain-verify", s.chainVerify)
 	s.mux.HandleFunc("POST /v1/credits/convert", s.convert)
+	s.mux.HandleFunc("POST /v1/credits/transfer", s.transfer)
 	s.mux.HandleFunc("GET /v1/credits/conversion-rates", s.conversionRates)
 	s.mux.HandleFunc("GET /v1/credits/cash/balances", s.cashBalances)
 	s.mux.HandleFunc("GET /v1/credits/cash/transactions", s.cashTransactions)

@@ -18,7 +18,8 @@ const (
 	OpMint        Operation = "mint"
 	OpBurn        Operation = "burn"
 	OpRefund      Operation = "refund"
-	OpTrade       Operation = "trade" // Phase 2 (settlement on fill) — unused in Phase 1
+	OpTrade       Operation = "trade"    // Phase 2 (settlement on fill) — unused in Phase 1
+	OpTransfer    Operation = "transfer" // between a tenant's main balance and a sub-account (v1.4)
 )
 
 // ErrInsufficientCredit is returned when a movement would drive a balance negative.

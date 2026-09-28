@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -106,4 +107,50 @@ func (c *LedgerClient) GrantPaperCash(ctx context.Context, tenantID, amount, ide
 		return fmt.Errorf("grant paper cash: ledger returned %d", resp.StatusCode)
 	}
 	return nil
+}
+
+// ErrInsufficientCredit: the ledger refused a transfer for lack of credits (402).
+var ErrInsufficientCredit = errors.New("ledger: insufficient credit")
+
+// Transfer moves credits between a tenant's main balance and a sub-account (credit.yaml v1.4).
+type Transfer struct {
+	TenantID   string
+	FromSub    *string // nil = the main balance
+	ToSub      *string
+	CreditType string
+	Amount     string
+	IsPaper    bool
+}
+
+// BudgetMover is what team budgets need from the ledger.
+type BudgetMover interface {
+	Transfer(ctx context.Context, t Transfer, idempotencyKey string) error
+}
+
+// Transfer POSTs /v1/credits/transfer with the service token; idempotent on the key.
+func (c *LedgerClient) Transfer(ctx context.Context, t Transfer, idempotencyKey string) error {
+	body, _ := json.Marshal(map[string]any{
+		"tenant_id": t.TenantID, "from_sub_account_id": t.FromSub, "to_sub_account_id": t.ToSub,
+		"credit_type": t.CreditType, "amount": t.Amount, "is_paper": t.IsPaper,
+	})
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url+"/v1/credits/transfer", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.serviceToken)
+	req.Header.Set("Idempotency-Key", idempotencyKey)
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("transfer: %w", err)
+	}
+	defer resp.Body.Close()
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return nil
+	case http.StatusPaymentRequired:
+		return ErrInsufficientCredit
+	default:
+		return fmt.Errorf("transfer: ledger returned %d", resp.StatusCode)
+	}
 }

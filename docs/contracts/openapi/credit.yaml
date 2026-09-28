@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: 1Trade Credit Ledger API
-  version: 1.3.0
+  version: 1.4.0
   description: >
     Per-tenant prepaid credit balances, append-only hash-chained transactions, purchases, and
     conversions. Owned by `credit-ledger`; see docs/contracts/credit-types.md and
@@ -35,6 +35,13 @@ info:
         yet live), and it already refuses such a 200.
       - `Reservation` gains `created_at`.
 
+
+    v1.4.0 (2026-09-28, team budgets) adds `POST /v1/credits/transfer`: move credits of one type
+    between a tenant's main balance and one of its sub-accounts (or between two sub-accounts), same
+    tenant and same side (paper or real). Two legs with operation `transfer` in one DB transaction,
+    each extending its own balance's hash chain; credits are never created or lost. Service token
+    only (platform-core calls it after its own RBAC check), no dev shortcut. Members placed in a
+    sub-account are billed to its balances, so the tenant funds it first.
 servers:
   - url: https://api.1trade.io
     description: prod
@@ -108,6 +115,41 @@ paths:
       responses:
         '200': { description: Booked., content: { application/json: { schema: { $ref: '#/components/schemas/Transaction' } } } }
         '409': { $ref: '#/components/responses/IdempotencyConflict' }
+        '422': { $ref: '#/components/responses/Error' }
+
+  /v1/credits/transfer:
+    post:
+      tags: [internal]
+      summary: "v1.4: move credits between a tenant's main balance and a sub-account (service token only)."
+      operationId: transfer
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tenant_id, credit_type, amount, is_paper]
+              additionalProperties: false
+              properties:
+                tenant_id:           { type: string, format: uuid }
+                from_sub_account_id: { type: string, format: uuid, nullable: true, description: "null = the main balance" }
+                to_sub_account_id:   { type: string, format: uuid, nullable: true, description: "null = the main balance; must differ from from" }
+                credit_type:         { $ref: '#/components/schemas/CreditType' }
+                amount:              { $ref: '#/components/schemas/Decimal' }
+                is_paper:            { type: boolean }
+      responses:
+        '200':
+          description: Both legs booked (a replay returns the original pair).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  debit:  { $ref: '#/components/schemas/Transaction' }
+                  credit: { $ref: '#/components/schemas/Transaction' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '402': { $ref: '#/components/responses/InsufficientCredit' }
         '422': { $ref: '#/components/responses/Error' }
 
   /v1/credits/convert:
@@ -476,7 +518,7 @@ components:
         tenant_id:      { type: string, format: uuid }
         sub_account_id: { type: string, format: uuid, nullable: true }
         credit_type:    { $ref: '#/components/schemas/CreditType' }
-        operation:      { type: string, enum: [purchase, consumption, conversion, mint, burn, refund, trade] }
+        operation:      { type: string, enum: [purchase, consumption, conversion, mint, burn, refund, trade, transfer] }
         amount:         { $ref: '#/components/schemas/Decimal', description: "signed delta applied to the balance" }
         reference_id:   { type: string, nullable: true, description: "e.g. stripe event id, usage event id" }
         balance_after:  { $ref: '#/components/schemas/Decimal' }

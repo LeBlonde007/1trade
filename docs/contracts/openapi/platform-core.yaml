@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: 1Trade Platform-Core API (auth, accounts, RBAC, keys, billing)
-  version: 1.5.0
+  version: 1.6.0
   description: >
     Identity for the whole platform. Owned by `platform-core`. Every other service authenticates
     inbound requests by verifying the JWT this service issues (see JwtClaims) — that's how each
@@ -9,11 +9,20 @@ info:
     (this v1 covers email+password, OAuth, API keys, and the account/org surface). See
     docs/plans/features/F02-auth-and-sso.md and F03-accounts-orgs-rbac.md.
 
+    **v1.6.0 (2026-09-28, team management).** Members (list; admins remove — never themselves, never
+    the last admin), invitations (admins invite an email with roles and optionally a sub-account; the
+    emailed token is single use, 7 days, and accepting it creates a verified user in the inviting
+    tenant and signs them in; one account per email), and sub-accounts (teams with their own ledger
+    balances: members placed in one carry `sub_account_id` in their JWT and are billed to it; admin
+    or billing funds or drains it from the main balance through credit.yaml v1.4 transfer). Every
+    change is audited. `/v1/auth/me` returns `sub_account_id`.
+
 servers:
   - { url: "https://api.1trade.io", description: prod }
   - { url: "http://localhost:8080", description: "local (k3d ingress)" }
 
 tags:
+  - { name: team, description: "v1.6: members, invitations, sub-accounts." }
   - { name: auth, description: "Login, OAuth, session, API keys." }
   - { name: accounts, description: "Tenants, orgs, users, roles." }
   - { name: billing, description: "Credit purchase — Stripe checkout, webhook, purchase history." }
@@ -277,6 +286,167 @@ paths:
       responses:
         '200': { description: Updated. }
         '403': { description: Insufficient role., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+
+  /v1/account/members:
+    get:
+      tags: [team]
+      summary: "v1.6: the tenant's members (any member)."
+      operationId: listMembers
+      security: [{ tenantJwt: [] }]
+      responses:
+        '200': { description: Members., content: { application/json: { schema: { type: object, properties: { members: { type: array, items: { $ref: '#/components/schemas/Member' } } } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/account/members/{id}:
+    delete:
+      tags: [team]
+      summary: "v1.6: remove a member (admin). 409 `self` for yourself, 409 `last_admin` for the last admin."
+      operationId: removeMember
+      security: [{ tenantJwt: [] }]
+      parameters: [ { name: id, in: path, required: true, schema: { type: string, format: uuid } } ]
+      responses:
+        '204': { description: Removed. }
+        '403': { description: Not an admin., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+        '404': { description: No such member., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+        '409': { description: self | last_admin., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+
+  /v1/account/members/{id}/sub-account:
+    put:
+      tags: [team]
+      summary: "v1.6: place a member in a sub-account (admin); null = the main balance. Takes effect at their next sign-in."
+      operationId: setMemberSubAccount
+      security: [{ tenantJwt: [] }]
+      parameters: [ { name: id, in: path, required: true, schema: { type: string, format: uuid } } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [sub_account_id], properties: { sub_account_id: { type: string, format: uuid, nullable: true } } } } }
+      responses:
+        '200': { description: Set. }
+        '404': { description: No such member or sub-account in this tenant., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+
+  /v1/account/invites:
+    get:
+      tags: [team]
+      summary: "v1.6: pending invitations (admin)."
+      operationId: listInvites
+      security: [{ tenantJwt: [] }]
+      responses:
+        '200': { description: Invitations., content: { application/json: { schema: { type: object, properties: { invites: { type: array, items: { $ref: '#/components/schemas/Invite' } } } } } } }
+    post:
+      tags: [team]
+      summary: "v1.6: invite an email (admin). Roles default to viewer. The link is emailed; in dev without mail it is returned as dev_token."
+      operationId: createInvite
+      security: [{ tenantJwt: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              additionalProperties: false
+              properties:
+                email:          { type: string, format: email }
+                roles:          { type: array, items: { $ref: '#/components/schemas/Role' } }
+                sub_account_id: { type: string, format: uuid, nullable: true }
+      responses:
+        '201': { description: Invited., content: { application/json: { schema: { $ref: '#/components/schemas/Invite' } } } }
+        '404': { description: No such sub-account in this tenant., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+        '409': { description: invite_pending | email_taken., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+        '422': { description: Bad email or role., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+
+  /v1/account/invites/{id}:
+    delete:
+      tags: [team]
+      summary: "v1.6: revoke a pending invitation (admin)."
+      operationId: revokeInvite
+      security: [{ tenantJwt: [] }]
+      parameters: [ { name: id, in: path, required: true, schema: { type: string, format: uuid } } ]
+      responses:
+        '204': { description: Revoked. }
+        '404': { description: No such pending invitation., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+
+  /v1/account/invites/lookup:
+    get:
+      tags: [team]
+      summary: "v1.6: what an invitation is for (no bearer: the token is the credential). 404 when invalid, used, revoked or expired."
+      operationId: lookupInvite
+      parameters: [ { name: token, in: query, required: true, schema: { type: string } } ]
+      responses:
+        '200':
+          description: The invitation.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  email:       { type: string }
+                  tenant_name: { type: string }
+                  roles:       { type: array, items: { $ref: '#/components/schemas/Role' } }
+                  expires_at:  { type: string, format: date-time }
+        '404': { description: invite_invalid., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+
+  /v1/account/invites/accept:
+    post:
+      tags: [team]
+      summary: "v1.6: accept an invitation (no bearer: the token is the credential); creates the user and signs them in. Single use."
+      operationId: acceptInvite
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [token, password], properties: { token: { type: string }, password: { type: string, format: password, minLength: 8, maxLength: 72 } } } } }
+      responses:
+        '201': { description: Created + authenticated., content: { application/json: { schema: { type: object, properties: { token: { type: string }, expires_at: { type: string, format: date-time } } } } } }
+        '404': { description: invite_invalid., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+        '409': { description: email_taken., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+        '422': { description: weak_password., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+
+  /v1/account/sub-accounts:
+    get:
+      tags: [team]
+      summary: "v1.6: the tenant's sub-accounts with member counts."
+      operationId: listSubAccounts
+      security: [{ tenantJwt: [] }]
+      responses:
+        '200': { description: Sub-accounts., content: { application/json: { schema: { type: object, properties: { sub_accounts: { type: array, items: { $ref: '#/components/schemas/SubAccount' } } } } } } }
+    post:
+      tags: [team]
+      summary: "v1.6: create a sub-account (admin). Names are unique per tenant."
+      operationId: createSubAccount
+      security: [{ tenantJwt: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [name], properties: { name: { type: string, minLength: 1, maxLength: 80 } } } } }
+      responses:
+        '201': { description: Created., content: { application/json: { schema: { $ref: '#/components/schemas/SubAccount' } } } }
+        '409': { description: name_taken., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+
+  /v1/account/sub-accounts/{id}/transfer:
+    post:
+      tags: [team]
+      summary: "v1.6: fund a sub-account from the main balance, or return credits to it (admin or billing). Idempotent on the key."
+      operationId: transferSubAccount
+      security: [{ tenantJwt: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [credit_type, amount, direction]
+              additionalProperties: false
+              properties:
+                credit_type: { type: string, description: "see credit-types.md" }
+                amount:      { type: string, description: "positive fixed-point, at most 6 decimals" }
+                direction:   { type: string, enum: [fund, return] }
+      responses:
+        '200': { description: Moved. }
+        '402': { description: insufficient_credit in the balance moved from., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+        '403': { description: Needs admin or billing., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+        '404': { description: No such sub-account in this tenant., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+        '502': { description: The ledger did not complete it; retry with the same key., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
 
   /v1/account/orgs:
     post:
@@ -696,6 +866,33 @@ components:
         status:      { type: string, enum: [pending, paid, failed] }
         created_at:  { type: string, format: date-time }
         paid_at:     { type: string, format: date-time, nullable: true }
+    Member:
+      type: object
+      properties:
+        id:             { type: string, format: uuid }
+        email:          { type: string }
+        roles:          { type: array, items: { $ref: '#/components/schemas/Role' } }
+        sub_account_id: { type: string, format: uuid, nullable: true }
+        email_verified: { type: boolean }
+        created_at:     { type: string, format: date-time }
+    Invite:
+      type: object
+      properties:
+        id:             { type: string, format: uuid }
+        email:          { type: string }
+        roles:          { type: array, items: { $ref: '#/components/schemas/Role' } }
+        sub_account_id: { type: string, format: uuid, nullable: true }
+        invited_by:     { type: string, format: uuid }
+        created_at:     { type: string, format: date-time }
+        expires_at:     { type: string, format: date-time }
+        dev_token:      { type: string, description: "dev only, when no mail transport is configured" }
+    SubAccount:
+      type: object
+      properties:
+        id:         { type: string, format: uuid }
+        name:       { type: string }
+        members:    { type: integer }
+        created_at: { type: string, format: date-time }
     ApiError:
       type: object
       required: [code, message]

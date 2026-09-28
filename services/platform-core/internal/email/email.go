@@ -91,6 +91,21 @@ func (s Sender) SendVerification(to, link string) error {
 	return s.send(to, buildMessage(s.from, to, subject, body))
 }
 
+// SendInvite emails an invitation to join a tenant. No-op (nil) when no transport is configured.
+func (s Sender) SendInvite(to, tenantName, link string) error {
+	if !s.Enabled() {
+		return nil
+	}
+	subject := "You're invited to " + tenantName + " on 1Trade"
+	body := "You've been invited to join " + tenantName + " on 1Trade.\r\n\r\n" +
+		"Accept the invitation and choose a password here (the link expires in 7 days):\r\n" + link + "\r\n\r\n" +
+		"If you weren't expecting this, you can ignore this message.\r\n"
+	if s.apiURL != "" {
+		return s.sendAPI(to, subject, body)
+	}
+	return s.send(to, buildMessage(s.from, to, subject, body))
+}
+
 // mailtrapPayload is the JSON body of the Mailtrap-style Email API (also matches several other HTTP
 // providers): a structured from/to plus subject and a text body.
 type mailtrapPayload struct {
@@ -217,6 +232,15 @@ func buildMessage(from, to, subject, body string) []byte {
 	b.WriteString("\r\n")
 	b.WriteString(body)
 	return []byte(b.String())
+}
+
+// InviteURL builds the web app's invitation link for a raw token (consumed by /invite).
+func InviteURL(baseURL, token string) string {
+	base := strings.TrimRight(baseURL, "/")
+	if base == "" {
+		base = "http://localhost:3000"
+	}
+	return fmt.Sprintf("%s/invite?token=%s", base, token)
 }
 
 // VerifyURL builds the web app's verification link for a raw token (consumed by /onboarding/verify).

@@ -10,13 +10,13 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/trade1/platform-core/internal/billing"
 	"github.com/trade1/platform-core/internal/config"
 	"github.com/trade1/platform-core/internal/domain"
 	"github.com/trade1/platform-core/internal/email"
 	"github.com/trade1/platform-core/internal/storage"
 	"github.com/trade1/platform-core/internal/store"
-	"github.com/google/uuid"
 )
 
 // Server wires config + store + the billing collaborators into an http.Handler.
@@ -28,6 +28,8 @@ type Server struct {
 	mailer  email.Sender
 	storage *storage.Store
 	mux     *http.ServeMux
+	// transfer funds and drains sub-accounts through the ledger (nil = not configured).
+	transfer billing.BudgetMover
 }
 
 // New builds the routed handler with the default billing collaborators (mock Stripe until a key is
@@ -55,6 +57,9 @@ func NewWithBilling(cfg config.Config, st *store.Store, stripe billing.StripeCli
 		objStore = &storage.Store{}
 	}
 	s := &Server{cfg: cfg, st: st, stripe: stripe, booker: booker, mailer: mailer, storage: objStore, mux: http.NewServeMux()}
+	if t, ok := booker.(billing.BudgetMover); ok {
+		s.transfer = t // the real ledger client books purchases and moves team budgets
+	}
 	s.routes()
 	return s
 }
@@ -84,11 +89,11 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /v1/auth/keys", s.listKeys)
 	s.mux.HandleFunc("POST /v1/auth/keys", s.createKey)
 	s.mux.HandleFunc("DELETE /v1/auth/keys/{id}", s.revokeKey)
-	s.mux.HandleFunc("POST /v1/auth/keys/introspect", s.introspectKey) // internal (service token)
-	s.mux.HandleFunc("POST /v1/files/presign", s.presignUpload)        // object storage (Spaces) — presigned upload
-	s.mux.HandleFunc("GET /v1/conversations", s.listConversations)     // chat history (playground) — list
-	s.mux.HandleFunc("POST /v1/conversations", s.createConversation)   // create
-	s.mux.HandleFunc("GET /v1/conversations/{id}", s.getConversation)  // load full transcript
+	s.mux.HandleFunc("POST /v1/auth/keys/introspect", s.introspectKey)      // internal (service token)
+	s.mux.HandleFunc("POST /v1/files/presign", s.presignUpload)             // object storage (Spaces) — presigned upload
+	s.mux.HandleFunc("GET /v1/conversations", s.listConversations)          // chat history (playground) — list
+	s.mux.HandleFunc("POST /v1/conversations", s.createConversation)        // create
+	s.mux.HandleFunc("GET /v1/conversations/{id}", s.getConversation)       // load full transcript
 	s.mux.HandleFunc("PUT /v1/conversations/{id}", s.updateConversation)    // save transcript
 	s.mux.HandleFunc("DELETE /v1/conversations/{id}", s.deleteConversation) // delete
 	s.mux.HandleFunc("POST /v1/billing/checkout", s.createCheckout)
@@ -108,6 +113,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /v1/account/kyc", s.submitKYC)                      // F22 — submit identity verification
 	s.mux.HandleFunc("POST /v1/account/kyc/{tenant_id}/decision", s.reviewKYC) // F22 — internal compliance decision (service token)
 	// OAuth is scaffolded; real provider wiring (client secrets via Vault) is a follow-up.
+	s.teamRoutes()
 	s.mux.HandleFunc("GET /v1/auth/oauth/{provider}", notConfigured)
 	s.mux.HandleFunc("GET /v1/auth/oauth/{provider}/callback", notConfigured)
 }
@@ -214,7 +220,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.issue(w, http.StatusOK, au.UserID, domain.Claims{
-		TenantID: au.TenantID, OrgID: au.OrgID, Roles: au.Roles, IsPaper: au.IsPaper,
+		TenantID: au.TenantID, OrgID: au.OrgID, SubAccountID: au.SubAccountID, Roles: au.Roles, IsPaper: au.IsPaper,
 	})
 }
 
@@ -249,6 +255,7 @@ func (s *Server) me(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"user_id": idn.UserID, "email": idn.Email, "tenant_id": idn.TenantID,
 		"org_id": idn.OrgID, "roles": idn.Roles, "is_paper": idn.IsPaper, "kyc_status": idn.KYCStatus,
+		"sub_account_id": nilIfEmpty(idn.SubAccountID),
 	})
 }
 
@@ -368,6 +375,14 @@ func (s *Server) introspectKey(w http.ResponseWriter, r *http.Request) {
 // notConfigured is the OAuth scaffold response until provider secrets are wired.
 func notConfigured(w http.ResponseWriter, _ *http.Request) {
 	writeErr(w, http.StatusNotImplemented, "not_configured", "OAuth provider not configured")
+}
+
+// nilIfEmpty renders "" as JSON null.
+func nilIfEmpty(v string) any {
+	if v == "" {
+		return nil
+	}
+	return v
 }
 
 // writeJSON writes a JSON response.

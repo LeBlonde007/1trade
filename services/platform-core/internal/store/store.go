@@ -90,18 +90,19 @@ type AuthUser struct {
 	Roles         []domain.Role
 	IsPaper       bool
 	EmailVerified bool
+	SubAccountID  string // "" = the tenant's main balance
 }
 
 // GetUserByEmail loads the login record (joined with the tenant for is_paper). ok=false if no such user.
 func (s *Store) GetUserByEmail(ctx context.Context, email string) (AuthUser, bool, error) {
 	email = domain.NormalizeEmail(email) // match Signup's canonical form (case-insensitive login)
 	var u AuthUser
-	var org *string
+	var org, sub *string
 	var roles []string
 	err := s.pool.QueryRow(ctx,
-		`SELECT u.id, u.tenant_id, u.org_id, u.password_hash, u.roles, t.is_paper, u.email_verified
+		`SELECT u.id, u.tenant_id, u.org_id, u.password_hash, u.roles, t.is_paper, u.email_verified, u.sub_account_id::text
 		 FROM users u JOIN tenants t ON t.id = u.tenant_id WHERE u.email = $1`, email).
-		Scan(&u.UserID, &u.TenantID, &org, &u.PasswordHash, &roles, &u.IsPaper, &u.EmailVerified)
+		Scan(&u.UserID, &u.TenantID, &org, &u.PasswordHash, &roles, &u.IsPaper, &u.EmailVerified, &sub)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return AuthUser{}, false, nil
 	}
@@ -111,6 +112,9 @@ func (s *Store) GetUserByEmail(ctx context.Context, email string) (AuthUser, boo
 	if org != nil {
 		u.OrgID = *org
 	}
+	if sub != nil {
+		u.SubAccountID = *sub
+	}
 	u.Roles = toRoles(roles)
 	return u, true, nil
 }
@@ -118,7 +122,7 @@ func (s *Store) GetUserByEmail(ctx context.Context, email string) (AuthUser, boo
 // Identity is the current-user view returned by /v1/auth/me. KYCStatus lets the web app render the
 // real-money gate without a second round trip (the gate reads it off the /me user object).
 type Identity struct {
-	UserID, Email, TenantID, OrgID string
+	UserID, Email, TenantID, OrgID, SubAccountID string
 	Roles                          []domain.Role
 	IsPaper                        bool
 	KYCStatus                      domain.KYCStatus
@@ -131,9 +135,9 @@ func (s *Store) GetUserByID(ctx context.Context, id string) (Identity, bool, err
 	var roles []string
 	var kyc string
 	err := s.pool.QueryRow(ctx,
-		`SELECT u.id, u.email, u.tenant_id, u.org_id, u.roles, t.is_paper, t.kyc_status
+		`SELECT u.id, u.email, u.tenant_id, u.org_id, u.roles, t.is_paper, t.kyc_status, coalesce(u.sub_account_id::text, '')
 		 FROM users u JOIN tenants t ON t.id = u.tenant_id WHERE u.id = $1`, id).
-		Scan(&idn.UserID, &idn.Email, &idn.TenantID, &org, &roles, &idn.IsPaper, &kyc)
+		Scan(&idn.UserID, &idn.Email, &idn.TenantID, &org, &roles, &idn.IsPaper, &kyc, &idn.SubAccountID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Identity{}, false, nil
 	}

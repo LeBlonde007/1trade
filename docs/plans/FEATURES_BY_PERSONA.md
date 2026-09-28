@@ -58,7 +58,8 @@ each step marked done / showcase / paused. Pair with [STATUS.md](STATUS.md) (tre
 | Console ops · budgets · purchase history | `/console` | ✅ | F20 · F06 |
 | **Admin home** — Settings → Account links to live Billing · Team · SSO · Audit (sidebar stays product-only) | `/settings` · `/enterprise/billing` | ✅ **live billing** (budget get/set · real balances + MTD spend · purchase history; honest Stripe/sandbox) | F06 (v0.3.11) |
 | Audit log + RBAC (admin actions → queryable trail) | `/enterprise/audit` | ✅ backend + **rich screen live** (filters + before→after diffs, admin-only) | F03 (v0.1.2) + F23 |
-| Enterprise team management + SAML SSO + sub-accounts | `/enterprise/teams` · `/enterprise/sso` | 🟩 **screens live + honest** (real account · member · roles · RBAC ref; sub-accounts / invites / SAML / SCIM / 2FA tagged M4 — no mock) | F02/F03 (M4) |
+| Team management — **members, email invitations (single-use link → `/invite`), sub-accounts with their own funded balances** | `/enterprise/teams` · `/invite` | ✅ live (2026-09-28) | F03 (M4) |
+| SAML SSO · 2FA · SCIM | `/enterprise/sso` · `/settings` | see F02 status (SCIM not built) | F02 (M4) |
 
 **Live today:** all of Phase 1 (→ console) + Phase 2, **including** the rich audit screen (F23) and
 the live Settings → Account admin home — **Billing · Team · SSO · Audit are all real screens on live

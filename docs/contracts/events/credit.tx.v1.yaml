@@ -23,7 +23,7 @@ payload_schema:
       enum: [ai_index, text, speech, image, video, embeddings, gpu_h100, gpu_h200]
     operation:
       type: string
-      enum: [purchase, consumption, conversion, mint, burn, refund, trade]
+      enum: [purchase, consumption, conversion, mint, burn, refund, trade, transfer]   # transfer: credit.yaml v1.4
     amount:         { type: string, description: "signed fixed-point decimal delta (NUMERIC(20,6)) as a string" }
     reference_id:   { type: [string, "null"] }
     balance_after:  { type: string, description: "fixed-point decimal string" }
