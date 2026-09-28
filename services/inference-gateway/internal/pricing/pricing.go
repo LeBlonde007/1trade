@@ -38,3 +38,20 @@ func UnitsForCount(price string, count int) (string, error) {
 	units := new(big.Rat).Mul(p, new(big.Rat).SetInt64(int64(count)))
 	return units.FloatString(6), nil
 }
+
+// UnitsPerBlock returns price × n / block as a fixed-point 6-decimal string, for models priced per
+// block of something other than 1K tokens: embeddings (per 1M tokens) and speech-to-text (per
+// minute = 60 seconds). UnitsForTokens is UnitsPerBlock with block 1000.
+func UnitsPerBlock(price string, n, block int) (string, error) {
+	p, ok := new(big.Rat).SetString(price)
+	if !ok {
+		return "", fmt.Errorf("invalid price %q", price)
+	}
+	if block <= 0 {
+		return "", fmt.Errorf("invalid block %d", block)
+	}
+	if n < 0 {
+		n = 0
+	}
+	return new(big.Rat).Mul(p, big.NewRat(int64(n), int64(block))).FloatString(6), nil
+}

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/trade1/cli/internal/client"
 	"github.com/trade1/cli/internal/config"
@@ -243,20 +244,32 @@ func cmdCatalog(cfg config.Config, _ []string) error {
 	}
 	var out struct {
 		Data []struct {
-			ID       string `json:"id"`
+			ID     string `json:"id"`
 			Trade1 struct {
-				Modality string `json:"modality"`
-				Unit     string `json:"unit"`
-				Price    string `json:"price"`
+				Modality    string `json:"modality"`
+				Unit        string `json:"unit"`
+				Price       string `json:"price"`
+				Status      string `json:"status"`
+				Deprecation *struct {
+					SunsetAt    time.Time `json:"sunset_at"`
+					Replacement string    `json:"replacement"`
+				} `json:"deprecation"`
 			} `json:"trade1"`
 		} `json:"data"`
 	}
 	if err := client.Do("GET", cfg.GatewayURL, "/v1/models", cfg.Token, nil, nil, &out); err != nil {
 		return err
 	}
-	fmt.Println(ui.Bold(fmt.Sprintf("%-20s %-10s %14s  %s", "MODEL", "MODALITY", "PRICE", "UNIT")))
+	fmt.Println(ui.Bold(fmt.Sprintf("%-20s %-13s %14s  %s", "MODEL", "MODALITY", "PRICE", "UNIT")))
 	for _, m := range out.Data {
-		fmt.Printf("%-20s %-10s %14s  %s\n", m.ID, m.Trade1.Modality, m.Trade1.Price, ui.Dim(m.Trade1.Unit))
+		fmt.Printf("%-20s %-13s %14s  %s\n", m.ID, m.Trade1.Modality, m.Trade1.Price, ui.Dim(m.Trade1.Unit))
+		if d := m.Trade1.Deprecation; m.Trade1.Status == "deprecated" && d != nil {
+			note := "  ⚠ deprecated — stops serving " + d.SunsetAt.UTC().Format(time.DateOnly)
+			if d.Replacement != "" {
+				note += "; use " + d.Replacement
+			}
+			fmt.Println(ui.Dim(note))
+		}
 	}
 	return nil
 }

@@ -53,6 +53,7 @@ func StreamChat(baseURL, path, token string, body any, onToken func(string)) (Us
 		return usage, err
 	}
 	defer resp.Body.Close()
+	warnDeprecation(resp.Header)
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return usage, apiErrorFromBody(resp)
 	}

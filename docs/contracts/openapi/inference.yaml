@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: 1Trade Inference API (chat, completions, embeddings, audio, images)
-  version: 1.0.0
+  version: 1.1.0
   description: >
     **The 1Trade inference API.** Owned by `inference-ml` (the inference-gateway). It is
     wire-compatible with the OpenAI request/response format so a customer migrates by changing one
@@ -15,6 +15,18 @@ info:
     from the authenticated tenant, never from the request body. See
     docs/plans/features/F08-inference-gateway.md, events/inference.usage.v1.yaml, and
     credit-types.md §2 (modality → credit_type).
+
+    v1.1.0 (2026-09-28, F10) — additive:
+      - Catalog metadata on `Model.trade1`: `category`, `context_length`, `status`, `deprecation`
+        (announced_at, sunset_at, replacement), and `latency_p50_ms` (measured by the gateway over
+        recent requests; null until the model has served one).
+      - Model lifecycle: a deprecated model keeps serving with `Deprecation` (RFC 9745), `Sunset`
+        (RFC 8594) and, when there is one, a `Link: </v1/models/ID>; rel="successor-version"`
+        header. At least 30 days after the announcement it retires: every inference endpoint
+        answers `410 model_retired` naming the replacement, and `/v1/models` stops listing it.
+      - `modality` covers what the catalog serves (vision, docs, code, agent and transcription bill
+        per their `credit_type`). Embeddings bill per 1M input tokens; speech-to-text per minute
+        of audio, pro rata to the second, rounded up.
 
 servers:
   - { url: "https://api.1trade.io", description: prod }
@@ -46,6 +58,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '402': { $ref: '#/components/responses/InsufficientCredit' }
         '404': { $ref: '#/components/responses/ModelNotFound' }
+        '410': { $ref: '#/components/responses/ModelRetired' }
         '429': { $ref: '#/components/responses/RateLimited' }
 
   /v1/completions:
@@ -65,6 +78,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '402': { $ref: '#/components/responses/InsufficientCredit' }
         '404': { $ref: '#/components/responses/ModelNotFound' }
+        '410': { $ref: '#/components/responses/ModelRetired' }
         '429': { $ref: '#/components/responses/RateLimited' }
 
   /v1/embeddings:
@@ -84,6 +98,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '402': { $ref: '#/components/responses/InsufficientCredit' }
         '404': { $ref: '#/components/responses/ModelNotFound' }
+        '410': { $ref: '#/components/responses/ModelRetired' }
 
   /v1/audio/transcriptions:
     post:
@@ -198,6 +213,11 @@ components:
               buy_credits_url: "https://app.1trade.io/billing/buy"
     ModelNotFound:
       description: Unknown or unavailable model id.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+    ModelRetired:
+      description: >
+        v1.1: the model passed its sunset date. `code: model_retired`; `details` carries `sunset_at`
+        and `replacement` (when there is one).
       content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
     RateLimited:
       description: Per-tenant rate/quota exceeded (fair-scheduling guard).
@@ -359,10 +379,22 @@ components:
           type: object
           description: 1Trade pricing/metadata extension.
           properties:
-            modality:    { type: string, enum: [text, speech, image, video, embeddings] }
+            modality:    { type: string, enum: [text, speech, image, video, embeddings, vision, docs, code, agent, transcription] }
             credit_type: { type: string, enum: [text, speech, image, video, embeddings] }
-            unit:        { type: string, description: "billable unit, e.g. '1K tokens'" }
+            unit:        { type: string, description: "billable unit, e.g. '1K tokens', '1M tokens', '1 minute'" }
             price:       { type: string, description: "credits per unit, fixed-point decimal string" }
+            category:    { type: string, description: "v1.1; catalog grouping, e.g. text-general, text-small, speech-stt, embeddings" }
+            context_length: { type: integer, description: "v1.1; context window in tokens; absent where it does not apply" }
+            status:      { type: string, enum: [active, deprecated], description: "v1.1; retired models are not listed" }
+            deprecation:
+              type: object
+              nullable: true
+              description: "v1.1; present while deprecated"
+              properties:
+                announced_at: { type: string, format: date-time }
+                sunset_at:    { type: string, format: date-time, description: "at least 30 days after announced_at" }
+                replacement:  { type: string, description: "the model id to move to" }
+            latency_p50_ms: { type: integer, nullable: true, description: "v1.1; median latency over recent requests on this gateway" }
 
     ModelList:
       type: object

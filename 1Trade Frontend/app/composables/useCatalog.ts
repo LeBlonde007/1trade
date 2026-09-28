@@ -7,7 +7,18 @@ export interface CatalogModel {
   object: string
   name?: string
   owned_by: string
-  trade1: { modality: string; credit_type: string; unit: string; price: string }
+  trade1: {
+    modality: string
+    credit_type: string
+    unit: string
+    price: string
+    // inference.yaml v1.1 catalog metadata (F10)
+    category?: string
+    context_length?: number
+    status?: 'active' | 'deprecated'
+    deprecation?: { announced_at: string; sunset_at: string; replacement?: string }
+    latency_p50_ms?: number | null
+  }
 }
 
 export function useCatalog() {

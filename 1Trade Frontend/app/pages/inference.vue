@@ -32,6 +32,8 @@ interface ModelDef {
   context?: string
   speed?: string
   sub?: string
+  // Set while the model is deprecated (F10): the playground shows a banner with a one-click switch.
+  deprecation?: { sunset: string; replacement?: string }
 }
 
 // ── Live catalog (no mock) ──────────────────────────────────────────────────────────────────────
@@ -48,6 +50,7 @@ function humanizeId(id: string): string {
 /** toCategory maps an 1Trade modality to a catalog UI category. */
 function toCategory(modality: string): Category {
   if (modality === 'embeddings' || modality === 'embed') return 'embed'
+  if (modality === 'transcription') return 'speech' // speech-to-text: never offered in the chat composer
   if (modality === 'speech' || modality === 'image' || modality === 'video' || modality === 'vision' || modality === 'docs' || modality === 'agent' || modality === 'code') return modality
   return 'text'
 }
@@ -69,6 +72,11 @@ function toModelDef(m: CatalogModel): ModelDef {
     category: toCategory(x.modality),
     priceLabel: `${Number(x.price).toLocaleString('en-US')} ${x.credit_type} / ${x.unit}`,
     sub: `${x.unit} · billed in ${x.credit_type} credits`,
+    context: x.context_length ? `${Math.round(x.context_length / 1024)}K context` : undefined,
+    speed: x.latency_p50_ms ? `${x.latency_p50_ms} ms median` : undefined,
+    deprecation: x.status === 'deprecated' && x.deprecation
+      ? { sunset: x.deprecation.sunset_at.slice(0, 10), replacement: x.deprecation.replacement }
+      : undefined,
   }
 }
 /** models — the live catalog mapped to cards (empty until loaded; never mock). */
@@ -1315,6 +1323,16 @@ async function copyText(text: string, label: string) {
               <span class="pg-version mono">{{ selected.version }}</span>
               <span class="pg-backend mono dim">· {{ selected.priceLabel }}</span>
             </div>
+            <div v-if="selected.deprecation" class="pg-deprecation" role="status">
+              {{ selected.name }} is deprecated and stops serving on
+              <span class="mono">{{ selected.deprecation.sunset }}</span>.
+              <button
+                v-if="selected.deprecation.replacement"
+                type="button"
+                class="pg-deprecation-switch"
+                @click="selectModel(selected.deprecation.replacement)"
+              >Switch to {{ modelLabel(selected.deprecation.replacement) }}</button>
+            </div>
             <div class="pg-status">
               <span class="status-tag">
                 <span class="pulse" />
@@ -2424,6 +2442,27 @@ ratelimit-remaining:   58 / 60 RPS</pre>
 .pg-backend {
   font-size: 11px;
   letter-spacing: 0.04em;
+}
+.pg-deprecation {
+  margin-top: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--warn);
+  border-radius: var(--radius-sm);
+  color: var(--warn);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.pg-deprecation-switch {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--text);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
 }
 .pg-status {
   margin-top: 4px;

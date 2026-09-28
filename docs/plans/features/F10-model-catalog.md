@@ -87,3 +87,37 @@ construction rather than by discipline.
 - [ ] The rest of the curated top-3–5 per category still route to hosted providers only.
 - [ ] Per-model latency documented / exposed.
 - [ ] Deprecation flow, quarterly review — untouched.
+
+## Status — catalog metadata, lifecycle and the missing endpoints (2026-09-28)
+
+**Built**
+- **Metadata on every model** (inference.yaml v1.1.0): `category`, `context_length`, `status`,
+  `deprecation`, and a measured `latency_p50_ms` (the median over the last 200 requests served by
+  this gateway; null until the model has served one).
+- **Deprecation flow, end to end:**
+  - deprecated models serve with `Deprecation`, `Sunset` and successor `Link` headers;
+  - the console shows a banner with a one-click switch;
+  - the CLI warns on every call and flags the model in `1trade catalog`;
+  - after the sunset: `410 model_retired` with the replacement, and the model is unlisted.
+
+  Schedules are validated (at least 30 days' notice, a replacement that exists and is not itself
+  retiring). The process is in `docs/catalog-refresh.md`.
+- **`POST /v1/embeddings`.** `bge-m3` and `e5-large` were listed but had no endpoint. Billed per 1M
+  tokens. A dedicated helper avoids the per-1K token helper, which would have overcharged 1000×.
+- **`POST /v1/audio/transcriptions`** with `whisper-large-v3`. Billed per minute pro rata to the
+  second (rounded up), in speech credits. A provider that reports no duration is refused rather
+  than billed a guess.
+- The usage event's `modality` now maps onto its contract enum. Vision, docs and code models used
+  to emit values the event contract rejects.
+
+**Tests:** lifecycle (active, then deprecated, then retired), schedule rules, metadata on every
+model, embeddings (batch, single, bounds, wrong-modality guard, 1M pricing), transcription
+(multipart, per-second billing, TTS model refused), deprecation over the API (headers, listing,
+410), and the CLI warning.
+
+**Open**
+- [ ] The curated top 3–5 per category still route to hosted providers only; self-hosting them
+  waits on GPUs (F12).
+- [ ] Reranker (`bge-reranker-v2`) needs a `/v1/rerank` contract endpoint.
+- [ ] A speech-to-text playground in the console. It is API only for now.
+- [ ] Deprecation emails are manual.

@@ -60,6 +60,7 @@ func Do(method, baseURL, path, token string, headers map[string]string, body, ou
 		return err
 	}
 	defer resp.Body.Close()
+	warnDeprecation(resp.Header)
 	data, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		ae := &APIError{Status: resp.StatusCode}

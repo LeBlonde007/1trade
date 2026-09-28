@@ -10,6 +10,14 @@ type Pricing struct {
 	CreditType string `json:"credit_type"`
 	Unit       string `json:"unit"`
 	Price      string `json:"price"`
+	// Metadata (inference.yaml v1.1). Category and ContextLength come from the meta table; Status
+	// and Deprecation from the lifecycle table; LatencyP50MS is measured by the gateway at list time
+	// (null until the model has served requests).
+	Category      string       `json:"category"`
+	ContextLength int          `json:"context_length,omitempty"`
+	Status        string       `json:"status"`
+	Deprecation   *Deprecation `json:"deprecation,omitempty"`
+	LatencyP50MS  *int         `json:"latency_p50_ms"`
 }
 
 // Model is one catalog entry, OpenAI-shaped (`id`/`object`/`owned_by`) plus a human display `name` and
@@ -125,6 +133,11 @@ var models = []Model{
 	{
 		ID: "wan-t2v", Name: "Wan 2.2 Text-to-Video", Object: "model", Created: catalogEpoch, OwnedBy: "1trade",
 		Trade1: Pricing{Modality: "video", CreditType: "video", Unit: "1 video", Price: "600.000000"},
+	},
+	// Speech-to-text (POST /v1/audio/transcriptions), billed in `speech` credits per minute of audio.
+	{
+		ID: "whisper-large-v3", Name: "Whisper Large v3", Object: "model", Created: catalogEpoch, OwnedBy: "1trade",
+		Trade1: Pricing{Modality: "transcription", CreditType: "speech", Unit: "1 minute", Price: "0.600000"},
 	},
 	// Embeddings, billed in `embeddings` credits per 1M tokens.
 	{

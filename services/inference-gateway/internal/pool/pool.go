@@ -201,3 +201,21 @@ func (b *Backend) GetVideoContent(ctx context.Context, id string) (io.ReadCloser
 	}
 	return f.GetVideoContent(ctx, id)
 }
+
+// Embed delegates to Fallback (pooling covers chat models only).
+func (b *Backend) Embed(ctx context.Context, req model.EmbedRequest) (model.EmbedResult, error) {
+	f, ok := b.Fallback.(model.EmbeddingsBackend)
+	if !ok {
+		return model.EmbedResult{}, model.ErrCapabilityUnavailable
+	}
+	return f.Embed(ctx, req)
+}
+
+// Transcribe delegates to Fallback.
+func (b *Backend) Transcribe(ctx context.Context, req model.TranscribeRequest) (model.TranscribeResult, error) {
+	f, ok := b.Fallback.(model.TranscriptionBackend)
+	if !ok {
+		return model.TranscribeResult{}, model.ErrCapabilityUnavailable
+	}
+	return f.Transcribe(ctx, req)
+}

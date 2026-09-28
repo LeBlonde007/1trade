@@ -42,11 +42,14 @@ type Server struct {
 	usage   events.Publisher
 	credit  CreditChecker
 	mux     *http.ServeMux
+	latency *latencies
+	// now is the clock for model lifecycle decisions (nil = time.Now); tests set it.
+	now func() time.Time
 }
 
 // New builds the routed handler. credit may be nil to disable the pre-flight balance check.
 func New(cfg config.Config, backend model.Backend, usage events.Publisher, credit CreditChecker) *Server {
-	s := &Server{cfg: cfg, auth: auth.NewResolver(cfg), backend: backend, usage: usage, credit: credit, mux: http.NewServeMux()}
+	s := &Server{cfg: cfg, auth: auth.NewResolver(cfg), backend: backend, usage: usage, credit: credit, mux: http.NewServeMux(), latency: newLatencies()}
 	s.routes()
 	return s
 }
@@ -63,6 +66,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /v1/chat/vision", s.visionChat) // VLM: prompt + image → text (bills text)
 	s.mux.HandleFunc("POST /v1/images/generations", s.imageGenerations)
 	s.mux.HandleFunc("POST /v1/audio/speech", s.audioSpeech)
+	s.mux.HandleFunc("POST /v1/embeddings", s.embeddings)
+	s.mux.HandleFunc("POST /v1/audio/transcriptions", s.transcriptions)
 	s.mux.HandleFunc("POST /v1/videos", s.submitVideo)                 // async text-to-video: submit
 	s.mux.HandleFunc("GET /v1/videos/{id}", s.getVideo)                // poll job status
 	s.mux.HandleFunc("GET /v1/videos/{id}/content", s.getVideoContent) // stream the finished mp4
@@ -73,7 +78,11 @@ func (s *Server) listModels(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.requireAuth(w, r); !ok {
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"object": "list", "data": catalog.ListServable(s.cfg.InferenceModelMap)})
+	data := catalog.Listing(s.cfg.InferenceModelMap, s.clock())
+	for i := range data {
+		data[i].Trade1.LatencyP50MS = s.latency.p50(data[i].ID)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"object": "list", "data": data})
 }
 
 // requireAuth resolves the caller from the bearer credential (API key or tenant JWT); on failure it
@@ -120,9 +129,8 @@ func (s *Server) chatCompletions(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "bad_request", "model and messages are required")
 		return
 	}
-	m, found := catalog.Lookup(req.Model)
+	m, found := s.resolveModel(w, req.Model)
 	if !found {
-		writeErr(w, http.StatusNotFound, "model_not_found", "unknown model: "+req.Model)
 		return
 	}
 	// In the catalogue but with no upstream on this deployment — say so, rather than forwarding a
@@ -170,7 +178,7 @@ func (s *Server) chatCompletions(w http.ResponseWriter, r *http.Request) {
 		serverError(w, err)
 		return
 	}
-	latency := int(time.Since(start).Milliseconds())
+	latency := elapsedMS(start)
 	total := res.PromptTokens + res.CompletionTokens
 	units, err := pricing.UnitsForTokens(m.Trade1.Price, total)
 	if err != nil {
@@ -202,11 +210,12 @@ func (s *Server) chatCompletions(w http.ResponseWriter, r *http.Request) {
 // meter emits exactly one inference.usage.v1 event for a served request. Best-effort: a publish
 // failure is logged, never fails the customer (the response was already produced).
 func (s *Server) meter(ctx context.Context, p auth.Principal, m catalog.Model, modelID string, res model.ChatResult, units string, latencyMS int, requestID string) {
+	s.latency.record(modelID, latencyMS)
 	in, out, lat := res.PromptTokens, res.CompletionTokens, latencyMS
 	metrics.RecordInference(modelID, m.Trade1.Modality, in, out)
 	e := events.UsageEvent{
 		RequestID: requestID, TenantID: p.TenantID, Model: modelID,
-		Modality: m.Trade1.Modality, CreditType: m.Trade1.CreditType,
+		Modality: eventModality(m), CreditType: m.Trade1.CreditType,
 		InputTokens: &in, OutputTokens: &out, Units: units, LatencyMS: &lat,
 		IsPaper: p.IsPaper, TS: time.Now().UTC().Format(time.RFC3339),
 	}
@@ -239,9 +248,8 @@ func (s *Server) imageGenerations(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "bad_request", "model and prompt are required")
 		return
 	}
-	m, found := catalog.Lookup(req.Model)
+	m, found := s.resolveModel(w, req.Model)
 	if !found {
-		writeErr(w, http.StatusNotFound, "model_not_found", "unknown model: "+req.Model)
 		return
 	}
 	// In the catalogue but with no upstream on this deployment — say so, rather than forwarding a
@@ -289,7 +297,7 @@ func (s *Server) imageGenerations(w http.ResponseWriter, r *http.Request) {
 		serverError(w, err)
 		return
 	}
-	latency := int(time.Since(start).Milliseconds())
+	latency := elapsedMS(start)
 	count := len(res.B64)
 	units, err := pricing.UnitsForCount(m.Trade1.Price, count)
 	if err != nil {
@@ -311,11 +319,12 @@ func (s *Server) imageGenerations(w http.ResponseWriter, r *http.Request) {
 // meterImage emits one inference.usage.v1 event for an image-generation request (units = image count),
 // billed in `image` credits. Best-effort, like meter — a publish failure never fails the customer.
 func (s *Server) meterImage(ctx context.Context, p auth.Principal, m catalog.Model, modelID string, count int, units string, latencyMS int, requestID string) {
+	s.latency.record(modelID, latencyMS)
 	lat := latencyMS
 	metrics.RecordInference(modelID, m.Trade1.Modality, 0, 0)
 	e := events.UsageEvent{
 		RequestID: requestID, TenantID: p.TenantID, Model: modelID,
-		Modality: m.Trade1.Modality, CreditType: m.Trade1.CreditType,
+		Modality: eventModality(m), CreditType: m.Trade1.CreditType,
 		Units: units, LatencyMS: &lat,
 		IsPaper: p.IsPaper, TS: time.Now().UTC().Format(time.RFC3339),
 	}
@@ -350,9 +359,8 @@ func (s *Server) audioSpeech(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "bad_request", "model and input are required")
 		return
 	}
-	m, found := catalog.Lookup(req.Model)
+	m, found := s.resolveModel(w, req.Model)
 	if !found {
-		writeErr(w, http.StatusNotFound, "model_not_found", "unknown model: "+req.Model)
 		return
 	}
 	// In the catalogue but with no upstream on this deployment — say so, rather than forwarding a
@@ -429,9 +437,8 @@ func (s *Server) visionChat(w http.ResponseWriter, r *http.Request) {
 	if strings.TrimSpace(req.Prompt) == "" {
 		req.Prompt = "Describe what is shown."
 	}
-	m, found := catalog.Lookup(req.Model)
+	m, found := s.resolveModel(w, req.Model)
 	if !found {
-		writeErr(w, http.StatusNotFound, "model_not_found", "unknown model: "+req.Model)
 		return
 	}
 	// In the catalogue but with no upstream on this deployment — say so, rather than forwarding a
@@ -479,7 +486,7 @@ func (s *Server) visionChat(w http.ResponseWriter, r *http.Request) {
 		"usage": map[string]any{"prompt_tokens": res.PromptTokens, "completion_tokens": res.CompletionTokens, "total_tokens": total},
 	})
 	// Token-based billing; modality=vision / credit_type=text come from the catalog entry.
-	s.meter(r.Context(), p, m, req.Model, model.ChatResult{PromptTokens: res.PromptTokens, CompletionTokens: res.CompletionTokens}, units, int(time.Since(start).Milliseconds()), requestID)
+	s.meter(r.Context(), p, m, req.Model, model.ChatResult{PromptTokens: res.PromptTokens, CompletionTokens: res.CompletionTokens}, units, elapsedMS(start), requestID)
 }
 
 // videoRequest is the text-to-video submit body.
@@ -502,9 +509,8 @@ func (s *Server) submitVideo(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "bad_request", "model and prompt are required")
 		return
 	}
-	m, found := catalog.Lookup(req.Model)
+	m, found := s.resolveModel(w, req.Model)
 	if !found {
-		writeErr(w, http.StatusNotFound, "model_not_found", "unknown model: "+req.Model)
 		return
 	}
 	// In the catalogue but with no upstream on this deployment — say so, rather than forwarding a
