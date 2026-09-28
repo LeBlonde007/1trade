@@ -49,6 +49,14 @@ func randomCommands(seed int64, n int) []Command {
 			cmds = append(cmds, Command{Submit: &c})
 		case k < 19 && len(ids) > 0:
 			cmds = append(cmds, Command{Cancel: &CancelCmd{OrderID: ids[r.Intn(len(ids))], TenantID: tenants[r.Intn(len(tenants))], TS: ts}})
+		case r.Intn(2) == 0:
+			// A void: of a fresh id (a tombstone later submits may run into) or of a known id (a no-op).
+			id := fmt.Sprintf("v%d", i)
+			if len(ids) > 0 && r.Intn(2) == 0 {
+				id = ids[r.Intn(len(ids))]
+			}
+			ids = append(ids, id)
+			cmds = append(cmds, Command{Void: &VoidCmd{OrderID: id, TenantID: tenants[r.Intn(len(tenants))], IsPaper: true, TS: ts}})
 		default:
 			cmds = append(cmds, Command{ExpireDay: &ExpireDayCmd{TS: ts}})
 		}
@@ -71,6 +79,8 @@ func run(e *Engine, cmds []Command) []Event {
 		case c.ExpireDay != nil:
 			evs, _ := e.ExpireDay(*c.ExpireDay)
 			all = append(all, evs...)
+		case c.Void != nil:
+			_, _, _ = e.Void(*c.Void)
 		}
 	}
 	return all
@@ -84,6 +94,7 @@ func run(e *Engine, cmds []Command) []Event {
 //     exceeds its quantity;
 //   - per-book sequences strictly increase and each book's trades form a valid hash chain.
 func TestInvariants(t *testing.T) {
+	totalVoids := 0
 	for seed := int64(1); seed <= 200; seed++ {
 		e := New(Config{})
 		evs := run(e, randomCommands(seed, 400))
@@ -156,6 +167,23 @@ func TestInvariants(t *testing.T) {
 				t.Fatalf("seed %d: broken trade chain on %s", seed, key)
 			}
 		}
+		// A tombstone never trades and never emits: a voided id has no event of any kind.
+		voids := 0
+		for id, o := range e.orders {
+			if o.Reason != ReasonVoided {
+				continue
+			}
+			voids++
+			for _, ev := range evs {
+				if (ev.Order != nil && ev.Order.OrderID == id) || (ev.Trade != nil && (ev.Trade.Buyer.OrderID == id || ev.Trade.Seller.OrderID == id)) {
+					t.Fatalf("seed %d: voided id %s appears in an event", seed, id)
+				}
+			}
+		}
+		totalVoids += voids
+	}
+	if totalVoids == 0 {
+		t.Fatal("the generator produced no tombstones; the void invariants tested nothing")
 	}
 }
 

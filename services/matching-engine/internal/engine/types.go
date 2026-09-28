@@ -67,6 +67,9 @@ const (
 	ReasonUnfilled    = "unfilled_remainder"
 	ReasonFOKUnfilled = "fok_unfilled"
 	ReasonDayExpired  = "day_expired"
+	// ReasonVoided marks a tombstone (VoidCmd): the order_id's first submit never reached the journal,
+	// its orphaned reservation was released, and the id can never be used again.
+	ReasonVoided = "voided"
 )
 
 // Liquidity roles on a trade.
@@ -226,11 +229,24 @@ type ExpireDayCmd struct {
 	TS time.Time
 }
 
+// VoidCmd tombstones an order_id the journal has never seen (SPEC.md §7.3). It exists for one case:
+// a submit whose journal write failed after the ledger had already reserved its hold. Once the id is
+// void, a later submit with it gets the voided order back instead of reserving again, so the
+// reconciler can release the orphaned reservation without racing a client retry. It emits no event:
+// no order was ever accepted.
+type VoidCmd struct {
+	OrderID  string
+	TenantID string
+	IsPaper  bool
+	TS       time.Time
+}
+
 // Command is one journaled input: exactly one field is set.
 type Command struct {
 	Submit    *SubmitCmd
 	Cancel    *CancelCmd
 	ExpireDay *ExpireDayCmd
+	Void      *VoidCmd
 }
 
 // FeeSchedule is the fee rate per liquidity role, in parts per million of notional.
@@ -277,4 +293,11 @@ type Config struct {
 	// and nothing changes, so the books never hold state the journal cannot reproduce. Nil keeps the
 	// journal in memory only (tests, replay).
 	Persist func(seq uint64, c Command) error
+
+	// OnUnjournaled is told about a submit whose journal write failed after its risk check ran. The
+	// risk check may have reserved the order's hold in the ledger, so that reservation may now back an
+	// order that does not exist; the reconciler voids the id and releases it (settle.Reconciler). It
+	// is called with the engine lock held, so it must be quick and must not call the engine. Only
+	// orders with a non-zero hold are reported.
+	OnUnjournaled func(o Order)
 }

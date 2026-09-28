@@ -77,8 +77,9 @@ Every command returns its events in emission order:
 ## 5. Event sourcing and replay
 
 The **journal** is the ordered list of every command that changed state: valid submits (including
-risk-rejected ones), successful cancels, and every day-expiry. Each submit carries its recorded risk
-decision. Validation failures and idempotent duplicates are not journaled; they change nothing.
+risk-rejected ones), successful cancels, every day-expiry, and voids (§7.3). Each submit carries its
+recorded risk decision. Validation failures and idempotent duplicates are not journaled; they change
+nothing.
 
 `Replay(cfg, journal)` rebuilds the engine and re-emits every event. Tests prove replay reproduces the
 original event stream and final books exactly, including after a JSON round trip of the journal
@@ -168,13 +169,64 @@ and executing at the taker's price. Both mutations were caught.
        - the real path runs Postgres journal → relay → embedded JetStream in order, and a full
          republish after losing the cursor adds zero messages.
    - **Cutover wiring** (licence-gated):
-     - `DATABASE_URL`, plus both migrations in an initContainer;
+     - `DATABASE_URL`, plus every migration (glob, in file order) in an initContainer;
      - the `ledger-settle` Secret mounted in the engine;
-     - `journal.Recover` with `ReserveRisk`;
+     - `journal.Recover` with `ReserveRisk`, and `OnUnjournaled: rec.Suspect` for a `Reconciler`
+       running every 30 s (below);
      - a `Worker` fed from the journal's events.
-   - **Known gap:** a reserve that succeeds but whose journal write then fails leaves a reservation
-     with no order. A client retry with the same `order_id` re-uses it, since reserve is idempotent.
-     Otherwise a reconciler must release reservations for order_ids the journal doesn't know.
+   - **Orphaned reservations — built (engine side).** The engine reserves an order's hold *before*
+     writing the order to its journal. If that write fails, the ledger holds a reservation for an order
+     that does not exist. Three parts close this:
+     1. **Void** (journal kind `void`, migration `0004_void.sql`). A void is a durable tombstone for an
+        order_id the journal has never seen.
+        - A later submit with that id gets the tombstone back (rejected, reason `voided`). It never
+          reaches the risk check, so nothing can claim the reservation again.
+        - Voids emit no events. Voiding an id the engine knows changes nothing.
+        - A void is write-ahead like any command. So an engine whose journal is behind the database
+          (a write that committed without the engine seeing it) cannot void anything: its append
+          collides on seq.
+     2. **Reconciler** (`settle.Reconciler`). The engine reports every submit whose journal write
+        failed after its risk check (`Config.OnUnjournaled`).
+        - Grace period (default 2 min): a client retry with the same order_id reuses the reservation,
+          and the order goes ahead.
+        - After it, the reconciler voids the id, then releases the reservation. Either step is retried
+          until it lands; once the id is void, the release cannot race an acceptance.
+        - It never releases for an order that exists, or for an id another tenant owns.
+     3. **The client checks what reserve returns.** The ledger answers a replay with the reservation's
+        *current* state, so a replay of a released reservation comes back as a 200. The client now
+        requires `state: open` and `remaining == amount == hold`. Otherwise the order is rejected with
+        `order_id_reused` instead of being accepted unfunded. This is defence in depth: with voids,
+        the engine never reserves a voided id again.
+
+     Tests:
+     - engine: void semantics, and submit-vs-void atomicity on 200 ids under `-race`. Voids are added
+       to the 200-stream property run: a tombstone never appears in any event.
+     - journal: a void survives restart, and a stale engine's void is refused on seq collision.
+     - relay: steps over voids, both in memory and on Postgres → JetStream.
+     - reconciler, each path:
+       - void and release after the grace period;
+       - a prompt retry keeps its reservation;
+       - a journal outage delays the void;
+       - a failed release is retried;
+       - a rejected retry is released;
+       - another tenant's id is left alone;
+       - the replay of a closed reservation is refused.
+     - a stress run: 8 clients with retries and cancels, a flapping journal, reserves that commit then
+       fail, and a live reconciler. The journal is then replayed through the worker. Every live order
+       ends with an open reservation, and no reservation is left without one.
+     - the real credit-ledger binary.
+
+     Mutation-checked. Each of these breaks a test:
+     - releasing live orders, or another tenant's id;
+     - releasing when the void failed;
+     - dropping the response check, the grace period, the hook, or the void's journal write;
+     - letting a submit through a tombstone;
+     - restarting the grace period on a repeat report.
+
+     **Still open.** Suspects are held in memory. If the engine crashes after a failed journal write
+     but before its reconciler pass, the suspect is lost, and the reservation stays locked until an
+     operator releases it. Finding those needs the ledger to list open reservations. That is proposed
+     in §8 (credit.yaml v1.3) and not yet approved.
 4. **Risk hook implementation.** Balance and position-limit checks against the ledger, plus
    surveillance holds (KW05).
 5. **API wiring.** Behind the licence gate: order entry, cancel, and orders/fills reads served from
@@ -194,6 +246,33 @@ and executing at the taker's price. Both mutations were caught.
   books. KW04 needs this decided before it builds paper quoting.
 - ~~**What if settlement is refused (402)?**~~ **Decided and built:** reserve at acceptance
   (credit.yaml v1.2). See §7.3.
-- **Cancel reasons.** The engine emits `user_cancel`, `self_trade`, `unfilled_remainder`,
-  `fok_unfilled` and `day_expired`. The contract's `reason` is free text with examples; proposed:
-  enumerate these.
+- **Cancel and reject reasons.** The engine emits:
+  - cancel reasons: `user_cancel`, `self_trade`, `unfilled_remainder`, `fok_unfilled` and `day_expired`;
+  - reject reasons: `insufficient_credit`, `insufficient_cash`, `risk_unavailable` and
+    `order_id_reused`.
+
+  `voided` marks a tombstone. It is returned on a duplicate submit and never emitted as an event. The
+  contract's `reason` is free text with examples; proposed: enumerate these.
+- **Proposed: credit.yaml v1.3, to find orphaned reservations after a crash (§7.3 "Still open").**
+  The contract has not been edited; this needs tech-lead approval. Changes:
+  - `GET /v1/credits/reservations?state=open&min_age_seconds=N&after=<order_id>&limit=N`.
+    - matching-engine only (the settle token). Keyset-paginated; the age is measured on the ledger's
+      clock.
+    - Returns `{data: [Reservation], next_cursor}`; `Reservation` gains `created_at`.
+    - The reconciler would page through it at start and periodically, and `Suspect` every open
+      reservation whose order the engine does not know. The void-then-release path then handles it
+      unchanged.
+  - An optional `reason` on `/v1/credits/release` (`order_closed` | `orphaned`), recorded on the
+    reservation's audit event. A repair is then distinguishable from a normal close in the ledger's
+    own audit trail.
+  - Make a reserve replay of a released reservation `409 RESERVATION_CLOSED`, instead of a 200
+    carrying the released state. The client already refuses that 200 (§7.3), so this is about
+    clarity, not safety.
+
+  Alternative without a contract change: the engine writes an intent row to its own database before
+  every reserve, and reconciles intents the journal never took. The cost is a second synchronous
+  write per order in the acceptance path. The listing is cheaper, and it keeps the ledger as the
+  source of truth for locks.
+
+  Affected: credit-ledger (implements it), matching-engine (consumes it), and security-compliance
+  (review; it touches credits).

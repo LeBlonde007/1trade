@@ -79,6 +79,9 @@ func (e *Engine) submit(c SubmitCmd) (Result, error) {
 		c.RiskChecked = true
 	}
 	if err := e.record(Command{Submit: &c}); err != nil {
+		if e.cfg.OnUnjournaled != nil && o.Hold.Amount > 0 {
+			e.cfg.OnUnjournaled(*o)
+		}
 		return Result{}, err
 	}
 	e.books[b.key] = b
@@ -390,6 +393,39 @@ func (e *Engine) expireDay(c ExpireDayCmd) ([]Event, error) {
 	return evs, nil
 }
 
+// Void tombstones an order_id the journal has never seen, so it can never be accepted afterwards (see
+// VoidCmd). The void is journaled like any command (write-ahead: a failed write changes nothing) and
+// emits no event. If the engine already knows the id, nothing changes and the order is returned as it
+// stands: a client retry may have been accepted, reusing the reservation. voided reports whether this
+// call created the tombstone. Another tenant's id is ErrOrderIDTaken.
+func (e *Engine) Void(c VoidCmd) (o Order, voided bool, err error) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.void(c)
+}
+
+// void is Void without the lock.
+func (e *Engine) void(c VoidCmd) (Order, bool, error) {
+	if c.OrderID == "" || c.TenantID == "" {
+		return Order{}, false, ErrMissingID
+	}
+	if c.TS.IsZero() {
+		return Order{}, false, ErrMissingTimestamp
+	}
+	if prev, ok := e.orders[c.OrderID]; ok {
+		if prev.TenantID != c.TenantID {
+			return Order{}, false, ErrOrderIDTaken
+		}
+		return *prev, false, nil
+	}
+	if err := e.record(Command{Void: &c}); err != nil {
+		return Order{}, false, err
+	}
+	o := &Order{OrderID: c.OrderID, TenantID: c.TenantID, IsPaper: c.IsPaper, State: Rejected, Reason: ReasonVoided, UpdatedAt: c.TS}
+	e.orders[c.OrderID] = o
+	return *o, true, nil
+}
+
 // sortedBooks returns books in a fixed order (product, then real before paper), never map order.
 func (e *Engine) sortedBooks() []*book {
 	out := make([]*book, 0, len(e.books))
@@ -460,6 +496,9 @@ func cloneCommand(c Command) Command {
 	case c.ExpireDay != nil:
 		x := *c.ExpireDay
 		return Command{ExpireDay: &x}
+	case c.Void != nil:
+		x := *c.Void
+		return Command{Void: &x}
 	}
 	return c
 }
@@ -488,6 +527,9 @@ func (e *Engine) Apply(c Command) ([]Event, error) {
 		return r.Events, err
 	case c.ExpireDay != nil:
 		return e.ExpireDay(*c.ExpireDay)
+	case c.Void != nil:
+		_, _, err := e.Void(*c.Void)
+		return nil, err
 	}
 	return nil, errors.New("engine: empty command")
 }

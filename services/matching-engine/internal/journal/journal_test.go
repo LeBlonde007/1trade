@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -52,7 +54,13 @@ func freshSchema(t testing.TB) string {
 		t.Fatal(err)
 	}
 	defer p.Close()
-	for _, f := range []string{"../../migrations/0001_journal.sql", "../../migrations/0002_meta.sql"} {
+	// Every migration, in file order: a hardcoded list would silently skip the next one added.
+	files, err := filepath.Glob("../../migrations/*.sql")
+	if err != nil || len(files) == 0 {
+		t.Fatalf("no migrations found: %v", err)
+	}
+	sort.Strings(files)
+	for _, f := range files {
 		sql, err := os.ReadFile(f)
 		if err != nil {
 			t.Fatal(err)
@@ -333,4 +341,52 @@ func TestReadAfterVerifiesContinuity(t *testing.T) {
 	if _, err := s.ReadAfter(context.Background(), 3, "not-the-head", 0); !errors.Is(err, ErrCorrupt) {
 		t.Errorf("wrong head err = %v, want ErrCorrupt", err)
 	}
+}
+
+// TestVoidSurvivesRestartAndCannotOutrunTheJournal: a void is a durable tombstone (kind 'void', replayed
+// on recovery), and an engine whose journal is behind the database cannot void anything — its append
+// collides on seq, so the reconciler never releases a reservation the durable journal already uses.
+func TestVoidSurvivesRestartAndCannotOutrunTheJournal(t *testing.T) {
+	dsn := freshSchema(t)
+	ctx := context.Background()
+	s1, e1 := open(t, dsn)
+	if _, err := e1.Submit(order("o1", "t1", engine.Sell, "0.001000", "5", 1)); err != nil {
+		t.Fatal(err)
+	}
+	if _, voided, err := e1.Void(engine.VoidCmd{OrderID: "x1", TenantID: "t2", IsPaper: true, TS: t0.Add(time.Second)}); err != nil || !voided {
+		t.Fatalf("void: voided=%v err=%v", voided, err)
+	}
+	s1.Close()
+
+	s2, e2 := open(t, dsn)
+	if o, ok := e2.Order("x1", "t2"); !ok || o.Reason != engine.ReasonVoided || !o.IsPaper {
+		t.Fatalf("tombstone after restart = %+v (found %v)", o, ok)
+	}
+	if r, err := e2.Submit(order("x1", "t2", engine.Buy, "0.001000", "1", 3)); err != nil || !r.Duplicate || r.Order.Reason != engine.ReasonVoided {
+		t.Fatalf("resubmit of a voided id after restart = %+v, %v", r, err)
+	}
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+	var kind string
+	if err := pool.QueryRow(ctx, `SELECT kind FROM engine_journal WHERE seq = 2`).Scan(&kind); err != nil || kind != "void" {
+		t.Fatalf("seq 2 kind = %q (%v), want void", kind, err)
+	}
+
+	// A second instance recovers the same journal and accepts "late" at seq 3. e2 still thinks the
+	// journal ends at 2, exactly as after an append whose commit it never saw acknowledged.
+	s3, e3 := open(t, dsn)
+	defer s3.Close()
+	if _, err := e3.Submit(order("late", "t3", engine.Sell, "0.001000", "1", 4)); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := e2.Void(engine.VoidCmd{OrderID: "late", TenantID: "t3", TS: t0.Add(2 * time.Second)}); !errors.Is(err, engine.ErrJournal) {
+		t.Fatalf("void from a stale engine = %v, want ErrJournal (seq collision)", err)
+	}
+	if _, ok := e2.Order("late", "t3"); ok {
+		t.Fatal("the stale engine recorded a tombstone its journal refused")
+	}
+	s2.Close()
 }

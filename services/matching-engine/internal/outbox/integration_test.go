@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -45,8 +47,13 @@ func TestRelayOverPostgresAndJetStream(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer pool.Close()
-	for _, f := range []string{"0001_journal.sql", "0002_meta.sql", "0003_outbox.sql"} {
-		sql, err := os.ReadFile("../../migrations/" + f)
+	files, err := filepath.Glob("../../migrations/*.sql")
+	if err != nil || len(files) == 0 {
+		t.Fatalf("no migrations found: %v", err)
+	}
+	sort.Strings(files)
+	for _, f := range files {
+		sql, err := os.ReadFile(f)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -77,6 +84,11 @@ func TestRelayOverPostgresAndJetStream(t *testing.T) {
 		}
 		for _, ev := range r.Events {
 			wantIDs = append(wantIDs, msgID(ev))
+		}
+		if i == 5 { // a void row mid-journal: chain-verified and stepped over like any command
+			if _, _, err := e.Void(engine.VoidCmd{OrderID: "v5", TenantID: "t0", IsPaper: true, TS: ts}); err != nil {
+				t.Fatal(err)
+			}
 		}
 	}
 	epoch, _ := js.Epoch(ctx)

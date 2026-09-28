@@ -87,6 +87,11 @@ func live(t *testing.T) ([]journal.Entry, []msg, engine.Config) {
 				add(r.Events)
 			}
 		}
+		if i%10 == 3 { // a void journals a command that emits nothing; the relay must step over it
+			if _, voided, err := e.Void(engine.VoidCmd{OrderID: fmt.Sprintf("v%d", i), TenantID: "t0", IsPaper: true, TS: ts}); err != nil || !voided {
+				t.Fatalf("void: %v %v", voided, err)
+			}
+		}
 	}
 	entries := make([]journal.Entry, 0, len(e.Journal()))
 	for i, c := range e.Journal() {

@@ -148,9 +148,20 @@ re-verified from the payloads alone.
 shadow engine and publishes them to JetStream in order: at-least-once, with dedupe ids and a Postgres
 cursor. Proven end to end on real Postgres and JetStream.
 
+**Orphaned reservations: closed on the engine side (2026-09-28, SPEC §7.3).** A submit whose journal
+write fails after the ledger reserved its hold used to leave that reservation locked, with no order.
+- The engine now reports such submits, and a reconciler voids the order_id after a grace period.
+  The void is a journaled tombstone, so no retry can claim the reservation. The reconciler then
+  releases it.
+- The reserve client refuses a replayed reservation that is no longer open.
+- Proven with a stress run (every live order funded, nothing orphaned) and against the real ledger.
+- Still open: an engine crash between the failed write and the reconciler pass loses the suspect.
+  Finding those needs a ledger listing of open reservations, proposed as credit.yaml v1.3 (SPEC §8)
+  and awaiting approval.
+
 Remaining: only the licence-gated cutover wiring (SPEC §7.3):
 - DATABASE_URL and the migrations;
-- `journal.Recover` with `ReserveRisk`;
+- `journal.Recover` with `ReserveRisk`, plus the reservation reconciler;
 - running the relay and the settlement worker;
 - serving order entry from the engine.
 
@@ -158,8 +169,11 @@ Remaining: only the licence-gated cutover wiring (SPEC §7.3):
 real risk hook (can now check the buyer's paper cash), and API wiring. The API wiring is the
 licence-gated cutover.
 
-**Open for tech-lead** (SPEC.md §8): sequence scope per `(product, is_paper)`, how paper liquidity
-works given the insider-risk rule (blocks KW04 paper quoting), and enumerating cancel reasons.
+**Open for tech-lead** (SPEC.md §8):
+- sequence scope per `(product, is_paper)`;
+- how paper liquidity works given the insider-risk rule (blocks KW04 paper quoting);
+- enumerating cancel and reject reasons;
+- the credit.yaml v1.3 reservation listing (proposed).
 
 Acceptance (Phase 2): ✅ deterministic, replayable, race-free under concurrent load · ✅ paper/real
 isolation enforced · ✅ property-based tests pass · ⬜ matches the trading contract end to end (API

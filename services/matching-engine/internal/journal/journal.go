@@ -66,8 +66,12 @@ func kindOf(c engine.Command) string {
 		return "submit"
 	case c.Cancel != nil:
 		return "cancel"
-	default:
+	case c.ExpireDay != nil:
 		return "expire_day"
+	case c.Void != nil:
+		return "void"
+	default:
+		return "" // an empty command: the kind CHECK refuses the row, so it can never be journaled
 	}
 }
 
