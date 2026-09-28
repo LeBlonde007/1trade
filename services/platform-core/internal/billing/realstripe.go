@@ -43,7 +43,7 @@ func NewRealStripe(secretKey, appBaseURL string) *RealStripe {
 // money amount. The returned session ID is what the settlement webhook references back to the order.
 func (c *RealStripe) CreateCheckoutSession(ctx context.Context, p CheckoutParams) (CheckoutSession, error) {
 	if p.Currency != "usd" {
-		return CheckoutSession{}, fmt.Errorf("card payments currently support USD only (got %q)", p.Currency)
+		return CheckoutSession{}, fmt.Errorf("payments are in US dollars only (got %q)", p.Currency)
 	}
 	cents, err := usdChargeCents(p.CreditType, p.Amount)
 	if err != nil {
@@ -52,6 +52,16 @@ func (c *RealStripe) CreateCheckoutSession(ctx context.Context, p CheckoutParams
 
 	form := url.Values{}
 	form.Set("mode", "payment")
+	// Card settles at checkout; an ACH debit (us_bank_account) settles days later and arrives as
+	// checkout.session.async_payment_succeeded / _failed.
+	switch p.Method {
+	case "", "card":
+		form.Set("payment_method_types[0]", "card")
+	case "ach":
+		form.Set("payment_method_types[0]", "us_bank_account")
+	default:
+		return CheckoutSession{}, fmt.Errorf("unsupported payment method %q", p.Method)
+	}
 	form.Set("client_reference_id", p.PurchaseID)
 	// {CHECKOUT_SESSION_ID} is expanded by Stripe on redirect — handy for the success screen.
 	form.Set("success_url", c.appBaseURL+"/wallet?purchase=success&cs={CHECKOUT_SESSION_ID}")

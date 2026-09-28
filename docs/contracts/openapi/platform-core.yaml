@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: 1Trade Platform-Core API (auth, accounts, RBAC, keys, billing)
-  version: 1.8.0
+  version: 1.9.0
   description: >
     Identity for the whole platform. Owned by `platform-core`. Every other service authenticates
     inbound requests by verifying the JWT this service issues (see JwtClaims) — that's how each
@@ -37,6 +37,17 @@ info:
     merged across tenants (403 `sso_account_conflict`); with JIT off, unknown emails get 403
     `sso_no_account`. Artifact binding and encrypted assertions are not supported (no outbound
     calls; no SP key). The IdP enforces its own MFA.
+
+    **v1.9.0 (2026-09-28, payment methods — US dollars only).** Checkout takes `method`: `card`
+    (settles at checkout) or `ach` (a US bank-account debit through Stripe, which settles days later).
+    `currency` must be `usd` (JPY removed). Credits are booked only once money has settled:
+    `checkout.session.completed` with `payment_status=paid`, or `checkout.session.async_payment_succeeded`;
+    a completed ACH checkout waits as `processing`; `async_payment_failed` marks it `failed` and it is
+    never revived. Every booking is keyed on the purchase (`purchase:<id>`), so the webhook, its
+    retries and the dev auto-settle can never double-mint. Wires: `POST /v1/billing/wires` (admin or
+    billing; KYC for real money; $1,000 minimum) returns 1Trade's USD bank details, the exact amount
+    and a unique reference; treasury records the receipt with the service token, and it must match
+    the invoice to the cent (409 `amount_mismatch` otherwise, reconciled by hand).
 
 servers:
   - { url: "https://api.1trade.io", description: prod }
@@ -802,7 +813,8 @@ paths:
               properties:
                 amount:      { type: string, description: "credits to buy, fixed-point decimal string" }
                 credit_type: { type: string, description: "e.g. text, ai_index, gpu_h100 (see credit-types.md)" }
-                currency:    { type: string, enum: [usd, jpy], description: "settlement currency" }
+                currency:    { type: string, enum: [usd], default: usd, description: "v1.9: US dollars only" }
+                method:      { type: string, enum: [card, ach], default: card, description: "v1.9: card, or ACH bank debit (settles in days); for wires use /v1/billing/wires" }
       responses:
         '200':
           description: Checkout created.
@@ -842,6 +854,58 @@ paths:
         '200': { description: Received (and booked if applicable). }
         '400': { description: Bad/again-replayable payload., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
         '401': { description: Signature verification failed., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+
+  /v1/billing/wires:
+    post:
+      tags: [billing]
+      summary: "v1.9: invoice a purchase payable by USD wire (admin or billing; KYC for real money; minimum $1,000)."
+      operationId: createWire
+      security: [{ tenantJwt: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [amount, credit_type], properties: { amount: { type: string }, credit_type: { type: string } } } } }
+      responses:
+        '201':
+          description: Wire invoice.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  purchase_id:  { type: string, format: uuid }
+                  status:       { type: string, enum: [pending] }
+                  amount_usd:   { type: string }
+                  credits:      { type: string }
+                  credit_type:  { type: string }
+                  reference:    { type: string, description: "put this on the wire so it can be matched" }
+                  instructions:
+                    type: object
+                    properties:
+                      bank_name:      { type: string }
+                      bank_address:   { type: string }
+                      account_name:   { type: string }
+                      account_number: { type: string }
+                      routing_number: { type: string, description: "ABA" }
+                      swift:          { type: string }
+        '403': { description: kyc_required or role., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+        '422': { description: below_wire_minimum | unpriced | bad_request., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+        '503': { description: wire_unavailable (no bank details configured)., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+  /v1/billing/wires/{id}/received:
+    post:
+      tags: [billing]
+      summary: "v1.9: treasury records an incoming wire (service token). Must equal the invoice to the cent; books the credits once."
+      operationId: wireReceived
+      security: [{ serviceToken: [] }]
+      parameters: [ { name: id, in: path, required: true, schema: { type: string, format: uuid } } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [amount_usd, bank_reference], properties: { amount_usd: { type: string, description: "dollars, at most 2 decimals" }, bank_reference: { type: string } } } } }
+      responses:
+        '200': { description: Paid and booked (a replay of the same receipt re-books idempotently). }
+        '401': { description: Not the service token. }
+        '404': { description: No such wire purchase., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+        '409': { description: amount_mismatch | not_pending., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+        '502': { description: booking_failed — recorded; send the same receipt again., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
 
   /v1/billing/purchases:
     get:
@@ -1002,8 +1066,12 @@ components:
         id:          { type: string, format: uuid }
         amount:      { type: string, description: "credits purchased, fixed-point decimal string" }
         credit_type: { type: string }
-        currency:    { type: string, enum: [usd, jpy] }
-        status:      { type: string, enum: [pending, paid, failed] }
+        currency:    { type: string, enum: [usd], description: "v1.9: US dollars only (older rows may show jpy)" }
+        status:      { type: string, enum: [pending, processing, paid, failed], description: "processing: an ACH debit is settling" }
+        method:      { type: string, enum: [card, ach, wire] }
+        amount_usd:  { type: string, description: "dollars charged, 2 decimals (when priced)" }
+        wire_reference: { type: string, description: "wire purchases: the reference to put on the wire" }
+        failure_reason: { type: string }
         created_at:  { type: string, format: date-time }
         paid_at:     { type: string, format: date-time, nullable: true }
     Member:

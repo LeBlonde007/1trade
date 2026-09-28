@@ -1,10 +1,14 @@
 <script setup lang="ts">
+import type { PayMethod, WireInvoice } from '~/composables/useBilling'
+
 /**
  * /wallet/buy — Buy credits (live, Stripe-only).
  *
  * Wired to F06 billing: pick a credit type + amount → useBilling().checkout() → redirect to the
- * Stripe-hosted checkout; the webhook books the credits to the ledger on settlement. Stripe is the
- * only rail right now (MockStripe in dev); ACH/wire + JPY are M3, so they're not offered here.
+ * Stripe-hosted checkout; the webhook books the credits to the ledger on settlement. US dollars only:
+ * card (settles at checkout), ACH bank debit (credits arrive when the bank clears it, a few business
+ * days) or a USD wire (an invoice with our bank details and a reference; credits arrive when the wire
+ * is received).
  *
  * `amount` is the number of CREDITS to buy (fixed-point), per platform-core /v1/billing/checkout.
  * The USD figure is INDICATIVE (published reference prices) — Stripe shows the exact charge.
@@ -17,7 +21,9 @@ useHead({ title: 'Buy credits — 1Trade', htmlAttrs: { 'data-theme': 'dark' } }
 
 const route = useRoute()
 const { user, refresh } = useAuth()
-const { checkout, loading } = useBilling()
+const { checkout, wire, loading } = useBilling()
+const payMethod = ref<PayMethod>('card')
+const invoice = ref<WireInvoice | null>(null)
 const { balances, loadBalances } = useWallet()
 const { submitting: kycSubmitting, submit: submitKyc } = useKyc()
 
@@ -93,12 +99,21 @@ function pickType(id: string) {
   else if (!id.startsWith('gpu_') && amount.value < 10_000) setQuick(100_000)
 }
 
-// ── Live Stripe checkout ────────────────────────────────────────────────────────────────────
+// ── Live checkout (card / ACH) or wire invoice ──────────────────────────────────────────────
 async function onCheckout() {
-  error.value = ''; done.value = false; settled.value = false
+  error.value = ''; done.value = false; settled.value = false; invoice.value = null
   if (amount.value <= 0) { error.value = 'Enter how many credits to buy.'; return }
+  if (payMethod.value === 'wire') {
+    try {
+      invoice.value = await wire(amount.value.toFixed(6), creditType.value)
+    } catch (e: unknown) {
+      const ex = e as { data?: { message?: string } }
+      error.value = ex?.data?.message || 'Could not create the wire invoice.'
+    }
+    return
+  }
   try {
-    const res = await checkout(amount.value.toFixed(6), creditType.value, 'usd')
+    const res = await checkout(amount.value.toFixed(6), creditType.value, payMethod.value)
     if (res.settled) {
       // Sandbox: MockStripe booked the credits inline — refresh the balance and confirm in place.
       await loadBalances()
@@ -139,7 +154,7 @@ onMounted(() => {
         <div class="eyebrow">Buy credits · funding</div>
         <h1 class="page-title">Add credits to your account.</h1>
         <p class="page-subtitle">
-          Pick a credit type and amount, then pay with card via Stripe. Credits are booked to your
+          Pick a credit type and amount, then pay in US dollars by card, ACH bank debit or wire. Credits are booked to your
           wallet on settlement. Sandbox purchases use test mode — no real charge.
         </p>
       </div>
@@ -232,6 +247,20 @@ onMounted(() => {
           <button v-for="v in quickAmounts" :key="v" type="button" class="qa-btn mono" :class="{ active: amount === v }" @click="setQuick(v)">{{ compact(v) }}</button>
         </div>
 
+        <!-- Payment method (US dollars) -->
+        <div class="field-label">— Pay with <span class="req">USD</span></div>
+        <div class="pm-row" role="radiogroup" aria-label="Payment method">
+          <button type="button" class="pm" :class="{ active: payMethod === 'card' }" role="radio" :aria-checked="payMethod === 'card'" @click="payMethod = 'card'; invoice = null">
+            <span class="pm-t">Card</span><span class="pm-d">instant</span>
+          </button>
+          <button type="button" class="pm" :class="{ active: payMethod === 'ach' }" role="radio" :aria-checked="payMethod === 'ach'" @click="payMethod = 'ach'; invoice = null">
+            <span class="pm-t">ACH bank debit</span><span class="pm-d">US bank · clears in ~4 business days</span>
+          </button>
+          <button type="button" class="pm" :class="{ active: payMethod === 'wire' }" role="radio" :aria-checked="payMethod === 'wire'" @click="payMethod = 'wire'; invoice = null">
+            <span class="pm-t">Wire transfer</span><span class="pm-d">USD · from $1,000</span>
+          </button>
+        </div>
+
         <!-- Preview -->
         <div class="preview">
           <div class="preview-row major">
@@ -254,14 +283,27 @@ onMounted(() => {
           <NuxtLink to="/wallet" class="bk">View wallet →</NuxtLink>
         </div>
         <div v-else-if="done" class="banner ok">
-          Secure checkout opened in a new tab — complete payment there. Credits arrive in your wallet on settlement.
+          <template v-if="payMethod === 'ach'">Bank-debit checkout opened in a new tab. Your credits arrive when the debit clears (usually about 4 business days); the purchase shows as processing until then.</template>
+          <template v-else>Secure checkout opened in a new tab — complete payment there. Credits arrive in your wallet on settlement.</template>
+        </div>
+        <div v-if="invoice" class="wire" aria-live="polite">
+          <div class="wire-h">Send exactly <span class="mono">${{ invoice.amount_usd }}</span> USD by wire</div>
+          <dl class="wire-kv mono">
+            <dt>Reference (required)</dt><dd class="ref">{{ invoice.reference }}</dd>
+            <dt>Beneficiary</dt><dd>{{ invoice.instructions.account_name }}</dd>
+            <dt>Bank</dt><dd>{{ invoice.instructions.bank_name }}<template v-if="invoice.instructions.bank_address">, {{ invoice.instructions.bank_address }}</template></dd>
+            <dt>Account number</dt><dd>{{ invoice.instructions.account_number }}</dd>
+            <dt>Routing (ABA)</dt><dd>{{ invoice.instructions.routing_number }}</dd>
+            <template v-if="invoice.instructions.swift"><dt>SWIFT</dt><dd>{{ invoice.instructions.swift }}</dd></template>
+          </dl>
+          <p class="wire-note">Put the reference in the wire's memo so we can match it. {{ compact(Number(invoice.credits)) }} {{ active.label }} credits are added when the wire arrives; the amount must match exactly. It appears in your purchase history as pending until then.</p>
         </div>
 
         <button type="button" class="btn primary lg full" :disabled="loading || amount <= 0" @click="onCheckout">
-          {{ loading ? 'Starting checkout…' : 'Continue to secure checkout →' }}
+          {{ loading ? 'Working…' : payMethod === 'wire' ? 'Get wire instructions →' : payMethod === 'ach' ? 'Continue to bank debit →' : 'Continue to secure checkout →' }}
         </button>
         <div class="foot-note">
-          Stripe-hosted · PCI-DSS · we never see your card. ACH / wire + JPY settlement arrive in a later release.
+          All prices and payments in US dollars. Card and ACH are Stripe-hosted (PCI-DSS) — we never see your card or bank login.
         </div>
       </div>
     </div>
@@ -378,4 +420,17 @@ onMounted(() => {
   .type-grid { grid-template-columns: repeat(2, 1fr); }
   .kyc-actions { flex-direction: column; }
 }
+.pm-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 18px; }
+.pm { display: flex; flex-direction: column; gap: 2px; text-align: left; padding: 10px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--elevated); color: var(--text); cursor: pointer; }
+.pm.active { border-color: var(--brand); }
+.pm-t { font-size: 13px; font-weight: 600; }
+.pm-d { font-size: 11px; color: var(--text-3); }
+.wire { border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin: 12px 0; }
+.wire-h { font-size: 14px; font-weight: 600; margin-bottom: 10px; }
+.wire-kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0; font-size: 12px; }
+.wire-kv dt { color: var(--text-3); }
+.wire-kv dd { margin: 0; }
+.wire-kv .ref { color: var(--brand); font-weight: 600; }
+.wire-note { font-size: 12px; color: var(--text-2); margin: 10px 0 0; }
+@media (max-width: 640px) { .pm-row { grid-template-columns: 1fr; } }
 </style>

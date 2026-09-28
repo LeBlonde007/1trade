@@ -12,6 +12,7 @@ type CheckoutParams struct {
 	Amount     string
 	CreditType string
 	Currency   string
+	Method     string // card | ach (US bank account debit)
 }
 
 // CheckoutSession is a created checkout; its ID links the later webhook back to the order.

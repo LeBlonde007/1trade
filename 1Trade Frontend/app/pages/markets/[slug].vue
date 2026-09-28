@@ -660,7 +660,7 @@ onBeforeUnmount(() => {
               <tr><th>Tick size</th><td>${{ (market.decimals === 6 ? 0.000001 : 0.0001).toFixed(market.decimals) }}</td></tr>
               <tr><th>Minimum order</th><td>100 credits · $0.10</td></tr>
               <tr><th>Trading hours</th><td>24 / 7 · 365</td></tr>
-              <tr><th>Currency</th><td>USD <span class="dim regular">(JPY pricing available)</span></td></tr>
+              <tr><th>Currency</th><td>USD</td></tr>
               <tr>
                 <th>Fees · retail tier</th>
                 <td>0.50% maker / 1.00% taker

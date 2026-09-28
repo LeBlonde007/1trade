@@ -45,6 +45,8 @@ spec:
             - configMapRef: { name: otel-env, optional: true }   # OTLP endpoint for traces; created by install-data-plane.sh OBS=1
             - configMapRef: { name: platform-core-env }
             - secretRef: { name: platform-auth }   # PLATFORM_JWT_SECRET — the signing key it issues with
+            - secretRef: { name: billing-bank, optional: true }   # WIRE_* receiving-bank details (v1.9); absent = wires unavailable
+            - secretRef: { name: platform-mfa, optional: true }   # MFA_ENC_KEY (v1.7); absent = derived from the JWT secret
           livenessProbe:
             httpGet: { path: /healthz, port: 8001 }
             periodSeconds: 10

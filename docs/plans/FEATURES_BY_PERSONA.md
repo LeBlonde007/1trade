@@ -47,6 +47,7 @@ each step marked done / showcase / paused. Pair with [STATUS.md](STATUS.md) (tre
 |---|---|---|---|
 | Browse the **live model catalog** | `/inference` | ✅ | F08 (v0.2.0) |
 | **Buy credits** — Stripe checkout → webhook → ledger mint | `/wallet/buy` | ✅ (mock Stripe in dev) | F06 (v0.2.1) |
+| Pay by **card, ACH bank debit or USD wire** — US dollars only | `/wallet/buy` | ✅ live (2026-09-28) | F06 |
 | **Run inference** (chat) → **real per-token debit** + session meter | `/inference` | ✅ | F08/F09 (v0.2.7) |
 | Convert credits (AI-index ↔ text), 1% spread | `/wallet` convert | ✅ | F07 (v0.2.5) |
 | **Rent + manage GPU instances** — provision / stop / start / delete | `/compute` · `/compute/new` | ✅ | **F13 (v0.3.0)** |

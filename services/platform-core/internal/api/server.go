@@ -119,6 +119,7 @@ func (s *Server) routes() {
 	s.teamRoutes()
 	s.mfaRoutes()
 	s.ssoRoutes()
+	s.wireRoutes()
 	s.mux.HandleFunc("GET /v1/auth/oauth/{provider}", notConfigured)
 	s.mux.HandleFunc("GET /v1/auth/oauth/{provider}/callback", notConfigured)
 }

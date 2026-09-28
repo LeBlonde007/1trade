@@ -153,7 +153,7 @@ func TestBillingCheckoutAndWebhook(t *testing.T) {
 	eventID := "evt_" + uuid.NewString()
 	payload, _ := json.Marshal(map[string]any{
 		"id": eventID, "type": "checkout.session.completed",
-		"data": map[string]any{"object": map[string]any{"id": sessionID}},
+		"data": map[string]any{"object": map[string]any{"id": sessionID, "payment_status": "paid"}},
 	})
 	sign := func(p []byte) string {
 		ts := time.Now().Unix()
@@ -163,16 +163,16 @@ func TestBillingCheckoutAndWebhook(t *testing.T) {
 		t.Fatalf("webhook status %d", code)
 	}
 	calls := booker.purchases()
-	if len(calls) != 1 || calls[0].Amount != "500.000000" || calls[0].CreditType != "text" || calls[0].IdempotencyKey != eventID || calls[0].TenantID == "" {
+	if len(calls) != 1 || calls[0].Amount != "500.000000" || calls[0].CreditType != "text" || calls[0].IdempotencyKey != "purchase:"+purchaseID || calls[0].TenantID == "" {
 		t.Fatalf("unexpected booking: %+v", calls)
 	}
 
-	// replay → still 200, same idempotency key (ledger dedupes → no double-mint)
+	// replay → still 200, same idempotency key (one booking per purchase; the ledger dedupes)
 	if code := postWebhook(payload, sign(payload)); code != 200 {
 		t.Fatalf("replay webhook status %d", code)
 	}
 	calls = booker.purchases()
-	if len(calls) != 2 || calls[1].IdempotencyKey != eventID {
+	if len(calls) != 2 || calls[1].IdempotencyKey != "purchase:"+purchaseID {
 		t.Fatalf("replay should re-book under the same idempotency key: %+v", calls)
 	}
 
@@ -193,7 +193,7 @@ func TestBillingCheckoutAndWebhook(t *testing.T) {
 
 // TestMockCheckoutAutoSettles covers the dev/sandbox path: with BillingAutoSettle + MockStripe, a
 // checkout books the credits inline (no webhook) and reports settled=true. Idempotency key is the
-// synthetic evt_mock_<purchase_id>, distinct from the real webhook's Stripe event id.
+// purchase itself (purchase:<id>), the same one the webhook uses, so the two can never double-mint.
 func TestMockCheckoutAutoSettles(t *testing.T) {
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
@@ -252,7 +252,7 @@ func TestMockCheckoutAutoSettles(t *testing.T) {
 	}
 	purchaseID, _ := co["purchase_id"].(string)
 	calls := booker.purchases()
-	if len(calls) != 1 || calls[0].Amount != "1000.000000" || calls[0].CreditType != "text" || calls[0].IdempotencyKey != "evt_mock_"+purchaseID {
+	if len(calls) != 1 || calls[0].Amount != "1000.000000" || calls[0].CreditType != "text" || calls[0].IdempotencyKey != "purchase:"+purchaseID {
 		t.Fatalf("auto-settle should book exactly once with the synthetic key: %+v", calls)
 	}
 

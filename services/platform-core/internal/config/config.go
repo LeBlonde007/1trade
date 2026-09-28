@@ -9,36 +9,37 @@ import (
 
 // Config holds runtime configuration.
 type Config struct {
-	Env                      string        // dev | staging | prod
-	Addr                     string        // listen address, e.g. ":8001"
-	DatabaseURL              string        // Postgres DSN
-	JWTSecret                string        // HS256 signing secret — SHARED with every service that verifies tokens
-	ServiceToken             string        // service-to-service token (guards internal endpoints; auths calls to the ledger)
-	CreditLedgerURL          string        // base URL for booking settled purchases (F06)
-	StripeWebhookSecret      string        // Stripe webhook signing secret (verifies inbound webhooks)
-	StripeSecretKey          string        // Stripe API key (real checkout sessions; empty → mock Stripe)
-	BillingAutoSettle        bool          // dev/sandbox: settle MockStripe checkouts inline (no webhook); never true in prod
-	KYCAutoApprove           bool          // dev/sandbox: a KYC submission is verified instantly (no compliance back-office); false in prod
-	SMTPAddr                 string        // SMTP server host:port for transactional email (empty → email disabled)
-	SMTPUser                 string        // SMTP AUTH username (empty → no auth, e.g. Mailpit)
-	SMTPPass                 string        // SMTP AUTH password (from a Secret — never hardcoded)
-	SMTPTLS                  string        // transport: "implicit" (465) | "starttls" (587) | "" (plain/Mailpit; inferred from port)
-	EmailAPIURL              string        // HTTP Email-API send URL (Mailtrap etc.); preferred over SMTP when set (works where SMTP ports are blocked)
-	EmailAPIToken            string        // bearer token for the HTTP Email API (from a Secret)
-	StorageEndpoint          string        // S3-compatible host for uploads, e.g. nyc3.digitaloceanspaces.com (empty → file storage disabled)
-	StorageRegion            string        // bucket region, e.g. nyc3
-	StorageBucket            string        // bucket name
-	StorageAccessKey         string        // S3 access key (from a Secret)
-	StorageSecretKey         string        // S3 secret key (from a Secret)
-	StoragePublicBase        string        // explicit public object URL base; overrides the derived origin/CDN base
-	StorageUseCDN            bool          // serve uploaded objects via the DigitalOcean Spaces CDN edge (STORAGE_CDN)
-	StoragePublicRead        bool          // sign uploads public-read so public/CDN links load (STORAGE_PUBLIC_READ, default on)
-	StoragePrefix            string        // optional bucket "directory" prefix for uploads (STORAGE_PREFIX)
-	EmailFrom                string        // From address for platform email
-	AppBaseURL               string        // public base URL of the web app, for links in emails
-	RequireEmailVerification bool          // gate login on a verified email; opt-in (default off), enabled by the deploy only when real SMTP is wired
-	TokenTTL                 time.Duration // issued-token lifetime
-	MFAKey                   string        // MFA_ENC_KEY: base64 32-byte key sealing TOTP secrets (default: derived from the JWT secret)
+	Env                      string           // dev | staging | prod
+	Addr                     string           // listen address, e.g. ":8001"
+	DatabaseURL              string           // Postgres DSN
+	JWTSecret                string           // HS256 signing secret — SHARED with every service that verifies tokens
+	ServiceToken             string           // service-to-service token (guards internal endpoints; auths calls to the ledger)
+	CreditLedgerURL          string           // base URL for booking settled purchases (F06)
+	StripeWebhookSecret      string           // Stripe webhook signing secret (verifies inbound webhooks)
+	StripeSecretKey          string           // Stripe API key (real checkout sessions; empty → mock Stripe)
+	BillingAutoSettle        bool             // dev/sandbox: settle MockStripe checkouts inline (no webhook); never true in prod
+	Wire                     WireInstructions // where customers send USD wires (unset bank = wires unavailable)
+	KYCAutoApprove           bool             // dev/sandbox: a KYC submission is verified instantly (no compliance back-office); false in prod
+	SMTPAddr                 string           // SMTP server host:port for transactional email (empty → email disabled)
+	SMTPUser                 string           // SMTP AUTH username (empty → no auth, e.g. Mailpit)
+	SMTPPass                 string           // SMTP AUTH password (from a Secret — never hardcoded)
+	SMTPTLS                  string           // transport: "implicit" (465) | "starttls" (587) | "" (plain/Mailpit; inferred from port)
+	EmailAPIURL              string           // HTTP Email-API send URL (Mailtrap etc.); preferred over SMTP when set (works where SMTP ports are blocked)
+	EmailAPIToken            string           // bearer token for the HTTP Email API (from a Secret)
+	StorageEndpoint          string           // S3-compatible host for uploads, e.g. nyc3.digitaloceanspaces.com (empty → file storage disabled)
+	StorageRegion            string           // bucket region, e.g. nyc3
+	StorageBucket            string           // bucket name
+	StorageAccessKey         string           // S3 access key (from a Secret)
+	StorageSecretKey         string           // S3 secret key (from a Secret)
+	StoragePublicBase        string           // explicit public object URL base; overrides the derived origin/CDN base
+	StorageUseCDN            bool             // serve uploaded objects via the DigitalOcean Spaces CDN edge (STORAGE_CDN)
+	StoragePublicRead        bool             // sign uploads public-read so public/CDN links load (STORAGE_PUBLIC_READ, default on)
+	StoragePrefix            string           // optional bucket "directory" prefix for uploads (STORAGE_PREFIX)
+	EmailFrom                string           // From address for platform email
+	AppBaseURL               string           // public base URL of the web app, for links in emails
+	RequireEmailVerification bool             // gate login on a verified email; opt-in (default off), enabled by the deploy only when real SMTP is wired
+	TokenTTL                 time.Duration    // issued-token lifetime
+	MFAKey                   string           // MFA_ENC_KEY: base64 32-byte key sealing TOTP secrets (default: derived from the JWT secret)
 }
 
 // Load reads configuration from the environment with sensible dev defaults.
@@ -59,6 +60,11 @@ func Load() Config {
 		CreditLedgerURL:     envOr("CREDIT_LEDGER_URL", "http://credit-ledger:8002"),
 		StripeWebhookSecret: os.Getenv("STRIPE_WEBHOOK_SECRET"),
 		StripeSecretKey:     os.Getenv("STRIPE_SECRET_KEY"),
+		Wire: WireInstructions{
+			BankName: os.Getenv("WIRE_BANK_NAME"), BankAddress: os.Getenv("WIRE_BANK_ADDRESS"),
+			AccountName: os.Getenv("WIRE_ACCOUNT_NAME"), AccountNumber: os.Getenv("WIRE_ACCOUNT_NUMBER"),
+			RoutingNumber: os.Getenv("WIRE_ROUTING_NUMBER"), SWIFT: os.Getenv("WIRE_SWIFT"),
+		},
 		// No real Stripe key ⇒ MockStripe ⇒ no hosted page / webhook will ever fire, so settle
 		// checkouts inline. Real deployments set STRIPE_SECRET_KEY → false → the webhook books.
 		BillingAutoSettle: os.Getenv("STRIPE_SECRET_KEY") == "",
@@ -112,4 +118,20 @@ func envOr(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// WireInstructions are 1Trade's receiving bank details for USD wires (from the environment; the
+// account number is sensitive and comes from a Secret).
+type WireInstructions struct {
+	BankName      string `json:"bank_name"`
+	BankAddress   string `json:"bank_address,omitempty"`
+	AccountName   string `json:"account_name"`
+	AccountNumber string `json:"account_number"`
+	RoutingNumber string `json:"routing_number"`  // ABA, for domestic wires
+	SWIFT         string `json:"swift,omitempty"` // for international wires (still USD)
+}
+
+// Configured reports whether wires can be offered.
+func (w WireInstructions) Configured() bool {
+	return w.BankName != "" && w.AccountName != "" && w.AccountNumber != "" && w.RoutingNumber != ""
 }

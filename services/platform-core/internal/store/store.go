@@ -252,6 +252,11 @@ type Purchase struct {
 	// predating 0007 are never back-filled, because an inferred price is not an observation.
 	UnitPriceUSD    string
 	ChargedUSDCents int64
+	// v1.9 payment methods (migration 0011): card | ach | wire.
+	Method            string
+	WireReference     string
+	WireReceivedCents int64
+	FailureReason     string
 }
 
 // CreatePurchase inserts a pending purchase linked to its Stripe checkout session.
@@ -270,11 +275,22 @@ func (s *Store) CreatePurchase(ctx context.Context, p Purchase, sessionID string
 	if p.ChargedUSDCents > 0 {
 		cents = p.ChargedUSDCents
 	}
+	method := p.Method
+	if method == "" {
+		method = "card"
+	}
+	var session, wireRef any
+	if sessionID != "" {
+		session = sessionID
+	}
+	if p.WireReference != "" {
+		wireRef = p.WireReference
+	}
 	_, err := s.pool.Exec(ctx,
 		`INSERT INTO purchases (id, tenant_id, amount, credit_type, currency, status, stripe_session_id, is_paper,
-		                        unit_price_usd, charged_usd_cents)
-		 VALUES ($1,$2,$3::numeric,$4,$5,'pending',$6,$7,$8::numeric,$9)`,
-		p.ID, p.TenantID, p.Amount, p.CreditType, p.Currency, sessionID, p.IsPaper, unitPrice, cents)
+		                        unit_price_usd, charged_usd_cents, method, wire_reference)
+		 VALUES ($1,$2,$3::numeric,$4,$5,'pending',$6,$7,$8::numeric,$9,$10,$11)`,
+		p.ID, p.TenantID, p.Amount, p.CreditType, p.Currency, session, p.IsPaper, unitPrice, cents, method, wireRef)
 	if err != nil {
 		return fmt.Errorf("insert purchase: %w", err)
 	}
@@ -297,19 +313,79 @@ func (s *Store) GetPurchaseBySession(ctx context.Context, sessionID string) (Pur
 	return p, true, nil
 }
 
-// MarkPurchasePaid settles a pending purchase: status→paid, stamps the Stripe event id + paid_at.
-// Idempotent — a replay (already paid) updates no rows and is not an error.
+// MarkPurchasePaid settles a pending or processing (ACH) purchase: status→paid, stamps the Stripe
+// event id + paid_at. Idempotent — a replay (already paid) updates no rows and is not an error. A
+// failed purchase is never revived.
 func (s *Store) MarkPurchasePaid(ctx context.Context, sessionID, eventID string) error {
 	_, err := s.pool.Exec(ctx,
 		`UPDATE purchases SET status='paid', stripe_event_id=$2, paid_at=now()
-		 WHERE stripe_session_id=$1 AND status='pending'`, sessionID, eventID)
+		 WHERE stripe_session_id=$1 AND status IN ('pending','processing')`, sessionID, eventID)
 	return err
+}
+
+// MarkPurchaseProcessing records that checkout finished but the money has not settled yet (ACH).
+func (s *Store) MarkPurchaseProcessing(ctx context.Context, sessionID string) error {
+	_, err := s.pool.Exec(ctx, `UPDATE purchases SET status='processing' WHERE stripe_session_id=$1 AND status='pending'`, sessionID)
+	return err
+}
+
+// MarkPurchaseFailed records that the payment did not settle (e.g. an ACH debit bounced). A paid
+// purchase is never marked failed.
+func (s *Store) MarkPurchaseFailed(ctx context.Context, sessionID, reason string) error {
+	_, err := s.pool.Exec(ctx, `UPDATE purchases SET status='failed', failure_reason=$2
+		WHERE stripe_session_id=$1 AND status IN ('pending','processing')`, sessionID, reason)
+	return err
+}
+
+// Wire errors.
+var (
+	ErrWireNotFound = errors.New("store: no such wire purchase")
+	ErrWireSettled  = errors.New("store: wire purchase is not pending")
+	ErrWireAmount   = errors.New("store: received amount does not match the invoice")
+)
+
+// MarkWireReceived settles a pending wire purchase when the recorded amount matches the invoice to
+// the cent. A replay of the same receipt returns the purchase with replayed=true.
+func (s *Store) MarkWireReceived(ctx context.Context, purchaseID string, cents int64, bankRef string) (p Purchase, replayed bool, err error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return Purchase{}, false, err
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // rollback after commit is a no-op
+	var expected *int64
+	var received *int64
+	var ref *string
+	err = tx.QueryRow(ctx, `SELECT id, tenant_id, amount::text, credit_type, currency, status, is_paper, charged_usd_cents,
+		wire_received_cents, bank_reference FROM purchases WHERE id=$1 AND method='wire' FOR UPDATE`, purchaseID).
+		Scan(&p.ID, &p.TenantID, &p.Amount, &p.CreditType, &p.Currency, &p.Status, &p.IsPaper, &expected, &received, &ref)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Purchase{}, false, ErrWireNotFound
+	}
+	if err != nil {
+		return Purchase{}, false, err
+	}
+	if p.Status == "paid" && received != nil && *received == cents && ref != nil && *ref == bankRef {
+		return p, true, nil
+	}
+	if p.Status != "pending" {
+		return Purchase{}, false, ErrWireSettled
+	}
+	if expected == nil || *expected != cents {
+		return Purchase{}, false, ErrWireAmount
+	}
+	if _, err := tx.Exec(ctx, `UPDATE purchases SET status='paid', wire_received_cents=$2, bank_reference=$3, paid_at=now()
+		WHERE id=$1`, purchaseID, cents, bankRef); err != nil {
+		return Purchase{}, false, fmt.Errorf("wire received: %w", err)
+	}
+	p.Status = "paid"
+	return p, false, tx.Commit(ctx)
 }
 
 // ListPurchases returns a tenant's purchase history, newest first.
 func (s *Store) ListPurchases(ctx context.Context, tenantID string, limit int) ([]Purchase, error) {
 	rows, err := s.pool.Query(ctx,
-		`SELECT id, tenant_id, amount::text, credit_type, currency, status, is_paper, created_at, paid_at
+		`SELECT id, tenant_id, amount::text, credit_type, currency, status, is_paper, created_at, paid_at,
+		        method, coalesce(wire_reference, ''), coalesce(charged_usd_cents, 0), coalesce(failure_reason, '')
 		 FROM purchases WHERE tenant_id=$1 ORDER BY created_at DESC LIMIT $2`, tenantID, limit)
 	if err != nil {
 		return nil, err
@@ -318,7 +394,8 @@ func (s *Store) ListPurchases(ctx context.Context, tenantID string, limit int) (
 	var out []Purchase
 	for rows.Next() {
 		var p Purchase
-		if err := rows.Scan(&p.ID, &p.TenantID, &p.Amount, &p.CreditType, &p.Currency, &p.Status, &p.IsPaper, &p.CreatedAt, &p.PaidAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.TenantID, &p.Amount, &p.CreditType, &p.Currency, &p.Status, &p.IsPaper, &p.CreatedAt, &p.PaidAt,
+			&p.Method, &p.WireReference, &p.ChargedUSDCents, &p.FailureReason); err != nil {
 			return nil, err
 		}
 		out = append(out, p)

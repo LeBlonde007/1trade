@@ -81,7 +81,6 @@ const CURRENCIES = [
   { value: 'USD', label: 'USD · US Dollar' },
   { value: 'EUR', label: 'EUR · Euro' },
   { value: 'GBP', label: 'GBP · British Pound' },
-  { value: 'JPY', label: 'JPY · Japanese Yen' },
   { value: 'SGD', label: 'SGD · Singapore Dollar' },
   { value: 'CHF', label: 'CHF · Swiss Franc' },
 ]

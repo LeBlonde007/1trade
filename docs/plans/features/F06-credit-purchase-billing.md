@@ -94,3 +94,52 @@ recorded here as F06's concern.
 **Open**
 - [ ] Amount (25) is a placeholder, not a business decision — ~5,000 tokens on `llama-3.2-1b`.
 - [ ] No expiry, and no abuse control: one free grant per *tenant*, and signup creates a tenant.
+
+---
+
+## Status — ACH and wire, US dollars only (2026-09-28)
+
+**Decision (founder, 2026-09-28): payments are in US dollars only.** JPY is removed from checkout, the
+contract, and the console. Multi-currency is out of scope.
+
+**Built** (`platform-core.yaml` v1.9, migration `0011_payments.sql`):
+- **Card:** unchanged; settles at checkout.
+- **ACH bank debit:** Stripe Checkout with `us_bank_account`. The purchase goes `pending` →
+  `processing` when the debit starts (`checkout.session.completed` with `payment_status=unpaid`), then
+  `paid` and booked on `async_payment_succeeded`, or `failed` on `async_payment_failed`. A failed
+  purchase is never revived, and a paid one never flips to failed.
+- **Fix, found while adding ACH:** the webhook used to book on any `checkout.session.completed`, which
+  for ACH would have minted credits before the money arrived. It now books only when payment has
+  settled.
+- **One booking per purchase:** the ledger idempotency key is `purchase:<id>` (it was the Stripe
+  event id), so a webhook, its retries, the second ACH event and the dev auto-settle can never
+  double-mint.
+- **Wire:**
+  - `POST /v1/billing/wires` (admin or billing, KYC for real money, from $1,000) returns 1Trade's USD
+    bank details (`WIRE_*` from a Secret), the exact dollar amount and a unique `1T-…` reference;
+  - treasury records the receipt with the service token (`/wires/{id}/received`); the amount must
+    match to the cent, or it is 409 `amount_mismatch` and reconciled by hand;
+  - a replay of the same receipt re-books idempotently, which also recovers a failed booking;
+  - audited.
+- **Console:** `/wallet/buy` has a USD payment-method choice (card / ACH / wire), shows wire
+  instructions with the reference, and explains ACH timing. Purchase history shows the method,
+  dollars, wire reference and failure reason.
+
+**Verified:**
+- **Tests:**
+  - the ACH lifecycle (nothing booked at checkout or when the debit starts; booked once on success,
+    retries included; a returned debit books nothing and is not revived; no booking without
+    `payment_status=paid`);
+  - USD-only and method validation; a paid purchase never marked failed;
+  - wire: minimum, invoice, amount mismatches, sub-cent input, a tenant cannot record its own wire,
+    the receipt, a replay, a second receipt, roles, KYC.
+- **Mutation-checked:** 13 of 13 caught.
+- **Live stack** (real ledger): an ACH purchase of 24 GPU-hours reaches the balance only on the
+  cleared event (a retry does not double). The wire invoice is $2,990.00 with its reference; a wrong
+  amount is refused; the correct receipt books 1,000 GPU-hours. Screenshot:
+  `docs/screenshots/buy-wire.png`.
+
+**Not built:**
+- automatic wire matching from a bank feed (treasury records receipts today);
+- ACH return handling after `paid` (a late R-code would need a clawback/debit flow);
+- Stripe live keys and live bank details (configuration, not code).

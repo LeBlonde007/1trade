@@ -19,7 +19,8 @@ import (
 type checkoutBody struct {
 	Amount     string `json:"amount"`
 	CreditType string `json:"credit_type"`
-	Currency   string `json:"currency"`
+	Currency   string `json:"currency"` // usd only (defaults to usd)
+	Method     string `json:"method"`   // card (default) | ach
 }
 
 // createCheckout validates an order, records a pending purchase, creates a Stripe checkout session,
@@ -39,39 +40,27 @@ func (s *Server) createCheckout(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusUnprocessableEntity, "bad_amount", "amount must be a positive decimal")
 		return
 	}
-	if b.CreditType == "" || (b.Currency != "usd" && b.Currency != "jpy") {
-		writeErr(w, http.StatusUnprocessableEntity, "bad_request", "credit_type and a supported currency (usd|jpy) are required")
+	if b.Currency == "" {
+		b.Currency = "usd"
+	}
+	if b.Method == "" {
+		b.Method = "card"
+	}
+	if b.CreditType == "" || b.Currency != "usd" {
+		writeErr(w, http.StatusUnprocessableEntity, "bad_request", "credit_type is required; payments are in US dollars only (currency usd)")
 		return
 	}
-
-	// KYC gate (F22): a real-money purchase (is_paper=false) requires a verified tenant. Sandbox/paper
-	// flows carry no real-money/AML exposure and are exempt. This server-side check is authoritative —
-	// the web app's gate is convenience only and is never trusted.
-	if !p.IsPaper {
-		kyc, found, err := s.st.GetKYC(r.Context(), p.TenantID)
-		if err != nil {
-			serverError(w, err)
-			return
-		}
-		if !found || !domain.CanPurchaseRealMoney(kyc.Status) {
-			status := "unverified"
-			if found {
-				status = string(kyc.Status)
-			}
-			slog.Warn("audit: real-money checkout blocked — kyc not verified", "tenant_id", p.TenantID, "kyc_status", status)
-			_, _ = s.st.WriteAudit(r.Context(), store.AuditEntry{
-				TenantID: p.TenantID, ActorID: p.UserID, Action: "billing.checkout.blocked",
-				TargetType: "tenant", TargetID: p.TenantID,
-				After: map[string]any{"reason": "kyc_required", "kyc_status": status}, IsPaper: p.IsPaper,
-			})
-			writeErr(w, http.StatusForbidden, "kyc_required", "identity verification is required before real-money purchases")
-			return
-		}
+	if b.Method != "card" && b.Method != "ach" {
+		writeErr(w, http.StatusUnprocessableEntity, "bad_method", "method must be card or ach (for a wire transfer use /v1/billing/wires)")
+		return
+	}
+	if !s.realMoneyAllowed(w, r, p) {
+		return
 	}
 
 	purchaseID := uuid.NewString()
 	session, err := s.stripe.CreateCheckoutSession(r.Context(), billing.CheckoutParams{
-		PurchaseID: purchaseID, TenantID: p.TenantID, Amount: b.Amount, CreditType: b.CreditType, Currency: b.Currency,
+		PurchaseID: purchaseID, TenantID: p.TenantID, Amount: b.Amount, CreditType: b.CreditType, Currency: b.Currency, Method: b.Method,
 	})
 	if err != nil {
 		serverError(w, err)
@@ -86,7 +75,7 @@ func (s *Server) createCheckout(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := s.st.CreatePurchase(r.Context(), store.Purchase{
 		ID: purchaseID, TenantID: p.TenantID, Amount: b.Amount, CreditType: b.CreditType, Currency: b.Currency, IsPaper: p.IsPaper,
-		UnitPriceUSD: unitPrice, ChargedUSDCents: cents,
+		UnitPriceUSD: unitPrice, ChargedUSDCents: cents, Method: b.Method,
 	}, session.ID); err != nil {
 		serverError(w, err)
 		return
@@ -97,8 +86,10 @@ func (s *Server) createCheckout(w http.ResponseWriter, r *http.Request) {
 	// purchase inline (mark paid + book the credits) exactly as the webhook would. Real Stripe
 	// deployments use a different StripeClient, so this never runs in prod — there, the signed
 	// checkout.session.completed webhook books the credits. Idempotent on a synthetic event id.
+	// An ACH debit never settles at checkout, even in dev: it waits for the bank (a signed
+	// async_payment_succeeded webhook), which is the behaviour worth exercising.
 	settled := false
-	if _, isMock := s.stripe.(billing.MockStripe); s.cfg.BillingAutoSettle && isMock {
+	if _, isMock := s.stripe.(billing.MockStripe); s.cfg.BillingAutoSettle && isMock && b.Method == "card" {
 		evID := "evt_mock_" + purchaseID
 		if err := s.st.MarkPurchasePaid(r.Context(), session.ID, evID); err != nil {
 			serverError(w, err)
@@ -106,7 +97,7 @@ func (s *Server) createCheckout(w http.ResponseWriter, r *http.Request) {
 		}
 		if err := s.booker.BookPurchase(r.Context(), billing.PurchaseBooking{
 			TenantID: p.TenantID, Amount: b.Amount, CreditType: b.CreditType, IsPaper: p.IsPaper,
-			ReferenceID: purchaseID, IdempotencyKey: evID,
+			ReferenceID: purchaseID, IdempotencyKey: bookingKey(purchaseID),
 		}); err != nil {
 			serverError(w, err)
 			return
@@ -114,7 +105,7 @@ func (s *Server) createCheckout(w http.ResponseWriter, r *http.Request) {
 		settled = true
 		slog.Info("audit: mock checkout settled instantly (dev)", "tenant_id", p.TenantID, "purchase_id", purchaseID)
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"purchase_id": purchaseID, "checkout_url": session.URL, "settled": settled})
+	writeJSON(w, http.StatusOK, map[string]any{"purchase_id": purchaseID, "checkout_url": session.URL, "settled": settled, "method": b.Method})
 }
 
 // stripeEvent is the slice of a Stripe Event payload we act on.
@@ -123,14 +114,24 @@ type stripeEvent struct {
 	Type string `json:"type"`
 	Data struct {
 		Object struct {
-			ID string `json:"id"`
+			ID            string `json:"id"`
+			PaymentStatus string `json:"payment_status"` // paid | unpaid (ACH still settling) | no_payment_required
 		} `json:"object"`
 	} `json:"data"`
 }
 
+// bookingKey is the ledger idempotency key for a purchase: credits are booked at most once per
+// purchase, whichever event (checkout completed, or ACH settled) or retry triggers it.
+func bookingKey(purchaseID string) string { return "purchase:" + purchaseID }
+
 // stripeWebhook receives Stripe events. Authenticity is the Stripe-Signature header (HMAC), never a
-// bearer token. On checkout.session.completed it marks the purchase paid and books the credits to
-// the ledger, idempotent on the Stripe event id (a replay never double-mints).
+// bearer token. Credits are booked only when money has settled:
+//   - checkout.session.completed with payment_status=paid (card) → paid, book;
+//   - checkout.session.completed with payment_status=unpaid (ACH debit started) → processing;
+//   - checkout.session.async_payment_succeeded (ACH cleared) → paid, book;
+//   - checkout.session.async_payment_failed (ACH returned) → failed, nothing booked.
+//
+// Booking is idempotent on the purchase, so a replay or a retry never double-mints.
 func (s *Server) stripeWebhook(w http.ResponseWriter, r *http.Request) {
 	payload, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
 	if err != nil {
@@ -148,34 +149,85 @@ func (s *Server) stripeWebhook(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "bad_request", "invalid event payload")
 		return
 	}
-	if ev.Type != "checkout.session.completed" {
-		w.WriteHeader(http.StatusOK) // not a settlement event — ack and ignore
+	session := ev.Data.Object.ID
+	settle := false
+	switch ev.Type {
+	case "checkout.session.completed":
+		switch ev.Data.Object.PaymentStatus {
+		case "paid":
+			settle = true
+		case "unpaid":
+			if err := s.st.MarkPurchaseProcessing(r.Context(), session); err != nil {
+				serverError(w, err)
+				return
+			}
+			slog.Info("audit: purchase processing (bank debit settling)", "session", session, "event_id", ev.ID)
+		}
+	case "checkout.session.async_payment_succeeded":
+		settle = true
+	case "checkout.session.async_payment_failed":
+		if err := s.st.MarkPurchaseFailed(r.Context(), session, "bank debit failed"); err != nil {
+			serverError(w, err)
+			return
+		}
+		slog.Warn("audit: purchase failed (bank debit returned)", "session", session, "event_id", ev.ID)
+	}
+	if !settle {
+		w.WriteHeader(http.StatusOK) // nothing to book — ack so Stripe stops retrying
 		return
 	}
-	pur, found, err := s.st.GetPurchaseBySession(r.Context(), ev.Data.Object.ID)
+	if err := s.st.MarkPurchasePaid(r.Context(), session, ev.ID); err != nil {
+		serverError(w, err)
+		return
+	}
+	pur, found, err := s.st.GetPurchaseBySession(r.Context(), session)
 	if err != nil {
 		serverError(w, err)
 		return
 	}
-	if !found {
-		w.WriteHeader(http.StatusOK) // unknown session — ack so Stripe stops retrying
+	if !found || pur.Status != "paid" {
+		w.WriteHeader(http.StatusOK) // unknown session, or a failed purchase that must not be revived
 		return
 	}
-	if err := s.st.MarkPurchasePaid(r.Context(), ev.Data.Object.ID, ev.ID); err != nil {
-		serverError(w, err)
-		return
-	}
-	// Book the credits. Idempotent on the event id, so a retry (e.g. after a transient failure here)
-	// recovers without double-minting. A failure returns 500 → Stripe retries.
+	// A failure returns 500 → Stripe retries; the booking key makes the retry safe.
 	if err := s.booker.BookPurchase(r.Context(), billing.PurchaseBooking{
 		TenantID: pur.TenantID, Amount: pur.Amount, CreditType: pur.CreditType, IsPaper: pur.IsPaper,
-		ReferenceID: pur.ID, IdempotencyKey: ev.ID,
+		ReferenceID: pur.ID, IdempotencyKey: bookingKey(pur.ID),
 	}); err != nil {
 		serverError(w, err)
 		return
 	}
 	slog.Info("audit: purchase booked", "tenant_id", pur.TenantID, "purchase_id", pur.ID, "event_id", ev.ID, "amount", pur.Amount)
 	w.WriteHeader(http.StatusOK)
+}
+
+// realMoneyAllowed is the KYC gate (F22): a real-money purchase (is_paper=false) requires a verified
+// tenant. Sandbox/paper flows carry no real-money/AML exposure and are exempt. Server-side and
+// authoritative — the web app's gate is convenience only. ok=false means a 403 was written.
+func (s *Server) realMoneyAllowed(w http.ResponseWriter, r *http.Request, p principal) bool {
+	if p.IsPaper {
+		return true
+	}
+	kyc, found, err := s.st.GetKYC(r.Context(), p.TenantID)
+	if err != nil {
+		serverError(w, err)
+		return false
+	}
+	if found && domain.CanPurchaseRealMoney(kyc.Status) {
+		return true
+	}
+	status := "unverified"
+	if found {
+		status = string(kyc.Status)
+	}
+	slog.Warn("audit: real-money purchase blocked — kyc not verified", "tenant_id", p.TenantID, "kyc_status", status)
+	_, _ = s.st.WriteAudit(r.Context(), store.AuditEntry{
+		TenantID: p.TenantID, ActorID: p.UserID, Action: "billing.checkout.blocked",
+		TargetType: "tenant", TargetID: p.TenantID,
+		After: map[string]any{"reason": "kyc_required", "kyc_status": status}, IsPaper: p.IsPaper,
+	})
+	writeErr(w, http.StatusForbidden, "kyc_required", "identity verification is required before real-money purchases")
+	return false
 }
 
 // listPurchases returns the tenant's purchase history.
@@ -200,6 +252,16 @@ func (s *Server) listPurchases(w http.ResponseWriter, r *http.Request) {
 		row := map[string]any{
 			"id": pu.ID, "amount": pu.Amount, "credit_type": pu.CreditType,
 			"currency": pu.Currency, "status": pu.Status, "created_at": pu.CreatedAt.UTC().Format(time.RFC3339),
+			"method": pu.Method,
+		}
+		if pu.ChargedUSDCents > 0 {
+			row["amount_usd"] = centsToUSD(pu.ChargedUSDCents)
+		}
+		if pu.WireReference != "" {
+			row["wire_reference"] = pu.WireReference
+		}
+		if pu.FailureReason != "" {
+			row["failure_reason"] = pu.FailureReason
 		}
 		if pu.PaidAt != nil {
 			row["paid_at"] = pu.PaidAt.UTC().Format(time.RFC3339)
