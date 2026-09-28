@@ -2,6 +2,7 @@ package email
 
 import (
 	"bufio"
+	"context"
 	"io"
 	"net"
 	"net/http"
@@ -88,7 +89,7 @@ func TestDisabledSenderNoop(t *testing.T) {
 	if s.Enabled() {
 		t.Fatal("Enabled() should be false with no transport configured")
 	}
-	if err := s.SendVerification("a@b.com", "http://x/verify?token=1"); err != nil {
+	if err := s.SendVerification(context.Background(), "a@b.com", "http://x/verify?token=1"); err != nil {
 		t.Fatalf("disabled SendVerification should be a nil no-op, got %v", err)
 	}
 }
@@ -117,7 +118,7 @@ func TestTLSModeInferredFromPort(t *testing.T) {
 func TestPlainDelivery(t *testing.T) {
 	addr, got := fakeSMTP(t)
 	s := New(Config{Addr: addr, From: "from@1trade.ai"})
-	if err := s.SendVerification("user@example.com", "http://app/verify?token=tok123"); err != nil {
+	if err := s.SendVerification(context.Background(), "user@example.com", "http://app/verify?token=tok123"); err != nil {
 		t.Fatalf("SendVerification: %v", err)
 	}
 	if !strings.Contains(<-got, "tok123") {
@@ -142,7 +143,7 @@ func TestAPIDelivery(t *testing.T) {
 	if !s.Enabled() {
 		t.Fatal("Enabled() should be true when an API URL is set")
 	}
-	if err := s.SendVerification("user@example.com", "http://app/verify?token=apitok9"); err != nil {
+	if err := s.SendVerification(context.Background(), "user@example.com", "http://app/verify?token=apitok9"); err != nil {
 		t.Fatalf("SendVerification (api): %v", err)
 	}
 	if gotAuth != "Bearer tok-abc" {
@@ -161,7 +162,7 @@ func TestAPIErrorSurfaced(t *testing.T) {
 	}))
 	defer srv.Close()
 	s := New(Config{From: "hello@1trade.ai", APIURL: srv.URL, APIToken: "bad"})
-	err := s.SendVerification("user@example.com", "http://app/verify?token=x")
+	err := s.SendVerification(context.Background(), "user@example.com", "http://app/verify?token=x")
 	if err == nil || !strings.Contains(err.Error(), "401") {
 		t.Fatalf("expected a 401 error surfaced, got %v", err)
 	}

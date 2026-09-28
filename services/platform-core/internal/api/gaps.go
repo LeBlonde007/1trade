@@ -146,7 +146,7 @@ func (s *Server) resendVerify(w http.ResponseWriter, r *http.Request) {
 			return
 		} else if found && !au.EmailVerified {
 			if raw := s.issueVerifyToken(r, au.UserID); raw != "" {
-				if err := s.mailer.SendVerification(b.Email, email.VerifyURL(s.cfg.AppBaseURL, raw)); err != nil {
+				if err := s.mailer.SendVerification(r.Context(), b.Email, email.VerifyURL(s.cfg.AppBaseURL, raw)); err != nil {
 					slog.Error("resend verification email (by email)", "err", err)
 				}
 			}
@@ -162,7 +162,7 @@ func (s *Server) resendVerify(w http.ResponseWriter, r *http.Request) {
 	raw := s.issueVerifyToken(r, p.UserID)
 	if raw != "" {
 		if idn, found, err := s.st.GetUserByID(r.Context(), p.UserID); err == nil && found {
-			if err := s.mailer.SendVerification(idn.Email, email.VerifyURL(s.cfg.AppBaseURL, raw)); err != nil {
+			if err := s.mailer.SendVerification(r.Context(), idn.Email, email.VerifyURL(s.cfg.AppBaseURL, raw)); err != nil {
 				slog.Error("resend verification email", "err", err, "user_id", p.UserID)
 			}
 		}

@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: 1Trade Platform-Core API (auth, accounts, RBAC, keys, billing)
-  version: 1.9.0
+  version: 1.10.0
   description: >
     Identity for the whole platform. Owned by `platform-core`. Every other service authenticates
     inbound requests by verifying the JWT this service issues (see JwtClaims) — that's how each
@@ -48,6 +48,15 @@ info:
     billing; KYC for real money; $1,000 minimum) returns 1Trade's USD bank details, the exact amount
     and a unique reference; treasury records the receipt with the service token, and it must match
     the invoice to the cent (409 `amount_mismatch` otherwise, reconciled by hand).
+
+    **v1.10.0 (2026-09-28, security review of v1.8).** SSO email domains must be proved before they
+    route: saving a configuration only *claims* a domain (any number of tenants may hold a pending
+    claim, so claiming first can neither hijack nor block the real owner); `POST
+    /v1/account/sso/domains/{domain}/verify` checks the TXT record `_1trade-verify.<domain>` =
+    `1trade-verify=<token>` and only then does the domain route sign-ins (one verified tenant per
+    domain; 409 `domain_taken`). Assertions are accepted only for verified domains. The IdP's SSO
+    URL must be https (http only in dev), checked when saved and again before the browser is sent
+    there. GET /v1/account/sso adds `verified_domains` and `pending_domains` (with the TXT record).
 
 servers:
   - { url: "https://api.1trade.io", description: prod }
@@ -409,6 +418,18 @@ paths:
       security: [{ tenantJwt: [] }]
       responses:
         '204': { description: Off. }
+  /v1/account/sso/domains/{domain}/verify:
+    post:
+      tags: [auth]
+      summary: "v1.10: prove an email domain via DNS TXT (admin); only verified domains route sign-ins."
+      operationId: verifySSODomain
+      security: [{ tenantJwt: [] }]
+      parameters: [ { name: domain, in: path, required: true, schema: { type: string } } ]
+      responses:
+        '200': { description: Verified; the configuration., content: { application/json: { schema: { $ref: '#/components/schemas/SSOConfig' } } } }
+        '404': { description: Not a domain in this tenant's configuration., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+        '409': { description: domain_taken (another tenant verified it)., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+        '422': { description: not_verified (TXT record missing or wrong)., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
   /v1/auth/sso/metadata/{tenant_id}:
     get:
       tags: [auth]
@@ -1106,7 +1127,12 @@ components:
       properties:
         configured:      { type: boolean }
         idp_entity_id:   { type: string }
-        email_domains:   { type: array, items: { type: string } }
+        email_domains:   { type: array, items: { type: string }, description: "every domain claimed" }
+        verified_domains: { type: array, items: { type: string }, description: "v1.10: proved by DNS; only these route" }
+        pending_domains:
+          type: array
+          description: "v1.10: claimed, awaiting the TXT record"
+          items: { type: object, properties: { domain: { type: string }, txt_name: { type: string }, txt_value: { type: string } } }
         default_role:    { type: string }
         jit:             { type: boolean }
         enforce:         { type: boolean }

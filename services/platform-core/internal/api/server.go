@@ -4,9 +4,11 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"net"
 	"net/http"
 	"time"
 
@@ -32,6 +34,8 @@ type Server struct {
 	transfer billing.BudgetMover
 	// mfaBox seals TOTP secrets at rest.
 	mfaBox domain.SecretBox
+	// lookupTXT resolves DNS TXT records (SSO domain proof); tests replace it.
+	lookupTXT func(ctx context.Context, name string) ([]string, error)
 }
 
 // New builds the routed handler with the default billing collaborators (mock Stripe until a key is
@@ -60,6 +64,7 @@ func NewWithBilling(cfg config.Config, st *store.Store, stripe billing.StripeCli
 	}
 	s := &Server{cfg: cfg, st: st, stripe: stripe, booker: booker, mailer: mailer, storage: objStore, mux: http.NewServeMux()}
 	s.mfaBox = mfaBox(cfg)
+	s.lookupTXT = net.DefaultResolver.LookupTXT
 	if t, ok := booker.(billing.BudgetMover); ok {
 		s.transfer = t // the real ledger client books purchases and moves team budgets
 	}
@@ -172,7 +177,7 @@ func (s *Server) signup(w http.ResponseWriter, r *http.Request) {
 	})
 	if raw := s.issueVerifyToken(r, u.ID); raw != "" {
 		link := email.VerifyURL(s.cfg.AppBaseURL, raw)
-		if err := s.mailer.SendVerification(b.Email, link); err != nil {
+		if err := s.mailer.SendVerification(r.Context(), b.Email, link); err != nil {
 			slog.Error("send verification email", "err", err, "user_id", u.ID)
 		}
 		if s.cfg.IsDev() && !s.mailer.Enabled() {

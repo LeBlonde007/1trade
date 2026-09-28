@@ -200,7 +200,7 @@ func (s *Server) createInvite(w http.ResponseWriter, r *http.Request) {
 	if t, found, err := s.st.GetTenant(r.Context(), p.TenantID); err == nil && found {
 		tenantName = t.Name
 	}
-	if err := s.mailer.SendInvite(inv.Email, tenantName, email.InviteURL(s.cfg.AppBaseURL, raw)); err != nil {
+	if err := s.mailer.SendInvite(r.Context(), inv.Email, tenantName, email.InviteURL(s.cfg.AppBaseURL, raw)); err != nil {
 		slog.Error("send invite email", "err", err, "invite_id", inv.ID)
 	}
 	_, _ = s.st.WriteAudit(r.Context(), store.AuditEntry{

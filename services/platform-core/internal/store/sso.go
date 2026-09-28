@@ -2,6 +2,8 @@ package store
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"time"
@@ -33,25 +35,56 @@ type SSOConfig struct {
 	DefaultRole string
 	JIT         bool
 	Enforce     bool
-	Domains     []string
+	Domains     []string    // every domain claimed (verified or not)
+	Verified    []string    // the domains proved by DNS: only these route sign-ins
+	Pending     []SSODomain // unverified claims, with the TXT record that would prove them
 	UpdatedAt   time.Time
+}
+
+// SSODomain is a domain claim awaiting its DNS proof.
+type SSODomain struct {
+	Domain string
+	Token  string
 }
 
 // GetSSO returns a tenant's configuration, or ErrNoSSO.
 func (s *Store) GetSSO(ctx context.Context, tenantID string) (SSOConfig, error) {
 	c := SSOConfig{TenantID: tenantID}
-	err := s.pool.QueryRow(ctx, `SELECT idp_metadata, idp_entity_id, default_role, jit, enforce, updated_at,
-		coalesce((SELECT array_agg(domain ORDER BY domain) FROM sso_domains WHERE tenant_id=$1), '{}')
+	err := s.pool.QueryRow(ctx, `SELECT idp_metadata, idp_entity_id, default_role, jit, enforce, updated_at
 		FROM sso_configs WHERE tenant_id=$1`, tenantID).
-		Scan(&c.IDPMetadata, &c.IDPEntityID, &c.DefaultRole, &c.JIT, &c.Enforce, &c.UpdatedAt, &c.Domains)
+		Scan(&c.IDPMetadata, &c.IDPEntityID, &c.DefaultRole, &c.JIT, &c.Enforce, &c.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return SSOConfig{}, ErrNoSSO
 	}
-	return c, err
+	if err != nil {
+		return SSOConfig{}, err
+	}
+	rows, err := s.pool.Query(ctx, `SELECT domain, verify_token, verified_at IS NOT NULL FROM sso_domains
+		WHERE tenant_id=$1 ORDER BY domain`, tenantID)
+	if err != nil {
+		return SSOConfig{}, err
+	}
+	defer rows.Close()
+	c.Domains, c.Verified, c.Pending = []string{}, []string{}, []SSODomain{}
+	for rows.Next() {
+		var d SSODomain
+		var verified bool
+		if err := rows.Scan(&d.Domain, &d.Token, &verified); err != nil {
+			return SSOConfig{}, err
+		}
+		c.Domains = append(c.Domains, d.Domain)
+		if verified {
+			c.Verified = append(c.Verified, d.Domain)
+		} else {
+			c.Pending = append(c.Pending, d)
+		}
+	}
+	return c, rows.Err()
 }
 
-// PutSSO replaces a tenant's configuration and the email domains that route to it. A domain that
-// already routes to another tenant is ErrDomainTaken (nothing changes).
+// PutSSO replaces a tenant's configuration and the email domains it claims. A domain kept from the
+// previous configuration keeps its proof (or pending token); a new one starts unverified with a fresh
+// token. Claims never conflict: only a verified domain routes, and only one tenant can verify it.
 func (s *Store) PutSSO(ctx context.Context, c SSOConfig) error {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -64,20 +97,51 @@ func (s *Store) PutSSO(ctx context.Context, c SSOConfig) error {
 		updated_at=now()`, c.TenantID, c.IDPMetadata, c.IDPEntityID, c.DefaultRole, c.JIT, c.Enforce); err != nil {
 		return fmt.Errorf("put sso: %w", err)
 	}
-	if _, err := tx.Exec(ctx, `DELETE FROM sso_domains WHERE tenant_id=$1`, c.TenantID); err != nil {
+	if _, err := tx.Exec(ctx, `DELETE FROM sso_domains WHERE tenant_id=$1 AND NOT (domain = ANY($2))`, c.TenantID, c.Domains); err != nil {
 		return err
 	}
 	for _, d := range c.Domains {
-		_, err := tx.Exec(ctx, `INSERT INTO sso_domains (domain, tenant_id) VALUES ($1,$2)`, d, c.TenantID)
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-			return ErrDomainTaken
-		}
+		tok, err := newDomainToken()
 		if err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO sso_domains (domain, tenant_id, verify_token) VALUES ($1,$2,$3)
+			ON CONFLICT (tenant_id, domain) DO NOTHING`, d, c.TenantID, tok); err != nil {
 			return err
 		}
 	}
 	return tx.Commit(ctx)
+}
+
+// newDomainToken is the random value a tenant publishes in DNS to prove a domain.
+func newDomainToken() (string, error) {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
+}
+
+// DomainToken returns the tenant's pending (unverified) token for a domain, or ErrNoSSO.
+func (s *Store) DomainToken(ctx context.Context, tenantID, domain string) (token string, verified bool, err error) {
+	err = s.pool.QueryRow(ctx, `SELECT verify_token, verified_at IS NOT NULL FROM sso_domains WHERE tenant_id=$1 AND domain=$2`,
+		tenantID, domain).Scan(&token, &verified)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", false, ErrNoSSO
+	}
+	return token, verified, err
+}
+
+// MarkDomainVerified records a tenant's DNS proof of a domain. If another tenant verified it first,
+// ErrDomainTaken.
+func (s *Store) MarkDomainVerified(ctx context.Context, tenantID, domain string) error {
+	_, err := s.pool.Exec(ctx, `UPDATE sso_domains SET verified_at=now() WHERE tenant_id=$1 AND domain=$2 AND verified_at IS NULL`,
+		tenantID, domain)
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		return ErrDomainTaken
+	}
+	return err
 }
 
 // DeleteSSO removes a tenant's configuration and domains.
@@ -96,10 +160,10 @@ func (s *Store) DeleteSSO(ctx context.Context, tenantID string) error {
 	return tx.Commit(ctx)
 }
 
-// SSOForDomain returns the configuration an email domain routes to, or ErrNoSSO.
+// SSOForDomain returns the configuration a verified email domain routes to, or ErrNoSSO.
 func (s *Store) SSOForDomain(ctx context.Context, emailDomain string) (SSOConfig, error) {
 	var tenant string
-	err := s.pool.QueryRow(ctx, `SELECT tenant_id::text FROM sso_domains WHERE domain=$1`, emailDomain).Scan(&tenant)
+	err := s.pool.QueryRow(ctx, `SELECT tenant_id::text FROM sso_domains WHERE domain=$1 AND verified_at IS NOT NULL`, emailDomain).Scan(&tenant)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return SSOConfig{}, ErrNoSSO
 	}

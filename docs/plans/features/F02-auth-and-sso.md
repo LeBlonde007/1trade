@@ -143,3 +143,20 @@ inbound requests through the same auth helper.
 **Acceptance:** ✅ SAML SSO (any SAML 2.0 IdP — Okta, Entra ID, Google Workspace — via metadata) ·
 ✅ 2FA TOTP · ⬜ SCIM 2.0 · ⬜ IP allowlisting · ⬜ domain ownership verification (DNS TXT) before a
 domain can route · ⬜ signed AuthnRequests and encrypted assertions (needs an SP key pair).
+
+### Security review (2026-09-28)
+
+The pre-merge `/security-review` raised three candidate findings; independent verification kept one:
+- **SSO email domains could be squatted.** Any self-serve tenant admin could claim a company's email
+  domain (first come, no proof), routing that company's users to an IdP the attacker controls and
+  blocking the real company from claiming it. **Fixed** (`0012_sso_domain_verification.sql`,
+  `platform-core.yaml` v1.10): a saved domain is only a *claim*; it routes sign-ins only after a DNS TXT
+  proof (`_1trade-verify.<domain>`), one verified tenant per domain, and assertions are accepted only
+  for verified domains. The IdP SSO URL must be https (http in dev only), checked when saved, before the
+  browser is sent there, and again in the login page. (The reported `javascript:` XSS vector was
+  already blocked by crewjam, which only accepts http/https endpoint URLs; the new checks are defence in
+  depth.) Tests: unverified domain routes nothing, wrong/missing TXT refused, second tenant cannot
+  verify a verified domain, pending-domain assertions refused, URL scheme unit test; mutation-checked.
+- *Dismissed as pre-existing:* stateless JWTs survive member removal until expiry (same as role
+  changes before this branch); compute-control's body `sub_account_id` override predates the branch
+  (tracked as a follow-up — it lets a member bill a sibling sub-account).

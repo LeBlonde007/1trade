@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/xml"
 	"errors"
@@ -23,9 +24,28 @@ func (s *Server) ssoRoutes() {
 	s.mux.HandleFunc("GET /v1/account/sso", s.getSSO)
 	s.mux.HandleFunc("PUT /v1/account/sso", s.putSSO)
 	s.mux.HandleFunc("DELETE /v1/account/sso", s.deleteSSO)
+	s.mux.HandleFunc("POST /v1/account/sso/domains/{domain}/verify", s.verifySSODomain)
 	s.mux.HandleFunc("GET /v1/auth/sso/metadata/{tenant_id}", s.ssoMetadata) // public: the IdP reads it
 	s.mux.HandleFunc("POST /v1/auth/sso/start", s.ssoStart)                  // public
 	s.mux.HandleFunc("POST /v1/auth/sso/acs", s.ssoACS)                      // public: the assertion is the credential
+}
+
+// domainTXTPrefix is where a tenant publishes its proof of an email domain:
+// TXT _1trade-verify.<domain> = "1trade-verify=<token>".
+const domainTXTPrefix = "_1trade-verify."
+
+// SetTXTLookup replaces the DNS TXT resolver (tests).
+func (s *Server) SetTXTLookup(f func(ctx context.Context, name string) ([]string, error)) { s.lookupTXT = f }
+
+// ssoURLAllowed reports whether an IdP SSO URL may be sent to a browser: https only (plain http is
+// accepted in dev, for a local test IdP). Anything else — javascript:, data:, relative — is refused,
+// because the login page navigates to it.
+func (s *Server) ssoURLAllowed(raw string) bool {
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" || u.Opaque != "" {
+		return false
+	}
+	return u.Scheme == "https" || (u.Scheme == "http" && s.cfg.IsDev())
 }
 
 // domainRe is a lowercase DNS name with at least one dot.
@@ -59,10 +79,63 @@ func (s *Server) serviceProvider(c store.SSOConfig) (*saml.ServiceProvider, erro
 func (s *Server) ssoJSON(c store.SSOConfig) map[string]any {
 	entity, acs := s.ssoURLs(c.TenantID)
 	return map[string]any{
-		"configured": true, "idp_entity_id": c.IDPEntityID, "email_domains": c.Domains, "default_role": c.DefaultRole,
+		"configured": true, "idp_entity_id": c.IDPEntityID, "email_domains": c.Domains, "verified_domains": c.Verified,
+		"pending_domains": pendingJSON(c.Pending), "default_role": c.DefaultRole,
 		"jit": c.JIT, "enforce": c.Enforce, "updated_at": c.UpdatedAt.UTC().Format(time.RFC3339),
 		"sp_entity_id": entity.String(), "acs_url": acs.String(), "sp_metadata_url": entity.String(),
 	}
+}
+
+// pendingJSON renders the TXT records that would prove each pending domain.
+func pendingJSON(p []store.SSODomain) []map[string]string {
+	out := make([]map[string]string, 0, len(p))
+	for _, d := range p {
+		out = append(out, map[string]string{"domain": d.Domain, "txt_name": domainTXTPrefix + d.Domain, "txt_value": "1trade-verify=" + d.Token})
+	}
+	return out
+}
+
+// verifySSODomain serves POST /v1/account/sso/domains/{domain}/verify (admin): looks up the TXT
+// record and, when it carries this tenant's token, marks the domain verified so it routes sign-ins.
+func (s *Server) verifySSODomain(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.authed(w, r)
+	if !ok || !requireRole(w, p, domain.RoleAdmin) {
+		return
+	}
+	d := strings.ToLower(r.PathValue("domain"))
+	tok, verified, err := s.st.DomainToken(r.Context(), p.TenantID, d)
+	if errors.Is(err, store.ErrNoSSO) {
+		writeErr(w, http.StatusNotFound, "not_found", "that domain is not in your SSO configuration")
+		return
+	}
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	if !verified {
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+		recs, _ := s.lookupTXT(ctx, domainTXTPrefix+d)
+		if !contains(recs, "1trade-verify="+tok) {
+			writeErr(w, http.StatusUnprocessableEntity, "not_verified", "the TXT record "+domainTXTPrefix+d+" does not contain your verification value yet")
+			return
+		}
+		if err := s.st.MarkDomainVerified(r.Context(), p.TenantID, d); errors.Is(err, store.ErrDomainTaken) {
+			writeErr(w, http.StatusConflict, "domain_taken", "another tenant has already verified that domain")
+			return
+		} else if err != nil {
+			serverError(w, err)
+			return
+		}
+		_, _ = s.st.WriteAudit(r.Context(), store.AuditEntry{TenantID: p.TenantID, ActorID: p.UserID, Action: "sso.domain.verify",
+			TargetType: "tenant", TargetID: p.TenantID, After: map[string]any{"domain": d}, IsPaper: p.IsPaper})
+	}
+	c, err := s.st.GetSSO(r.Context(), p.TenantID)
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, s.ssoJSON(c))
 }
 
 // getSSO serves GET /v1/account/sso (admin).
@@ -110,6 +183,10 @@ func (s *Server) putSSO(w http.ResponseWriter, r *http.Request) {
 	}
 	if !hasSigningCert(md) || ssoLocation(md) == "" {
 		writeErr(w, http.StatusUnprocessableEntity, "bad_metadata", "the metadata needs a signing certificate and an HTTP-Redirect SSO URL")
+		return
+	}
+	if !s.ssoURLAllowed(ssoLocation(md)) {
+		writeErr(w, http.StatusUnprocessableEntity, "bad_metadata", "the IdP's SSO URL must be an https:// URL")
 		return
 	}
 	if b.DefaultRole == "" {
@@ -259,6 +336,10 @@ func (s *Server) ssoStart(w http.ResponseWriter, r *http.Request) {
 		serverError(w, err)
 		return
 	}
+	if !s.ssoURLAllowed(u.String()) { // re-checked here: the browser navigates to it
+		writeErr(w, http.StatusUnprocessableEntity, "bad_metadata", "the identity provider's sign-in URL is not https")
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"redirect_url": u.String()})
 }
 
@@ -311,7 +392,7 @@ func (s *Server) ssoACS(w http.ResponseWriter, r *http.Request) {
 	}
 	email := assertedEmail(assertion)
 	at := strings.LastIndex(email, "@")
-	if at < 1 || !contains(c.Domains, strings.ToLower(email[at+1:])) {
+	if at < 1 || !contains(c.Verified, strings.ToLower(email[at+1:])) {
 		fail("sso_domain", "that email is not in a domain this tenant signs in with", errors.New(email))
 		return
 	}

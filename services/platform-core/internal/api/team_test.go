@@ -44,6 +44,8 @@ type teamRig struct {
 	t      *testing.T
 	srv    *httptest.Server
 	ledger *fakeBudgetMover
+	api    *api.Server
+	txt    map[string][]string // DNS TXT records the server sees
 }
 
 // newTeamRig skips without DATABASE_URL.
@@ -61,6 +63,8 @@ func newTeamRig(t *testing.T) *teamRig {
 	s := api.New(config.Config{Env: "dev", JWTSecret: jwtSecret, ServiceToken: svcToken, TokenTTL: 3600_000_000_000}, st)
 	rg := &teamRig{t: t, ledger: &fakeBudgetMover{}}
 	s.SetBudgetMover(rg.ledger)
+	rg.api, rg.txt = s, map[string][]string{}
+	s.SetTXTLookup(func(_ context.Context, name string) ([]string, error) { return rg.txt[name], nil })
 	rg.srv = httptest.NewServer(s)
 	t.Cleanup(rg.srv.Close)
 	return rg

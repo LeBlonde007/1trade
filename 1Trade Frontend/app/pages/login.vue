@@ -35,7 +35,10 @@ async function onSSO() {
   submitting.value = true
   try {
     const r = await $fetch<{ redirect_url: string }>('/api/auth/sso/start', { method: 'POST', body: { email: email.value } })
-    window.location.href = r.redirect_url
+    // Only ever leave for an https identity provider (plain http only on a local dev stack).
+    const target = new URL(r.redirect_url)
+    if (target.protocol !== 'https:' && !(import.meta.dev && target.protocol === 'http:')) throw new Error('unsafe sso url')
+    window.location.href = target.toString()
   } catch (err: unknown) {
     const ex = err as { data?: { code?: string } }
     authError.value = ex?.data?.code === 'sso_not_configured' ? 'Single sign-on is not set up for that email domain.' : 'Could not start single sign-on.'

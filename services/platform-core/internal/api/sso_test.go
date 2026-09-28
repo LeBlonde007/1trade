@@ -98,6 +98,19 @@ func (ti *testIdP) respond(t *testing.T, redirectURL, email string) string {
 	return base64.StdEncoding.EncodeToString(b)
 }
 
+// verifyDomain publishes the tenant's TXT proof for dom and verifies it; it returns the status code.
+func (rg *teamRig) verifyDomain(t *testing.T, admin, dom string) (int, map[string]any) {
+	t.Helper()
+	_, cfg := rg.do("GET", "/v1/account/sso", admin, nil, nil)
+	for _, p := range cfg["pending_domains"].([]any) {
+		m := p.(map[string]any)
+		if m["domain"] == dom {
+			rg.txt[m["txt_name"].(string)] = append(rg.txt[m["txt_name"].(string)], m["txt_value"].(string))
+		}
+	}
+	return rg.do("POST", "/v1/account/sso/domains/"+dom+"/verify", admin, nil, nil)
+}
+
 // start begins SSO for an email and returns the IdP redirect URL and the relay state.
 func (rg *teamRig) ssoStart(t *testing.T, email string) (string, string) {
 	t.Helper()
@@ -123,8 +136,22 @@ func TestSAMLSignIn(t *testing.T) {
 	ti := newTestIdP(t, rg, "idp."+dom)
 	body := map[string]any{"idp_metadata_xml": ti.metadataXML(), "email_domains": []string{strings.ToUpper(dom)}, "default_role": "engineer"}
 	code, cfg := rg.do("PUT", "/v1/account/sso", admin, body, nil)
-	if code != 200 || cfg["configured"] != true || cfg["email_domains"].([]any)[0] != dom {
+	if code != 200 || cfg["configured"] != true || cfg["email_domains"].([]any)[0] != dom || len(cfg["verified_domains"].([]any)) != 0 {
 		t.Fatalf("configure: %d %v", code, cfg)
+	}
+	// An unverified domain routes nothing, and a missing TXT record does not verify it.
+	if code, _ := rg.do("POST", "/v1/auth/sso/start", "", map[string]string{"email": "alice@" + dom}, nil); code != 404 {
+		t.Fatalf("start on an unverified domain: %d", code)
+	}
+	if code, _ := rg.do("POST", "/v1/account/sso/domains/"+dom+"/verify", admin, nil, nil); code != 422 {
+		t.Fatalf("verify without the TXT record: %d", code)
+	}
+	rg.txt["_1trade-verify."+dom] = []string{"1trade-verify=someone-elses-token"}
+	if code, _ := rg.do("POST", "/v1/account/sso/domains/"+dom+"/verify", admin, nil, nil); code != 422 {
+		t.Fatalf("verify with a wrong TXT value: %d", code)
+	}
+	if code, out := rg.verifyDomain(t, admin, dom); code != 200 || out["verified_domains"].([]any)[0] != dom {
+		t.Fatalf("verify: %d %v", code, out)
 	}
 
 	alice := "alice@" + dom
@@ -179,6 +206,17 @@ func TestSAMLSignIn(t *testing.T) {
 	if code, _ := rg.acs(late, relay); code != 401 {
 		t.Fatalf("expired request: %d", code)
 	}
+	// A second domain the tenant claimed but never proved does not sign anyone in, even through the
+	// tenant's own IdP.
+	pending := "pending-" + uuid.NewString()[:8] + ".com"
+	body["email_domains"] = []string{dom, pending}
+	if code, _ := rg.do("PUT", "/v1/account/sso", admin, body, nil); code != 200 {
+		t.Fatal("add a pending domain")
+	}
+	redirect, relay = rg.ssoStart(t, alice)
+	if code, out := rg.acs(ti.respond(t, redirect, "bob@"+pending), relay); code != 401 || out["code"] != "sso_domain" {
+		t.Fatalf("assertion for an unverified domain: %d %v", code, out)
+	}
 	// The second sign-in finds the same member.
 	redirect, relay = rg.ssoStart(t, alice)
 	_, out = rg.acs(ti.respond(t, redirect, alice), relay)
@@ -214,12 +252,17 @@ func TestSAMLPolicy(t *testing.T) {
 	other := "bob@" + dom
 	rg.do("POST", "/v1/auth/signup", "", map[string]string{"email": other, "password": "pw-123456"}, nil)
 	f := false
-	put := func(tok string, b map[string]any) (int, map[string]any) { return rg.do("PUT", "/v1/account/sso", tok, b, nil) }
+	put := func(tok string, b map[string]any) (int, map[string]any) {
+		return rg.do("PUT", "/v1/account/sso", tok, b, nil)
+	}
 	base := func() map[string]any {
 		return map[string]any{"idp_metadata_xml": ti.metadataXML(), "email_domains": []string{dom}, "jit": &f}
 	}
 	if code, _ := put(admin, base()); code != 200 {
 		t.Fatalf("configure: %d", code)
+	}
+	if code, _ := rg.verifyDomain(t, admin, dom); code != 200 {
+		t.Fatalf("verify: %d", code)
 	}
 	redirect, relay := rg.ssoStart(t, other)
 	if code, out := rg.acs(ti.respond(t, redirect, other), relay); code != 403 || out["code"] != "sso_account_conflict" {
@@ -241,16 +284,22 @@ func TestSAMLPolicy(t *testing.T) {
 	if code, out := rg.do("POST", "/v1/auth/login", "", map[string]string{"email": dave, "password": "correct-horse"}, nil); code != 403 || out["code"] != "sso_required" {
 		t.Fatalf("password sign-in under enforcement: %d %v", code, out)
 	}
-	// Another tenant cannot claim the domain.
+	// Another tenant may claim the domain, but cannot verify it (and so never receives its sign-ins).
 	admin2, _ := rg.signup()
-	if code, _ := put(admin2, base()); code != 409 {
-		t.Fatalf("domain claimed twice: %d", code)
+	if code, _ := put(admin2, base()); code != 200 {
+		t.Fatalf("a pending claim by another tenant: %d", code)
+	}
+	if code, out := rg.verifyDomain(t, admin2, dom); code != 409 || out["code"] != "domain_taken" {
+		t.Fatalf("second tenant verifying a verified domain: %d %v", code, out)
 	}
 	for name, mut := range map[string]func(map[string]any){
 		"bad metadata": func(m map[string]any) { m["idp_metadata_xml"] = "<x/>" },
 		"admin role":   func(m map[string]any) { m["default_role"] = "admin" },
 		"bad domain":   func(m map[string]any) { m["email_domains"] = []string{"not a domain"} },
 		"no domain":    func(m map[string]any) { m["email_domains"] = []string{} },
+		"javascript sso url": func(m map[string]any) {
+			m["idp_metadata_xml"] = strings.ReplaceAll(m["idp_metadata_xml"].(string), "https://idp."+dom+"/sso", "javascript:alert(document.domain)//")
+		},
 	} {
 		m := base()
 		mut(m)

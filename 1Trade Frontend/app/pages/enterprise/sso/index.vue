@@ -12,6 +12,8 @@ interface SSO {
   configured: boolean
   idp_entity_id?: string
   email_domains?: string[]
+  verified_domains?: string[]
+  pending_domains?: { domain: string; txt_name: string; txt_value: string }[]
   default_role?: string
   jit?: boolean
   enforce?: boolean
@@ -64,6 +66,21 @@ async function save() {
     notice.value = 'Single sign-on saved.'
   } catch (e: any) {
     error.value = e?.data?.message || 'Could not save.'
+  } finally {
+    busy.value = false
+  }
+}
+
+/** verify asks the backend to check a domain's DNS TXT record. */
+async function verify(domain: string) {
+  busy.value = true
+  error.value = ''
+  notice.value = ''
+  try {
+    sso.value = await $fetch<SSO>(`/api/account/sso/domains/${encodeURIComponent(domain)}/verify`, { method: 'POST' })
+    notice.value = `${domain} verified — its members can now sign in with SSO.`
+  } catch (e: any) {
+    error.value = e?.data?.message || 'Could not verify that domain yet.'
   } finally {
     busy.value = false
   }
@@ -140,6 +157,21 @@ async function remove() {
         </form>
       </section>
 
+      <section v-if="sso?.configured" class="panel">
+        <header class="panel-h"><span class="panel-title">3 · Prove you own each domain</span></header>
+        <p class="pad muted small">A domain signs people in only after you add this DNS TXT record. Until then nobody is routed to your IdP — and nobody else can take the domain from you.</p>
+        <table class="dns">
+          <tbody>
+            <tr v-for="d in sso.verified_domains" :key="d"><td class="mono">{{ d }}</td><td colspan="2"><span class="tag ok">verified</span></td></tr>
+            <tr v-for="d in sso.pending_domains" :key="d.domain">
+              <td class="mono">{{ d.domain }}</td>
+              <td class="mono small">TXT <strong>{{ d.txt_name }}</strong><br>{{ d.txt_value }}</td>
+              <td><button type="button" class="btn" :disabled="busy" @click="verify(d.domain)">Verify</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
       <section class="panel pad muted small">
         Accounts are never merged: an email that already belongs to another 1Trade tenant cannot sign in through your IdP.
         SCIM provisioning is not built yet — use invitations or just-in-time creation.
@@ -180,5 +212,7 @@ textarea, input, select { background: var(--canvas); border: 1px solid var(--bor
 .mono { font-family: var(--font-mono); }
 .muted { color: var(--text-3); }
 .small { font-size: var(--fs-xs); }
+.dns { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+.dns td { padding: var(--sp-2) var(--sp-4); border-top: 1px solid var(--border); vertical-align: middle; word-break: break-all; }
 @media (max-width: 760px) { .kv, .row2 { grid-template-columns: 1fr; } }
 </style>

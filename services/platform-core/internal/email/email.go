@@ -77,7 +77,7 @@ func (s Sender) Enabled() bool { return s.apiURL != "" || s.addr != "" }
 
 // SendVerification emails an email-verification link over whichever transport is configured (HTTP API
 // preferred, then SMTP). No-op (nil) when none is configured.
-func (s Sender) SendVerification(to, link string) error {
+func (s Sender) SendVerification(ctx context.Context, to, link string) error {
 	if !s.Enabled() {
 		return nil
 	}
@@ -86,13 +86,13 @@ func (s Sender) SendVerification(to, link string) error {
 		"Confirm your email to finish setting up your account:\r\n" + link + "\r\n\r\n" +
 		"If you didn't create an account, you can ignore this message.\r\n"
 	if s.apiURL != "" {
-		return s.sendAPI(to, subject, body)
+		return s.sendAPI(ctx, to, subject, body)
 	}
-	return s.send(to, buildMessage(s.from, to, subject, body))
+	return s.send(ctx, to, buildMessage(s.from, to, subject, body))
 }
 
 // SendInvite emails an invitation to join a tenant. No-op (nil) when no transport is configured.
-func (s Sender) SendInvite(to, tenantName, link string) error {
+func (s Sender) SendInvite(ctx context.Context, to, tenantName, link string) error {
 	if !s.Enabled() {
 		return nil
 	}
@@ -101,9 +101,9 @@ func (s Sender) SendInvite(to, tenantName, link string) error {
 		"Accept the invitation and choose a password here (the link expires in 7 days):\r\n" + link + "\r\n\r\n" +
 		"If you weren't expecting this, you can ignore this message.\r\n"
 	if s.apiURL != "" {
-		return s.sendAPI(to, subject, body)
+		return s.sendAPI(ctx, to, subject, body)
 	}
-	return s.send(to, buildMessage(s.from, to, subject, body))
+	return s.send(ctx, to, buildMessage(s.from, to, subject, body))
 }
 
 // mailtrapPayload is the JSON body of the Mailtrap-style Email API (also matches several other HTTP
@@ -124,7 +124,7 @@ type addr struct {
 
 // sendAPI delivers a message via the HTTP Email API (HTTPS/443) — used when SMTP egress is blocked. A
 // non-2xx is surfaced with the provider's response body (truncated) so misconfig is visible in logs.
-func (s Sender) sendAPI(to, subject, body string) error {
+func (s Sender) sendAPI(ctx context.Context, to, subject, body string) error {
 	payload, _ := json.Marshal(mailtrapPayload{
 		From:     addr{Email: s.from, Name: "1Trade"},
 		To:       []addr{{Email: to}},
@@ -132,7 +132,9 @@ func (s Sender) sendAPI(to, subject, body string) error {
 		Text:     body,
 		Category: "verification",
 	})
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	// Detached from the request: a slow mail provider must not be cut off when the caller's request
+	// ends, but the request's trace values still flow through.
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.apiURL, bytes.NewReader(payload))
 	if err != nil {
@@ -154,8 +156,8 @@ func (s Sender) sendAPI(to, subject, body string) error {
 
 // send delivers msg to one recipient over the configured SMTP transport, running AUTH when credentials
 // are set. Implicit TLS dials a TLS socket up front; STARTTLS upgrades a plain socket; otherwise it
-// speaks plain SMTP (Mailpit). PlainAuth refuses to send credentials over a cleartext link.
-func (s Sender) send(to string, msg []byte) error {
+// speaks plain SMTP (Mailpit). ctx carries request values; its cancellation is ignored. PlainAuth refuses to send credentials over a cleartext link.
+func (s Sender) send(ctx context.Context, to string, msg []byte) error {
 	host, _, err := net.SplitHostPort(s.addr)
 	if err != nil {
 		return fmt.Errorf("smtp addr %q: %w", s.addr, err)
@@ -167,7 +169,8 @@ func (s Sender) send(to string, msg []byte) error {
 
 	switch s.tls {
 	case "implicit", "ssl", "tls", "smtps":
-		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		// Detached from the request like sendAPI: the dial must not be cut off when the request ends.
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
 		defer cancel()
 		d := tls.Dialer{Config: &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}}
 		conn, err := d.DialContext(ctx, "tcp", s.addr)
