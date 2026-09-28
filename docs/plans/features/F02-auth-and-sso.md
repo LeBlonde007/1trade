@@ -61,7 +61,7 @@ inbound requests through the same auth helper.
 
 ## Status — two-factor authentication (2026-09-28)
 
-**Built** (`platform-core.yaml` v1.7, migration `0007_mfa.sql`):
+**Built** (`platform-core.yaml` v1.7, migration `0009_mfa.sql`):
 - **TOTP (RFC 6238):** SHA-1, 6 digits, 30 s steps, one step of drift allowed either side. Secrets
   are sealed with AES-256-GCM (`MFA_ENC_KEY`, or a key derived from the JWT secret with domain
   separation).
@@ -103,7 +103,7 @@ inbound requests through the same auth helper.
 
 ## Status — SAML single sign-on (2026-09-28)
 
-**Built** (`platform-core.yaml` v1.8, migration `0008_sso.sql`, crewjam/saml for XML-DSig):
+**Built** (`platform-core.yaml` v1.8, migration `0010_sso.sql`, crewjam/saml for XML-DSig):
 - **Per-tenant IdP.** Admins save the IdP metadata (it must carry a signing certificate and an
   HTTP-Redirect SSO URL), 1–10 email domains (each routes to exactly one tenant), a non-admin role
   for just-in-time members, and optional **enforcement**. Under enforcement, password sign-in is

@@ -58,7 +58,7 @@
 
 ## Status — team management (2026-09-28)
 
-**Built** (`platform-core.yaml` v1.6, `credit.yaml` v1.4, platform-core migration `0006_team.sql`,
+**Built** (`platform-core.yaml` v1.6, `credit.yaml` v1.4, platform-core migration `0008_team.sql`,
 ledger migration `0006_transfer.sql`):
 - **Members:** the whole team can list members. Admins remove them, but never themselves (409 `self`)
   and never the last admin (409 `last_admin`). The last-admin check runs under a lock over the

@@ -1,4 +1,4 @@
--- 0008_sso.sql — SAML single sign-on (platform-core.yaml v1.8). One IdP per tenant; each email
+-- 0010_sso.sql — SAML single sign-on (platform-core.yaml v1.8). One IdP per tenant; each email
 -- domain routes to at most one tenant; every AuthnRequest id is recorded and consumed once, so an
 -- assertion can only answer a request we made (and only once). Rollback: forward-only in prod.
 CREATE TABLE IF NOT EXISTS sso_configs (

@@ -1,4 +1,4 @@
--- 0006_team.sql — team management (platform-core.yaml v1.x, F02/F03 M4): sub-accounts (team budgets
+-- 0008_team.sql — team management (platform-core.yaml v1.x, F02/F03 M4): sub-accounts (team budgets
 -- with their own ledger balances), invitations, and membership changes. Rollback: forward-only in prod.
 
 -- A sub-account is a team inside a tenant. Its members' usage is billed to its own ledger balances,
