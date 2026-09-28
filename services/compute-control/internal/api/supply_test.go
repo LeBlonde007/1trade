@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"crypto/ed25519"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -75,6 +76,8 @@ type supplyRig struct {
 	sched *scheduler.MockScheduler
 	sync  *supply.Syncer
 	now   time.Time
+	// signer stands in for the GPU attestation root the rig's verifier trusts.
+	signer ed25519.PrivateKey
 }
 
 // newSupplyRig builds it: 4 owned H100s.
@@ -91,7 +94,12 @@ func newSupplyRig(t *testing.T) *supplyRig {
 	rg.sched = scheduler.NewMockWithPool(rg.pool, pub)
 	rg.sync = &supply.Syncer{Store: st, Pool: rg.pool, Now: func() time.Time { return rg.now }}
 	rg.s = New(config.Config{Env: "dev", Paper: true}, auth.NewResolver(testSecret, testSvc), rg.sched, instance.NewManager(rg.pool, pub))
-	rg.s.EnableSupply(&SupplyDeps{Store: st, Pool: rg.pool, Sync: rg.sync})
+	pub2, priv, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rg.signer = priv
+	rg.s.EnableSupply(&SupplyDeps{Store: st, Pool: rg.pool, Sync: rg.sync, Verifier: supply.Ed25519Verifier{Keys: []ed25519.PublicKey{pub2}}})
 	return rg
 }
 
@@ -149,8 +157,12 @@ func TestPartnerSupplyEndToEnd(t *testing.T) {
 	if code, _ := rg.call("POST", "/v1/supply/sources/"+id+"/activate", tok, "", nil); code != 403 {
 		t.Fatalf("partner self-activation: %d", code)
 	}
-	if code, a := rg.call("POST", "/v1/supply/sources/"+id+"/activate", testSvc, "", nil); code != 200 || a["state"] != "active" || a["schedulable"] != false {
-		t.Fatalf("activate: %d %v (no heartbeat yet, so not schedulable)", code, a)
+	if code, a := rg.call("POST", "/v1/supply/sources/"+id+"/activate", testSvc, "", nil); code != 409 || a["code"] != "ATTESTATION_INCOMPLETE" {
+		t.Fatalf("activate before attestation: %d %v", code, a)
+	}
+	rg.attest(t, id, tok, 16)
+	if code, a := rg.call("GET", "/v1/supply/sources/"+id, tok, "", nil); code != 200 || a["state"] != "active" {
+		t.Fatalf("attestation did not activate the source: %d %v", code, a)
 	}
 
 	// Heartbeat with 12 of 16 healthy: 12 join the pool.
@@ -268,8 +280,7 @@ func TestStaleHeartbeatStopsNewWork(t *testing.T) {
 	tok := partnerJWT(t, "00000000-0000-4000-8000-00000000000c", "engineer")
 	_, src := rg.call("POST", "/v1/supply/sources", tok, `{"name":"n","gpu_type":"gpu_h100","gpu_count":8,"region":"r","sla_tier":"gold"}`, map[string]string{"Idempotency-Key": "k"})
 	id := src["id"].(string)
-	rg.call("POST", "/v1/supply/sources/"+id+"/activate", testSvc, "", nil)
-	rg.call("POST", "/v1/supply/sources/"+id+"/heartbeat", tok, `{"gpus_healthy":8}`, nil)
+	rg.attest(t, id, tok, 8)
 	if rg.pool.Capacity(domain.CreditH100) != 12 {
 		t.Fatal(rg.pool.Capacity(domain.CreditH100))
 	}

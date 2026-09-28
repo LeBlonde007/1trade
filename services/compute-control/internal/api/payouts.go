@@ -50,7 +50,12 @@ func payoutJSON(p supply.Payout) map[string]any {
 
 // decodeStrict reads a small JSON body into v, refusing unknown fields.
 func decodeStrict(w http.ResponseWriter, r *http.Request, v any) bool {
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8192))
+	return decodeStrictN(w, r, v, 8192)
+}
+
+// decodeStrictN reads a JSON body of at most limit bytes into v, refusing unknown fields.
+func decodeStrictN(w http.ResponseWriter, r *http.Request, v any, limit int64) bool {
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, limit))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(v); err != nil {
 		writeErr(w, http.StatusUnprocessableEntity, "bad_request", "invalid JSON body")

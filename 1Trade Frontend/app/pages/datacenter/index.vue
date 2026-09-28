@@ -5,12 +5,12 @@
  * GPUs in use from the live scheduling pool, GPU time served from the usage records that payouts
  * (F18) are computed from. No mock data.
  */
-import type { SupplySource, SourceUsage, Payout, Agreement } from '~/composables/useSupply'
+import type { SupplySource, SourceUsage, Payout, Agreement, AttestationStatus, AttestationLayer } from '~/composables/useSupply'
 
 definePageMeta({ layout: 'app', middleware: 'auth' })
 useHead({ title: 'Datacenter · Supply — 1Trade' })
 
-const { sources, loading, error, load, usage, act, payouts, agreement, dispute } = useSupply()
+const { sources, loading, error, load, usage, attestation, act, payouts, agreement, dispute } = useSupply()
 const statements = ref<Payout[]>([])
 const terms = ref<Agreement | null>(null)
 const payoutError = ref('')
@@ -44,26 +44,38 @@ const disputable = (p: Payout) => (p.state === 'pending' || p.state === 'wired')
 const day = (iso: string) => iso.slice(0, 10)
 const usd = (v: string) => Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 })
 const usageBy = ref<Record<string, SourceUsage | null>>({})
+const attestBy = ref<Record<string, AttestationStatus | null>>({})
 const busy = ref<string>('')
 const actionError = ref('')
 
-/** loadAll fetches the sources, then each non-retired source's 30-day usage. */
+/** loadAll fetches the sources, then each non-retired source's 30-day usage and attestation. */
 async function loadAll() {
   await load()
+  await loadDetail()
+}
+
+/** loadDetail fetches usage and attestation for every non-retired source; a failure shows as a dash. */
+async function loadDetail() {
   const live = sources.value.filter(s => s.state !== 'retired')
-  const results = await Promise.allSettled(live.map(s => usage(s.id)))
-  const next: Record<string, SourceUsage | null> = {}
+  const [use, att] = await Promise.all([
+    Promise.allSettled(live.map(s => usage(s.id))),
+    Promise.allSettled(live.map(s => attestation(s.id))),
+  ])
+  const nextUse: Record<string, SourceUsage | null> = {}
+  const nextAtt: Record<string, AttestationStatus | null> = {}
   live.forEach((s, i) => {
-    const r = results[i]!
-    next[s.id] = r.status === 'fulfilled' ? r.value : null
+    const u = use[i]!, a = att[i]!
+    nextUse[s.id] = u.status === 'fulfilled' ? u.value : null
+    nextAtt[s.id] = a.status === 'fulfilled' ? a.value : null
   })
-  usageBy.value = next
+  usageBy.value = nextUse
+  attestBy.value = nextAtt
 }
 
 onMounted(() => {
   loadAll()
   loadPayouts()
-  const t = setInterval(load, 30_000) // heartbeats land every 30 s
+  const t = setInterval(loadAll, 30_000) // heartbeats (and telemetry attestation) land every 30 s
   onBeforeUnmount(() => clearInterval(t))
 })
 
@@ -97,9 +109,28 @@ function ago(iso: string | null): string {
   return `${Math.round(s / 3600)}h ago`
 }
 
+const LAYER: Record<AttestationLayer, string> = {
+  kyb: 'KYB review', hardware: 'GPU identity', challenge: 'challenge', telemetry: 'telemetry', bond: 'bond',
+}
+
+/** attestLabel summarises a source's attestation as "passed / 5". */
+function attestLabel(a: AttestationStatus | null | undefined): string {
+  return a ? `${5 - a.missing.length} / 5` : '—'
+}
+
+/** attestProblem names the first failing or drifted layer (with the reason), else what is still missing. */
+function attestProblem(a: AttestationStatus | null | undefined): string {
+  if (!a || a.complete) return ''
+  for (const l of a.missing) {
+    const r = a.layers[l]
+    if (r && r.state !== 'pass') return `${LAYER[l]}: ${r.state}${r.detail ? ' — ' + r.detail : ''}`
+  }
+  return 'Awaiting ' + a.missing.map(l => LAYER[l]).join(', ')
+}
+
 /** why explains, in one phrase, why a source is or is not taking work. */
 function why(s: SupplySource): string {
-  if (s.state === 'pending') return 'Awaiting activation by 1Trade'
+  if (s.state === 'pending') return 'Activates when attestation passes'
   if (s.state === 'suspended') return 'Suspended — draining'
   if (s.schedulable) return 'Taking work'
   if (!s.last_heartbeat_at) return 'Waiting for the agent’s first heartbeat'
@@ -159,7 +190,7 @@ async function run(s: SupplySource, action: 'suspend' | 'resume' | 'retire') {
             <thead>
               <tr>
                 <th>Source</th><th>GPU</th><th class="num">Healthy / registered</th><th class="num">In use</th>
-                <th class="num">Util.</th><th>Heartbeat</th><th class="num">GPU-h · 30d</th><th>Status</th><th />
+                <th class="num">Util.</th><th>Heartbeat</th><th class="num">GPU-h · 30d</th><th>Attestation</th><th>Status</th><th />
               </tr>
             </thead>
             <tbody>
@@ -171,6 +202,10 @@ async function run(s: SupplySource, action: 'suspend' | 'resume' | 'retire') {
                 <td class="num mono">{{ s.utilization_pct == null ? '—' : s.utilization_pct + '%' }}</td>
                 <td class="mono small">{{ ago(s.last_heartbeat_at) }}</td>
                 <td class="num mono">{{ gpuHours(usageBy[s.id]) }}</td>
+                <td>
+                  <span class="mono" :class="attestBy[s.id]?.complete ? 'pos-text' : ''">{{ attestLabel(attestBy[s.id]) }}</span>
+                  <div v-if="attestProblem(attestBy[s.id])" class="small dim">{{ attestProblem(attestBy[s.id]) }}</div>
+                </td>
                 <td>
                   <span class="pill" :class="s.schedulable ? 'pos' : s.state === 'suspended' ? 'warn' : 'dim'">{{ s.state }}</span>
                   <div class="small dim">{{ why(s) }}</div>
@@ -201,8 +236,10 @@ async function run(s: SupplySource, action: 'suspend' | 'resume' | 'retire') {
         <div class="card">
           <header class="card-head"><h2>Activation &amp; terms</h2></header>
           <p class="small">
-            New sources start <strong>pending</strong> and are activated by 1Trade after review. Automated GPU
-            attestation is on the way.
+            New sources start <strong>pending</strong> and activate by themselves once all five attestation
+            layers pass: KYB review and bond (1Trade), and from your agent a signed GPU identity report, a
+            timed challenge, and clean telemetry. ECC errors or a failed layer suspend the source until it
+            is clean again.
           </p>
           <p v-if="terms" class="small mono">
             <template v-for="(rate, tier) in terms.rates" :key="tier">{{ TIER[tier] ?? tier }} ${{ usd(rate) }}/GPU-h · </template>
@@ -284,6 +321,7 @@ td { padding: 10px 8px; border-bottom: 1px solid var(--border); vertical-align: 
 .pill.pos { color: var(--pos); }
 .pill.warn { color: var(--warn); }
 .pill.dim { color: var(--text-2); }
+.pos-text { color: var(--pos); }
 .actions { white-space: nowrap; text-align: right; }
 .actions button { background: none; border: 1px solid var(--border); color: var(--text); border-radius: 5px; padding: 3px 8px; font-size: 12px; cursor: pointer; margin-left: 4px; }
 .actions button.danger { color: var(--neg); }

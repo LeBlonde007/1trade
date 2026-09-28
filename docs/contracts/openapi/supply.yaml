@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: 1Trade Supply API (partner datacenter capacity)
-  version: 1.1.0
+  version: 1.2.0
   description: >
     **Partner datacenters bring GPUs into the one 1Trade pool (F16 / F17).** Owned by
     `compute-platform` (served by `compute-control`). A partner registers a supply source (GPU tier,
@@ -33,6 +33,18 @@ info:
     **Paper and real never mix.** Usage carries `is_paper`; a cycle produces separate statements for
     paper and real usage. A paper statement is a simulation — it shows what the partner would earn —
     and can never be wired (409 PAPER_STATEMENT).
+
+    **v1.2.0 (F19) — attestation gates activation.** A source activates only when all five layers
+    pass: `kyb` and `bond` (recorded by operations), `hardware` (a signed GPU identity report bound to
+    a fresh 1Trade nonce, checked against a trusted key: GPU count and model must match the
+    registration), `challenge` (a nonce-seeded challenge answered correctly before its deadline —
+    presence and responsiveness), and `telemetry` (a fresh heartbeat with no uncorrectable ECC
+    errors). When the last layer passes, a pending source activates by itself. A later `fail` or
+    `drift` on any layer suspends an active source. We attest genuineness, presence and delivery —
+    not the correctness of arbitrary computation. `activate` by operations, and `resume` of a
+    suspended source, return 409 ATTESTATION_INCOMPLETE until every layer passes. At most 10
+    challenges may be open per source (429). The hardware verifier is a stand-in signing root until
+    NVIDIA attestation (NRAS) is wired; with no trusted root configured the layer cannot pass.
 
 servers:
   - { url: "https://api.1trade.io", description: prod }
@@ -151,6 +163,78 @@ paths:
         '200': { description: Usage., content: { application/json: { schema: { $ref: '#/components/schemas/SourceUsage' } } } }
         '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/Invalid' }
+
+  /v1/supply/sources/{id}/attestation:
+    parameters: [ { $ref: '#/components/parameters/SourceId' } ]
+    get:
+      tags: [supply]
+      summary: "v1.2: each layer's latest result, and which layers still block activation."
+      operationId: getAttestation
+      responses:
+        '200': { description: Attestation status., content: { application/json: { schema: { $ref: '#/components/schemas/AttestationStatus' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/supply/sources/{id}/attestation/{layer}:
+    parameters:
+      - { $ref: '#/components/parameters/SourceId' }
+      - { name: layer, in: path, required: true, schema: { type: string, enum: [kyb, bond] } }
+    post:
+      tags: [operations]
+      summary: "v1.2: operations record a manual layer (KYB review, bond staked). Service token only."
+      operationId: recordManualLayer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [state, evidence]
+              properties:
+                state:    { type: string, enum: [pass, fail] }
+                evidence: { type: object, description: "document references, bond amount and custody reference", additionalProperties: true }
+      responses:
+        '200': { description: Recorded., content: { application/json: { schema: { $ref: '#/components/schemas/AttestationStatus' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/supply/sources/{id}/challenges:
+    parameters: [ { $ref: '#/components/parameters/SourceId' } ]
+    post:
+      tags: [supply]
+      summary: "v1.2: issue a nonce for the agent: `hardware` (to bind into the signed GPU report) or `challenge` (to answer)."
+      operationId: issueChallenge
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [kind], properties: { kind: { type: string, enum: [hardware, challenge] } } } } }
+      responses:
+        '201': { description: Issued., content: { application/json: { schema: { $ref: '#/components/schemas/Challenge' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { description: Too many open challenges., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+
+  /v1/supply/sources/{id}/challenges/{challenge_id}:
+    parameters:
+      - { $ref: '#/components/parameters/SourceId' }
+      - { name: challenge_id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [supply]
+      summary: >
+        v1.2: answer a challenge. For `hardware`, `report` (base64 JSON: source_id, nonce, gpus[{uuid, model}])
+        and `signature` (base64). For `challenge`, `result` (hex). One answer per challenge; late or
+        replayed answers fail.
+      operationId: answerChallenge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                report:    { type: string }
+                signature: { type: string }
+                result:    { type: string }
+      responses:
+        '200': { description: The layer's result was recorded (pass or fail)., content: { application/json: { schema: { $ref: '#/components/schemas/AttestationStatus' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: Already answered or expired., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
 
   /v1/supply/partners/{tenant_id}/agreement:
     parameters: [ { name: tenant_id, in: path, required: true, schema: { type: string, format: uuid } } ]
@@ -323,6 +407,30 @@ components:
               gpu_seconds: { type: string, description: "fixed-point decimal, as on compute.usage.v1" }
               units:       { type: string, description: "gpu credits billed to customers for this time, fixed-point" }
               sessions:    { type: integer, description: "usage events (metering intervals) counted" }
+    AttestationStatus:
+      type: object
+      required: [source_id, complete, layers, missing]
+      properties:
+        source_id: { type: string, format: uuid }
+        complete:  { type: boolean, description: "every layer's latest result is pass" }
+        missing:   { type: array, items: { type: string }, description: "layers not yet passing" }
+        layers:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              state:       { type: string, enum: [pass, fail, drift] }
+              attested_at: { type: string, format: date-time }
+              detail:      { type: string }
+    Challenge:
+      type: object
+      required: [id, kind, nonce, expires_at]
+      properties:
+        id:         { type: string, format: uuid }
+        kind:       { type: string, enum: [hardware, challenge] }
+        nonce:      { type: string, description: "hex" }
+        iterations: { type: integer, description: "challenge: apply SHA-256 this many times to the nonce bytes; answer the final digest in hex" }
+        expires_at: { type: string, format: date-time }
     Agreement:
       type: object
       required: [rates, fee_percent, holdback_percent, dispute_days]

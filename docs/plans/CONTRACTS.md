@@ -112,6 +112,7 @@ These are authored alongside Phase 1 so the switch-on is a config flip, not a re
 | `openapi/inference.yaml` v1.1 catalog metadata + model lifecycle (Deprecation/Sunset headers, 410 `model_retired`) | authored + implemented 2026-09-28 (F10); consumers: web console, CLI |
 | `openapi/supply.yaml` v1.0 partner supply sources (register / heartbeat / suspend / retire / usage; activation by operations) | authored + implemented 2026-09-28 in compute-control (F16/F17) |
 | `openapi/supply.yaml` v1.1 partner payouts (agreements, cycles, wire / dispute / resolve / holdback; paper statements never wired) | authored + implemented 2026-09-28 (F18) |
+| `openapi/supply.yaml` v1.2 GPU attestation (five layers, nonce challenges, activation gate, drift suspends) | authored + implemented 2026-09-28 (F19) |
 
 ---
 

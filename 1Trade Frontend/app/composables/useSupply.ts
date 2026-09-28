@@ -1,5 +1,5 @@
 /**
- * useSupply — the partner's supply sources (supply.yaml v1.0, F16/F17) through the BFF. Live only:
+ * useSupply — the partner's supply sources (supply.yaml v1.2, F16–F19) through the BFF. Live only:
  * every value comes from compute-control; there is no mock data.
  */
 export interface SupplySource {
@@ -23,6 +23,15 @@ export interface SourceUsage {
   from: string
   to: string
   by_tier: { gpu_type: string; gpu_seconds: string; units: string; sessions: number }[]
+}
+
+export type AttestationLayer = 'kyb' | 'hardware' | 'challenge' | 'telemetry' | 'bond'
+
+export interface AttestationStatus {
+  source_id: string
+  complete: boolean
+  missing: AttestationLayer[]
+  layers: Partial<Record<AttestationLayer, { state: 'pass' | 'fail' | 'drift'; attested_at: string; detail: string }>>
 }
 
 export interface PayoutLine { gpu_type: string; gpu_hours: string; rate: string; gross: string }
@@ -89,6 +98,11 @@ export function useSupply() {
     return $fetch<SourceUsage>(`/api/supply/sources/${id}/usage`)
   }
 
+  /** attestation fetches each attestation layer's latest result for one source (F19). */
+  function attestation(id: string) {
+    return $fetch<AttestationStatus>(`/api/supply/sources/${id}/attestation`)
+  }
+
   /** act runs suspend | resume | retire and reloads. */
   async function act(id: string, action: 'suspend' | 'resume' | 'retire') {
     if (action === 'retire') await $fetch(`/api/supply/sources/${id}`, { method: 'DELETE' })
@@ -111,5 +125,5 @@ export function useSupply() {
   const dispute = (id: string, reason: string) =>
     $fetch<Payout>(`/api/supply/payouts/${id}/dispute`, { method: 'POST', body: { reason } })
 
-  return { sources, loading, error, load, usage, act, register, payouts, agreement, dispute }
+  return { sources, loading, error, load, usage, attestation, act, register, payouts, agreement, dispute }
 }

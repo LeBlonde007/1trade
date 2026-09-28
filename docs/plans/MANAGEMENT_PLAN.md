@@ -162,10 +162,10 @@ Status legend: ⬜ Not started · 🔵 In progress · ✅ Done · ⚠️ At risk
 | F13 | GPU instance lifecycle (on-demand, <90s) | Compute | M3 | 🔵 | ~70% | **v0 complete (v0.3.0).** Customer-facing instances (create/list/get/stop/start/delete) over `compute.yaml` v1.1.0, drawing from one shared `pool.Pool` with the scheduler (capacity never double-counted). Per-interval metering ticker → `compute.usage.v1` → ledger `gpu_*` debit (idempotent on `usage_id`); versioned ML-Stack image catalog (stable/latest/pinned); idle-stop field plumbed. `1trade gpu …` CLI + live web `/compute` list & provision (BFF + `useCompute`). Tenant-scoped (404 cross-tenant), `is_paper` server-derived; security-review clean. **Mock-GPU backend** — real K8s provisioner (same interface) + **<90s-P95 timing GPU-node-gated**; idle auto-stop enforcement lands with F06 policy. |
 | F14 | Reserved capacity (1/6/12-mo discounts) | Compute + Ledger | M3 | ⬜ | 0% | Cash upfront. |
 | F15 | Multi-node clusters (InfiniBand, gang-scheduled) | Compute | M5 | ⬜ | 0% | Sales-engaged for 32+ GPU. |
-| F16 | Supply-source abstraction (owned + partner = one pool) | Compute + Settlement | M3 / M4 | ⬜ | 0% | |
-| F17 | DC partner onboarding (manual v1) | Settlement | M4 / M5 | ⬜ | 0% | |
-| F18 | Partner payouts (escrow + streamed; proof-of-reserves) | Settlement + Ledger | M4 / M5 | ⬜ | 0% | |
-| F19 | GPU attestation (KYB + NVIDIA + challenge-response + DCGM + bond) | Settlement | M4 | ⬜ | 0% | Makes credits credible. |
+| F16 | Supply-source abstraction (owned + partner = one pool) | Compute + Settlement | M3 / M4 | ✅ | 90% | One pool, registry, drain (2026-09-28). |
+| F17 | DC partner onboarding (manual v1) | Settlement | M4 / M5 | ✅ | 85% | Live dashboard + self-serve registration. |
+| F18 | Partner payouts (escrow + streamed; proof-of-reserves) | Settlement + Ledger | M4 / M5 | 🟨 | 75% | Cycles, holdback, disputes; proof-of-reserves + real wire open. |
+| F19 | GPU attestation (KYB + NVIDIA + challenge-response + DCGM + bond) | Settlement | M4 | 🟨 | 70% | Five layers gate activation; stand-in root until NVIDIA NRAS. |
 | F20 | Platform console UI (catalog, wallet, compute, billing) | Frontend | M1→M6 | 🔵 | ~50% | **M2 mock→live seam done (v0.2.3).** Nitro BFF + `TRADE1_API_MODE` flip; composables for auth/catalog/wallet/inference/billing/keys (all proven live). **Live `/console`** (design-system tokens) ties the loop: run inference → wallet debits; buy credits; manage keys. login/signup wired. **Wallet convert drawer executes live F07 conversions** (rate/spread + atomic burn+mint, idempotent; v0.2.5). Live-only since v0.2.11 (mock mode removed; persona-scoped nav + onboarding). Per-screen v1.5 depth tracked in **F23**. |
 | F21 | SOC 2 Type I (Vanta, controls, evidence) | Security + Infra | M4 / M6 | ⬜ | 0% | |
 | F22 | Licensing track (jurisdiction, counsel, prepaid framing) | Security | parallel | 🔵 | ~10% | Counsel engagement starting; keeps Phase 2 unblockable. |

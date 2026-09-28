@@ -19,6 +19,9 @@ type SupplyDeps struct {
 	Store *supply.Store
 	Pool  *pool.Pool
 	Sync  *supply.Syncer
+	// Verifier checks signed GPU identity reports (F19); nil means no trusted root is configured, so
+	// the hardware layer cannot pass.
+	Verifier supply.HardwareVerifier
 }
 
 // EnableSupply turns the supply endpoints on.
@@ -44,6 +47,7 @@ func (s *Server) supplyRoutes() {
 	s.mux.HandleFunc("POST /v1/supply/payouts/{payout_id}/dispute", s.disputePayout)
 	s.mux.HandleFunc("POST /v1/supply/payouts/{payout_id}/release-holdback", s.releaseHoldback)
 	s.mux.HandleFunc("POST /v1/supply/payouts/{payout_id}/resolve", s.resolvePayout)
+	s.attestRoutes()
 }
 
 // supplyCaller authorises a supply call. The service token is operations (partner ""); a tenant JWT
@@ -113,6 +117,12 @@ func writeSupplyErr(w http.ResponseWriter, err error) {
 		writeErr(w, http.StatusConflict, "PAPER_STATEMENT", "a paper statement is a simulation and is never wired")
 	case errors.Is(err, supply.ErrDisputeWindow):
 		writeErr(w, http.StatusConflict, "dispute_window", "outside the statement's dispute window")
+	case errors.Is(err, supply.ErrAttestationIncomplete):
+		writeErr(w, http.StatusConflict, "ATTESTATION_INCOMPLETE", strings.TrimPrefix(err.Error(), "supply: "))
+	case errors.Is(err, supply.ErrChallengeClosed):
+		writeErr(w, http.StatusConflict, "challenge_closed", "the challenge was already answered or has expired")
+	case errors.Is(err, supply.ErrTooManyChallenges):
+		writeErr(w, http.StatusTooManyRequests, "too_many_challenges", "answer or let expire the open challenges first")
 	case errors.Is(err, supply.ErrIdemConflict):
 		writeErr(w, http.StatusConflict, "IDEMPOTENCY_CONFLICT", "Idempotency-Key reused with a different body")
 	default:

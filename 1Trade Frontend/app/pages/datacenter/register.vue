@@ -2,7 +2,7 @@
 /**
  * /datacenter/register — register GPU capacity with 1Trade (F17), live on compute-control's supply API.
  * The form holds one idempotency key for its lifetime, so a double submit or a retry after a network
- * error registers the source once. A new source is pending until 1Trade activates it.
+ * error registers the source once. A new source is pending until its attestation (F19) passes.
  */
 import type { Registration, SupplySource } from '~/composables/useSupply'
 
@@ -57,8 +57,9 @@ async function submit() {
         <h2>Registered — pending activation</h2>
         <p class="small">
           <strong>{{ created.name }}</strong> ({{ created.gpu_count }} × {{ created.gpu_type === 'gpu_h100' ? 'H100' : 'H200' }},
-          {{ created.region }}) is registered. 1Trade activates it after review; it takes work once it is active and
-          your agent is heartbeating.
+          {{ created.region }}) is registered. It activates by itself once attestation passes — KYB review and bond
+          by 1Trade, and from your agent a signed GPU identity report, a timed challenge and clean telemetry — and
+          takes work while your agent is heartbeating.
         </p>
         <p class="small">Source id <span class="mono">{{ created.id }}</span> — your agent heartbeats to it:</p>
         <pre class="mono code">curl -X POST https://api.1trade.io/v1/supply/sources/{{ created.id }}/heartbeat \
@@ -101,7 +102,7 @@ async function submit() {
         </div>
         <p v-if="error" class="banner neg" role="alert">{{ error }}</p>
         <div class="foot">
-          <span class="small dim">New sources start pending until 1Trade activates them.</span>
+          <span class="small dim">New sources start pending until attestation passes.</span>
           <button type="submit" class="btn-primary" :disabled="!valid || submitting">{{ submitting ? 'Registering…' : 'Register' }}</button>
         </div>
       </form>

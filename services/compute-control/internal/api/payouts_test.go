@@ -12,7 +12,8 @@ import (
 	"github.com/trade1/compute-control/internal/scheduler"
 )
 
-// activePartner registers, activates and heartbeats a source for tenant; it returns the source id.
+// activePartner registers a source for tenant and attests it (which activates it and heartbeats);
+// it returns the source id.
 func (rg *supplyRig) activePartner(t *testing.T, tenant, tok string) string {
 	t.Helper()
 	code, src := rg.call("POST", "/v1/supply/sources", tok, `{"name":"row 1","gpu_type":"gpu_h100","gpu_count":16,"region":"eu","sla_tier":"gold"}`, map[string]string{"Idempotency-Key": "k-" + tenant})
@@ -20,8 +21,7 @@ func (rg *supplyRig) activePartner(t *testing.T, tenant, tok string) string {
 		t.Fatalf("register: %d %v", code, src)
 	}
 	id := src["id"].(string)
-	rg.call("POST", "/v1/supply/sources/"+id+"/activate", testSvc, "", nil)
-	rg.call("POST", "/v1/supply/sources/"+id+"/heartbeat", tok, `{"gpus_healthy":16}`, nil)
+	rg.attest(t, id, tok, 16)
 	return id
 }
 

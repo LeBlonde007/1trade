@@ -64,6 +64,18 @@ func main() {
 		syncer := &supply.Syncer{Store: st, Pool: gpuPool}
 		go syncer.Run(context.Background(), 15*time.Second)
 		supplyDeps = &api.SupplyDeps{Store: st, Pool: gpuPool, Sync: syncer}
+		// GPU attestation (F19): the stand-in root until NVIDIA attestation is wired. No keys means no
+		// source can pass the hardware layer, so none can activate (fail closed).
+		keys, err := supply.ParseTrustKeys(cfg.AttestKeys)
+		if err != nil {
+			slog.Error("attestation trust keys", "err", err)
+			os.Exit(1)
+		}
+		if len(keys) > 0 {
+			supplyDeps.Verifier = supply.Ed25519Verifier{Keys: keys}
+		} else {
+			slog.Warn("ATTESTATION_TRUST_KEYS unset; the hardware attestation layer cannot pass")
+		}
 		slog.Info("partner supply enabled")
 	} else {
 		slog.Warn("DATABASE_URL unset; partner supply disabled (owned capacity only)")

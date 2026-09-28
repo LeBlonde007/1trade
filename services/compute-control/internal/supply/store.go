@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -203,7 +204,7 @@ var transitions = map[string]struct {
 }
 
 // Transition applies an action (activate | suspend | resume | retire) for actor. partner "" is
-// operations. Repeating an action that already holds (suspend a suspended source) is a no-op
+// operations. Activating, or resuming a suspended source, needs complete attestation. Repeating an action that already holds (suspend a suspended source) is a no-op
 // success; an action from a state it does not leave is ErrState.
 func (s *Store) Transition(ctx context.Context, id, partner, action, actor string) (Source, error) {
 	t, ok := transitions[action]
@@ -235,6 +236,15 @@ func (s *Store) Transition(ctx context.Context, id, partner, action, actor strin
 	if src.State == t.to {
 		return src, nil // already there
 	}
+	if t.to == Active { // activate, or resume from suspended: every attestation layer must pass (F19)
+		st, err := latest(ctx, tx, id)
+		if err != nil {
+			return Source{}, err
+		}
+		if !st.Complete {
+			return Source{}, fmt.Errorf("%w: missing %s", ErrAttestationIncomplete, strings.Join(st.Missing, ", "))
+		}
+	}
 	src, err = scanSource(tx.QueryRow(ctx, `UPDATE supply_sources SET state=$2, updated_at=now() WHERE id=$1 RETURNING `+columns, id, t.to))
 	if err != nil {
 		return Source{}, fmt.Errorf("supply: %s: %w", action, err)
@@ -245,18 +255,31 @@ func (s *Store) Transition(ctx context.Context, id, partner, action, actor strin
 	return src, tx.Commit(ctx)
 }
 
-// Heartbeat records an agent report for a partner's source. A retired source refuses (ErrState).
+// Heartbeat records an agent report for a partner's source, and the telemetry layer it implies
+// (F19: ECC errors are drift and suspend an active source). A retired source refuses (ErrState).
 func (s *Store) Heartbeat(ctx context.Context, id, partner string, healthy, util int, ecc int64) (Source, error) {
-	src, err := s.Get(ctx, id, partner)
+	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return Source{}, err
 	}
-	if src.State == Retired {
-		return Source{}, ErrState
+	defer tx.Rollback(ctx) //nolint:errcheck // rollback after commit is a no-op
+	src, err := lockSource(ctx, tx, id, partner)
+	if err != nil {
+		return Source{}, err
 	}
-	return scanSource(s.pool.QueryRow(ctx, `UPDATE supply_sources SET gpus_healthy=$2, utilization_pct=$3,
-		ecc_errors=ecc_errors+$4, last_heartbeat_at=now(), updated_at=now() WHERE id=$1 RETURNING `+columns,
-		id, min(healthy, src.GPUCount), util, ecc))
+	healthy = min(healthy, src.GPUCount)
+	if _, err := tx.Exec(ctx, `UPDATE supply_sources SET gpus_healthy=$2, utilization_pct=$3,
+		ecc_errors=ecc_errors+$4, last_heartbeat_at=now(), updated_at=now() WHERE id=$1`, id, healthy, util, ecc); err != nil {
+		return Source{}, fmt.Errorf("supply: heartbeat: %w", err)
+	}
+	if err := telemetry(ctx, tx, src, healthy, ecc); err != nil {
+		return Source{}, err
+	}
+	src, err = scanSource(tx.QueryRow(ctx, `SELECT `+columns+` FROM supply_sources WHERE id=$1`, id))
+	if err != nil {
+		return Source{}, err
+	}
+	return src, tx.Commit(ctx)
 }
 
 // Usage is metered GPU time on a source for one tier.
