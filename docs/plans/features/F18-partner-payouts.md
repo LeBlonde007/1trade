@@ -92,3 +92,46 @@ Backing ratio ≥ 1.00 enforced at mint (F05/F14).
 
 - M4 (Gate 4): first payout cycle.
 - M5 (Gate 5): public PoR.
+
+## Status — payout cycles, holdback, disputes (2026-09-28)
+
+**Built** (`supply.yaml` v1.1, compute-control migration `0002_payouts.sql`):
+- **Agreements per partner**, set by operations: a rate per GPU-hour per tier, the 1Trade fee,
+  the holdback and the dispute window. They are validated: known tiers, at most 6 decimals, percents
+  from 0 to 100, a window of 1 to 90 days.
+- **Cycles**, closed by operations over [start, end):
+  - unpaid usage on partner sources becomes one statement per (partner, paper or real), priced by
+    the agreement (`gross − fee = payout`; `payout − holdback = released`);
+  - `big.Rat` math, truncated to 6 places, and DB CHECKs enforce both identities;
+  - **each usage record is in exactly one statement** (`payout_usage.usage_id` is the primary key),
+    under an exclusive lock, so payouts reconcile to usage by construction and a repeat close pays
+    nothing;
+  - usage waits unpaid until terms exist.
+- **Lifecycle:**
+  - pending → wired: operations records the transfer reference. The money movement itself is outside
+    the API and licence-gated.
+  - wired → settled: the holdback is released after the dispute window.
+  - disputed: the partner raises it inside the window, it goes to the operations review queue
+    (`?state=disputed`), and `resolve` releases or withholds the holdback.
+
+  An append-only audit records every change.
+- **Paper and real never mix:** paper usage makes paper statements, which are **simulations that can
+  never be wired** (409 PAPER_STATEMENT, plus a DB CHECK).
+- **Console:** `/datacenter` shows the terms, the statements (paper ones labelled "Simulated —
+  sandbox usage, no money moves") and a dispute button inside the window.
+
+**Verified:**
+- **Unit:** the formula and truncation, agreement validation.
+- **Postgres end to end:** no terms means nothing paid; paper and real statements; exact
+  reconciliation (no unpaid usage left; a repeat close creates none); paper wire refused; a partner
+  cannot wire, close or set terms; wired, then disputed, the review queue, resolved; the holdback
+  held inside the window and released after it; a dispute after the window refused; isolation.
+- **Live:** a paper job lands on the partner, and the closed cycle shows as a simulated statement on
+  the dashboard (screenshot `docs/screenshots/datacenter.png`).
+- **Mutation-checked:** a paper wire, double-paid usage, a late dispute, an early holdback release, a
+  cross-partner read, and a dropped fee all fail a test.
+
+**Acceptance:** ✅ payout matches the usage (reconciled) · ✅ holdback released after the window ·
+✅ disputes go to the review queue · ⬜ proof-of-reserves (needs attestation, F19, and a ledger total of
+outstanding GPU credits) · ⬜ backing-ratio alert · ⬜ `payout.cycle.v1` event · ⬜ the real wire
+(licence-gated) and an automatic monthly schedule.

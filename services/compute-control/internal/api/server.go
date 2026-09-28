@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/trade1/compute-control/internal/auth"
 	"github.com/trade1/compute-control/internal/config"
@@ -29,6 +30,8 @@ type Server struct {
 	mux   *http.ServeMux
 	// supply is set by EnableSupply; nil answers the supply endpoints with 503.
 	supply *SupplyDeps
+	// now is the clock for payout windows (nil = time.Now); tests set it.
+	now func() time.Time
 }
 
 // New builds the routed handler.

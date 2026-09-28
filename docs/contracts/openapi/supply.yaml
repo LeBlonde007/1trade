@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: 1Trade Supply API (partner datacenter capacity)
-  version: 1.0.0
+  version: 1.1.0
   description: >
     **Partner datacenters bring GPUs into the one 1Trade pool (F16 / F17).** Owned by
     `compute-platform` (served by `compute-control`). A partner registers a supply source (GPU tier,
@@ -18,6 +18,21 @@ info:
     Auth: a first-party tenant JWT with the `admin` or `engineer` role manages that tenant's own
     sources (another tenant's source reads as 404). The internal service token is for operations
     (list all, activate). Mutations take an Idempotency-Key.
+
+    **v1.1.0 (F18) — partner payouts.** Operations sets each partner's agreement (rate per GPU-hour per
+    tier, 1Trade fee, holdback, dispute window) and closes payout cycles. A cycle turns the per-source
+    usage records into one statement per partner, and each usage record is counted in exactly one
+    statement, so payouts reconcile to usage by construction:
+    `gross = Σ gpu_hours × rate`, `fee = gross × fee_percent`, `payout = gross − fee`,
+    `holdback = payout × holdback_percent`, `released = payout − holdback` (fixed-point, truncated to 6
+    places). States: `pending` → `wired` (operations records the transfer reference; moving real money is
+    outside this API) → `settled` once the holdback is released after the dispute window. A partner may
+    `dispute` a statement inside its window; disputes wait in the operations review queue, which
+    `resolve`s them by releasing or withholding the holdback.
+
+    **Paper and real never mix.** Usage carries `is_paper`; a cycle produces separate statements for
+    paper and real usage. A paper statement is a simulation — it shows what the partner would earn —
+    and can never be wired (409 PAPER_STATEMENT).
 
 servers:
   - { url: "https://api.1trade.io", description: prod }
@@ -137,12 +152,118 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/Invalid' }
 
+  /v1/supply/partners/{tenant_id}/agreement:
+    parameters: [ { name: tenant_id, in: path, required: true, schema: { type: string, format: uuid } } ]
+    put:
+      tags: [operations]
+      summary: Set a partner's payout agreement (v1.1). Service token only. Applies to cycles closed afterwards.
+      operationId: setAgreement
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/Agreement' } } } }
+      responses:
+        '200': { description: Stored., content: { application/json: { schema: { $ref: '#/components/schemas/Agreement' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Invalid' }
+    get:
+      tags: [supply]
+      summary: A partner's agreement (the partner itself, or operations).
+      operationId: getAgreement
+      responses:
+        '200': { description: The agreement., content: { application/json: { schema: { $ref: '#/components/schemas/Agreement' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/supply/payouts/cycles:
+    post:
+      tags: [operations]
+      summary: >
+        Close a payout cycle (v1.1). Service token only. For every partner with an agreement and
+        unpaid usage created in [period_start, period_end), one statement. Idempotent: usage already
+        in a statement is never counted again, and closing the same period twice adds nothing.
+      operationId: closeCycle
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [period_start, period_end]
+              properties:
+                period_start: { type: string, format: date-time }
+                period_end:   { type: string, format: date-time, description: "must be in the past" }
+      responses:
+        '200': { description: Statements created by this call (empty on a repeat)., content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/Payout' } } } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Invalid' }
+
+  /v1/supply/payouts:
+    get:
+      tags: [supply]
+      summary: The partner's payout statements, newest first. With the service token, all of them; `state=disputed` is the review queue.
+      operationId: listPayouts
+      parameters:
+        - { name: state, in: query, schema: { type: string, enum: [pending, wired, disputed, settled] } }
+      responses:
+        '200': { description: Statements., content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/Payout' } } } } } } }
+
+  /v1/supply/payouts/{payout_id}:
+    parameters: [ { $ref: '#/components/parameters/PayoutId' } ]
+    get:
+      tags: [supply]
+      summary: One statement with its per-tier lines.
+      operationId: getPayout
+      responses:
+        '200': { description: The statement., content: { application/json: { schema: { $ref: '#/components/schemas/Payout' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/supply/payouts/{payout_id}/wire:
+    parameters: [ { $ref: '#/components/parameters/PayoutId' } ]
+    post:
+      tags: [operations]
+      summary: "pending → wired: operations records the transfer of the released amount. Service token only."
+      operationId: markWired
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [reference], properties: { reference: { type: string, minLength: 1, maxLength: 128 } } } } } }
+      responses:
+        '200': { description: Wired., content: { application/json: { schema: { $ref: '#/components/schemas/Payout' } } } }
+        '409': { description: "Not pending, or a paper statement (PAPER_STATEMENT: simulations never move money).", content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+
+  /v1/supply/payouts/{payout_id}/dispute:
+    parameters: [ { $ref: '#/components/parameters/PayoutId' } ]
+    post:
+      tags: [supply]
+      summary: The partner disputes a statement inside its dispute window. The holdback is frozen until operations resolves it.
+      operationId: disputePayout
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [reason], properties: { reason: { type: string, minLength: 1, maxLength: 2000 } } } } } }
+      responses:
+        '200': { description: Disputed., content: { application/json: { schema: { $ref: '#/components/schemas/Payout' } } } }
+        '409': { description: Outside the dispute window, or not pending / wired., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+
+  /v1/supply/payouts/{payout_id}/release-holdback:
+    parameters: [ { $ref: '#/components/parameters/PayoutId' } ]
+    post:
+      tags: [operations]
+      summary: "wired → settled once the dispute window has passed with no dispute. Service token only."
+      operationId: releaseHoldback
+      responses:
+        '200': { description: Settled., content: { application/json: { schema: { $ref: '#/components/schemas/Payout' } } } }
+        '409': { description: Not wired, disputed, or still inside the dispute window., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+
+  /v1/supply/payouts/{payout_id}/resolve:
+    parameters: [ { $ref: '#/components/parameters/PayoutId' } ]
+    post:
+      tags: [operations]
+      summary: Resolve a dispute (the review queue). `release` pays the holdback; `withhold` keeps it. Either way the statement settles.
+      operationId: resolveDispute
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [outcome, note], properties: { outcome: { type: string, enum: [release, withhold] }, note: { type: string, minLength: 1, maxLength: 2000 } } } } } }
+      responses:
+        '200': { description: Resolved., content: { application/json: { schema: { $ref: '#/components/schemas/Payout' } } } }
+        '409': { description: Not disputed., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+
 components:
   securitySchemes:
     tenantJwt: { type: http, scheme: bearer, bearerFormat: JWT }
     serviceToken: { type: http, scheme: bearer }
   parameters:
     SourceId: { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    PayoutId: { name: payout_id, in: path, required: true, schema: { type: string, format: uuid } }
     IdempotencyKey: { name: Idempotency-Key, in: header, required: true, schema: { type: string, maxLength: 255 } }
   responses:
     Unauthorized: { description: Missing or invalid credential., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
@@ -202,6 +323,49 @@ components:
               gpu_seconds: { type: string, description: "fixed-point decimal, as on compute.usage.v1" }
               units:       { type: string, description: "gpu credits billed to customers for this time, fixed-point" }
               sessions:    { type: integer, description: "usage events (metering intervals) counted" }
+    Agreement:
+      type: object
+      required: [rates, fee_percent, holdback_percent, dispute_days]
+      properties:
+        partner_tenant_id: { type: string, format: uuid, readOnly: true }
+        rates:
+          type: object
+          description: "USD per GPU-hour, per tier, fixed-point strings, e.g. {gpu_h100: \"1.800000\"}"
+          additionalProperties: { type: string }
+        fee_percent:      { type: string, description: "1Trade's fee, fixed-point percent 0-100" }
+        holdback_percent: { type: string, description: "held until the dispute window passes, 0-100" }
+        dispute_days:     { type: integer, minimum: 1, maximum: 90 }
+    Payout:
+      type: object
+      required: [id, partner_tenant_id, period_start, period_end, currency, is_paper, gpu_hours, gross, fee, payout, holdback, released, state, dispute_until, lines]
+      properties:
+        id:                { type: string, format: uuid }
+        partner_tenant_id: { type: string, format: uuid }
+        period_start:      { type: string, format: date-time }
+        period_end:        { type: string, format: date-time }
+        currency:          { type: string, enum: [USD] }
+        is_paper:          { type: boolean, description: "a simulation from paper usage; never wired" }
+        gpu_hours:         { type: string }
+        gross:             { type: string }
+        fee:               { type: string }
+        payout:            { type: string, description: "gross − fee" }
+        holdback:          { type: string }
+        released:          { type: string, description: "payout − holdback: what the wire carries" }
+        usage_records:     { type: integer }
+        state:             { type: string, enum: [pending, wired, disputed, settled] }
+        wire_reference:    { type: string, nullable: true }
+        dispute_until:     { type: string, format: date-time }
+        dispute_reason:    { type: string, nullable: true }
+        resolution:        { type: string, nullable: true, enum: [release, withhold, null] }
+        lines:
+          type: array
+          items:
+            type: object
+            properties:
+              gpu_type:    { type: string }
+              gpu_hours:   { type: string }
+              rate:        { type: string }
+              gross:       { type: string }
     ApiError:
       type: object
       required: [code, message]

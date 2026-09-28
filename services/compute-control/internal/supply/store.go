@@ -297,3 +297,8 @@ func (s *Store) UsageFor(ctx context.Context, sourceID string, from, to time.Tim
 	}
 	return out, rows.Err()
 }
+
+// QueryRowForTest runs a read-only query (tests reconcile tables directly).
+func (s *Store) QueryRowForTest(ctx context.Context, q string, args ...any) pgx.Row {
+	return s.pool.QueryRow(ctx, q, args...)
+}

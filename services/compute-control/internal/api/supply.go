@@ -35,6 +35,15 @@ func (s *Server) supplyRoutes() {
 	s.mux.HandleFunc("POST /v1/supply/sources/{id}/activate", s.sourceAction("activate"))
 	s.mux.HandleFunc("POST /v1/supply/sources/{id}/heartbeat", s.heartbeat)
 	s.mux.HandleFunc("GET /v1/supply/sources/{id}/usage", s.sourceUsage)
+	s.mux.HandleFunc("PUT /v1/supply/partners/{tenant_id}/agreement", s.setAgreement)
+	s.mux.HandleFunc("GET /v1/supply/partners/{tenant_id}/agreement", s.getAgreement)
+	s.mux.HandleFunc("POST /v1/supply/payouts/cycles", s.closeCycle)
+	s.mux.HandleFunc("GET /v1/supply/payouts", s.listPayouts)
+	s.mux.HandleFunc("GET /v1/supply/payouts/{payout_id}", s.getPayout)
+	s.mux.HandleFunc("POST /v1/supply/payouts/{payout_id}/wire", s.wirePayout)
+	s.mux.HandleFunc("POST /v1/supply/payouts/{payout_id}/dispute", s.disputePayout)
+	s.mux.HandleFunc("POST /v1/supply/payouts/{payout_id}/release-holdback", s.releaseHoldback)
+	s.mux.HandleFunc("POST /v1/supply/payouts/{payout_id}/resolve", s.resolvePayout)
 }
 
 // supplyCaller authorises a supply call. The service token is operations (partner ""); a tenant JWT
@@ -96,6 +105,14 @@ func writeSupplyErr(w http.ResponseWriter, err error) {
 		writeErr(w, http.StatusNotFound, "not_found", "no such source")
 	case errors.Is(err, supply.ErrState):
 		writeErr(w, http.StatusConflict, "invalid_state", "not allowed in the source's current state")
+	case errors.Is(err, supply.ErrNoAgreement):
+		writeErr(w, http.StatusNotFound, "not_found", "no payout agreement")
+	case errors.Is(err, supply.ErrBadAgreement):
+		writeErr(w, http.StatusUnprocessableEntity, "bad_request", err.Error())
+	case errors.Is(err, supply.ErrPaperPayout):
+		writeErr(w, http.StatusConflict, "PAPER_STATEMENT", "a paper statement is a simulation and is never wired")
+	case errors.Is(err, supply.ErrDisputeWindow):
+		writeErr(w, http.StatusConflict, "dispute_window", "outside the statement's dispute window")
 	case errors.Is(err, supply.ErrIdemConflict):
 		writeErr(w, http.StatusConflict, "IDEMPOTENCY_CONFLICT", "Idempotency-Key reused with a different body")
 	default:

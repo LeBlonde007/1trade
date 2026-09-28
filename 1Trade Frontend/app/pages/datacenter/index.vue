@@ -5,12 +5,44 @@
  * GPUs in use from the live scheduling pool, GPU time served from the usage records that payouts
  * (F18) are computed from. No mock data.
  */
-import type { SupplySource, SourceUsage } from '~/composables/useSupply'
+import type { SupplySource, SourceUsage, Payout, Agreement } from '~/composables/useSupply'
 
 definePageMeta({ layout: 'app', middleware: 'auth' })
 useHead({ title: 'Datacenter · Supply — 1Trade' })
 
-const { sources, loading, error, load, usage, act } = useSupply()
+const { sources, loading, error, load, usage, act, payouts, agreement, dispute } = useSupply()
+const statements = ref<Payout[]>([])
+const terms = ref<Agreement | null>(null)
+const payoutError = ref('')
+
+/** loadPayouts fetches statements and terms (independent of the sources table). */
+async function loadPayouts() {
+  payoutError.value = ''
+  try {
+    const [st, ag] = await Promise.all([payouts(), agreement()])
+    statements.value = st
+    terms.value = ag
+  } catch (e: any) {
+    payoutError.value = e?.data?.message || e?.statusMessage || 'Could not load payouts.'
+  }
+}
+
+/** raiseDispute asks for a reason and disputes the statement. */
+async function raiseDispute(p: Payout) {
+  const reason = prompt('What is wrong with this statement? (sent to 1Trade operations)')
+  if (!reason?.trim()) return
+  try {
+    await dispute(p.id, reason.trim())
+    await loadPayouts()
+  } catch (e: any) {
+    payoutError.value = e?.data?.message || e?.statusMessage || 'Could not raise the dispute.'
+  }
+}
+
+/** disputable: pending or wired, and still inside the window. */
+const disputable = (p: Payout) => (p.state === 'pending' || p.state === 'wired') && Date.parse(p.dispute_until) > Date.now()
+const day = (iso: string) => iso.slice(0, 10)
+const usd = (v: string) => Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 })
 const usageBy = ref<Record<string, SourceUsage | null>>({})
 const busy = ref<string>('')
 const actionError = ref('')
@@ -30,6 +62,7 @@ async function loadAll() {
 
 onMounted(() => {
   loadAll()
+  loadPayouts()
   const t = setInterval(load, 30_000) // heartbeats land every 30 s
   onBeforeUnmount(() => clearInterval(t))
 })
@@ -166,15 +199,52 @@ async function run(s: SupplySource, action: 'suspend' | 'resume' | 'retire') {
   -d '{"gpus_healthy": 16, "utilization_pct": 42, "ecc_errors": 0}'</pre>
         </div>
         <div class="card">
-          <header class="card-head"><h2>Activation &amp; payouts</h2></header>
+          <header class="card-head"><h2>Activation &amp; terms</h2></header>
           <p class="small">
             New sources start <strong>pending</strong> and are activated by 1Trade after review. Automated GPU
             attestation is on the way.
           </p>
-          <p class="small">
-            Every GPU-second your sources serve is recorded against them (the GPU-hours above).
-            Payouts are computed from these records; the payout statement arrives with the payouts release.
+          <p v-if="terms" class="small mono">
+            <template v-for="(rate, tier) in terms.rates" :key="tier">{{ TIER[tier] ?? tier }} ${{ usd(rate) }}/GPU-h · </template>
+            fee {{ Number(terms.fee_percent) }}% · holdback {{ Number(terms.holdback_percent) }}% · dispute window {{ terms.dispute_days }} days
           </p>
+          <p v-else class="small dim">Your payout terms have not been set yet. Usage is recorded meanwhile and is paid once they are.</p>
+        </div>
+      </section>
+
+      <section class="card">
+        <header class="card-head"><h2>Payouts</h2><span class="dim">Statements are computed from the GPU time your sources served</span></header>
+        <p v-if="payoutError" class="banner neg" role="alert">{{ payoutError }}</p>
+        <div v-if="!statements.length" class="empty">No statements yet. 1Trade closes payout cycles monthly.</div>
+        <div v-else class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Period</th><th class="num">GPU-h</th><th class="num">Gross</th><th class="num">Fee</th>
+                <th class="num">Holdback</th><th class="num">Released</th><th>Status</th><th />
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="p in statements" :key="p.id">
+                <td class="mono small">{{ day(p.period_start) }} → {{ day(p.period_end) }}
+                  <div v-if="p.is_paper" class="small dim">Simulated — sandbox usage, no money moves</div>
+                </td>
+                <td class="num mono">{{ Number(p.gpu_hours).toFixed(2) }}</td>
+                <td class="num mono">${{ usd(p.gross) }}</td>
+                <td class="num mono">${{ usd(p.fee) }}</td>
+                <td class="num mono">${{ usd(p.holdback) }}</td>
+                <td class="num mono">${{ usd(p.released) }}</td>
+                <td>
+                  <span class="pill" :class="p.state === 'settled' ? 'pos' : p.state === 'disputed' ? 'warn' : 'dim'">{{ p.state }}</span>
+                  <div v-if="p.wire_reference" class="small dim mono">{{ p.wire_reference }}</div>
+                  <div v-if="p.state === 'disputed'" class="small dim">In review with 1Trade</div>
+                </td>
+                <td class="actions">
+                  <button v-if="disputable(p)" type="button" @click="raiseDispute(p)">Dispute</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </section>
     </main>

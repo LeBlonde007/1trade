@@ -25,6 +25,36 @@ export interface SourceUsage {
   by_tier: { gpu_type: string; gpu_seconds: string; units: string; sessions: number }[]
 }
 
+export interface PayoutLine { gpu_type: string; gpu_hours: string; rate: string; gross: string }
+
+export interface Payout {
+  id: string
+  period_start: string
+  period_end: string
+  currency: 'USD'
+  is_paper: boolean
+  gpu_hours: string
+  gross: string
+  fee: string
+  payout: string
+  holdback: string
+  released: string
+  usage_records: number
+  state: 'pending' | 'wired' | 'disputed' | 'settled'
+  wire_reference: string | null
+  dispute_until: string
+  dispute_reason: string | null
+  resolution: 'release' | 'withhold' | null
+  lines: PayoutLine[]
+}
+
+export interface Agreement {
+  rates: Record<string, string>
+  fee_percent: string
+  holdback_percent: string
+  dispute_days: number
+}
+
 export interface Registration {
   name: string
   gpu_type: 'gpu_h100' | 'gpu_h200'
@@ -71,5 +101,15 @@ export function useSupply() {
     return $fetch<SupplySource>('/api/supply/sources', { method: 'POST', body: reg, headers: { 'Idempotency-Key': key } })
   }
 
-  return { sources, loading, error, load, usage, act, register }
+  /** payouts fetches the partner's statements; agreement its terms (null until 1Trade sets them). */
+  const payouts = () => $fetch<{ data: Payout[] }>('/api/supply/payouts').then(r => r.data)
+  const agreement = () => $fetch<Agreement>('/api/supply/agreement').catch((e: any) => {
+    if (e?.statusCode === 404) return null
+    throw e
+  })
+  /** dispute raises a dispute on a statement inside its window. */
+  const dispute = (id: string, reason: string) =>
+    $fetch<Payout>(`/api/supply/payouts/${id}/dispute`, { method: 'POST', body: { reason } })
+
+  return { sources, loading, error, load, usage, act, register, payouts, agreement, dispute }
 }
