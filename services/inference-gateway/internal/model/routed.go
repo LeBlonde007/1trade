@@ -9,6 +9,10 @@ import (
 // ErrCapabilityUnavailable is returned when the routed backend can't serve a requested modality.
 var ErrCapabilityUnavailable = errors.New("the selected backend does not support this modality")
 
+// ErrModelCold means the model is served from a GPU pool (F11) but no replica is loaded right now. The
+// handler answers 503 with Retry-After rather than an opaque 500.
+var ErrModelCold = errors.New("model is not loaded on any GPU")
+
 // RoutedBackend dispatches each request to a per-model backend: model ids in OpenAIModels go to the
 // OpenAI backend (frontier image / vision / text), everything else to Default (the DigitalOcean
 // multimodal runtime). Video always uses Default — its poll/content steps key off an opaque job id (no

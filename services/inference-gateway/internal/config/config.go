@@ -24,11 +24,14 @@ type Config struct {
 	// OpenAI provider (optional): when OpenAIAPIKey is set, the models in OpenAIModelMap route to OpenAI
 	// (frontier image / vision / text) instead of the DO runtime; everything else stays on DO. Unset →
 	// the gateway uses the DO backend directly (no behaviour change). NEVER hardcode the key — from a Secret.
-	OpenAIAPIKey     string
-	OpenAIBaseURL    string            // default https://api.openai.com/v1
-	OpenAIModelMap   map[string]string // catalog-id → OpenAI model (e.g. {"gpt-image-1.5":"gpt-image-1"})
-	InferenceTimeout time.Duration     // model-call timeout (generation can take longer than control calls)
-	HTTPTimeout      time.Duration     // upstream HTTP client timeout
+	OpenAIAPIKey   string
+	OpenAIBaseURL  string            // default https://api.openai.com/v1
+	OpenAIModelMap map[string]string // catalog-id → OpenAI model (e.g. {"gpt-image-1.5":"gpt-image-1"})
+	// InferencePool (F11, optional) is the INFERENCE_POOL JSON: GPUs, measured model profiles and running
+	// replicas. When set, chat for the pooled models is spread across those runtime pods.
+	InferencePool    string
+	InferenceTimeout time.Duration // model-call timeout (generation can take longer than control calls)
+	HTTPTimeout      time.Duration // upstream HTTP client timeout
 }
 
 // Load reads configuration from the environment with sensible dev defaults.
@@ -48,6 +51,7 @@ func Load() Config {
 		OpenAIAPIKey:      os.Getenv("OPENAI_API_KEY"),
 		OpenAIBaseURL:     envOr("OPENAI_BASE_URL", "https://api.openai.com/v1"),
 		OpenAIModelMap:    openaiModelMap(os.Getenv("OPENAI_MODEL_MAP")),
+		InferencePool:     os.Getenv("INFERENCE_POOL"),
 		InferenceTimeout:  120 * time.Second,
 		HTTPTimeout:       5 * time.Second,
 	}

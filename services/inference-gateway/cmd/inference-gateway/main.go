@@ -13,6 +13,7 @@ import (
 	"github.com/trade1/inference-gateway/internal/ledger"
 	"github.com/trade1/inference-gateway/internal/model"
 	"github.com/trade1/inference-gateway/internal/obs"
+	"github.com/trade1/inference-gateway/internal/pool"
 )
 
 // Version is set at build time (-ldflags -X main.Version=...).
@@ -52,6 +53,35 @@ func main() {
 		}
 	} else {
 		slog.Info("inference backend: mock")
+	}
+
+	// F11 pool (optional): chat for pooled models is spread across several single-model runtime pods
+	// sharing GPUs. A bad spec (unmeasured model, overcommitted GPU, static model not running) stops the
+	// gateway at boot rather than serving from a pool that breaks the VRAM rules.
+	if cfg.InferencePool != "" {
+		spec, err := pool.ParseSpec(cfg.InferencePool)
+		if err == nil {
+			var p *pool.Backend
+			p, err = pool.New(spec, backend, func(url string) model.Backend {
+				return model.NewVLLMBackend(url, "", nil, cfg.InferenceTimeout)
+			})
+			if err == nil {
+				backend = p
+				// A non-empty model map gates servability; pooled models are served by raw id.
+				if len(cfg.InferenceModelMap) > 0 {
+					for _, id := range p.Models() {
+						if _, ok := cfg.InferenceModelMap[id]; !ok {
+							cfg.InferenceModelMap[id] = id
+						}
+					}
+				}
+				slog.Info("inference pool enabled", "gpus", len(spec.GPUs), "models", len(spec.Profiles), "replicas", len(spec.Replicas))
+			}
+		}
+		if err != nil {
+			slog.Error("inference pool", "err", err)
+			os.Exit(1)
+		}
 	}
 
 	// Pre-flight credit guard — only when a JWT secret is configured (it mints the tenant token the

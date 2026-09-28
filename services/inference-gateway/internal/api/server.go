@@ -7,6 +7,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -160,6 +161,11 @@ func (s *Server) chatCompletions(w http.ResponseWriter, r *http.Request) {
 
 	start := time.Now()
 	res, err := s.backend.Chat(r.Context(), model.ChatRequest{Model: req.Model, Messages: msgs, MaxTokens: req.MaxTokens})
+	if errors.Is(err, model.ErrModelCold) {
+		w.Header().Set("Retry-After", "30")
+		writeErr(w, http.StatusServiceUnavailable, "model_loading", req.Model+" is not loaded right now; retry shortly")
+		return
+	}
 	if err != nil {
 		serverError(w, err)
 		return

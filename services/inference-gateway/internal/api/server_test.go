@@ -204,3 +204,44 @@ func TestChatStreaming(t *testing.T) {
 		t.Fatalf("SSE body missing chunks/DONE: %s", b)
 	}
 }
+
+// coldBackend reports every model as not loaded (an F11 pool with no warm replica).
+type coldBackend struct{}
+
+// Chat always fails with ErrModelCold.
+func (coldBackend) Chat(_ context.Context, _ model.ChatRequest) (model.ChatResult, error) {
+	return model.ChatResult{}, model.ErrModelCold
+}
+
+// TestChatModelCold: a pooled model with no replica is an honest 503 + Retry-After, and nothing is
+// metered (the customer was not served, so the ledger must not debit).
+func TestChatModelCold(t *testing.T) {
+	pub := &capturePub{}
+	cfg := config.Config{Env: "dev", JWTSecret: testSecret, HTTPTimeout: time.Second}
+	srv := httptest.NewServer(api.New(cfg, coldBackend{}, pub, nil))
+	defer srv.Close()
+	body, _ := json.Marshal(map[string]any{
+		"model": "llama-3.1-8b", "messages": []map[string]string{{"role": "user", "content": "hi"}},
+	})
+	req, _ := http.NewRequest("POST", srv.URL+"/v1/chat/completions", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+signJWT(t, "tenant-abc"))
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var out struct {
+		Code string `json:"code"`
+	}
+	_ = json.NewDecoder(resp.Body).Decode(&out)
+	if resp.StatusCode != http.StatusServiceUnavailable || resp.Header.Get("Retry-After") == "" || out.Code != "model_loading" {
+		t.Fatalf("status %d retry-after %q code %q", resp.StatusCode, resp.Header.Get("Retry-After"), out.Code)
+	}
+	time.Sleep(50 * time.Millisecond)
+	pub.mu.Lock()
+	n := len(pub.events)
+	pub.mu.Unlock()
+	if n != 0 {
+		t.Fatalf("a cold request was metered: %d events", n)
+	}
+}

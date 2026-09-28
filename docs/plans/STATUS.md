@@ -76,7 +76,7 @@ Last updated: 2026-06-04.
 │                                inference real credit cost + session meter (v0.2.7); settings · API
 │                                keys live (v0.2.8); persona-scoped nav + onboarding (v0.2.9–v0.2.10).
 │
-├── 🟩 M3+ — ✅ F13 GPU lifecycle (v0.3.0) · ⬜ F10 catalog · F11 packing · F14 reserved · F15 clusters
+├── 🟩 M3+ — ✅ F13 GPU lifecycle (v0.3.0) · ⬜ F10 catalog · 🟨 F11 packing (routing + pool built; load path F12) · F14 reserved · F15 clusters
 │        · F16 supply abstraction · F17 DC onboarding · F18 payouts · F19 attestation
 │
 ├── 🟩 F23 Console v1.5 screens (~45%) — live, honest, no-mock screens shipped v0.3.1–v0.3.12:
@@ -135,7 +135,8 @@ F01 hardening), v0.3.0 (M3 — F13), v0.3.1→v0.3.12 (M3 — live AI-company pr
    v0.2.14). Remaining: observability (`OBS=1` Prometheus/Loki/Tempo + per-service `/metrics`; tasks
    #3/#13), SOPS secrets, real-env clusters, CI green (wire `make test-e2e` into the pre-staging gate).
    Prod-hardening before paying customers (M3).
-2. **M3 continues — F11 multi-model-per-GPU packing, F10 full catalog, F14 reserved capacity, F16
+2. **M3 continues — F11 multi-model-per-GPU packing (🟨 placement/routing/pool built + tested; process
+   load/unload waits on F12, MIG not started), F10 full catalog, F14 reserved capacity, F16
    supply abstraction.** ✅ **F13 GPU instance lifecycle done** (v0.3.0). The real Kueue+Volcano
    provisioner behind F13's instance manager (same interface) + <90s-P95 timing remain GPU-node-gated.
 3. **M3 provisioning (your side)** — Stripe + domain/Cloudflare + registry + GPU node + HF token +

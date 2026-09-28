@@ -49,3 +49,53 @@ Routing rules:
 ## Milestone
 
 - M3 (Gate 3): packing in production.
+
+## Build status (2026-09-28)
+
+**Built and tested: placement, routing and gateway wiring.** Not built: process load/unload (F12), MIG,
+and anything measured on real GPUs.
+
+On this stack one runtime process serves one model (`services/inference-runtime`). So "several models
+per GPU" means several single-model processes sharing a GPU's memory. The gateway decides placement
+and routing. Starting and stopping processes belongs to the compute control plane (F12).
+
+- **`internal/routing`** (pure, no I/O):
+  - `Plan` pins static models, largest first, each on the GPU where it fits most tightly (best-fit
+    decreasing). It fails if any static model can't be placed.
+  - The `Router` tracks live replicas. For a warm model it routes to the replica with the fewest
+    requests in flight, then the least recently used one.
+  - For a cold model it returns a load plan: the tightest GPU with free room. Failing that, it picks
+    the GPU needing the fewest evictions, evicting least recently used first.
+  - VRAM rules:
+    - every decision uses measured peak VRAM (`measured_at` required; an unmeasured model is refused);
+    - every GPU keeps `headroom_ppm` free (default 5%);
+    - a registration that would overcommit a GPU is refused.
+  - Anti-thrash: a replica is never evicted if it is static, has requests in flight, or is younger than
+    `min_residency` (default 2 min).
+- **`internal/pool`** plus the `INFERENCE_POOL` env (JSON: `gpus`, `profiles`, `replicas`,
+  `headroom_ppm`, `min_residency`; unknown fields are rejected).
+  - Chat for pooled models is spread across the runtime pods. Other models and modalities use the
+    existing backend.
+  - A pooled model with no warm replica answers **503 `model_loading` with `Retry-After`**. It is not
+    metered, and the load plan is logged for F12.
+  - The gateway **refuses to boot** if the spec breaks a VRAM rule, or if a static model has no running
+    replica.
+- **Tests** (`go test -race ./internal/routing/ ./internal/pool/ ./internal/api/`):
+  - packing and headroom, including 500 random fleets that never overcommit;
+  - refusal of unmeasured models;
+  - each eviction protection, the least-recently-used victim, and the fewest-victims choice;
+  - 10 minutes of alternating demand for one slot: at most one swap per `min_residency`;
+  - concurrent routing under `-race`;
+  - real HTTP pods: 8 held requests split 4/4, with in-flight counts draining to zero.
+
+  Mutation-checked: removing the static, in-flight or residency guard, reversing the eviction order,
+  dropping headroom, or switching to worst-fit each fails a test.
+
+### Acceptance status
+
+- [~] Top-3 models always available: static models are pinned and the gateway won't boot without them.
+  Cold-start latency is not measured yet (needs GPUs).
+- [~] No thrashing: proven in simulation; the real load path waits on F12's loader.
+- [~] Headroom above 5%: enforced on measured profiles. Profiles must come from real runs under load.
+- [ ] Unit economics: needs production traffic.
+- [ ] MIG for video: not started.
