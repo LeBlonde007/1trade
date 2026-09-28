@@ -70,6 +70,7 @@ func main() {
 				return model.NewVLLMBackend(url, "", nil, cfg.InferenceTimeout)
 			})
 			if err == nil {
+				defer p.Close() // stop runtime processes the pool started
 				backend = p
 				// A non-empty model map gates servability; pooled models are served by raw id.
 				if len(cfg.InferenceModelMap) > 0 {

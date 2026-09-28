@@ -52,8 +52,8 @@ Routing rules:
 
 ## Build status (2026-09-28)
 
-**Built and tested: placement, routing and gateway wiring.** Not built: process load/unload (F12), MIG,
-and anything measured on real GPUs.
+**Built and tested: placement, routing, gateway wiring, and (2026-09-28, below) the load/unload path.**
+Not built: MIG, and anything measured on real GPUs.
 
 On this stack one runtime process serves one model (`services/inference-runtime`). So "several models
 per GPU" means several single-model processes sharing a GPU's memory. The gateway decides placement
@@ -91,11 +91,52 @@ and routing. Starting and stopping processes belongs to the compute control plan
   Mutation-checked: removing the static, in-flight or residency guard, reversing the eviction order,
   dropping headroom, or switching to worst-fit each fails a test.
 
+### Load / unload path (2026-09-28)
+
+- **Router:** `BeginLoad` commits a load plan under the lock. It claims the new model's VRAM (a
+  `Loading` replica that takes no requests) and marks the eviction victims `Draining` (no new requests).
+  One load per model runs at a time (`ErrLoading`). `FinishLoad`, `AbortLoad` (releases the claimed
+  VRAM) and `Undrain` (a victim that could not be stopped goes back into service) complete it. A route
+  to a model whose load is underway says so rather than planning another.
+- **`Loader` interface; `ProcessLoader`** starts each replica as a real process (vLLM, or the CPU stub
+  in dev):
+  - argv with `{model}` `{port}` `{gpu}` `{device}`, no shell, and `MODEL_ID` / `PORT` /
+    `CUDA_VISIBLE_DEVICES`;
+  - waits for `/readyz` (`ready_timeout`), and kills a process that exits or times out while loading;
+  - unloads with SIGTERM, then SIGKILL after 10 s;
+  - reports a process that dies unexpectedly, and the pool stops routing to it.
+- **Pool:**
+  - a request for a cold pooled model starts the load (single-flight) and waits up to `load_wait`,
+    then is served; otherwise it gets 503 `model_loading` while the load continues in the background;
+  - victims are stopped before the new model starts;
+  - static models missing at boot are loaded before the gateway serves (largest first), or the
+    gateway refuses to start;
+  - processes are stopped on shutdown.
+- **Cold-start latency is measured:** `inference_model_load_seconds` (histogram) is recorded, alongside
+  `inference_model_loads_total{result}` and `inference_model_evictions_total`, and each load logs
+  `cold_start_ms`. With the CPU stub runtime a load takes about 0.2 s; real vLLM numbers need GPUs.
+- **Config** (`INFERENCE_POOL`): `"loader": {"kind": "process", "command": [...], "ready_timeout":
+  "10m"}`, `"load_wait": "30s"`, and a per-GPU `"device"`. On Kubernetes the same `Loader` interface
+  is backed by the compute control plane.
+- **Tests** (`-race`):
+  - real runtime processes: load, serve, unload (the process is gone); a crash is reported; a command
+    that exits fails fast;
+  - hot swap with real processes: the static model starts at boot; a cold tail model loads and
+    serves; a second tail model evicts the first, whose process stops;
+  - 8 concurrent cold requests start exactly 1 load and are all served;
+  - `load_wait` 0 answers cold and loads in the background;
+  - a failed load releases its VRAM; a failed eviction abandons the load and the victim serves again;
+  - draining and loading replicas take no requests.
+
+  Mutation-checked: 14 mutations, all caught.
+
 ### Acceptance status
 
-- [~] Top-3 models always available: static models are pinned and the gateway won't boot without them.
-  Cold-start latency is not measured yet (needs GPUs).
-- [~] No thrashing: proven in simulation; the real load path waits on F12's loader.
+- [~] Top-3 models always available: static models are pinned, loaded at boot, and the gateway won't
+  serve without them. Cold-start latency is now measured (`inference_model_load_seconds`); the real
+  figure needs GPUs.
+- [x] No thrashing: proven in simulation and on the real load path (residency, static, in-flight and
+  draining guards; single-flight loads).
 - [~] Headroom above 5%: enforced on measured profiles. Profiles must come from real runs under load.
 - [ ] Unit economics: needs production traffic.
 - [ ] MIG for video: not started.

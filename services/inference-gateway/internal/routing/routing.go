@@ -27,6 +27,8 @@ var (
 	ErrUnknownModel = errors.New("routing: model has no profile")
 	ErrNoCapacity   = errors.New("routing: no GPU can host the model without evicting protected replicas")
 	ErrDoesNotFit   = errors.New("routing: model is larger than any GPU's usable VRAM")
+	ErrLoading      = errors.New("routing: model is already being loaded")
+	ErrWarm         = errors.New("routing: model already has a live replica")
 )
 
 // GPU is one GPU (or MIG slice) that runtime processes can share.
@@ -55,7 +57,14 @@ type Replica struct {
 	LoadedAt time.Time
 	LastUsed time.Time
 	Inflight int
+	// Loading: the process is starting; its VRAM is claimed but it takes no requests yet.
+	Loading bool
+	// Draining: chosen for eviction; it takes no new requests and is about to be stopped.
+	Draining bool
 }
+
+// routable reports whether a replica may take a request.
+func (rep *Replica) routable() bool { return !rep.Loading && !rep.Draining }
 
 // Config tunes packing and eviction.
 type Config struct {
@@ -122,6 +131,8 @@ type Decision struct {
 	// Otherwise the model must be loaded on LoadGPU after evicting Evict (tail replicas, LRU first).
 	LoadGPU string
 	Evict   []Replica
+	// Loading is set when a load of this model is already underway: wait, do not plan another.
+	Loading bool
 }
 
 // Router tracks the live replicas and routes requests. Safe for concurrent use.
@@ -186,12 +197,13 @@ func (r *Router) Loaded(model, gpu, url string) error {
 	return nil
 }
 
-// Unloaded removes a replica (evicted, or its process died).
+// Unloaded removes a live or draining replica (evicted, or its process died). A load in progress is
+// not touched: that is AbortLoad.
 func (r *Router) Unloaded(model, gpu string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	for i, rep := range r.replicas {
-		if rep.Model == model && rep.GPU == gpu {
+		if rep.Model == model && rep.GPU == gpu && !rep.Loading {
 			r.replicas = append(r.replicas[:i], r.replicas[i+1:]...)
 			return
 		}
@@ -209,8 +221,15 @@ func (r *Router) Route(model string) (Decision, error) {
 		return Decision{}, fmt.Errorf("%w: %s", ErrUnknownModel, model)
 	}
 	var best *Replica
+	loading := false
 	for _, rep := range r.replicas {
 		if rep.Model != model {
+			continue
+		}
+		if rep.Loading {
+			loading = true
+		}
+		if !rep.routable() {
 			continue
 		}
 		if best == nil || rep.Inflight < best.Inflight || (rep.Inflight == best.Inflight && rep.LastUsed.Before(best.LastUsed)) {
@@ -222,6 +241,9 @@ func (r *Router) Route(model string) (Decision, error) {
 		best.LastUsed = r.now()
 		cp := *best
 		return Decision{Replica: &cp}, nil
+	}
+	if loading {
+		return Decision{Loading: true}, nil
 	}
 	if p.MeasuredAt.IsZero() || p.PeakVRAMMiB <= 0 {
 		return Decision{}, fmt.Errorf("%w: %s", ErrUnmeasured, model)
@@ -265,7 +287,7 @@ func (r *Router) planLoad(p Profile) (Decision, error) {
 	for _, id := range ids {
 		var cands []*Replica
 		for _, rep := range r.replicas {
-			if rep.GPU == id && !rep.Static && rep.Inflight == 0 && now.Sub(rep.LoadedAt) >= r.cfg.MinResidency {
+			if rep.GPU == id && rep.routable() && !rep.Static && rep.Inflight == 0 && now.Sub(rep.LoadedAt) >= r.cfg.MinResidency {
 				cands = append(cands, rep)
 			}
 		}
@@ -291,6 +313,91 @@ func (r *Router) planLoad(p Profile) (Decision, error) {
 		return Decision{}, fmt.Errorf("%w: %s", ErrNoCapacity, p.Model)
 	}
 	return Decision{LoadGPU: best.gpu, Evict: best.evict}, nil
+}
+
+// Load is a planned load: start Model on GPU once Evict have been stopped.
+type Load struct {
+	Model string
+	GPU   string
+	Evict []Replica
+}
+
+// BeginLoad plans a load of a cold model and commits to it: the new model's VRAM is claimed on the
+// chosen GPU (a Loading replica that takes no requests), and the eviction victims are set Draining so
+// no new request lands on them. Only one load per model runs at a time (ErrLoading). The caller stops
+// the victims (Unloaded, or Undrain if that fails), starts the process, then calls FinishLoad — or
+// AbortLoad if it could not.
+func (r *Router) BeginLoad(model string) (Load, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	p, ok := r.profiles[model]
+	if !ok {
+		return Load{}, fmt.Errorf("%w: %s", ErrUnknownModel, model)
+	}
+	for _, rep := range r.replicas {
+		if rep.Model != model {
+			continue
+		}
+		if rep.Loading {
+			return Load{}, ErrLoading
+		}
+		if rep.routable() {
+			return Load{}, ErrWarm
+		}
+	}
+	if p.MeasuredAt.IsZero() || p.PeakVRAMMiB <= 0 {
+		return Load{}, fmt.Errorf("%w: %s", ErrUnmeasured, model)
+	}
+	d, err := r.planLoad(p)
+	if err != nil {
+		return Load{}, err
+	}
+	for _, v := range d.Evict {
+		for _, rep := range r.replicas {
+			if rep.Model == v.Model && rep.GPU == v.GPU {
+				rep.Draining = true
+			}
+		}
+	}
+	t := r.now()
+	r.replicas = append(r.replicas, &Replica{Model: model, GPU: d.LoadGPU, Static: p.Static, LoadedAt: t, LastUsed: t, Loading: true})
+	return Load{Model: model, GPU: d.LoadGPU, Evict: d.Evict}, nil
+}
+
+// FinishLoad makes a loading replica live at url.
+func (r *Router) FinishLoad(model, gpu, url string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, rep := range r.replicas {
+		if rep.Model == model && rep.GPU == gpu && rep.Loading {
+			t := r.now()
+			rep.Loading, rep.URL, rep.LoadedAt, rep.LastUsed = false, url, t, t
+			return
+		}
+	}
+}
+
+// AbortLoad drops a load that failed, releasing the VRAM it claimed.
+func (r *Router) AbortLoad(model, gpu string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for i, rep := range r.replicas {
+		if rep.Model == model && rep.GPU == gpu && rep.Loading {
+			r.replicas = append(r.replicas[:i], r.replicas[i+1:]...)
+			return
+		}
+	}
+}
+
+// Undrain puts a replica chosen for eviction back into service (its process could not be stopped).
+func (r *Router) Undrain(model, gpu string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, rep := range r.replicas {
+		if rep.Model == model && rep.GPU == gpu {
+			rep.Draining = false
+		}
+	}
 }
 
 // Done ends a request on a replica (decrements its in-flight count).

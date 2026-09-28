@@ -31,3 +31,23 @@ func RecordInference(model, modality string, inputTokens, outputTokens int) {
 		TokensTotal.WithLabelValues(model, "output").Add(float64(outputTokens))
 	}
 }
+
+// ModelLoadSeconds is how long a pooled model took to become ready after a cold start (F11) — the
+// measured cold-start latency.
+var ModelLoadSeconds = promauto.NewHistogramVec(prometheus.HistogramOpts{
+	Name:    "inference_model_load_seconds",
+	Help:    "Time from starting a pooled model's runtime process to it answering ready.",
+	Buckets: []float64{0.5, 1, 2, 5, 10, 20, 30, 60, 120, 300, 600},
+}, []string{"model"})
+
+// ModelLoadsTotal counts pooled model loads by outcome (ok | failed).
+var ModelLoadsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+	Name: "inference_model_loads_total",
+	Help: "Pooled model loads, by model and outcome.",
+}, []string{"model", "result"})
+
+// ModelEvictionsTotal counts replicas stopped to make room for another model.
+var ModelEvictionsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+	Name: "inference_model_evictions_total",
+	Help: "Pooled model replicas evicted to make room, by model.",
+}, []string{"model"})
