@@ -171,3 +171,16 @@ Settlement can no longer fail for lack of funds when the engine reserves at orde
 - **Mutation-checked:** without the row lock, 20 of 20 reserves are granted and `locked` is
   corrupted. Without the application check, the DB CHECK still refuses the overspend.
 
+
+**credit.yaml v1.3: reservation reconciliation (2026-09-28).**
+- `GET /v1/credits/reservations`: open reservations at least `min_age_seconds` old (ledger clock),
+  in order_id order, keyset-paginated. Only the engine's settle token may call it. Migration
+  `0005` adds a partial index on open reservations.
+- A replay of a released reservation is `409 RESERVATION_CLOSED` (it used to be a 200 carrying the
+  released state). Nothing is re-locked.
+- `/release` takes an optional `reason` (`order_closed` | `orphaned`), stored on the release audit
+  event.
+- Tests against Postgres cover: the closed replay; the audited reason and refusal of unknown reasons;
+  keyset pages that neither skip nor repeat; the age filter; auth (shared and tenant tokens refused);
+  and every bad parameter. Mutation-checked: replay allowed, age ignored, cursor skipping a row,
+  listing without auth, and the reason not stored all fail a test.

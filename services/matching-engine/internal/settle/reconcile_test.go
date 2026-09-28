@@ -6,10 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"sort"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -30,6 +33,7 @@ type httpLedger struct {
 	// that fires after the ledger's commit. failRelease makes that many releases answer 503 unapplied.
 	commitThenFail int
 	failRelease    int
+	reasons        map[string]string // order_id → release reason (the audit record)
 }
 
 // heldRes is one reservation.
@@ -41,7 +45,7 @@ type heldRes struct {
 // newHTTPLedger starts a fake ledger that closes with the test.
 func newHTTPLedger(t *testing.T) *httpLedger {
 	t.Helper()
-	f := &httpLedger{res: map[string]*heldRes{}}
+	f := &httpLedger{res: map[string]*heldRes{}, reasons: map[string]string{}}
 	f.Server = httptest.NewServer(http.HandlerFunc(f.serve))
 	t.Cleanup(f.Close)
 	return f
@@ -56,15 +60,43 @@ func (f *httpLedger) serve(w http.ResponseWriter, r *http.Request) {
 		Asset     string `json:"asset"`
 		Amount    string `json:"amount"`
 	}
-	_ = json.NewDecoder(r.Body).Decode(&b)
+	var rel struct {
+		Reason string `json:"reason"`
+	}
+	raw, _ := io.ReadAll(r.Body)
+	_ = json.Unmarshal(raw, &b)
+	_ = json.Unmarshal(raw, &rel)
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	switch r.URL.Path {
+	case "/v1/credits/reservations": // v1.3 listing: open only, order_id order, keyset pages of `limit`
+		var ids []string
+		for id, x := range f.res {
+			if x.open && id > r.URL.Query().Get("after") {
+				ids = append(ids, id)
+			}
+		}
+		sort.Strings(ids)
+		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+		var next any
+		if len(ids) > limit {
+			ids, next = ids[:limit], ids[limit-1]
+		}
+		data := []map[string]any{}
+		for _, id := range ids {
+			data = append(data, map[string]any{"order_id": id, "tenant_id": f.res[id].tenant, "is_paper": true, "state": "open"})
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"data": data, "next_cursor": next})
 	case "/v1/credits/reserve":
 		if x, ok := f.res[b.OrderID]; ok {
 			if x.tenant != b.TenantID || x.kind != b.AssetKind || x.asset != b.Asset || x.amount != b.Amount {
 				w.WriteHeader(http.StatusConflict)
 				_, _ = w.Write([]byte(`{"code":"IDEMPOTENCY_CONFLICT"}`))
+				return
+			}
+			if !x.open { // v1.3: a released reservation is spent
+				w.WriteHeader(http.StatusConflict)
+				_, _ = w.Write([]byte(`{"code":"RESERVATION_CLOSED"}`))
 				return
 			}
 			writeHeldRes(w, b.OrderID, x)
@@ -90,6 +122,9 @@ func (f *httpLedger) serve(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte(`{"code":"not_found"}`))
 			return
 		}
+		if x.open {
+			f.reasons[b.OrderID] = rel.Reason
+		}
 		x.open = false
 		writeHeldRes(w, b.OrderID, x)
 	case "/v1/credits/settle-trade":
@@ -107,6 +142,13 @@ func writeHeldRes(w http.ResponseWriter, id string, x *heldRes) {
 	}
 	_ = json.NewEncoder(w).Encode(map[string]any{"order_id": id, "tenant_id": x.tenant, "sub_account_id": nil,
 		"asset_kind": x.kind, "asset": x.asset, "amount": x.amount, "remaining": remaining, "state": state, "is_paper": true})
+}
+
+// reasonFor returns the reason recorded when an order_id's reservation was released.
+func (f *httpLedger) reasonFor(id string) string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.reasons[id]
 }
 
 // isOpen reports whether an order_id has an open reservation.
@@ -212,6 +254,9 @@ func TestReconcilerVoidsAndReleasesAnOrphan(t *testing.T) {
 	if rg.led.isOpen("o1") || rg.rec.Pending() != 0 {
 		t.Fatalf("reservation open=%v, pending=%d", rg.led.isOpen("o1"), rg.rec.Pending())
 	}
+	if got := rg.led.reasonFor("o1"); got != ReleaseOrphaned {
+		t.Fatalf("release audit reason = %q, want orphaned", got)
+	}
 	j := rg.e.Journal()
 	if len(j) != 1 || j[0].Void == nil || j[0].Void.OrderID != "o1" || !j[0].Void.IsPaper {
 		t.Fatalf("journal = %+v, want exactly the void", j)
@@ -231,6 +276,60 @@ func TestSuspectKeepsTheFirstReport(t *testing.T) {
 	rg.advance(time.Second)
 	if rep := rg.rec.RunOnce(context.Background()); rep != (Report{Voided: 1, Released: 1}) {
 		t.Fatalf("a repeat report restarted the grace period: %+v", rep)
+	}
+}
+
+// TestSweepFindsAnOrphanLostInACrash: the process died after the failed journal write, so no suspect
+// survives. The ledger's listing (credit.yaml v1.3) finds the orphan; the reservation backing a live
+// order is listed too and left alone.
+func TestSweepFindsAnOrphanLostInACrash(t *testing.T) {
+	rg := newRig(t)
+	rg.orphan(t, "o1", "t1")
+	if r, err := rg.e.Submit(sell("o2", "t2", "1", rg.clock())); err != nil || r.Order.State != engine.Accepted {
+		t.Fatalf("live order: %+v %v", r, err)
+	}
+	// "Restart": the engine's journal is intact, the reconciler's memory is gone.
+	fresh := &Reconciler{Engine: rg.e, Ledger: rg.c, Now: rg.clock}
+	if n, err := fresh.Sweep(context.Background(), rg.c, 0); err != nil || n != 2 {
+		t.Fatalf("sweep queued %d (%v), want both open reservations", n, err)
+	}
+	if rep := fresh.RunOnce(context.Background()); rep != (Report{Voided: 1, Released: 1, Kept: 1}) {
+		t.Fatalf("report = %+v", rep)
+	}
+	if rg.led.isOpen("o1") || !rg.led.isOpen("o2") || rg.led.reasonFor("o1") != ReleaseOrphaned {
+		t.Fatalf("o1 open=%v (reason %q), o2 open=%v", rg.led.isOpen("o1"), rg.led.reasonFor("o1"), rg.led.isOpen("o2"))
+	}
+}
+
+// pagedLister serves fixed pages and records the cursors it was asked for.
+type pagedLister struct {
+	pages  [][]OpenReservation
+	afters []string
+}
+
+// ListOpenReservations returns the next page; next is the page's last id unless it is the final one.
+func (p *pagedLister) ListOpenReservations(_ context.Context, _ time.Duration, after string, _ int) ([]OpenReservation, string, error) {
+	p.afters = append(p.afters, after)
+	i := len(p.afters) - 1
+	next := ""
+	if i < len(p.pages)-1 {
+		next = p.pages[i][len(p.pages[i])-1].OrderID
+	}
+	return p.pages[i], next, nil
+}
+
+// TestSweepFollowsTheCursor: every page is read, each with the previous page's cursor.
+func TestSweepFollowsTheCursor(t *testing.T) {
+	l := &pagedLister{pages: [][]OpenReservation{{{OrderID: "a"}, {OrderID: "b"}}, {{OrderID: "c"}, {OrderID: "d"}}, {{OrderID: "e"}}}}
+	rec := &Reconciler{}
+	if n, err := rec.Sweep(context.Background(), l, time.Minute); err != nil || n != 5 || rec.Pending() != 5 {
+		t.Fatalf("queued %d, pending %d, %v", n, rec.Pending(), err)
+	}
+	if fmt.Sprint(l.afters) != "[ b d]" {
+		t.Fatalf("cursors = %q", l.afters)
+	}
+	if n, _ := (&Reconciler{suspects: rec.suspects}).Sweep(context.Background(), &pagedLister{pages: [][]OpenReservation{{{OrderID: "a"}}}}, 0); n != 0 {
+		t.Fatalf("a repeat sweep re-queued %d known suspects", n)
 	}
 }
 
@@ -335,6 +434,9 @@ func TestReconcilerReleasesARejectedRetry(t *testing.T) {
 	rg.advance(time.Minute)
 	if rep := rg.rec.RunOnce(context.Background()); rep != (Report{Released: 1}) || rg.led.isOpen("o1") {
 		t.Fatalf("report = %+v, open=%v", rep, rg.led.isOpen("o1"))
+	}
+	if got := rg.led.reasonFor("o1"); got != ReleaseOrderClosed {
+		t.Fatalf("release audit reason = %q, want order_closed (the order was rejected, not orphaned)", got)
 	}
 }
 
@@ -501,6 +603,14 @@ func stress(t *testing.T, seed int64) {
 	flaky.Store(false)
 	stop()
 	<-recDone
+	if seed%2 == 0 {
+		// Even seeds "crash": every in-memory suspect is lost, and only the ledger's listing can find
+		// the orphans (credit.yaml v1.3).
+		rec = &Reconciler{Engine: e, Ledger: c}
+		if _, err := rec.Sweep(context.Background(), c, 0); err != nil {
+			t.Fatal(err)
+		}
+	}
 	rec.Grace, rec.Now = time.Nanosecond, func() time.Time { return time.Now().Add(time.Hour) }
 	for i := 0; rec.Pending() > 0; i++ {
 		if i > 10 {
@@ -670,6 +780,31 @@ func TestReconcilerAgainstRealLedger(t *testing.T) {
 	now = now.Add(time.Minute)
 	if rep := rec.RunOnce(context.Background()); rep != (Report{Kept: 1}) || locked() != "2.000000" {
 		t.Fatalf("retried order: %+v, locked %s (want 2 still reserved)", rep, locked())
+	}
+
+	// A crash-lost orphan: the reserve landed, the journal refused, and the process "died" before
+	// any reconciler pass. A fresh reconciler finds it through the real ledger's listing (v1.3) and
+	// leaves y — listed too, but live — alone.
+	z := id(12)
+	down.Store(true)
+	if _, err := e.Submit(sell(z, seller, "1", now)); !errors.Is(err, engine.ErrJournal) {
+		t.Fatal(err)
+	}
+	down.Store(false)
+	if got := locked(); got != "3.000000" {
+		t.Fatalf("locked with y + orphan z = %s, want 3", got)
+	}
+	fresh := &Reconciler{Engine: e, Ledger: c, Now: func() time.Time { return now }}
+	if _, err := fresh.Sweep(context.Background(), c, 0); err != nil {
+		t.Fatal(err)
+	}
+	fresh.RunOnce(context.Background())
+	if got := locked(); got != "2.000000" {
+		t.Fatalf("locked after the sweep = %s, want 2 (orphan z freed, live y kept)", got)
+	}
+	if code := call(http.MethodPost, "/v1/credits/reserve", map[string]string{"Authorization": "Bearer " + settleTok, "Idempotency-Key": z},
+		map[string]any{"order_id": z, "tenant_id": seller, "sub_account_id": nil, "asset_kind": "credit", "asset": "gpu_h100", "amount": "1.000000", "is_paper": true}, nil); code != http.StatusConflict {
+		t.Fatalf("replay of the swept reservation = %d, want 409 RESERVATION_CLOSED", code)
 	}
 
 	// Close it the normal way: cancel, and the worker releases on the terminal event.

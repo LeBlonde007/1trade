@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -22,6 +24,7 @@ type reservationDTO struct {
 	Remaining    string  `json:"remaining"`
 	State        string  `json:"state"`
 	IsPaper      bool    `json:"is_paper"`
+	CreatedAt    string  `json:"created_at"`
 }
 
 // toReservationDTO maps a store reservation to its contract shape.
@@ -29,6 +32,7 @@ func toReservationDTO(r store.Reservation) reservationDTO {
 	return reservationDTO{
 		OrderID: r.OrderID, TenantID: r.TenantID, SubAccountID: strOrNil(r.SubAccountID), AssetKind: r.AssetKind,
 		Asset: r.Asset, Amount: r.Amount.String(), Remaining: r.Remaining.String(), State: r.State, IsPaper: true,
+		CreatedAt: r.CreatedAt.UTC().Format(time.RFC3339Nano),
 	}
 }
 
@@ -91,6 +95,8 @@ func (s *Server) reserve(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusPaymentRequired, "INSUFFICIENT_CASH", "not enough available cash to reserve")
 	case errors.Is(err, store.ErrReserveConflict):
 		writeErr(w, http.StatusConflict, "IDEMPOTENCY_CONFLICT", "order already reserved with a different body")
+	case errors.Is(err, store.ErrReservationClosed):
+		writeErr(w, http.StatusConflict, "RESERVATION_CLOSED", "this order_id's reservation is already released; use a new order_id")
 	case errors.Is(err, store.ErrBadAsset):
 		writeErr(w, http.StatusUnprocessableEntity, "bad_request", "unknown asset for this asset kind")
 	case err != nil:
@@ -108,6 +114,7 @@ func (s *Server) release(w http.ResponseWriter, r *http.Request) {
 	}
 	var b struct {
 		OrderID string `json:"order_id"`
+		Reason  string `json:"reason"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&b); err != nil {
 		writeErr(w, http.StatusBadRequest, "bad_request", "invalid JSON body")
@@ -117,7 +124,11 @@ func (s *Server) release(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusUnprocessableEntity, "bad_request", "order_id must be a uuid")
 		return
 	}
-	res, err := s.st.Release(r.Context(), b.OrderID)
+	if b.Reason != "" && b.Reason != store.ReleaseOrderClosed && b.Reason != store.ReleaseOrphaned {
+		writeErr(w, http.StatusUnprocessableEntity, "bad_request", "reason must be order_closed or orphaned")
+		return
+	}
+	res, err := s.st.Release(r.Context(), b.OrderID, b.Reason)
 	switch {
 	case errors.Is(err, store.ErrNoReservation):
 		writeErr(w, http.StatusNotFound, "not_found", "no reservation for this order")
@@ -126,4 +137,58 @@ func (s *Server) release(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeJSON(w, http.StatusOK, toReservationDTO(res))
 	}
+}
+
+// reservationPage is the ReservationPage wire shape (credit.yaml v1.3).
+type reservationPage struct {
+	Data       []reservationDTO `json:"data"`
+	NextCursor *string          `json:"next_cursor"`
+}
+
+// listReservations pages through open reservations for the engine's reconciler (internal,
+// matching-engine only, credit.yaml v1.3).
+func (s *Server) listReservations(w http.ResponseWriter, r *http.Request) {
+	if err := settlePrincipal(s.cfg, r); err != nil {
+		writeErr(w, http.StatusForbidden, "forbidden", "reservations are restricted to the matching engine")
+		return
+	}
+	q := r.URL.Query()
+	if q.Get("state") != "open" {
+		writeErr(w, http.StatusUnprocessableEntity, "bad_request", "state=open is required")
+		return
+	}
+	minAge, limit := 0, 100
+	var err error
+	if v := q.Get("min_age_seconds"); v != "" {
+		if minAge, err = strconv.Atoi(v); err != nil || minAge < 0 || minAge > 604800 {
+			writeErr(w, http.StatusUnprocessableEntity, "bad_request", "min_age_seconds must be 0..604800")
+			return
+		}
+	}
+	if v := q.Get("limit"); v != "" {
+		if limit, err = strconv.Atoi(v); err != nil || limit < 1 || limit > 500 {
+			writeErr(w, http.StatusUnprocessableEntity, "bad_request", "limit must be 1..500")
+			return
+		}
+	}
+	after := q.Get("after")
+	if after != "" {
+		if _, err := uuid.Parse(after); err != nil {
+			writeErr(w, http.StatusUnprocessableEntity, "bad_request", "after must be a uuid")
+			return
+		}
+	}
+	rows, next, err := s.st.ListOpenReservations(r.Context(), time.Duration(minAge)*time.Second, after, limit)
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+	page := reservationPage{Data: make([]reservationDTO, 0, len(rows))}
+	for _, res := range rows {
+		page.Data = append(page.Data, toReservationDTO(res))
+	}
+	if next != "" {
+		page.NextCursor = &next
+	}
+	writeJSON(w, http.StatusOK, page)
 }

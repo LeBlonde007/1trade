@@ -16,10 +16,15 @@ type Voider interface {
 	Void(c engine.VoidCmd) (engine.Order, bool, error)
 }
 
-// Releaser frees what an order's reservation still holds; *Client implements it (a 404, meaning
-// nothing was reserved, counts as success).
+// Releaser frees what an order's reservation still holds, recording why; *Client implements it (a
+// 404, meaning nothing was reserved, counts as success).
 type Releaser interface {
-	Release(ctx context.Context, orderID string) error
+	ReleaseWithReason(ctx context.Context, orderID, reason string) error
+}
+
+// Lister pages through the ledger's open reservations (credit.yaml v1.3); *Client implements it.
+type Lister interface {
+	ListOpenReservations(ctx context.Context, minAge time.Duration, after string, limit int) ([]OpenReservation, string, error)
 }
 
 // Reconciler frees reservations stranded by a submit whose journal write failed after the ledger had
@@ -36,9 +41,9 @@ type Releaser interface {
 //     the engine seeing it), the void collides on seq and is refused. So a reservation the journal
 //     relies on is never released.
 //
-// Suspects are held in memory. A tombstone survives a crash and is re-released after recovery (Resume),
-// but a suspect lost before its void is not recovered; finding those needs the ledger to list open
-// reservations (proposed as credit.yaml v1.3, SPEC.md §8).
+// Suspects are held in memory, so the reconciler also sweeps the ledger's open reservations (Sweep,
+// credit.yaml v1.3) at start and periodically: an orphan whose suspect died with the process is found
+// there. Tombstones are also re-released after recovery (Resume).
 type Reconciler struct {
 	Engine Voider
 	Ledger Releaser
@@ -48,6 +53,11 @@ type Reconciler struct {
 	Timeout time.Duration
 	// Now is the clock (nil means time.Now).
 	Now func() time.Time
+	// Lister, when set, makes Run sweep the ledger's open reservations (Sweep) at start and every
+	// SweepEvery (default 10 minutes), for reservations at least SweepMinAge old (default 10 minutes).
+	Lister      Lister
+	SweepEvery  time.Duration
+	SweepMinAge time.Duration
 
 	mu       sync.Mutex
 	suspects map[string]suspect
@@ -104,6 +114,36 @@ func (r *Reconciler) Resume(voided []engine.Order) {
 		if _, ok := r.suspects[o.OrderID]; !ok {
 			r.suspects[o.OrderID] = suspect{tenantID: o.TenantID, isPaper: o.IsPaper} // zero since: due now
 		}
+	}
+}
+
+// Sweep pages through the ledger's open reservations at least minAge old and queues every one as a
+// suspect, due now. It is the crash-proof path: suspects reported by the engine live only in memory,
+// but the ledger remembers every lock. Resolving a suspect whose order exists is a cheap no-op (the
+// order is kept), so reservations backing live orders are safe to include. minAge must exceed the
+// grace period, so a prompt client retry can still reuse its reservation. Returns how many were queued.
+func (r *Reconciler) Sweep(ctx context.Context, l Lister, minAge time.Duration) (int, error) {
+	n, after := 0, ""
+	for {
+		page, next, err := l.ListOpenReservations(ctx, minAge, after, 500)
+		if err != nil {
+			return n, err
+		}
+		r.mu.Lock()
+		if r.suspects == nil {
+			r.suspects = map[string]suspect{}
+		}
+		for _, res := range page {
+			if _, ok := r.suspects[res.OrderID]; !ok {
+				r.suspects[res.OrderID] = suspect{tenantID: res.TenantID, isPaper: res.IsPaper} // due now
+				n++
+			}
+		}
+		r.mu.Unlock()
+		if next == "" {
+			return n, nil
+		}
+		after = next
 	}
 }
 
@@ -183,7 +223,11 @@ func (r *Reconciler) resolve(ctx context.Context, id string, s suspect, now time
 	}
 	cctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	if err := r.Ledger.Release(cctx, id); err != nil {
+	reason := ReleaseOrderClosed // rejected at entry
+	if o.Reason == engine.ReasonVoided {
+		reason = ReleaseOrphaned
+	}
+	if err := r.Ledger.ReleaseWithReason(cctx, id, reason); err != nil {
 		slog.Warn("releasing an orphaned reservation failed; will retry", "order_id", id, "err", err)
 		rep.Failed++
 		return false
@@ -197,11 +241,29 @@ func (r *Reconciler) resolve(ctx context.Context, id string, s suspect, now time
 func (r *Reconciler) Run(ctx context.Context, every time.Duration) {
 	t := time.NewTicker(every)
 	defer t.Stop()
+	sweepEvery, minAge := r.SweepEvery, r.SweepMinAge
+	if sweepEvery <= 0 {
+		sweepEvery = 10 * time.Minute
+	}
+	if minAge <= 0 {
+		minAge = 10 * time.Minute
+	}
+	var lastSweep time.Time
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-t.C:
+		}
+		if r.Lister != nil && time.Since(lastSweep) >= sweepEvery {
+			if n, err := r.Sweep(ctx, r.Lister, minAge); err != nil {
+				slog.Warn("reservation sweep failed; will retry", "err", err)
+			} else {
+				lastSweep = time.Now()
+				if n > 0 {
+					slog.Info("reservation sweep queued open reservations for checking", "count", n)
+				}
+			}
 		}
 		if rep := r.RunOnce(ctx); rep.Voided+rep.Released+rep.Kept+rep.Failed > 0 {
 			slog.Info("reservation reconciler pass", "voided", rep.Voided, "released", rep.Released,

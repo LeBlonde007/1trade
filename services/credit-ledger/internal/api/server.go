@@ -53,6 +53,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /v1/credits/settle-trade", s.settleTrade)
 	s.mux.HandleFunc("POST /v1/credits/reserve", s.reserve)
 	s.mux.HandleFunc("POST /v1/credits/release", s.release)
+	s.mux.HandleFunc("GET /v1/credits/reservations", s.listReservations)
 }
 
 // readyz checks the DB is reachable.

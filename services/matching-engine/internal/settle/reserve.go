@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -119,6 +120,9 @@ func (c *Client) Reserve(ctx context.Context, o engine.Order, h engine.Hold) err
 		return checkReservation(body, o.OrderID, h.Amount)
 	case status == http.StatusPaymentRequired:
 		return fmt.Errorf("%w: order %s: %s", ErrInsufficient, o.OrderID, code)
+	case status == http.StatusConflict && code == "RESERVATION_CLOSED":
+		// credit.yaml v1.3: the id's reservation was already released; the id is spent.
+		return fmt.Errorf("%w: order %s", ErrReservationUnusable, o.OrderID)
 	case status == http.StatusConflict:
 		return fmt.Errorf("%w: order %s", ErrConflict, o.OrderID)
 	default:
@@ -126,10 +130,22 @@ func (c *Client) Reserve(ctx context.Context, o engine.Order, h engine.Hold) err
 	}
 }
 
-// Release frees whatever an order's reservation still holds. A 404 (nothing was reserved) is success:
-// there is nothing to free.
+// Release reasons recorded on the ledger's release audit event (credit.yaml v1.3).
+const (
+	ReleaseOrderClosed = "order_closed" // the order reached a terminal state
+	ReleaseOrphaned    = "orphaned"     // the journal never took the order (the reconciler voided it)
+)
+
+// Release frees whatever a closed order's reservation still holds (reason order_closed). A 404
+// (nothing was reserved) is success: there is nothing to free.
 func (c *Client) Release(ctx context.Context, orderID string) error {
-	status, body, err := c.post(ctx, "/v1/credits/release", "", map[string]any{"order_id": orderID})
+	return c.ReleaseWithReason(ctx, orderID, ReleaseOrderClosed)
+}
+
+// ReleaseWithReason is Release with the audit reason spelled out (ReleaseOrderClosed or
+// ReleaseOrphaned).
+func (c *Client) ReleaseWithReason(ctx context.Context, orderID, reason string) error {
+	status, body, err := c.post(ctx, "/v1/credits/release", "", map[string]any{"order_id": orderID, "reason": reason})
 	switch {
 	case err != nil:
 		return err
@@ -138,6 +154,48 @@ func (c *Client) Release(ctx context.Context, orderID string) error {
 	default:
 		return fmt.Errorf("settle: release order %s: ledger returned %d %s", orderID, status, apiCode(body))
 	}
+}
+
+// OpenReservation is one open reservation as the ledger lists it (credit.yaml v1.3).
+type OpenReservation struct {
+	OrderID   string    `json:"order_id"`
+	TenantID  string    `json:"tenant_id"`
+	IsPaper   bool      `json:"is_paper"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// ListOpenReservations reads one page of open reservations at least minAge old (on the ledger's
+// clock), after the given order_id cursor. next is "" on the last page.
+func (c *Client) ListOpenReservations(ctx context.Context, minAge time.Duration, after string, limit int) (page []OpenReservation, next string, err error) {
+	q := url.Values{"state": {"open"}, "min_age_seconds": {fmt.Sprint(int(minAge.Seconds()))}, "limit": {fmt.Sprint(limit)}}
+	if after != "" {
+		q.Set("after", after)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/v1/credits/reservations?"+q.Encode(), nil)
+	if err != nil {
+		return nil, "", fmt.Errorf("settle: build list: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, "", fmt.Errorf("settle: list reservations: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, maxBody))
+		return nil, "", fmt.Errorf("settle: list reservations: ledger returned %d %s", resp.StatusCode, apiCode(body))
+	}
+	var out struct {
+		Data       []OpenReservation `json:"data"`
+		NextCursor *string           `json:"next_cursor"`
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 4<<20)).Decode(&out); err != nil {
+		return nil, "", fmt.Errorf("settle: list reservations: %w", err)
+	}
+	if out.NextCursor != nil {
+		next = *out.NextCursor
+	}
+	return out.Data, next, nil
 }
 
 // ReserveRisk adapts the client into the engine's pre-trade risk check: an order is accepted only if

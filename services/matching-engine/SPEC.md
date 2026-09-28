@@ -172,7 +172,8 @@ and executing at the taker's price. Both mutations were caught.
      - `DATABASE_URL`, plus every migration (glob, in file order) in an initContainer;
      - the `ledger-settle` Secret mounted in the engine;
      - `journal.Recover` with `ReserveRisk`, and `OnUnjournaled: rec.Suspect` for a `Reconciler`
-       running every 30 s (below), with `rec.Resume(e.Voided())` right after recovery;
+       running every 30 s (below), with `rec.Resume(e.Voided())` right after recovery and
+       `Lister: client` so it sweeps the ledger's open reservations;
      - a `Worker` fed from the journal's events.
    - **Orphaned reservations — built (engine side).** The engine reserves an order's hold *before*
      writing the order to its journal. If that write fails, the ledger holds a reservation for an order
@@ -228,8 +229,18 @@ and executing at the taker's price. Both mutations were caught.
      Release is idempotent, so one that landed before the crash is a no-op. That covers a crash
      between the void and the release.
 
-     **Still open.** A crash after a failed journal write but *before* the void loses the suspect.
-     That reservation stays locked until an operator releases it. Finding those needs the ledger to list open reservations. That is proposed
+     **Crash before the void — closed (credit.yaml v1.3).** The reconciler also sweeps the ledger's open
+     reservations older than 10 minutes, at start and every 10 minutes (`Sweep`, `GET
+     /v1/credits/reservations`). Every listed reservation goes through the same void-then-release
+     path: one backing a live order is kept, and an orphan is voided and released. Releases carry an
+     audit reason: `order_closed` from the worker, `orphaned` from the reconciler. Proven with a stress
+     run where odd seeds recover with the suspects and even seeds "crash" and recover through the
+     sweep alone, and against the real ledger.
+
+     **Deployment invariant: one engine journal per ledger.** The sweep releases every reservation
+     whose order this engine's journal does not know. Two engines (two journals) sharing one ledger
+     would release each other's live reservations. A reset journal against a populated ledger is fine:
+     its old orders no longer exist anywhere. Finding those needs the ledger to list open reservations. That is proposed
      in §8 (credit.yaml v1.3) and not yet approved.
 4. **Risk hook implementation.** Balance and position-limit checks against the ledger, plus
    surveillance holds (KW05).
@@ -257,8 +268,8 @@ and executing at the taker's price. Both mutations were caught.
 
   `voided` marks a tombstone. It is returned on a duplicate submit and never emitted as an event. The
   contract's `reason` is free text with examples; proposed: enumerate these.
-- **Proposed: credit.yaml v1.3, to find orphaned reservations after a crash (§7.3 "Still open").**
-  The contract has not been edited; this needs tech-lead approval. Changes:
+- ~~**Proposed: credit.yaml v1.3**~~ **Authored and implemented 2026-09-28** (owner-approved). The
+  changes, as proposed:
   - `GET /v1/credits/reservations?state=open&min_age_seconds=N&after=<order_id>&limit=N`.
     - matching-engine only (the settle token). Keyset-paginated; the age is measured on the ledger's
       clock.

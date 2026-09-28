@@ -243,3 +243,139 @@ func TestLockedBackstop(t *testing.T) {
 		t.Error("locked_amount above balance was accepted")
 	}
 }
+
+// TestReplayOfReleasedReservationIsClosed: v1.3 — a released reservation locks nothing, so a replay
+// is 409 RESERVATION_CLOSED (not a 200 the engine could mistake for funds), and nothing is re-locked.
+func TestReplayOfReleasedReservationIsClosed(t *testing.T) {
+	h := newHarness(t)
+	tenant := uuid.NewString()
+	h.fund(tenant, "100", "")
+	order := uuid.NewString()
+	var res map[string]any
+	if code := h.do("POST", "/v1/credits/reserve", engine(order), reserveBody(order, tenant, "cash", "USD", "10"), &res); code != 200 || res["created_at"] == "" || res["created_at"] == nil {
+		t.Fatalf("reserve: %d %v", code, res)
+	}
+	if code, _ := h.release(order); code != 200 {
+		t.Fatal(code)
+	}
+	if code, c := h.reserve(order, tenant, "cash", "USD", "10"); code != 409 || c != "RESERVATION_CLOSED" {
+		t.Fatalf("replay of a released reservation: %d %s, want 409 RESERVATION_CLOSED", code, c)
+	}
+	if got := h.locked(tenant, "USD"); got != "0.000000" {
+		t.Fatalf("locked = %s after the refused replay", got)
+	}
+}
+
+// TestReleaseReasonIsAudited: the optional reason lands on the release audit event; unknown reasons
+// are refused.
+func TestReleaseReasonIsAudited(t *testing.T) {
+	h := newHarness(t)
+	tenant := uuid.NewString()
+	h.fund(tenant, "100", "")
+	order := uuid.NewString()
+	if code, _ := h.reserve(order, tenant, "cash", "USD", "5"); code != 200 {
+		t.Fatal(code)
+	}
+	settle := map[string]string{"Authorization": "Bearer " + settleToken}
+	if code := h.do("POST", "/v1/credits/release", settle, map[string]any{"order_id": order, "reason": "because"}, nil); code != 422 {
+		t.Fatalf("unknown reason: %d, want 422", code)
+	}
+	if code := h.do("POST", "/v1/credits/release", settle, map[string]any{"order_id": order, "reason": "orphaned"}, nil); code != 200 {
+		t.Fatalf("release: %d", code)
+	}
+	pool, err := pgxpool.New(context.Background(), os.Getenv("DATABASE_URL"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+	var ref string
+	if err := pool.QueryRow(context.Background(), `SELECT coalesce(reference,'') FROM reservation_events WHERE order_id=$1 AND kind='release'`, order).Scan(&ref); err != nil || ref != "orphaned" {
+		t.Fatalf("release audit reference = %q (%v), want orphaned", ref, err)
+	}
+}
+
+// TestListOpenReservations: engine-only, open only, age on the ledger clock, keyset pages that
+// neither skip nor repeat.
+func TestListOpenReservations(t *testing.T) {
+	h := newHarness(t)
+	tenant := uuid.NewString()
+	h.fund(tenant, "100", "")
+	mine := make([]string, 0, 3)
+	for range 3 {
+		id := uuid.NewString()
+		if code, _ := h.reserve(id, tenant, "cash", "USD", "1"); code != 200 {
+			t.Fatal(code)
+		}
+		mine = append(mine, id)
+	}
+	gone := uuid.NewString()
+	h.reserve(gone, tenant, "cash", "USD", "1")
+	h.release(gone)
+
+	settle := map[string]string{"Authorization": "Bearer " + settleToken}
+	type page struct {
+		Data []struct {
+			OrderID string `json:"order_id"`
+			State   string `json:"state"`
+		} `json:"data"`
+		NextCursor *string `json:"next_cursor"`
+	}
+	seen := map[string]int{}
+	last := ""
+	for after, n := "", 0; ; n++ {
+		var p page
+		path := "/v1/credits/reservations?state=open&limit=2"
+		if after != "" {
+			path += "&after=" + after
+		}
+		if code := h.do("GET", path, settle, nil, &p); code != 200 {
+			t.Fatalf("list: %d", code)
+		}
+		for _, r := range p.Data {
+			if r.State != "open" || r.OrderID <= last {
+				t.Fatalf("page %d: %+v after %s (closed, or out of order)", n, r, last)
+			}
+			last = r.OrderID
+			seen[r.OrderID]++
+		}
+		if p.NextCursor == nil {
+			break
+		}
+		after = *p.NextCursor
+	}
+	for _, id := range mine {
+		if seen[id] != 1 {
+			t.Fatalf("open reservation %s listed %d times", id, seen[id])
+		}
+	}
+	if seen[gone] != 0 {
+		t.Fatal("a released reservation was listed")
+	}
+	var young page
+	h.do("GET", "/v1/credits/reservations?state=open&limit=500&min_age_seconds=3600", settle, nil, &young)
+	for _, r := range young.Data {
+		for _, id := range mine {
+			if r.OrderID == id {
+				t.Fatal("a reservation younger than min_age_seconds was listed")
+			}
+		}
+	}
+	for _, c := range []struct {
+		path    string
+		headers map[string]string
+		want    int
+	}{
+		{"/v1/credits/reservations?state=open", map[string]string{"Authorization": "Bearer " + serviceToken}, 403},
+		{"/v1/credits/reservations?state=open", map[string]string{"X-Dev-Tenant": tenant}, 403},
+		{"/v1/credits/reservations", settle, 422},
+		{"/v1/credits/reservations?state=released", settle, 422},
+		{"/v1/credits/reservations?state=open&limit=0", settle, 422},
+		{"/v1/credits/reservations?state=open&limit=501", settle, 422},
+		{"/v1/credits/reservations?state=open&min_age_seconds=-1", settle, 422},
+		{"/v1/credits/reservations?state=open&after=x'--", settle, 422},
+	} {
+		if code := h.do("GET", c.path, c.headers, nil, nil); code != c.want {
+			t.Errorf("%s: %d, want %d", c.path, code, c.want)
+		}
+	}
+}

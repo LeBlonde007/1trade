@@ -155,9 +155,9 @@ write fails after the ledger reserved its hold used to leave that reservation lo
   releases it.
 - The reserve client refuses a replayed reservation that is no longer open.
 - Proven with a stress run (every live order funded, nothing orphaned) and against the real ledger.
-- Still open: an engine crash between the failed write and the reconciler pass loses the suspect.
-  Finding those needs a ledger listing of open reservations, proposed as credit.yaml v1.3 (SPEC §8)
-  and awaiting approval.
+- Crash-safe (credit.yaml v1.3): the reconciler also sweeps the ledger's open reservations, so an
+  orphan whose suspect died with the process is still found. Releases carry an audit reason.
+  Invariant: one engine journal per ledger (SPEC §7.3).
 
 Remaining: only the licence-gated cutover wiring (SPEC §7.3):
 - DATABASE_URL and the migrations;
@@ -173,7 +173,7 @@ licence-gated cutover.
 - sequence scope per `(product, is_paper)`;
 - how paper liquidity works given the insider-risk rule (blocks KW04 paper quoting);
 - enumerating cancel and reject reasons;
-- the credit.yaml v1.3 reservation listing (proposed).
+- ~~the credit.yaml v1.3 reservation listing~~ (authored and built 2026-09-28).
 
 Acceptance (Phase 2): ✅ deterministic, replayable, race-free under concurrent load · ✅ paper/real
 isolation enforced · ✅ property-based tests pass · ⬜ matches the trading contract end to end (API

@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -21,6 +22,15 @@ var (
 	ErrNoReservation = errors.New("no reservation for this order")
 	// ErrBadAsset: the asset is not a known credit type / currency for its kind (422).
 	ErrBadAsset = errors.New("unknown asset for this asset kind")
+	// ErrReservationClosed: a reserve replay named an order_id whose reservation is already released
+	// (409 RESERVATION_CLOSED, v1.3). A released reservation locks nothing, so the id is spent.
+	ErrReservationClosed = errors.New("this order_id's reservation is already released")
+)
+
+// Release reasons recorded on the release audit event (credit.yaml v1.3).
+const (
+	ReleaseOrderClosed = "order_closed"
+	ReleaseOrphaned    = "orphaned"
 )
 
 // Reservation is one order's hold on a balance (credit.yaml v1.2 Reservation).
@@ -33,6 +43,7 @@ type Reservation struct {
 	Amount       domain.Money
 	Remaining    domain.Money
 	State        string // open | released
+	CreatedAt    time.Time
 }
 
 // hash is the idempotency fingerprint of a reserve request (order_id is the key; this detects a
@@ -133,6 +144,9 @@ func (s *Store) Reserve(ctx context.Context, r Reservation) (Reservation, bool, 
 		if prev.hash() != r.hash() {
 			return Reservation{}, false, ErrReserveConflict
 		}
+		if prev.State != "open" {
+			return Reservation{}, false, ErrReservationClosed
+		}
 		return prev, true, nil
 	}
 	if bal.Sub(locked).Cmp(r.Amount) < 0 {
@@ -142,10 +156,10 @@ func (s *Store) Reserve(ctx context.Context, r Reservation) (Reservation, bool, 
 		return Reservation{}, false, domain.ErrInsufficientCredit
 	}
 	r.Remaining, r.State = r.Amount, "open"
-	if _, err := dbtx.Exec(ctx,
+	if err := dbtx.QueryRow(ctx,
 		`INSERT INTO reservations (order_id, tenant_id, sub_account_id, asset_kind, asset, amount, remaining, state, is_paper, request_hash)
-		 VALUES ($1,$2,$3,$4,$5,$6::numeric,$6::numeric,'open',true,$7)`,
-		r.OrderID, r.TenantID, nullable(r.SubAccountID), r.AssetKind, r.Asset, r.Amount.String(), r.hash()); err != nil {
+		 VALUES ($1,$2,$3,$4,$5,$6::numeric,$6::numeric,'open',true,$7) RETURNING created_at`,
+		r.OrderID, r.TenantID, nullable(r.SubAccountID), r.AssetKind, r.Asset, r.Amount.String(), r.hash()).Scan(&r.CreatedAt); err != nil {
 		if IsUniqueViolation(err) {
 			return Reservation{}, false, ErrReserveConflict // same order_id reserved concurrently on another asset
 		}
@@ -163,9 +177,10 @@ func (s *Store) Reserve(ctx context.Context, r Reservation) (Reservation, bool, 
 	return r, false, nil
 }
 
-// Release unlocks whatever an order's reservation still holds (credit.yaml v1.2 /release).
+// Release unlocks whatever an order's reservation still holds (credit.yaml v1.2 /release). reason
+// ("" | ReleaseOrderClosed | ReleaseOrphaned, v1.3) is recorded on the release audit event.
 // Idempotent: a released reservation is returned unchanged.
-func (s *Store) Release(ctx context.Context, orderID string) (Reservation, error) {
+func (s *Store) Release(ctx context.Context, orderID, reason string) (Reservation, error) {
 	dbtx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return Reservation{}, err
@@ -199,7 +214,7 @@ func (s *Store) Release(ctx context.Context, orderID string) (Reservation, error
 	if err := setLocked(ctx, dbtx, r.AssetKind, r.TenantID, r.SubAccountID, r.Asset, locked.Sub(freed)); err != nil {
 		return Reservation{}, err
 	}
-	if err := reservationEvent(ctx, dbtx, orderID, "release", freed, domain.Zero(), ""); err != nil {
+	if err := reservationEvent(ctx, dbtx, orderID, "release", freed, domain.Zero(), reason); err != nil {
 		return Reservation{}, err
 	}
 	if err := dbtx.Commit(ctx); err != nil {
@@ -244,13 +259,13 @@ func consumeReservation(ctx context.Context, dbtx pgx.Tx, orderID, kind, tenantI
 // getReservation reads one reservation, optionally FOR UPDATE.
 func getReservation(ctx context.Context, dbtx pgx.Tx, orderID string, forUpdate bool) (Reservation, bool, error) {
 	q := `SELECT order_id::text, tenant_id::text, coalesce(sub_account_id::text,''), asset_kind, asset,
-	             amount::text, remaining::text, state FROM reservations WHERE order_id=$1`
+	             amount::text, remaining::text, state, created_at FROM reservations WHERE order_id=$1`
 	if forUpdate {
 		q += ` FOR UPDATE`
 	}
 	var r Reservation
 	var amt, rem string
-	err := dbtx.QueryRow(ctx, q, orderID).Scan(&r.OrderID, &r.TenantID, &r.SubAccountID, &r.AssetKind, &r.Asset, &amt, &rem, &r.State)
+	err := dbtx.QueryRow(ctx, q, orderID).Scan(&r.OrderID, &r.TenantID, &r.SubAccountID, &r.AssetKind, &r.Asset, &amt, &rem, &r.State, &r.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Reservation{}, false, nil
 	}
@@ -260,4 +275,40 @@ func getReservation(ctx context.Context, dbtx pgx.Tx, orderID string, forUpdate 
 	r.Amount, _ = domain.ParseMoney(amt)
 	r.Remaining, _ = domain.ParseMoney(rem)
 	return r, true, nil
+}
+
+// ListOpenReservations returns up to limit OPEN reservations at least minAge old, measured on the
+// database clock, with order_id greater than after (keyset; "" starts at the beginning), ordered by
+// order_id. next is the last order_id returned when more may follow, else "" (credit.yaml v1.3).
+func (s *Store) ListOpenReservations(ctx context.Context, minAge time.Duration, after string, limit int) (out []Reservation, next string, err error) {
+	rows, err := s.pool.Query(ctx,
+		`SELECT order_id::text, tenant_id::text, coalesce(sub_account_id::text,''), asset_kind, asset,
+		        amount::text, remaining::text, state, created_at
+		   FROM reservations
+		  WHERE state = 'open' AND created_at <= now() - make_interval(secs => $1)
+		    AND ($2 = '' OR order_id > $2::uuid)
+		  ORDER BY order_id LIMIT $3`,
+		minAge.Seconds(), after, limit+1)
+	if err != nil {
+		return nil, "", fmt.Errorf("list reservations: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var r Reservation
+		var amt, rem string
+		if err := rows.Scan(&r.OrderID, &r.TenantID, &r.SubAccountID, &r.AssetKind, &r.Asset, &amt, &rem, &r.State, &r.CreatedAt); err != nil {
+			return nil, "", fmt.Errorf("scan reservation: %w", err)
+		}
+		r.Amount, _ = domain.ParseMoney(amt)
+		r.Remaining, _ = domain.ParseMoney(rem)
+		out = append(out, r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, "", fmt.Errorf("list reservations: %w", err)
+	}
+	if len(out) > limit {
+		out = out[:limit]
+		next = out[limit-1].OrderID
+	}
+	return out, next, nil
 }
