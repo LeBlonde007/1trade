@@ -43,6 +43,15 @@ k8s_yaml(kustomize('deploy/k8s/credit-ledger/base'))
 k8s_resource('credit-ledger', port_forwards='8002:8002',
              resource_deps=['credit-ledger-migrations', 'platform-auth', 'ledger-settle'])
 
+# local_env patches a kustomize build's ConfigMap with values that exist ONLY in local dev. They live
+# here, not in deploy/k8s/*/base, because the public sandbox overlay builds on those bases.
+def local_env(path, configmap, values):
+    objs = decode_yaml_stream(kustomize(path))
+    for o in objs:
+        if o.get('kind') == 'ConfigMap' and o['metadata']['name'] == configmap:
+            o['data'].update(values)
+    return encode_yaml_stream(objs)
+
 # --- platform-core (F02) — identity for the fleet; issues the JWT credit-ledger verifies ---
 local_resource(
     'platform-core-migrations',
@@ -55,7 +64,18 @@ local_resource(
 )
 docker_build('1trade/platform-core:dev', 'services/platform-core',
              dockerfile='services/platform-core/Dockerfile')
-k8s_yaml(kustomize('deploy/k8s/platform-core/base'))
+# Local-only: sign test Stripe webhooks (ACH clears via `node scripts/dev/ops.mjs ach-clear`), offer a
+# test bank for wires, and let SSO domains verify without real DNS (the flag is inert outside dev).
+k8s_yaml(local_env('deploy/k8s/platform-core/base', 'platform-core-env', {
+    'STRIPE_WEBHOOK_SECRET': 'whsec_local_dev_only',
+    'WIRE_BANK_NAME': 'Local Test Bank',
+    'WIRE_BANK_ADDRESS': '1 Test Plaza, New York, NY',
+    'WIRE_ACCOUNT_NAME': '1Trade Inc. (local test)',
+    'WIRE_ACCOUNT_NUMBER': '000000000000',
+    'WIRE_ROUTING_NUMBER': '021000021',
+    'WIRE_SWIFT': 'TESTUS33',
+    'SSO_DEV_SKIP_DNS': '1',
+}))
 k8s_resource('platform-core', port_forwards='8001:8001',
              resource_deps=['platform-core-migrations', 'platform-auth'])
 
@@ -83,7 +103,11 @@ local_resource(
         '--dry-run=client -o yaml | kubectl apply -f -',
     deps=['services/compute-control/migrations'],
 )
-k8s_yaml(kustomize('deploy/k8s/compute-control/base'))
+# Local-only: trust the developer's own attestation key (generated on first use into .dev/, gitignored)
+# so `node scripts/dev/ops.mjs attest` can take a registered datacenter source through F19.
+k8s_yaml(local_env('deploy/k8s/compute-control/base', 'compute-control-env', {
+    'ATTESTATION_TRUST_KEYS': str(local('node scripts/dev/ops.mjs pubkey', quiet=True)).strip(),
+}))
 k8s_resource('compute-control', port_forwards='8086:8086',
              resource_deps=['platform-auth', 'compute-control-migrations'])
 

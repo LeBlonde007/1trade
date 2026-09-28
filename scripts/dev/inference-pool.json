@@ -1,0 +1,17 @@
+{
+  "headroom_ppm": 50000,
+  "min_residency": "5s",
+  "load_wait": "30s",
+  "gpus": [{ "id": "gpu-0", "class": "gpu_h100", "vram_mib": 81920, "device": "0" }],
+  "profiles": [
+    { "model": "llama-3.1-8b", "peak_vram_mib": 48000, "measured_at": "2026-09-01T00:00:00Z" },
+    { "model": "qwen2.5-1.5b", "peak_vram_mib": 40000, "measured_at": "2026-09-01T00:00:00Z" }
+  ],
+  "replicas": [],
+  "loader": {
+    "kind": "process",
+    "command": ["python3", "services/inference-runtime/stub/server.py"],
+    "ready_timeout": "30s",
+    "host": "127.0.0.1"
+  }
+}

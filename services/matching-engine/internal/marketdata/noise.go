@@ -27,7 +27,7 @@ func hash01(seed string, i int64) float64 {
 	h := fnv.New64a()
 	_, _ = h.Write([]byte(seed))
 	var b [8]byte
-	binary.LittleEndian.PutUint64(b[:], uint64(i))
+	binary.LittleEndian.PutUint64(b[:], uint64(i)) //nolint:gosec // bit reinterpretation for hashing, not arithmetic
 	_, _ = h.Write(b[:])
 	// Drop the top bit so the conversion to float64 stays exact and non-negative.
 	return float64(h.Sum64()&math.MaxInt64) / float64(math.MaxInt64+1.0)

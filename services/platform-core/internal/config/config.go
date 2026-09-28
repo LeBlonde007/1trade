@@ -40,6 +40,7 @@ type Config struct {
 	RequireEmailVerification bool             // gate login on a verified email; opt-in (default off), enabled by the deploy only when real SMTP is wired
 	TokenTTL                 time.Duration    // issued-token lifetime
 	MFAKey                   string           // MFA_ENC_KEY: base64 32-byte key sealing TOTP secrets (default: derived from the JWT secret)
+	SSODevSkipDNS            bool             // SSO_DEV_SKIP_DNS: dev only — SSO domain verification skips the DNS TXT check (local testing has no DNS)
 }
 
 // Load reads configuration from the environment with sensible dev defaults.
@@ -93,6 +94,7 @@ func Load() Config {
 		// could verify → no one could log in) and local/CI/e2e keep immediate login.
 		RequireEmailVerification: envBool("REQUIRE_EMAIL_VERIFICATION", false),
 		TokenTTL:                 ttl,
+		SSODevSkipDNS:            envBool("SSO_DEV_SKIP_DNS", false),
 	}
 }
 
@@ -111,6 +113,10 @@ func envBool(key string, fallback bool) bool {
 
 // IsDev reports whether the dev environment is active.
 func (c Config) IsDev() bool { return c.Env == "dev" }
+
+// SkipDomainDNS reports whether SSO domain verification may skip its DNS proof: only when explicitly
+// asked for AND running in dev, so the flag can never weaken staging or prod.
+func (c Config) SkipDomainDNS() bool { return c.SSODevSkipDNS && c.IsDev() }
 
 // envOr returns the env var or a fallback when unset.
 func envOr(key, fallback string) string {

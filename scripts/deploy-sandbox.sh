@@ -118,10 +118,13 @@ kubectl get secret platform-auth >/dev/null 2>&1 || kubectl create secret generi
   --from-literal=SERVICE_TOKEN="$(openssl rand -base64 32)"
 kubectl create configmap platform-core-migrations --from-file=services/platform-core/migrations/ \
   --dry-run=client -o yaml | kubectl apply -f -
+# Whole directories, as in the Tiltfile — a per-file list here silently left the sandbox ledger on
+# 0002 and gave compute-control no ConfigMap at all (its initContainer then never started).
 kubectl create configmap credit-ledger-migrations \
   --from-file=types.sql=docs/contracts/schemas/types.sql \
-  --from-file=0001_init.sql=services/credit-ledger/migrations/0001_init.sql \
-  --from-file=0002_conversion.sql=services/credit-ledger/migrations/0002_conversion.sql \
+  --from-file=services/credit-ledger/migrations/ \
+  --dry-run=client -o yaml | kubectl apply -f -
+kubectl create configmap compute-control-migrations --from-file=services/compute-control/migrations/ \
   --dry-run=client -o yaml | kubectl apply -f -
 
 # 5. data plane (namespace `data`).

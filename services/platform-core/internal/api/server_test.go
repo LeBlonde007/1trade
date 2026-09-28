@@ -115,6 +115,14 @@ func TestAPIIntegration(t *testing.T) {
 		t.Fatalf("expected 1 key, got %d", len(list.Keys))
 	}
 
+	// API key: scopes is required (a missing field is a 400, not a NOT NULL 500); [] is allowed.
+	if code := do("POST", "/v1/auth/keys", token, map[string]any{"name": "no-scopes"}, nil); code != 400 {
+		t.Fatalf("create key without scopes = %d, want 400", code)
+	}
+	if code := do("POST", "/v1/auth/keys", token, map[string]any{"name": "empty", "scopes": []string{}}, nil); code != 201 {
+		t.Fatalf("create key with empty scopes = %d, want 201", code)
+	}
+
 	// introspect (service-to-service): the raw key resolves to its tenant + is_paper. This is the
 	// path the inference gateway uses to authenticate a customer API key.
 	secret := created["secret"].(string)

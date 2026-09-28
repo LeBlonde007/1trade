@@ -323,7 +323,7 @@ func DeterministicID(parts ...any) string {
 			_, _ = h.Write([]byte(v))
 		case int64:
 			var b [8]byte
-			binary.LittleEndian.PutUint64(b[:], uint64(v))
+			binary.LittleEndian.PutUint64(b[:], uint64(v)) //nolint:gosec // bit reinterpretation for hashing, not arithmetic
 			_, _ = h.Write(b[:])
 		}
 	}

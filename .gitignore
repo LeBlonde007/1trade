@@ -13,6 +13,8 @@ sandbox.env.example
 *.p12
 *-credentials.json
 vault-token
+# local dev keys (scripts/dev/ops.mjs)
+.dev/
 
 # --- Go ---
 /bin/

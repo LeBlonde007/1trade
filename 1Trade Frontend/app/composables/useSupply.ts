@@ -117,10 +117,7 @@ export function useSupply() {
 
   /** payouts fetches the partner's statements; agreement its terms (null until 1Trade sets them). */
   const payouts = () => $fetch<{ data: Payout[] }>('/api/supply/payouts').then(r => r.data)
-  const agreement = () => $fetch<Agreement>('/api/supply/agreement').catch((e: any) => {
-    if (e?.statusCode === 404) return null
-    throw e
-  })
+  const agreement = () => $fetch<Agreement | null>('/api/supply/agreement')
   /** dispute raises a dispute on a statement inside its window. */
   const dispute = (id: string, reason: string) =>
     $fetch<Payout>(`/api/supply/payouts/${id}/dispute`, { method: 'POST', body: { reason } })

@@ -323,8 +323,10 @@ func (s *Server) createKey(w http.ResponseWriter, r *http.Request) {
 		Name   string   `json:"name"`
 		Scopes []string `json:"scopes"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&b); err != nil || b.Name == "" {
-		writeErr(w, http.StatusBadRequest, "bad_request", "name is required")
+	// scopes is required by the contract; [] is a valid (empty) grant, a missing field is not — and
+	// letting a nil slice through would hit the column's NOT NULL as a 500.
+	if err := json.NewDecoder(r.Body).Decode(&b); err != nil || b.Name == "" || b.Scopes == nil {
+		writeErr(w, http.StatusBadRequest, "bad_request", "name and scopes are required")
 		return
 	}
 	k, err := domain.GenerateAPIKey()

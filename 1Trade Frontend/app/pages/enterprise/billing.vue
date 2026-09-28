@@ -13,7 +13,7 @@ definePageMeta({ layout: 'app', middleware: 'auth' })
 useHead({ title: 'Billing & payment — 1Trade' })
 
 interface Budget { credit_type: string; monthly_limit: string }
-interface Purchase { id: string; amount: string; credit_type: string; currency: string; status: string; created_at: string }
+interface Purchase { id: string; amount: string; credit_type: string; currency: string; status: string; created_at: string; method?: string; wire_reference?: string }
 
 const { user } = useAuth()
 const { balances, transactions, loadBalances, loadTransactions } = useWallet()
@@ -207,17 +207,19 @@ function dt(s: string): string {
     <section class="panel">
       <header class="panel-h"><span class="panel-title">Purchase history</span><span class="panel-meta mono">{{ purchases.length }}</span></header>
       <table class="tbl">
-        <thead><tr><th>Date</th><th>Credit</th><th class="r">Amount</th><th>Currency</th><th>Status</th></tr></thead>
+        <thead><tr><th>Date</th><th>Credit</th><th class="r">Amount</th><th>Currency</th><th>Method</th><th>Reference</th><th>Status</th></tr></thead>
         <tbody>
-          <tr v-if="loading"><td colspan="5" class="pad muted">Loading…</td></tr>
+          <tr v-if="loading"><td colspan="7" class="pad muted">Loading…</td></tr>
           <tr v-for="p in purchases" v-else :key="p.id">
             <td class="mono muted">{{ dt(p.created_at) }}</td>
             <td>{{ ctLabel(p.credit_type) }}</td>
             <td class="r mono" :title="full(p.amount)">{{ compact(p.amount) }}</td>
             <td class="mono upper">{{ p.currency }}</td>
+            <td class="upper">{{ p.method || 'card' }}</td>
+            <td class="mono muted ref"><span v-if="p.wire_reference" class="wref">{{ p.wire_reference }}</span>{{ p.id }}</td>
             <td><span class="st" :class="statusClass(p.status)"><span class="dot" />{{ p.status }}</span></td>
           </tr>
-          <tr v-if="!loading && !purchases.length"><td colspan="5" class="pad muted">No purchases yet. <NuxtLink to="/wallet/buy" class="link">Buy credits →</NuxtLink></td></tr>
+          <tr v-if="!loading && !purchases.length"><td colspan="7" class="pad muted">No purchases yet. <NuxtLink to="/wallet/buy" class="link">Buy credits →</NuxtLink></td></tr>
         </tbody>
       </table>
     </section>
@@ -313,4 +315,6 @@ function dt(s: string): string {
   .grid { grid-template-columns: 1fr; }
   .budget { grid-template-columns: 1fr; gap: var(--sp-4); }
 }
+.ref { font-size: var(--fs-xs); word-break: break-all; }
+.ref .wref { display: block; color: var(--text); }
 </style>

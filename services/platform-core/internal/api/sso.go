@@ -116,7 +116,7 @@ func (s *Server) verifySSODomain(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
 		recs, _ := s.lookupTXT(ctx, domainTXTPrefix+d)
-		if !contains(recs, "1trade-verify="+tok) {
+		if !contains(recs, "1trade-verify="+tok) && !s.cfg.SkipDomainDNS() {
 			writeErr(w, http.StatusUnprocessableEntity, "not_verified", "the TXT record "+domainTXTPrefix+d+" does not contain your verification value yet")
 			return
 		}

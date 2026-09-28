@@ -4,8 +4,10 @@
 live services). `LOCAL_DEV.md` describes the *intended* end-state (ingress `:8080`, Grafana, `make
 seed`, `1trade login --dev`); several of those aren't wired yet. When in doubt, follow this file.
 
-Last verified: 2026-05-31 (tags up to `v0.2.8`). To **verify the shipped features** once it's up, see
-**[TESTING.md](./TESTING.md)** (automated tests + curl + CLI + web, per feature).
+Last verified: 2026-09-28. To **click through every user flow** once it's up (sign-up, 2FA, teams,
+SSO, card/ACH/wire, compute, datacenter attestation + payouts, inference, hot-swap, paper exchange),
+follow **[LOCAL_TEST_FLOWS.md](./LOCAL_TEST_FLOWS.md)**. For the automated tests see
+**[TESTING.md](./TESTING.md)**.
 
 ---
 
@@ -20,10 +22,14 @@ Last verified: 2026-05-31 (tags up to `v0.2.8`). To **verify the shipped feature
 - the **Nuxt web console** (`1Trade Frontend/`) — `:3000`
 - the **`1trade` CLI** (`apps/cli/`) → `bin/1trade`
 
+- `compute-control` (instances · reserved capacity · clusters · datacenter supply, attestation,
+  payouts) — `:8086`
+- `matching-engine` (paper exchange + index; order entry paused behind the licence gate) — `:8087`
+- `surveillance` (market-abuse alerts on the engine's stream) — `:8088`
+
 **Not wired yet (don't follow `LOCAL_DEV.md` for these):** the `:8080` Traefik ingress, Grafana/
-Prometheus dashboards, `make seed`, `1trade login --dev`, and the compute/exchange layers. You
-reach services through the **Tilt port-forwards** and create accounts/credits the real way
-(signup + mint).
+Prometheus dashboards, `make seed` and `1trade login --dev`. You reach services through the **Tilt
+port-forwards** and create accounts/credits the real way (signup + buy).
 
 ---
 
@@ -50,6 +56,9 @@ port-forwards for you**:
 | credit-ledger    | `:8002` | balances, convert, debits |
 | inference-gateway| `:8085` | OpenAI-compatible API |
 | inference-runtime| `:8000` | CPU stub |
+| compute-control  | `:8086` | compute, datacenter supply |
+| matching-engine  | `:8087` | paper exchange + index |
+| surveillance     | `:8088` | market-abuse alerts |
 
 > **If the cluster is already up but Tilt isn't running** (e.g. after a manual deploy), either run
 > `tilt up` to reconcile + restore the forwards, or forward manually:
@@ -58,6 +67,8 @@ port-forwards for you**:
 > kubectl port-forward -n default deploy/platform-core    8001:8001 &
 > kubectl port-forward -n default deploy/credit-ledger    8002:8002 &
 > kubectl port-forward -n default deploy/inference-gateway 8085:8085 &
+> kubectl port-forward -n default deploy/compute-control   8086:8086 &
+> kubectl port-forward -n default deploy/matching-engine   8087:8087 &
 > ```
 >
 > "address already in use" just means that port is already forwarded — leave it.
@@ -76,7 +87,8 @@ cd "1Trade Frontend"
 npm run dev        # → http://localhost:3000
 ```
 
-No env needed — the BFF's upstream URLs default to `localhost:8001/8085/8002` (the Tilt forwards).
+No env needed — the BFF's upstream URLs default to `localhost:8001/8002/8085/8086/8087` (the Tilt
+forwards).
 Override only if you forwarded to different ports:
 
 ```bash
@@ -160,6 +172,9 @@ meter) → wallet balances + recent-movements update live.**
 | `:8002` | credit-ledger (credits/convert/debits) |
 | `:8085` | inference-gateway (OpenAI API) |
 | `:8000` | inference-runtime (CPU stub) |
+| `:8086` | compute-control (compute, datacenter supply) |
+| `:8087` | matching-engine (paper exchange + index) |
+| `:8088` | surveillance (alerts; internal) |
 | `:8025` | Mailpit web UI — captured emails (`kubectl port-forward -n data deploy/mailpit 8025:8025`) |
 
 ---

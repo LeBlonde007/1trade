@@ -50,6 +50,11 @@ func main() {
 		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
+	if cfg.SkipDomainDNS() {
+		slog.Warn("SSO_DEV_SKIP_DNS on: SSO domains verify without a DNS TXT record (dev only)")
+	} else if cfg.SSODevSkipDNS {
+		slog.Warn("SSO_DEV_SKIP_DNS ignored outside dev", "env", cfg.Env)
+	}
 	slog.Info("platform-core listening", "addr", cfg.Addr, "env", cfg.Env, "version", Version)
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		slog.Error("server", "err", err)
