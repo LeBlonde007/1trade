@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: 1Trade Platform-Core API (auth, accounts, RBAC, keys, billing)
-  version: 1.7.0
+  version: 1.8.0
   description: >
     Identity for the whole platform. Owned by `platform-core`. Every other service authenticates
     inbound requests by verifying the JWT this service issues (see JwtClaims) — that's how each
@@ -25,6 +25,18 @@ info:
     it at `/v1/auth/login/2fa`. Every code works once (the time step is claimed atomically). Five
     wrong codes lock the second step for 15 minutes (429 `mfa_locked`). Turning 2FA off needs a
     current code or a recovery code. `/v1/auth/me` and members return `mfa_enabled`.
+
+    **v1.8.0 (2026-09-28, SAML single sign-on).** One IdP per tenant (admins save its metadata XML,
+    which must carry a signing certificate and an HTTP-Redirect SSO URL), 1–10 email domains that
+    route to it (each domain to one tenant only), a non-admin role for just-in-time members, and an
+    optional enforcement (password sign-in refused with 403 `sso_required` for non-admins; admins
+    keep it as the break-glass path). Flow: `sso/start {email}` returns the IdP URL with an
+    AuthnRequest whose id we record; the web app's ACS relays the IdP's form post to `sso/acs`,
+    which accepts only a signed assertion answering that request (single use, 10 minutes), for our
+    ACS and audience, currently valid, naming an email in the tenant's domains. Accounts are never
+    merged across tenants (403 `sso_account_conflict`); with JIT off, unknown emails get 403
+    `sso_no_account`. Artifact binding and encrypted assertions are not supported (no outbound
+    calls; no SP key). The IdP enforces its own MFA.
 
 servers:
   - { url: "https://api.1trade.io", description: prod }
@@ -346,6 +358,74 @@ paths:
         '200': { description: Session., content: { application/json: { schema: { type: object, properties: { token: { type: string }, expires_at: { type: string, format: date-time } } } } } }
         '401': { description: invalid_challenge | bad_code., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
         '429': { description: mfa_locked., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+
+  /v1/account/sso:
+    get:
+      tags: [auth]
+      summary: "v1.8: the tenant's SAML configuration and our service-provider values (admin)."
+      operationId: getSSO
+      security: [{ tenantJwt: [] }]
+      responses:
+        '200': { description: Configuration., content: { application/json: { schema: { $ref: '#/components/schemas/SSOConfig' } } } }
+        '403': { description: Not an admin., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+    put:
+      tags: [auth]
+      summary: "v1.8: save the IdP metadata, email domains and policy (admin)."
+      operationId: putSSO
+      security: [{ tenantJwt: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [idp_metadata_xml, email_domains]
+              additionalProperties: false
+              properties:
+                idp_metadata_xml: { type: string }
+                email_domains:    { type: array, minItems: 1, maxItems: 10, items: { type: string } }
+                default_role:     { type: string, enum: [billing, engineer, viewer, trader], default: viewer }
+                jit:              { type: boolean, default: true }
+                enforce:          { type: boolean, default: false }
+      responses:
+        '200': { description: Saved., content: { application/json: { schema: { $ref: '#/components/schemas/SSOConfig' } } } }
+        '409': { description: domain_taken., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+        '422': { description: bad_metadata | bad_domains | bad_role., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+    delete:
+      tags: [auth]
+      summary: "v1.8: turn single sign-on off (admin)."
+      operationId: deleteSSO
+      security: [{ tenantJwt: [] }]
+      responses:
+        '204': { description: Off. }
+  /v1/auth/sso/metadata/{tenant_id}:
+    get:
+      tags: [auth]
+      summary: "v1.8: our service-provider metadata for the tenant (public, for the IdP admin)."
+      operationId: ssoMetadata
+      parameters: [ { name: tenant_id, in: path, required: true, schema: { type: string, format: uuid } } ]
+      responses:
+        '200': { description: SAML metadata., content: { application/samlmetadata+xml: { schema: { type: string } } } }
+        '404': { description: Not configured., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+  /v1/auth/sso/start:
+    post:
+      tags: [auth]
+      summary: "v1.8: where to send the browser for this work email (public)."
+      operationId: ssoStart
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [email], properties: { email: { type: string } } } } } }
+      responses:
+        '200': { description: IdP redirect., content: { application/json: { schema: { type: object, properties: { redirect_url: { type: string } } } } } }
+        '404': { description: sso_not_configured., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+  /v1/auth/sso/acs:
+    post:
+      tags: [auth]
+      summary: "v1.8: redeem the IdP's SAMLResponse (relayed by the web app's ACS) for a session (public: the signed assertion is the credential)."
+      operationId: ssoACS
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [saml_response, relay_state], properties: { saml_response: { type: string, description: "base64, as posted by the IdP" }, relay_state: { type: string } } } } } }
+      responses:
+        '200': { description: Session., content: { application/json: { schema: { type: object, properties: { token: { type: string }, expires_at: { type: string, format: date-time } } } } } }
+        '401': { description: sso_request | sso_invalid | sso_domain | sso_not_configured., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+        '403': { description: sso_account_conflict | sso_no_account., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
 
   /v1/account/members:
     get:
@@ -953,6 +1033,19 @@ components:
         name:       { type: string }
         members:    { type: integer }
         created_at: { type: string, format: date-time }
+    SSOConfig:
+      type: object
+      properties:
+        configured:      { type: boolean }
+        idp_entity_id:   { type: string }
+        email_domains:   { type: array, items: { type: string } }
+        default_role:    { type: string }
+        jit:             { type: boolean }
+        enforce:         { type: boolean }
+        updated_at:      { type: string, format: date-time }
+        sp_entity_id:    { type: string, description: "audience the IdP must use" }
+        acs_url:         { type: string }
+        sp_metadata_url: { type: string }
     ApiError:
       type: object
       required: [code, message]

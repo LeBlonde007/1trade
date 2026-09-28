@@ -37,13 +37,18 @@ func (s *Server) SetBudgetMover(t billing.BudgetMover) { s.transfer = t }
 
 // decodeBody reads a small JSON body, refusing unknown fields.
 func decodeBody(w http.ResponseWriter, r *http.Request, v any) bool {
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8192))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(v); err != nil {
+	if err := jsonDecoder(w, r, 8192).Decode(v); err != nil {
 		writeErr(w, http.StatusBadRequest, "bad_request", "invalid JSON body")
 		return false
 	}
 	return true
+}
+
+// jsonDecoder reads at most limit bytes of JSON, refusing unknown fields.
+func jsonDecoder(w http.ResponseWriter, r *http.Request, limit int64) *json.Decoder {
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, limit))
+	dec.DisallowUnknownFields()
+	return dec
 }
 
 // writeTeamErr maps team errors onto statuses.

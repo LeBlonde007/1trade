@@ -118,6 +118,7 @@ func (s *Server) routes() {
 	// OAuth is scaffolded; real provider wiring (client secrets via Vault) is a follow-up.
 	s.teamRoutes()
 	s.mfaRoutes()
+	s.ssoRoutes()
 	s.mux.HandleFunc("GET /v1/auth/oauth/{provider}", notConfigured)
 	s.mux.HandleFunc("GET /v1/auth/oauth/{provider}/callback", notConfigured)
 }
@@ -221,6 +222,15 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	// and offer a resend, without leaking whether the password was right (we only reach here on a match).
 	if s.cfg.RequireEmailVerification && !au.EmailVerified {
 		writeErr(w, http.StatusForbidden, "email_unverified", "verify your email to sign in — check your inbox")
+		return
+	}
+	// A tenant that enforces SSO signs in through its IdP; admins keep password sign-in as the
+	// break-glass path (e.g. to repair a broken IdP configuration).
+	if enforced, err := s.st.SSOEnforced(r.Context(), au.TenantID); err != nil {
+		serverError(w, err)
+		return
+	} else if enforced && !domain.HasRole(au.Roles, domain.RoleAdmin) {
+		writeErr(w, http.StatusForbidden, "sso_required", "your organization signs in with single sign-on")
 		return
 	}
 	// Two-factor: the password alone earns only a 5-minute challenge, redeemed at /v1/auth/login/2fa.

@@ -16,6 +16,32 @@ const submitting = ref(false)
 const needsVerify = ref(false)
 const resending = ref(false)
 const resent = ref(false)
+// SSO: the work email decides the identity provider; failures come back as ?sso_error=<code>.
+const ssoMode = ref(false)
+const SSO_ERRORS: Record<string, string> = {
+  sso_account_conflict: 'That email already has an account in another 1Trade organization.',
+  sso_no_account: 'You have no account yet — ask your admin to invite you.',
+  sso_domain: 'Your identity provider sent an email outside your organization’s domains.',
+  sso_request: 'That sign-in attempt expired — try again.',
+}
+const ssoError = computed(() => {
+  const c = useRoute().query.sso_error
+  return typeof c === 'string' ? (SSO_ERRORS[c] ?? 'Single sign-on failed. Try again or contact your admin.') : ''
+})
+/** onSSO sends the browser to the identity provider for the email's domain. */
+async function onSSO() {
+  authError.value = ''
+  if (!email.value.includes('@')) { authError.value = 'Enter your work email.'; return }
+  submitting.value = true
+  try {
+    const r = await $fetch<{ redirect_url: string }>('/api/auth/sso/start', { method: 'POST', body: { email: email.value } })
+    window.location.href = r.redirect_url
+  } catch (err: unknown) {
+    const ex = err as { data?: { code?: string } }
+    authError.value = ex?.data?.code === 'sso_not_configured' ? 'Single sign-on is not set up for that email domain.' : 'Could not start single sign-on.'
+    submitting.value = false
+  }
+}
 // Shown after the user confirms their email and is redirected here (verify.vue → /login?verified=1).
 const justVerified = computed(() => useRoute().query.verified === '1')
 // Initials for the 2FA email pill — derived from the signed-in address, never hardcoded.
@@ -51,6 +77,9 @@ async function onCreds(e: Event) {
     // prompt + resend, not the generic "invalid email or password".
     if (ex?.statusCode === 403 && ex?.data?.code === 'email_unverified') {
       needsVerify.value = true
+    } else if (ex?.data?.code === 'sso_required') {
+      ssoMode.value = true
+      authError.value = 'Your organization signs in with single sign-on.'
     } else {
       authError.value = ex?.data?.message || 'Invalid email or password'
     }
@@ -205,7 +234,7 @@ onBeforeUnmount(() => {
           <p class="lf-sub">Access your paper or real-money account on the 1Trade venue.</p>
 
           <p v-if="justVerified" class="form-ok" role="status">Email verified — sign in to continue.</p>
-          <p v-if="authError" class="form-error" role="alert">{{ authError }}</p>
+          <p v-if="authError || ssoError" class="form-error" role="alert">{{ authError || ssoError }}</p>
           <div v-if="needsVerify" class="form-notice" role="alert">
             <p class="fn-text">Your email isn't verified yet — check your inbox for the confirmation link.</p>
             <p v-if="resent" class="fn-ok">✓ Sent — check your inbox at {{ email }}.</p>
@@ -226,7 +255,7 @@ onBeforeUnmount(() => {
               />
             </div>
 
-            <div class="field">
+            <div v-if="!ssoMode" class="field">
               <div class="field-label">
                 <span>— Password</span>
                 <a href="mailto:support@1trade.ai?subject=Password%20reset">Forgot password?</a>
@@ -252,7 +281,10 @@ onBeforeUnmount(() => {
               </div>
             </div>
 
-            <button class="btn" type="submit" :disabled="submitting">
+            <button v-if="ssoMode" class="btn" type="button" :disabled="submitting" @click="onSSO">
+              {{ submitting ? 'Redirecting…' : 'Continue with SSO' }}
+            </button>
+            <button v-else class="btn" type="submit" :disabled="submitting">
               <template v-if="submitting">
                 <span class="btn-spinner" aria-hidden="true" />
                 Signing in…
@@ -297,7 +329,7 @@ onBeforeUnmount(() => {
 
           <div class="lf-meta">
             <NuxtLink to="/signup" class="lf-link primary">New to 1Trade? Open an account →</NuxtLink>
-            <NuxtLink to="/enterprise/sso" class="lf-link">Sign in with SSO (firm accounts)</NuxtLink>
+            <a href="#" class="lf-link" @click.prevent="ssoMode = !ssoMode">{{ ssoMode ? 'Sign in with a password instead' : 'Sign in with SSO (firm accounts)' }}</a>
           </div>
         </template>
 

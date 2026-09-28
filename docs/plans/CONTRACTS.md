@@ -114,6 +114,7 @@ These are authored alongside Phase 1 so the switch-on is a config flip, not a re
 | `openapi/supply.yaml` v1.1 partner payouts (agreements, cycles, wire / dispute / resolve / holdback; paper statements never wired) | authored + implemented 2026-09-28 (F18) |
 | `openapi/compute.yaml` v1.2 reserved capacity (quote / buy / list; holds; prepaid usage units 0) + clusters (create / list / get / delete); `events/compute.usage.v1` units note | authored + implemented 2026-09-28 (F14/F15) |
 | `openapi/platform-core.yaml` v1.6 team management (members, invitations, sub-accounts + transfer); `openapi/credit.yaml` v1.4 transfer (+ `transfer` operation on `credit.tx.v1`) | authored + implemented 2026-09-28 (F03) |
+| `openapi/platform-core.yaml` v1.7 two-factor (TOTP, recovery codes, login challenge) · v1.8 SAML SSO (per-tenant IdP, domain routing, JIT, enforcement) | authored + implemented 2026-09-28 (F02) |
 | `openapi/supply.yaml` v1.2 GPU attestation (five layers, nonce challenges, activation gate, drift suspends) | authored + implemented 2026-09-28 (F19) |
 
 ---

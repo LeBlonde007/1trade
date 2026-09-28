@@ -100,3 +100,46 @@ inbound requests through the same auth helper.
   `login-2fa.png`.
 
 **Acceptance:** ✅ 2FA TOTP · ⬜ tenant-wide "require 2FA" policy · ⬜ WebAuthn.
+
+## Status — SAML single sign-on (2026-09-28)
+
+**Built** (`platform-core.yaml` v1.8, migration `0008_sso.sql`, crewjam/saml for XML-DSig):
+- **Per-tenant IdP.** Admins save the IdP metadata (it must carry a signing certificate and an
+  HTTP-Redirect SSO URL), 1–10 email domains (each routes to exactly one tenant), a non-admin role
+  for just-in-time members, and optional **enforcement**. Under enforcement, password sign-in is
+  refused for non-admins; admins keep it as the break-glass path. Changes are audited.
+- **Flow.** The login "Sign in with SSO" option takes the work email and redirects to the IdP. The
+  AuthnRequest id is recorded. The IdP form-posts to the web app's ACS, which relays it to
+  platform-core. The assertion must:
+  - be signed by the tenant's IdP;
+  - answer a request we made (the id is consumed once, within 10 minutes);
+  - be for our ACS and audience;
+  - be currently valid;
+  - name an email in the tenant's domains.
+
+  The member is then found, or created (JIT) with the default role, a verified email and no usable
+  password, and signed in. The BFF sets the session and redirects to `/console`; failures land on
+  `/login?sso_error=…` with a readable reason.
+- **Never merges accounts.** An email that belongs to another tenant is refused. There are no
+  outbound calls: the artifact binding and metadata-by-URL are not accepted (no SSRF surface).
+  Encrypted assertions are not supported, because there is no SP key.
+- **Console:** `/enterprise/sso` is live. It shows the SP entity ID, ACS and metadata URL for the IdP
+  admin, and takes the metadata, domains and policy.
+
+**Verified:**
+- **Real crewjam IdP in tests:**
+  - JIT sign-in with role and tenant;
+  - replay, a response to another request, a tampered assertion, an untrusted IdP key, a foreign
+    domain and an expired request are all refused;
+  - the second sign-in reuses the member; an SSO member has no password;
+  - audit entries; an unknown domain is 404.
+- **Policy:** another tenant's account refused, JIT off refused, enforcement (a viewer is refused,
+  removal restores password sign-in), domain exclusivity, metadata / role / domain validation, and
+  admins only.
+- **Mutation-checked:** 9 of 9 caught.
+- **Live browser against a running SAML IdP:** login → IdP → signed post → console as a JIT
+  engineer. Screenshot: `docs/screenshots/sso-admin.png`.
+
+**Acceptance:** ✅ SAML SSO (any SAML 2.0 IdP — Okta, Entra ID, Google Workspace — via metadata) ·
+✅ 2FA TOTP · ⬜ SCIM 2.0 · ⬜ IP allowlisting · ⬜ domain ownership verification (DNS TXT) before a
+domain can route · ⬜ signed AuthnRequests and encrypted assertions (needs an SP key pair).
