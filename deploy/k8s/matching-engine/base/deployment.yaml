@@ -19,6 +19,7 @@ spec:
           image: 1trade/matching-engine:dev
           ports: [{ containerPort: 8087 }]
           envFrom:
+            - configMapRef: { name: otel-env, optional: true }   # OTLP endpoint for traces; created by install-data-plane.sh OBS=1
             - configMapRef: { name: matching-engine-env }
             - secretRef: { name: platform-auth }   # PLATFORM_JWT_SECRET (verify tenant JWTs)
           livenessProbe:

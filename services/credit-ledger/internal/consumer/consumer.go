@@ -11,12 +11,17 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
+
+	"github.com/nats-io/nats.go"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/trade1/credit-ledger/internal/domain"
 	"github.com/trade1/credit-ledger/internal/events"
+	"github.com/trade1/credit-ledger/internal/obs"
 	"github.com/trade1/credit-ledger/internal/store"
-	"github.com/nats-io/nats.go"
 )
 
 // Source describes one usage stream this consumer drains: its NATS subject, the JetStream stream that
@@ -137,21 +142,29 @@ func (c *UsageConsumer) loop() {
 // so a redelivery is a no-op. Unparseable/invalid messages are terminated (poison); transient store
 // errors are NAK'd.
 func (c *UsageConsumer) handle(msg *nats.Msg) {
+	// Continue the producer's trace: the gateway carries it in the message headers, so the debit
+	// appears under the inference request that caused it.
+	tctx, span := obs.StartSpan(obs.ExtractHeader(context.Background(), msg.Header), "ledger.debit usage",
+		trace.WithSpanKind(trace.SpanKindConsumer))
+	defer span.End()
 	var e usageEvent
 	if err := json.Unmarshal(msg.Data, &e); err != nil {
 		slog.Error("usage event unparseable — terminating", "err", err)
+		span.SetStatus(codes.Error, "terminated")
 		_ = msg.Term()
 		return
 	}
 	id := e.id()
 	if id == "" || e.TenantID == "" || e.CreditType == "" {
 		slog.Error("usage event missing required fields — terminating", "id", id)
+		span.SetStatus(codes.Error, "terminated")
 		_ = msg.Term()
 		return
 	}
 	amt, err := domain.ParseMoney(e.Units)
 	if err != nil || amt.Sign() < 0 {
 		slog.Error("usage event has bad units — terminating", "id", id, "units", e.Units)
+		span.SetStatus(codes.Error, "terminated")
 		_ = msg.Term()
 		return
 	}
@@ -159,7 +172,7 @@ func (c *UsageConsumer) handle(msg *nats.Msg) {
 	if e.SubAccountID != nil {
 		sub = *e.SubAccountID
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(tctx, 5*time.Second)
 	defer cancel()
 	tx, err := c.st.ApplyMovement(ctx, store.Movement{
 		TenantID: e.TenantID, SubAccountID: sub, CreditType: domain.CreditType(e.CreditType),
@@ -176,6 +189,7 @@ func (c *UsageConsumer) handle(msg *nats.Msg) {
 	}
 	if err != nil {
 		slog.Error("usage debit failed — will redeliver", "id", id, "err", err)
+		span.SetStatus(codes.Error, "redelivering")
 		_ = msg.Nak()
 		return
 	}
@@ -193,5 +207,55 @@ func (c *UsageConsumer) Close() {
 	}
 	if c.nc != nil {
 		_ = c.nc.Drain()
+	}
+}
+
+// Supervise starts the consumer for src, retrying in the background every `every` until it succeeds:
+// NATS may not be up yet when the ledger boots. Before, one failed attempt left the ledger without a
+// usage consumer until the next restart, and served usage was never debited. The returned func stops
+// retrying and closes the consumer if it started.
+func Supervise(url string, src Source, st *store.Store, pub events.Publisher, every time.Duration) (stop func()) {
+	var (
+		mu      sync.Mutex
+		running *UsageConsumer
+		stopped bool
+		once    sync.Once
+	)
+	done := make(chan struct{})
+	go func() {
+		for attempt := 1; ; attempt++ {
+			c, err := Start(url, src, st, pub)
+			if err == nil {
+				mu.Lock()
+				defer mu.Unlock()
+				if stopped {
+					c.Close()
+					return
+				}
+				running = c
+				if attempt > 1 {
+					slog.Info("usage consumer started after retrying", "stream", src.Stream, "attempts", attempt)
+				}
+				return
+			}
+			slog.Error("usage consumer not running yet — debits are waiting in the stream; retrying",
+				"stream", src.Stream, "attempt", attempt, "err", err)
+			select {
+			case <-done:
+				return
+			case <-time.After(every):
+			}
+		}
+	}()
+	return func() {
+		once.Do(func() {
+			close(done)
+			mu.Lock()
+			defer mu.Unlock()
+			stopped = true
+			if running != nil {
+				running.Close()
+			}
+		})
 	}
 }

@@ -43,6 +43,7 @@ spec:
           image: 1trade/credit-ledger:dev
           ports: [{ containerPort: 8002 }]
           envFrom:
+            - configMapRef: { name: otel-env, optional: true }   # OTLP endpoint for traces; created by install-data-plane.sh OBS=1
             - configMapRef: { name: credit-ledger-env }
             - secretRef: { name: platform-auth }   # shared PLATFORM_JWT_SECRET — verifies platform-core JWTs (F02↔F05)
             # SETTLE_SERVICE_TOKEN — the matching-engine's own bearer for /v1/credits/settle-trade.

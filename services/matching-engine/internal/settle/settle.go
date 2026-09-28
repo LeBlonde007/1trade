@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/trade1/matching-engine/internal/engine"
+	"github.com/trade1/matching-engine/internal/obs"
 )
 
 // Outcome errors — see the package comment.
@@ -46,7 +47,7 @@ type Client struct {
 // New returns a client. token is SETTLE_SERVICE_TOKEN — the engine's own bearer, never the shared
 // service token.
 func New(baseURL, token string, timeout time.Duration) *Client {
-	return &Client{baseURL: strings.TrimRight(baseURL, "/"), token: token, http: &http.Client{Timeout: timeout}}
+	return &Client{baseURL: strings.TrimRight(baseURL, "/"), token: token, http: &http.Client{Timeout: timeout, Transport: obs.Transport(nil)}} // traced: the ledger is ours
 }
 
 // party is one SettleParty on the wire.

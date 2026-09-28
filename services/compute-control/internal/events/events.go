@@ -53,7 +53,8 @@ type NATSPublisher struct {
 
 // Open connects to NATS and returns a JetStream publisher.
 func Open(url string) (*NATSPublisher, error) {
-	nc, err := nats.Connect(url, nats.Name("compute-control"), nats.Timeout(5*time.Second))
+	nc, err := nats.Connect(url, nats.Name("compute-control"), nats.Timeout(5*time.Second),
+		nats.RetryOnFailedConnect(true), nats.MaxReconnects(-1), nats.ReconnectWait(time.Second))
 	if err != nil {
 		return nil, err
 	}

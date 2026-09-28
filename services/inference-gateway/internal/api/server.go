@@ -196,12 +196,12 @@ func (s *Server) chatCompletions(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	// Emit AFTER the response completes (exactly once). request_id is the ledger's debit idempotency key.
-	s.meter(p, m, req.Model, res, units, latency, requestID)
+	s.meter(r.Context(), p, m, req.Model, res, units, latency, requestID)
 }
 
 // meter emits exactly one inference.usage.v1 event for a served request. Best-effort: a publish
 // failure is logged, never fails the customer (the response was already produced).
-func (s *Server) meter(p auth.Principal, m catalog.Model, modelID string, res model.ChatResult, units string, latencyMS int, requestID string) {
+func (s *Server) meter(ctx context.Context, p auth.Principal, m catalog.Model, modelID string, res model.ChatResult, units string, latencyMS int, requestID string) {
 	in, out, lat := res.PromptTokens, res.CompletionTokens, latencyMS
 	metrics.RecordInference(modelID, m.Trade1.Modality, in, out)
 	e := events.UsageEvent{
@@ -213,7 +213,7 @@ func (s *Server) meter(p auth.Principal, m catalog.Model, modelID string, res mo
 	if p.SubAccountID != "" {
 		e.SubAccountID = &p.SubAccountID
 	}
-	if err := s.usage.PublishUsage(e); err != nil {
+	if err := s.usage.PublishUsage(ctx, e); err != nil {
 		slog.Error("publish inference.usage.v1 failed", "request_id", requestID, "err", err)
 	}
 }
@@ -305,12 +305,12 @@ func (s *Server) imageGenerations(w http.ResponseWriter, r *http.Request) {
 		"created": time.Now().Unix(), "model": req.Model, "data": data,
 	})
 	// Emit AFTER the response (exactly once). request_id is the ledger's debit idempotency key.
-	s.meterImage(p, m, req.Model, count, units, latency, requestID)
+	s.meterImage(r.Context(), p, m, req.Model, count, units, latency, requestID)
 }
 
 // meterImage emits one inference.usage.v1 event for an image-generation request (units = image count),
 // billed in `image` credits. Best-effort, like meter — a publish failure never fails the customer.
-func (s *Server) meterImage(p auth.Principal, m catalog.Model, modelID string, count int, units string, latencyMS int, requestID string) {
+func (s *Server) meterImage(ctx context.Context, p auth.Principal, m catalog.Model, modelID string, count int, units string, latencyMS int, requestID string) {
 	lat := latencyMS
 	metrics.RecordInference(modelID, m.Trade1.Modality, 0, 0)
 	e := events.UsageEvent{
@@ -322,7 +322,7 @@ func (s *Server) meterImage(p auth.Principal, m catalog.Model, modelID string, c
 	if p.SubAccountID != "" {
 		e.SubAccountID = &p.SubAccountID
 	}
-	if err := s.usage.PublishUsage(e); err != nil {
+	if err := s.usage.PublishUsage(ctx, e); err != nil {
 		slog.Error("publish inference.usage.v1 (image) failed", "request_id", requestID, "err", err)
 	}
 	_ = count // count is reflected in `units`; kept for symmetry with meter()'s signature
@@ -397,7 +397,7 @@ func (s *Server) audioSpeech(w http.ResponseWriter, r *http.Request) {
 	}
 	// Bill speech credits = price × chars / 1K (UnitsForTokens computes price × n / 1000).
 	units, _ := pricing.UnitsForTokens(m.Trade1.Price, len(req.Input))
-	s.meterImage(p, m, req.Model, len(req.Input), units, 0, "ttsreq_"+uuid.NewString())
+	s.meterImage(r.Context(), p, m, req.Model, len(req.Input), units, 0, "ttsreq_"+uuid.NewString())
 	if ctype == "" {
 		ctype = "audio/wav"
 	}
@@ -479,7 +479,7 @@ func (s *Server) visionChat(w http.ResponseWriter, r *http.Request) {
 		"usage": map[string]any{"prompt_tokens": res.PromptTokens, "completion_tokens": res.CompletionTokens, "total_tokens": total},
 	})
 	// Token-based billing; modality=vision / credit_type=text come from the catalog entry.
-	s.meter(p, m, req.Model, model.ChatResult{PromptTokens: res.PromptTokens, CompletionTokens: res.CompletionTokens}, units, int(time.Since(start).Milliseconds()), requestID)
+	s.meter(r.Context(), p, m, req.Model, model.ChatResult{PromptTokens: res.PromptTokens, CompletionTokens: res.CompletionTokens}, units, int(time.Since(start).Milliseconds()), requestID)
 }
 
 // videoRequest is the text-to-video submit body.
@@ -541,7 +541,7 @@ func (s *Server) submitVideo(w http.ResponseWriter, r *http.Request) {
 	}
 	// Bill one clip on a successful submit (units = price × 1).
 	units, _ := pricing.UnitsForCount(m.Trade1.Price, 1)
-	s.meterImage(p, m, req.Model, 1, units, 0, "vidreq_"+uuid.NewString())
+	s.meterImage(r.Context(), p, m, req.Model, 1, units, 0, "vidreq_"+uuid.NewString())
 	writeJSON(w, http.StatusAccepted, map[string]any{"id": job.ID, "status": job.Status, "model": req.Model})
 }
 

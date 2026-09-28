@@ -21,6 +21,9 @@ var Version = "dev"
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
 	cfg := config.Load()
+	if _, err := obs.InitTracing(context.Background(), "platform-core"); err != nil {
+		slog.Warn("tracing disabled", "err", err)
+	}
 	if cfg.DatabaseURL == "" {
 		slog.Error("DATABASE_URL is required")
 		os.Exit(1)

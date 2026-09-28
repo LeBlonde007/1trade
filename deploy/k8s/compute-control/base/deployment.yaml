@@ -19,6 +19,7 @@ spec:
           image: 1trade/compute-control:dev
           ports: [{ containerPort: 8086 }]
           envFrom:
+            - configMapRef: { name: otel-env, optional: true }   # OTLP endpoint for traces; created by install-data-plane.sh OBS=1
             - configMapRef: { name: compute-control-env }
             - secretRef: { name: platform-auth }   # PLATFORM_JWT_SECRET (verify tenant JWTs) + SERVICE_TOKEN (internal scheduling)
           livenessProbe:

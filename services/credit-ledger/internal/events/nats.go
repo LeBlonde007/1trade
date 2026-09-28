@@ -18,7 +18,8 @@ type NatsPublisher struct {
 
 // NewNatsPublisher connects to NATS (credit.tx.v1 subject).
 func NewNatsPublisher(url string) (*NatsPublisher, error) {
-	nc, err := nats.Connect(url, nats.Name("credit-ledger"), nats.Timeout(5*time.Second))
+	nc, err := nats.Connect(url, nats.Name("credit-ledger"), nats.Timeout(5*time.Second),
+		nats.RetryOnFailedConnect(true), nats.MaxReconnects(-1), nats.ReconnectWait(time.Second))
 	if err != nil {
 		return nil, err
 	}

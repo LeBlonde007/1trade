@@ -18,8 +18,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/trade1/inference-gateway/internal/config"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/trade1/inference-gateway/internal/config"
+	"github.com/trade1/inference-gateway/internal/obs"
 )
 
 // ErrUnauthenticated is returned when a credential is missing, malformed, or rejected. The API
@@ -59,7 +60,7 @@ func NewResolver(cfg config.Config) *Resolver {
 		platformURL:  strings.TrimRight(cfg.PlatformCoreURL, "/"),
 		serviceToken: cfg.ServiceToken,
 		jwtSecret:    cfg.JWTSecret,
-		http:         &http.Client{Timeout: cfg.HTTPTimeout},
+		http:         &http.Client{Timeout: cfg.HTTPTimeout, Transport: obs.Transport(nil)}, // traced: platform-core is ours
 		cacheTTL:     30 * time.Second,
 		cache:        make(map[string]cacheEntry),
 	}

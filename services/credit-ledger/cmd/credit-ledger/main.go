@@ -23,6 +23,9 @@ var Version = "dev"
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})))
 	cfg := config.Load()
+	if _, err := obs.InitTracing(context.Background(), "credit-ledger"); err != nil {
+		slog.Warn("tracing disabled", "err", err)
+	}
 	if cfg.DatabaseURL == "" {
 		slog.Error("DATABASE_URL is required")
 		os.Exit(1)
@@ -47,18 +50,10 @@ func main() {
 			pub = np
 			slog.Info("publishing credit.tx.v1 to NATS", "url", cfg.NATSURL)
 		}
-		// Consume inference.usage.v1 → idempotent debit (the inference billing loop, F08↔F05).
-		if uc, err := consumer.Start(cfg.NATSURL, consumer.Inference, st, pub); err != nil {
-			slog.Error("inference usage consumer not started — inference debits will not flow", "err", err)
-		} else {
-			defer uc.Close()
-		}
-		// Consume compute.usage.v1 → idempotent gpu_* debit (the GPU billing loop, F12↔F05).
-		if cc, err := consumer.Start(cfg.NATSURL, consumer.Compute, st, pub); err != nil {
-			slog.Error("compute usage consumer not started — gpu debits will not flow", "err", err)
-		} else {
-			defer cc.Close()
-		}
+		// Consume inference.usage.v1 → idempotent debit (the inference billing loop, F08↔F05), and
+		// compute.usage.v1 → gpu_* debit (F12↔F05). Retried in the background until NATS is up.
+		defer consumer.Supervise(cfg.NATSURL, consumer.Inference, st, pub, 5*time.Second)()
+		defer consumer.Supervise(cfg.NATSURL, consumer.Compute, st, pub, 5*time.Second)()
 	}
 
 	// Mount the app behind RED-metrics instrumentation, and expose Prometheus /metrics alongside it on

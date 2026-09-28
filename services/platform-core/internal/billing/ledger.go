@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/trade1/platform-core/internal/config"
+	"github.com/trade1/platform-core/internal/obs"
 )
 
 // PurchaseBooking is a settled purchase to mint into the ledger.
@@ -39,7 +40,7 @@ func NewLedgerClient(cfg config.Config) *LedgerClient {
 	return &LedgerClient{
 		url:          strings.TrimRight(cfg.CreditLedgerURL, "/"),
 		serviceToken: cfg.ServiceToken,
-		http:         &http.Client{Timeout: 5 * time.Second},
+		http:         &http.Client{Timeout: 5 * time.Second, Transport: obs.Transport(nil)}, // traced: the ledger is ours
 	}
 }
 

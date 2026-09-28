@@ -28,7 +28,7 @@ type capturePub struct {
 }
 
 // PublishUsage records the event.
-func (c *capturePub) PublishUsage(e events.UsageEvent) error {
+func (c *capturePub) PublishUsage(_ context.Context, e events.UsageEvent) error {
 	c.mu.Lock()
 	c.events = append(c.events, e)
 	c.mu.Unlock()

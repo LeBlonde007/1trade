@@ -37,12 +37,31 @@
 >   - Both checks were mutation-checked: a metric typo and a broken billing rule each fail.
 > - **Loud failures.** `OBS=1` now applies the rules and the dashboard, and says out loud when Loki or
 >   Tempo fail (they used to be swallowed with `|| true`).
+> - **Tracing (OTel) — built 2026-09-28.** All six Go services share it through the verbatim-copied
+>   `internal/obs`.
+>   - Every inbound request gets a server span (`HTTP <method>`, never a path). Probes and scrapes
+>     are not traced.
+>   - Calls between 1Trade services carry `traceparent`: gateway → ledger and platform-core,
+>     platform-core → ledger, engine → ledger. Calls to third parties (Stripe, email, hosted model
+>     providers) do not, so trace ids never leave the platform.
+>   - Usage events carry the trace through NATS. The ledger's debit is a consumer span under the
+>     inference request that caused it.
+>   - Export is OTLP/HTTP, and only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set. `OBS=1` points every
+>     service at Tempo (the `otel-env` ConfigMap) and adds a Tempo datasource to Grafana. Without it,
+>     services only propagate trace context. Only trace context is propagated, not baggage.
+>   - Proven end to end with the real binaries: a chat request is one trace from the gateway, through
+>     its ledger balance check, over NATS, to the ledger debit. Tests are mutation-checked:
+>     propagation, span naming, probe filtering, provider install, and header case.
+> - **Billing fix found while proving tracing.** NATS being down at boot silently stopped all usage
+>   debits. The gateway fell back to logging for good, and the ledger never started its consumers.
+>   Now the gateway reconnects and buffers, and ensures the usage stream exists. The ledger retries
+>   its consumers in the background. The same run proved a debit lands with NATS started last.
 > - **Not done.**
->   - Tracing instrumentation: no service emits OpenTelemetry spans yet, so Tempo has nothing to show.
->   - The stack has not been installed on a cluster from here.
->   - The billing-stalled alerts need NATS consumers running to be meaningful.
+>   - The stack has not been installed on a cluster from here. Tempo's chart defaults are assumed to
+>     accept OTLP/HTTP on 4318; check this on the first install.
+>   - Logs do not yet carry `trace_id`.
 >
-> **Pending:** tracing (OTel), staging/prod-paper/prod-real clusters, SOPS-sealed secrets, CI-green.
+> **Pending:** staging/prod-paper/prod-real clusters, SOPS-sealed secrets, CI-green.
 
 ## Spec
 

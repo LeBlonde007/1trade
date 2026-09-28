@@ -1,0 +1,19 @@
+# Grafana datasource for Tempo (traces). kube-prometheus-stack's Grafana sidecar loads any ConfigMap
+# labelled grafana_datasource=1. The services export spans over OTLP/HTTP to tempo:4318 (the otel-env
+# ConfigMap that install-data-plane.sh creates when OBS=1); Grafana queries Tempo's HTTP API on 3100.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: 1trade-datasource-tempo
+  namespace: observability
+  labels:
+    grafana_datasource: "1"
+data:
+  tempo.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Tempo
+        type: tempo
+        uid: tempo
+        access: proxy
+        url: http://tempo.observability.svc.cluster.local:3100

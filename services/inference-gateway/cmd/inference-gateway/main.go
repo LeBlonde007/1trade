@@ -2,6 +2,7 @@
 package main
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"os"
@@ -23,6 +24,9 @@ var Version = "dev"
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
 	cfg := config.Load()
+	if _, err := obs.InitTracing(context.Background(), "inference-gateway"); err != nil {
+		slog.Warn("tracing disabled", "err", err)
+	}
 
 	// Usage events drive ledger debits. Prefer NATS; fall back to logging so local dev still runs.
 	var usage events.Publisher

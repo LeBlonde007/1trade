@@ -11,6 +11,7 @@
 package main
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"os"
@@ -29,6 +30,9 @@ var Version = "dev"
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
 	cfg := config.Load()
+	if _, err := obs.InitTracing(context.Background(), "matching-engine"); err != nil {
+		slog.Warn("tracing disabled", "err", err)
+	}
 
 	if cfg.JWTSecret == "" {
 		slog.Warn("PLATFORM_JWT_SECRET unset; tenant reads (orders, positions, fills) will be rejected (401)")

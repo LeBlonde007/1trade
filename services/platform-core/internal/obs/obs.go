@@ -36,11 +36,12 @@ var inFlight = promauto.NewGauge(prometheus.GaugeOpts{
 // carries Go-runtime and process collectors, so memory/GC/fd/CPU metrics ship for free.
 func Handler() http.Handler { return promhttp.Handler() }
 
-// Instrument wraps an http.Handler with RED metrics (rate, errors, duration) plus an in-flight gauge.
+// Instrument wraps an http.Handler with RED metrics (rate, errors, duration) plus an in-flight gauge,
+// inside a trace span (Trace).
 // Cardinality is intentionally bounded to method × status code — no path label, which an id would
 // blow up.
 func Instrument(next http.Handler) http.Handler {
-	return promhttp.InstrumentHandlerInFlight(inFlight,
+	return Trace(promhttp.InstrumentHandlerInFlight(inFlight,
 		promhttp.InstrumentHandlerDuration(duration,
-			promhttp.InstrumentHandlerCounter(requests, next)))
+			promhttp.InstrumentHandlerCounter(requests, next))))
 }

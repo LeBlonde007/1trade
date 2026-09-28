@@ -63,6 +63,11 @@ if [ "$OBS" = "1" ]; then
     || echo "WARN: Loki did not install — logs will not be queryable in Grafana"
   helm upgrade --install tempo grafana/tempo -n observability --wait \
     || echo "WARN: Tempo did not install — traces will not be available"
+  # Point every Go service at Tempo's OTLP/HTTP receiver. Deployments read this ConfigMap as
+  # optional, so without OBS=1 they only propagate trace context and export nothing.
+  kubectl -n default create configmap otel-env \
+    --from-literal=OTEL_EXPORTER_OTLP_ENDPOINT=http://tempo.observability.svc.cluster.local:4318 \
+    --dry-run=client -o yaml | kubectl apply -f -
   OBSDIR="$HERE/../observability"
   # Scrape the Go services' /metrics (CRDs now exist from kube-prometheus-stack). Harmless before the
   # app services are deployed — the ServiceMonitor just matches nothing until they exist.
@@ -70,6 +75,7 @@ if [ "$OBS" = "1" ]; then
   # Alert rules (unit-tested offline: make obs-check) and the platform dashboard. The Grafana sidecar
   # in kube-prometheus-stack loads any ConfigMap labelled grafana_dashboard=1.
   kubectl apply -f "$OBSDIR/alerts.yaml"
+  kubectl apply -f "$OBSDIR/datasources.yaml"
   kubectl -n observability create configmap 1trade-dashboards --from-file="$OBSDIR/dashboards/" \
     --dry-run=client -o yaml | kubectl apply -f -
   kubectl -n observability label configmap 1trade-dashboards grafana_dashboard=1 --overwrite

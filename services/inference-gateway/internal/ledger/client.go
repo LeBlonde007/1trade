@@ -13,8 +13,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/trade1/inference-gateway/internal/config"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/trade1/inference-gateway/internal/config"
+	"github.com/trade1/inference-gateway/internal/obs"
 )
 
 // Client reads tenant balances from credit-ledger.
@@ -30,7 +31,7 @@ func NewClient(cfg config.Config) *Client {
 	return &Client{
 		url:       strings.TrimRight(cfg.CreditLedgerURL, "/"),
 		jwtSecret: cfg.JWTSecret,
-		http:      &http.Client{Timeout: cfg.HTTPTimeout},
+		http:      &http.Client{Timeout: cfg.HTTPTimeout, Transport: obs.Transport(nil)}, // traced: ledger is ours
 	}
 }
 

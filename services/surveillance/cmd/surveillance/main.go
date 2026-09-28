@@ -24,6 +24,9 @@ import (
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
 	cfg := config.Load()
+	if _, err := obs.InitTracing(context.Background(), "surveillance"); err != nil {
+		slog.Warn("tracing disabled", "err", err)
+	}
 	if cfg.DatabaseURL == "" {
 		slog.Error("DATABASE_URL is required")
 		os.Exit(1)

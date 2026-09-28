@@ -39,6 +39,7 @@ spec:
           image: 1trade/surveillance:dev
           ports: [{ containerPort: 8088 }]
           envFrom:
+            - configMapRef: { name: otel-env, optional: true }   # OTLP endpoint for traces; created by install-data-plane.sh OBS=1
             - configMapRef: { name: surveillance-env }
             - secretRef: { name: platform-auth }   # SERVICE_TOKEN guards the review API
           livenessProbe:
