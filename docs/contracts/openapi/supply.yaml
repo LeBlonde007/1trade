@@ -1,0 +1,214 @@
+openapi: 3.0.3
+info:
+  title: 1Trade Supply API (partner datacenter capacity)
+  version: 1.0.0
+  description: >
+    **Partner datacenters bring GPUs into the one 1Trade pool (F16 / F17).** Owned by
+    `compute-platform` (served by `compute-control`). A partner registers a supply source (GPU tier,
+    count, region, SLA tier); it stays `pending` until activated (by 1Trade operations today; by GPU
+    attestation, F19, next). An `active` source whose agent heartbeats is scheduled exactly like
+    1Trade's own capacity: placement never special-cases owned versus partner, and every job and
+    instance records the source that served it (`supply_source_id` on `compute.usage.v1`), which
+    drives partner payouts (F18).
+
+    **Drain.** Suspending a source, retiring it, or missing heartbeats stops NEW work landing on it;
+    work already running keeps its GPUs until it ends. Healthy capacity is `min(gpu_count,
+    gpus_healthy)` from the latest heartbeat.
+
+    Auth: a first-party tenant JWT with the `admin` or `engineer` role manages that tenant's own
+    sources (another tenant's source reads as 404). The internal service token is for operations
+    (list all, activate). Mutations take an Idempotency-Key.
+
+servers:
+  - { url: "https://api.1trade.io", description: prod }
+  - { url: "http://localhost:8086", description: "local (compute-control)" }
+
+tags:
+  - { name: supply, description: "Partner capacity: register, heartbeat, suspend / resume, retire, usage." }
+  - { name: operations, description: "Internal: activation and the fleet-wide view." }
+
+paths:
+  /v1/supply/sources:
+    post:
+      tags: [supply]
+      summary: Register a supply source. It starts `pending`.
+      operationId: registerSource
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/RegisterSource' } } }
+      responses:
+        '201': { description: Registered (or the original, on replay)., content: { application/json: { schema: { $ref: '#/components/schemas/Source' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { description: Idempotency-Key reused with a different body., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+        '422': { $ref: '#/components/responses/Invalid' }
+    get:
+      tags: [supply]
+      summary: >
+        The caller's sources, with live GPUs in use. With the service token: every source,
+        including 1Trade's own.
+      operationId: listSources
+      responses:
+        '200': { description: Sources., content: { application/json: { schema: { type: object, required: [data], properties: { data: { type: array, items: { $ref: '#/components/schemas/Source' } } } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/supply/sources/{id}:
+    parameters: [ { $ref: '#/components/parameters/SourceId' } ]
+    get:
+      tags: [supply]
+      summary: One source.
+      operationId: getSource
+      responses:
+        '200': { description: The source., content: { application/json: { schema: { $ref: '#/components/schemas/Source' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [supply]
+      summary: Retire a source (terminal). It drains, then leaves the pool.
+      operationId: retireSource
+      responses:
+        '200': { description: Retired., content: { application/json: { schema: { $ref: '#/components/schemas/Source' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/supply/sources/{id}/heartbeat:
+    parameters: [ { $ref: '#/components/parameters/SourceId' } ]
+    post:
+      tags: [supply]
+      summary: >
+        The partner agent's heartbeat (every 30 s). A source with no heartbeat for 2 minutes takes no
+        new work until one arrives.
+      operationId: heartbeat
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/Heartbeat' } } }
+      responses:
+        '200': { description: Recorded., content: { application/json: { schema: { $ref: '#/components/schemas/Source' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: The source is retired., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+        '422': { $ref: '#/components/responses/Invalid' }
+
+  /v1/supply/sources/{id}/suspend:
+    parameters: [ { $ref: '#/components/parameters/SourceId' } ]
+    post:
+      tags: [supply]
+      summary: Stop taking new work (drain). Idempotent.
+      operationId: suspendSource
+      responses:
+        '200': { description: Suspended., content: { application/json: { schema: { $ref: '#/components/schemas/Source' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: Not active or suspended (pending or retired)., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+
+  /v1/supply/sources/{id}/resume:
+    parameters: [ { $ref: '#/components/parameters/SourceId' } ]
+    post:
+      tags: [supply]
+      summary: Take work again after a suspension. Idempotent.
+      operationId: resumeSource
+      responses:
+        '200': { description: Active., content: { application/json: { schema: { $ref: '#/components/schemas/Source' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: Not suspended or active (pending or retired)., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+
+  /v1/supply/sources/{id}/activate:
+    parameters: [ { $ref: '#/components/parameters/SourceId' } ]
+    post:
+      tags: [operations]
+      summary: "pending → active. Service token only (operations today; attestation, F19, next)."
+      operationId: activateSource
+      responses:
+        '200': { description: Active., content: { application/json: { schema: { $ref: '#/components/schemas/Source' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: Not pending., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+
+  /v1/supply/sources/{id}/usage:
+    parameters: [ { $ref: '#/components/parameters/SourceId' } ]
+    get:
+      tags: [supply]
+      summary: >
+        GPU time served on this source, per tier, from the same metering that produces
+        compute.usage.v1 (the basis for payouts, F18).
+      operationId: sourceUsage
+      parameters:
+        - { name: from, in: query, schema: { type: string, format: date-time }, description: "inclusive; default: 30 days ago" }
+        - { name: to, in: query, schema: { type: string, format: date-time }, description: "exclusive; default: now" }
+      responses:
+        '200': { description: Usage., content: { application/json: { schema: { $ref: '#/components/schemas/SourceUsage' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Invalid' }
+
+components:
+  securitySchemes:
+    tenantJwt: { type: http, scheme: bearer, bearerFormat: JWT }
+    serviceToken: { type: http, scheme: bearer }
+  parameters:
+    SourceId: { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    IdempotencyKey: { name: Idempotency-Key, in: header, required: true, schema: { type: string, maxLength: 255 } }
+  responses:
+    Unauthorized: { description: Missing or invalid credential., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+    Forbidden: { description: "Needs the admin or engineer role (or, for operations, the service token).", content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+    NotFound: { description: No such source for this caller., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+    Invalid: { description: Invalid request., content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+  schemas:
+    RegisterSource:
+      type: object
+      required: [name, gpu_type, gpu_count, region, sla_tier]
+      additionalProperties: false
+      properties:
+        name:      { type: string, minLength: 1, maxLength: 80 }
+        gpu_type:  { type: string, enum: [gpu_h100, gpu_h200], description: "the GPU credit tier it supplies (credit-types.md §1)" }
+        gpu_count: { type: integer, minimum: 1, maximum: 4096 }
+        region:    { type: string, minLength: 1, maxLength: 64, example: us-east-1a }
+        sla_tier:  { type: string, enum: [bronze, silver, gold] }
+    Heartbeat:
+      type: object
+      required: [gpus_healthy]
+      properties:
+        gpus_healthy:    { type: integer, minimum: 0, description: "GPUs the agent reports fit to schedule" }
+        utilization_pct: { type: integer, minimum: 0, maximum: 100 }
+        ecc_errors:      { type: integer, minimum: 0, description: "uncorrectable ECC errors since the last heartbeat" }
+    Source:
+      type: object
+      required: [id, name, gpu_type, gpu_count, region, sla_tier, state, schedulable, gpus_in_use, created_at]
+      properties:
+        id:                { type: string, format: uuid }
+        partner_tenant_id: { type: string, format: uuid, nullable: true, description: "null for 1Trade-owned capacity" }
+        name:              { type: string }
+        gpu_type:          { type: string, enum: [gpu_h100, gpu_h200] }
+        gpu_count:         { type: integer }
+        region:            { type: string }
+        sla_tier:          { type: string, enum: [bronze, silver, gold] }
+        state:             { type: string, enum: [pending, active, suspended, retired] }
+        schedulable:       { type: boolean, description: "taking new work right now: active, heartbeat fresh, healthy GPUs > 0" }
+        gpus_healthy:      { type: integer, nullable: true, description: "from the latest heartbeat" }
+        gpus_in_use:       { type: integer, description: "reserved by running jobs and instances" }
+        utilization_pct:   { type: integer, nullable: true }
+        last_heartbeat_at: { type: string, format: date-time, nullable: true }
+        created_at:        { type: string, format: date-time }
+    SourceUsage:
+      type: object
+      required: [source_id, from, to, by_tier]
+      properties:
+        source_id: { type: string, format: uuid }
+        from:      { type: string, format: date-time }
+        to:        { type: string, format: date-time }
+        by_tier:
+          type: array
+          items:
+            type: object
+            required: [gpu_type, gpu_seconds, units, sessions]
+            properties:
+              gpu_type:    { type: string }
+              gpu_seconds: { type: string, description: "fixed-point decimal, as on compute.usage.v1" }
+              units:       { type: string, description: "gpu credits billed to customers for this time, fixed-point" }
+              sessions:    { type: integer, description: "usage events (metering intervals) counted" }
+    ApiError:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string }
+        message: { type: string }
+
+security:
+  - tenantJwt: []
+  - serviceToken: []

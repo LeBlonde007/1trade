@@ -10,11 +10,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/trade1/compute-control/internal/domain"
 	"github.com/trade1/compute-control/internal/events"
 	"github.com/trade1/compute-control/internal/metrics"
 	"github.com/trade1/compute-control/internal/pool"
-	"github.com/google/uuid"
 )
 
 // Submit-time errors surfaced to the API layer (mapped to 4xx).
@@ -81,31 +81,29 @@ type idemKey struct {
 // placement to the configured supply source, meters nothing until a job is cancelled/completed, and
 // is idempotent on (tenant, Idempotency-Key).
 type MockScheduler struct {
-	mu       sync.Mutex
-	jobs     map[string]*domain.Job // jobID → job
-	idem     map[idemKey]string     // (tenant, key) → jobID
-	pool     *pool.Pool             // shared GPU capacity (jobs + instances)
-	supplyID string
-	pub      events.Publisher
-	now      func() time.Time
+	mu   sync.Mutex
+	jobs map[string]*domain.Job // jobID → job
+	idem map[idemKey]string     // (tenant, key) → jobID
+	pool *pool.Pool             // shared GPU capacity (jobs + instances), across supply sources
+	pub  events.Publisher
+	now  func() time.Time
 }
 
 // NewMock builds a MockScheduler over a fresh private pool of the given per-tier capacity. Use this
 // when the scheduler owns all the GPUs (e.g. unit tests with no instance manager).
 func NewMock(h100, h200 int, supplyID string, pub events.Publisher) *MockScheduler {
-	return NewMockWithPool(pool.New(map[string]int{domain.CreditH100: h100, domain.CreditH200: h200}), supplyID, pub)
+	return NewMockWithPool(pool.New(supplyID, map[string]int{domain.CreditH100: h100, domain.CreditH200: h200}), pub)
 }
 
 // NewMockWithPool builds a MockScheduler sharing an existing pool — so jobs and customer instances
 // contend for the same GPUs (the F13 wiring).
-func NewMockWithPool(p *pool.Pool, supplyID string, pub events.Publisher) *MockScheduler {
+func NewMockWithPool(p *pool.Pool, pub events.Publisher) *MockScheduler {
 	return &MockScheduler{
-		jobs:     make(map[string]*domain.Job),
-		idem:     make(map[idemKey]string),
-		pool:     p,
-		supplyID: supplyID,
-		pub:      pub,
-		now:      time.Now,
+		jobs: make(map[string]*domain.Job),
+		idem: make(map[idemKey]string),
+		pool: p,
+		pub:  pub,
+		now:  time.Now,
 	}
 }
 
@@ -150,7 +148,8 @@ func (m *MockScheduler) Submit(spec JobSpec, idempotencyKey string) (domain.Job,
 
 	// Reserve the whole gang atomically from the shared pool (all-or-nothing). A repeated idem key
 	// already returned above, so this never double-reserves.
-	if !m.pool.Reserve(spec.GPUType, spec.TotalGPUs()) {
+	source, ok := m.pool.Reserve(spec.GPUType, spec.TotalGPUs())
+	if !ok {
 		return domain.Job{}, ErrCapacity
 	}
 
@@ -167,8 +166,8 @@ func (m *MockScheduler) Submit(spec JobSpec, idempotencyKey string) (domain.Job,
 		GPUs:           spec.GPUs,
 		Pods:           spec.Pods,
 		Reserved:       spec.Reserved,
-		SupplySourceID: m.supplyID,
-		Placement:      m.supplyID + "/mock",
+		SupplySourceID: source, // whichever datacenter took the gang (F16)
+		Placement:      source + "/mock",
 		ReferenceID:    spec.ReferenceID,
 		IsPaper:        spec.IsPaper,
 		CreatedAt:      now,
@@ -230,7 +229,7 @@ func (m *MockScheduler) Cancel(tenantID, jobID string) (domain.Job, error) {
 	snapshot := *j
 	m.mu.Unlock()
 
-	m.pool.Release(snapshot.GPUType, snapshot.TotalGPUs()) // GPUs go back to the shared pool
+	m.pool.Release(snapshot.SupplySourceID, snapshot.GPUType, snapshot.TotalGPUs()) // back to the datacenter that supplied them
 	m.emitUsage(snapshot, elapsed)
 	return snapshot, nil
 }

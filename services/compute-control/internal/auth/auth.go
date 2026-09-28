@@ -20,7 +20,18 @@ type Principal struct {
 	TenantID     string
 	SubAccountID string
 	IsPaper      bool
-	Service      bool // true when authenticated with the service token (internal calls)
+	Roles        []string // RBAC roles from the platform JWT (admin, billing, engineer, viewer, trader)
+	Service      bool     // true when authenticated with the service token (internal calls)
+}
+
+// HasRole reports whether the principal holds role (admin satisfies every role, as in platform-core).
+func (p Principal) HasRole(role string) bool {
+	for _, r := range p.Roles {
+		if r == role || r == "admin" {
+			return true
+		}
+	}
+	return false
 }
 
 // Resolver verifies credentials against the shared HS256 secret + the service token.
@@ -66,5 +77,13 @@ func (r *Resolver) ResolveJWT(bearer string) (Principal, error) {
 	}
 	sub, _ := claims["sub_account_id"].(string)
 	isPaper, _ := claims["is_paper"].(bool)
-	return Principal{TenantID: tenantID, SubAccountID: sub, IsPaper: isPaper}, nil
+	var roles []string
+	if rs, ok := claims["roles"].([]any); ok {
+		for _, r := range rs {
+			if s, ok := r.(string); ok {
+				roles = append(roles, s)
+			}
+		}
+	}
+	return Principal{TenantID: tenantID, SubAccountID: sub, IsPaper: isPaper, Roles: roles}, nil
 }

@@ -27,9 +27,9 @@ const (
 // with a known secret + service token.
 func newServer() *Server {
 	cfg := config.Config{Env: "dev", Paper: true, SupplySource: "dc-owned-1"}
-	p := pool.New(map[string]int{domain.CreditH100: 8, domain.CreditH200: 0})
-	sched := scheduler.NewMockWithPool(p, "dc-owned-1", events.NoopPublisher{})
-	mgr := instance.NewManager(p, "dc-owned-1", events.NoopPublisher{})
+	p := pool.New("dc-owned-1", map[string]int{domain.CreditH100: 8, domain.CreditH200: 0})
+	sched := scheduler.NewMockWithPool(p, events.NoopPublisher{})
+	mgr := instance.NewManager(p, events.NoopPublisher{})
 	return New(cfg, auth.NewResolver(testSecret, testSvc), sched, mgr)
 }
 

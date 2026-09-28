@@ -110,6 +110,7 @@ These are authored alongside Phase 1 so the switch-on is a config flip, not a re
 | `openapi/credit.yaml` v1.2 order reservations (`reserve` / `release`; available = balance − locked on every debit) | authored + implemented in credit-ledger 2026-09-27; engine side built (reserve as risk check, in-order release, orphan reconciler) |
 | `openapi/credit.yaml` v1.3 open-reservation listing, release `reason`, `RESERVATION_CLOSED` | authored + implemented 2026-09-28 (credit-ledger serves it; matching-engine's reconciler consumes it) |
 | `openapi/inference.yaml` v1.1 catalog metadata + model lifecycle (Deprecation/Sunset headers, 410 `model_retired`) | authored + implemented 2026-09-28 (F10); consumers: web console, CLI |
+| `openapi/supply.yaml` v1.0 partner supply sources (register / heartbeat / suspend / retire / usage; activation by operations) | authored + implemented 2026-09-28 in compute-control (F16/F17) |
 
 ---
 

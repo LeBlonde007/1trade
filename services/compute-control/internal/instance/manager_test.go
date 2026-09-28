@@ -30,8 +30,8 @@ func (c *capturePublisher) count() int {
 
 // newManager builds a manager over a fresh pool of h100 H100s.
 func newManager(h100 int, pub events.Publisher) (*Manager, *pool.Pool) {
-	p := pool.New(map[string]int{domain.CreditH100: h100, domain.CreditH200: 0})
-	return NewManager(p, "dc-owned-1", pub), p
+	p := pool.New("dc-owned-1", map[string]int{domain.CreditH100: h100, domain.CreditH200: 0})
+	return NewManager(p, pub), p
 }
 
 func spec(tenant string) Spec {

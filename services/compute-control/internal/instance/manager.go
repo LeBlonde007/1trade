@@ -10,11 +10,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/trade1/compute-control/internal/domain"
 	"github.com/trade1/compute-control/internal/events"
 	"github.com/trade1/compute-control/internal/metrics"
 	"github.com/trade1/compute-control/internal/pool"
-	"github.com/google/uuid"
 )
 
 // Lifecycle errors surfaced to the API layer (mapped to 4xx).
@@ -54,19 +54,17 @@ type Manager struct {
 	instances map[string]*domain.Instance // id → instance
 	idem      map[idemKey]string          // (tenant, key) → id
 	pool      *pool.Pool
-	supplyID  string
 	pub       events.Publisher
 	now       func() time.Time
 }
 
 // NewManager builds a Manager sharing the given GPU pool, supply attribution, and usage publisher
 // (pass events.NoopPublisher{} when NATS is unconfigured).
-func NewManager(p *pool.Pool, supplyID string, pub events.Publisher) *Manager {
+func NewManager(p *pool.Pool, pub events.Publisher) *Manager {
 	return &Manager{
 		instances: make(map[string]*domain.Instance),
 		idem:      make(map[idemKey]string),
 		pool:      p,
-		supplyID:  supplyID,
 		pub:       pub,
 		now:       time.Now,
 	}
@@ -102,7 +100,8 @@ func (m *Manager) Create(spec Spec, idempotencyKey string) (domain.Instance, err
 		}
 	}
 
-	if !m.pool.Reserve(spec.GPUType, spec.Count) {
+	source, ok := m.pool.Reserve(spec.GPUType, spec.Count)
+	if !ok {
 		return domain.Instance{}, ErrCapacity
 	}
 
@@ -118,7 +117,7 @@ func (m *Manager) Create(spec Spec, idempotencyKey string) (domain.Instance, err
 		Image:           image,
 		Region:          region,
 		Connect:         domain.BuildConnect(id, region),
-		SupplySourceID:  m.supplyID,
+		SupplySourceID:  source, // whichever datacenter took it (F16): drives the partner payout
 		IdleStopMinutes: spec.IdleStopMinutes,
 		IsPaper:         spec.IsPaper,
 		CreatedAt:       now,
@@ -183,7 +182,7 @@ func (m *Manager) Stop(tenantID, id string) (domain.Instance, error) {
 	snapshot := *inst
 	m.mu.Unlock()
 
-	m.pool.Release(snapshot.GPUType, snapshot.Count)
+	m.pool.Release(snapshot.SupplySourceID, snapshot.GPUType, snapshot.Count)
 	m.emit(snapshot, elapsed)
 	return snapshot, nil
 }
@@ -199,10 +198,12 @@ func (m *Manager) Start(tenantID, id string) (domain.Instance, error) {
 	if !domain.CanStart(inst.State) {
 		return domain.Instance{}, ErrNotStartable
 	}
-	if !m.pool.Reserve(inst.GPUType, inst.Count) {
+	source, ok := m.pool.Reserve(inst.GPUType, inst.Count)
+	if !ok {
 		return domain.Instance{}, ErrCapacity
 	}
 	now := m.now().UTC()
+	inst.SupplySourceID = source // a restart may land on a different datacenter
 	inst.State = domain.InstanceRunning
 	inst.Connect = domain.BuildConnect(inst.ID, inst.Region)
 	inst.StartedAt = now
@@ -230,7 +231,7 @@ func (m *Manager) Delete(tenantID, id string) (domain.Instance, error) {
 	m.mu.Unlock()
 
 	if wasLive {
-		m.pool.Release(snapshot.GPUType, snapshot.Count)
+		m.pool.Release(snapshot.SupplySourceID, snapshot.GPUType, snapshot.Count)
 		m.emit(snapshot, elapsed)
 	}
 	return snapshot, nil

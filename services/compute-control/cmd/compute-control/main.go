@@ -21,6 +21,7 @@ import (
 	"github.com/trade1/compute-control/internal/obs"
 	"github.com/trade1/compute-control/internal/pool"
 	"github.com/trade1/compute-control/internal/scheduler"
+	"github.com/trade1/compute-control/internal/supply"
 )
 
 // Version is set at build time (-ldflags -X main.Version=...).
@@ -46,14 +47,34 @@ func main() {
 
 	// One shared GPU pool: internal jobs (scheduler) and customer instances (manager) contend for the
 	// same GPUs, so capacity is never double-counted.
-	gpuPool := pool.New(map[string]int{domain.CreditH100: cfg.H100Count, domain.CreditH200: cfg.H200Count})
+	gpuPool := pool.New(cfg.SupplySource, map[string]int{domain.CreditH100: cfg.H100Count, domain.CreditH200: cfg.H200Count})
+
+	// Partner supply (F16): with a database, partner datacenters' GPUs join the same pool, every
+	// metered interval is recorded per source (the payout basis, F18), and the registry is mirrored
+	// into the pool continuously (heartbeat staleness is time-driven).
+	var supplyDeps *api.SupplyDeps
+	if cfg.DatabaseURL != "" {
+		st, err := supply.Open(context.Background(), cfg.DatabaseURL)
+		if err != nil {
+			slog.Error("supply registry unavailable", "err", err)
+			os.Exit(1)
+		}
+		defer st.Close()
+		usage = supply.Recorder{Next: usage, Store: st}
+		syncer := &supply.Syncer{Store: st, Pool: gpuPool}
+		go syncer.Run(context.Background(), 15*time.Second)
+		supplyDeps = &api.SupplyDeps{Store: st, Pool: gpuPool, Sync: syncer}
+		slog.Info("partner supply enabled")
+	} else {
+		slog.Warn("DATABASE_URL unset; partner supply disabled (owned capacity only)")
+	}
 
 	// Scheduler backend selection. M2/M3 ship "mock" (in-memory, GPU-free); "k8s" (Kueue+Volcano) lands
 	// behind the same interface later.
 	var sched scheduler.Scheduler
 	switch cfg.Scheduler {
 	case "mock":
-		sched = scheduler.NewMockWithPool(gpuPool, cfg.SupplySource, usage)
+		sched = scheduler.NewMockWithPool(gpuPool, usage)
 		slog.Info("scheduler: mock-GPU", "h100", cfg.H100Count, "h200", cfg.H200Count, "supply", cfg.SupplySource)
 	default:
 		slog.Error("unsupported scheduler backend (only 'mock' in M2/M3)", "scheduler", cfg.Scheduler)
@@ -62,7 +83,7 @@ func main() {
 
 	// Customer instance manager (F13) over the same pool. A background ticker meters running instances
 	// per interval → compute.usage.v1 → ledger debits the gpu_* tier.
-	mgr := instance.NewManager(gpuPool, cfg.SupplySource, usage)
+	mgr := instance.NewManager(gpuPool, usage)
 	meterStop := startMetering(mgr, cfg.MeterInterval)
 	defer close(meterStop)
 
@@ -74,7 +95,11 @@ func main() {
 	// Expose Prometheus /metrics next to the app (same port, cluster-internal) + instrument app routes.
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", obs.Handler())
-	mux.Handle("/", obs.Instrument(api.New(cfg, resolver, sched, mgr)))
+	server := api.New(cfg, resolver, sched, mgr)
+	if supplyDeps != nil {
+		server.EnableSupply(supplyDeps)
+	}
+	mux.Handle("/", obs.Instrument(server))
 	srv := &http.Server{
 		Addr:              cfg.Addr,
 		Handler:           mux,

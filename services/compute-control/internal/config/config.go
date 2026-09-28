@@ -21,6 +21,7 @@ type Config struct {
 	H200Count     int           // schedulable H200s
 	HTTPTimeout   time.Duration // upstream HTTP client timeout
 	MeterInterval time.Duration // how often running instances are metered → compute.usage.v1
+	DatabaseURL   string        // partner supply registry (supply.yaml); unset = owned capacity only
 }
 
 // Load reads configuration from the environment with sensible dev defaults.
@@ -38,6 +39,7 @@ func Load() Config {
 		H200Count:     intEnv("COMPUTE_H200_COUNT", 0),
 		HTTPTimeout:   5 * time.Second,
 		MeterInterval: time.Duration(intEnv("COMPUTE_METER_INTERVAL_SEC", 60)) * time.Second,
+		DatabaseURL:   os.Getenv("DATABASE_URL"),
 	}
 }
 

@@ -14,6 +14,24 @@ spec:
     metadata:
       labels: { app: compute-control }
     spec:
+      # Apply compute-control's migrations (supply registry) before it starts. Idempotent; a glob,
+      # never a hardcoded list, so a new NNNN_*.sql cannot be skipped.
+      initContainers:
+        - name: migrate
+          image: postgres:16-alpine
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              set -- /migrations/[0-9]*.sql
+              [ -e "$1" ] || { echo "no migrations mounted"; exit 1; }
+              for f in "$@"; do
+                echo "applying $f"; psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"
+              done
+          env:
+            - { name: DATABASE_URL, valueFrom: { configMapKeyRef: { name: compute-control-env, key: DATABASE_URL } } }
+          volumeMounts:
+            - { name: migrations, mountPath: /migrations }
       containers:
         - name: compute-control
           image: 1trade/compute-control:dev
@@ -38,3 +56,8 @@ spec:
             readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
             capabilities: { drop: [ALL] }
+      volumes:
+        # compute-control-migrations: services/compute-control/migrations/*.sql, created out-of-band
+        # (Tiltfile locally / CI) like the other services' migration ConfigMaps.
+        - name: migrations
+          configMap: { name: compute-control-migrations }

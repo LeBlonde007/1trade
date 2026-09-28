@@ -27,6 +27,8 @@ type Server struct {
 	sched scheduler.Scheduler
 	inst  *instance.Manager
 	mux   *http.ServeMux
+	// supply is set by EnableSupply; nil answers the supply endpoints with 503.
+	supply *SupplyDeps
 }
 
 // New builds the routed handler.
@@ -55,6 +57,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("DELETE /v1/compute/instances/{id}", s.deleteInstance)
 	s.mux.HandleFunc("POST /v1/compute/instances/{id}/stop", s.stopInstance)
 	s.mux.HandleFunc("POST /v1/compute/instances/{id}/start", s.startInstance)
+	s.supplyRoutes()
 }
 
 // listTypes serves the GPU-tier catalog with live availability. Public read (no auth) — it leaks no

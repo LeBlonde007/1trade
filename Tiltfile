@@ -86,9 +86,16 @@ k8s_resource('inference-gateway', port_forwards='8085:8085',
 # M2 runs the in-memory mock-GPU scheduler; it emits compute.usage.v1 → credit-ledger debits gpu_*. ---
 docker_build('1trade/compute-control:dev', 'services/compute-control',
              dockerfile='services/compute-control/Dockerfile')
+local_resource(
+    'compute-control-migrations',
+    cmd='kubectl create configmap compute-control-migrations ' +
+        '--from-file=services/compute-control/migrations/ ' +
+        '--dry-run=client -o yaml | kubectl apply -f -',
+    deps=['services/compute-control/migrations'],
+)
 k8s_yaml(kustomize('deploy/k8s/compute-control/base'))
 k8s_resource('compute-control', port_forwards='8086:8086',
-             resource_deps=['platform-auth'])
+             resource_deps=['platform-auth', 'compute-control-migrations'])
 
 # --- data-plane UIs — deployed by `make data-plane` (not Tilt), so Tilt can't port-forward them
 # itself. These long-running local_resources hold the forwards open for the life of `tilt up` and
