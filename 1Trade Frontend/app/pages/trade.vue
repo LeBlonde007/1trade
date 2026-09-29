@@ -65,6 +65,21 @@ const flashHeader = ref<'up' | 'down' | null>(null)
 const dp = computed(() => product.value?.quote_precision ?? 6)
 const tick = computed(() => Number(product.value?.tick_size ?? '0.000001'))
 
+const products = ref<Product[]>([])
+
+/** loadProducts lists the tradeable markets for the switcher. */
+async function loadProducts() {
+  try {
+    const r = await $fetch<{ products: Product[] }>('/api/trading/products')
+    products.value = (r.products ?? []).filter(p => p.tradeable)
+  } catch { /* the switcher shows the current market only */ }
+}
+
+/** switchProduct opens another market (a full load, so every panel starts clean). */
+function switchProduct(id: string) {
+  if (id && id !== PRODUCT_ID) window.location.assign('/trade?product=' + encodeURIComponent(id))
+}
+
 /** loadProduct reads the product and its 24h summary (last, range, volume) from the engine. */
 async function loadProduct() {
   try {
@@ -355,9 +370,21 @@ async function closePosition(p: PositionApi) {
 // Order entry
 // =====================================================
 const orderSide = ref<Side>('buy')
-const orderType = ref<OrderType>('limit')
+// Market by default: a first order should fill, not silently rest at the mid.
+const orderType = ref<OrderType>('market')
+// Switching to limit starts at the touch on the side being traded (the best ask to buy, bid to sell).
+watch(orderType, (t) => {
+  if (t === 'limit' && !parseNum(limitPx.value)) {
+    const px = orderSide.value === 'buy' ? bestAsk.value : bestBid.value
+    if (px) limitPx.value = onTick(px).toFixed(dp.value)
+  }
+})
 const limitPx = ref('')
 const qty = ref('')
+// Size the order in dollars (the default — a credit costs a fraction of a cent, so "how many credits"
+// is a hard first question) or in credits.
+const sizeMode = ref<'usd' | 'qty'>('usd')
+const amountUsd = ref('100')
 const submitting = ref(false)
 const orderMsg = ref('')
 const orderOk = ref(false)
@@ -366,8 +393,12 @@ const orderOk = ref(false)
 function parseNum(s: string): number {
   return parseFloat(s.replace(/[^0-9.]/g, '')) || 0
 }
-const qtyN = computed(() => parseNum(qty.value))
 const pxN = computed(() => orderType.value === 'market' ? (orderSide.value === 'buy' ? bestAsk.value : bestBid.value) || midPrice.value : parseNum(limitPx.value))
+/** qtyN is the order size in credits: typed directly, or the dollar amount ÷ price (to 6 dp). */
+const qtyN = computed(() => {
+  if (sizeMode.value === 'qty') return parseNum(qty.value)
+  return pxN.value > 0 ? Math.floor(parseNum(amountUsd.value) / pxN.value * 1e6) / 1e6 : 0
+})
 const notional = computed(() => pxN.value * qtyN.value)
 const fee = computed(() => notional.value * 0.01)
 const total = computed(() => orderSide.value === 'buy' ? notional.value + fee.value : notional.value - fee.value)
@@ -388,9 +419,24 @@ function bumpQty(dir: 1 | -1) {
   const step = qtyN.value < 100 ? 1 : qtyN.value < 1000 ? 10 : 100
   qty.value = fmtQty(Math.max(0, qtyN.value + dir * step))
 }
-/** quickFill sets the quantity to a share of buying power. */
+/** quickFill sizes the order to a share of buying power, in whichever unit the ticket is using. */
 function quickFill(pct: number) {
-  qty.value = fmtQty(Math.floor(buyingPower.value * pct * 1e6) / 1e6)
+  const credits = Math.floor(buyingPower.value * pct * 1e6) / 1e6
+  if (sizeMode.value === 'qty') qty.value = fmtQty(credits)
+  else amountUsd.value = (Math.floor(credits * pxN.value * 100) / 100).toFixed(2)
+}
+/** setSizeMode switches the size unit, carrying the current size across. */
+function setSizeMode(m: 'usd' | 'qty') {
+  if (m === sizeMode.value) return
+  if (m === 'qty') qty.value = qtyN.value ? fmtQty(qtyN.value) : ''
+  else amountUsd.value = qtyN.value && pxN.value ? (qtyN.value * pxN.value).toFixed(2) : '100'
+  sizeMode.value = m
+}
+/** pickLevel fills the ticket from a book level: an ask sets up a buy at it, a bid a sell. */
+function pickLevel(price: number, side: 'ask' | 'bid') {
+  orderType.value = 'limit'
+  orderSide.value = side === 'ask' ? 'buy' : 'sell'
+  limitPx.value = onTick(price).toFixed(dp.value)
 }
 /** onTick rounds a price to the product's tick. */
 function onTick(p: number) {
@@ -479,11 +525,11 @@ let tapeInterval: ReturnType<typeof setInterval> | null = null
 let accountInterval: ReturnType<typeof setInterval> | null = null
 
 onMounted(async () => {
+  void loadProducts()
   await loadProduct()
   await loadCandles()
   initChart()
   await loadBook()
-  if (!limitPx.value && midPrice.value) setLastPx()
   void loadTape()
   void loadAccount()
   void loadBalances()
@@ -505,7 +551,10 @@ onBeforeUnmount(() => {
       <!-- ============ CHART ============ -->
       <section class="panel chart-panel">
         <header class="chart-head">
-          <span class="sym">{{ PRODUCT_ID }}</span>
+          <select class="sym sym-select" :value="PRODUCT_ID" aria-label="Market" @change="switchProduct(($event.target as HTMLSelectElement).value)">
+            <option v-if="!products.length" :value="PRODUCT_ID">{{ PRODUCT_ID }}</option>
+            <option v-for="p in products" :key="p.product_id" :value="p.product_id">{{ p.product_id }} — {{ p.name }}</option>
+          </select>
           <span class="paper-badge" title="Paper trading: paper cash and credits only. Real-money trading is paused pending exchange licensing.">PAPER</span>
           <span class="px" :class="headerPxClass">{{ fmtPx(midPrice) }}</span>
           <span class="delta" :class="arrowUp ? 'pos' : 'neg'">
@@ -515,7 +564,7 @@ onBeforeUnmount(() => {
             <span class="k">Vol 24h</span> {{ fmtQty(volume24h) }}
             <span class="k stat-spacer">H</span> {{ fmtPx(high24h) }}
             <span class="k stat-spacer">L</span> {{ fmtPx(low24h) }}
-            <span v-if="tradedBars < candles.length" class="k stat-spacer ref-note" title="Bars with no paper trades show the reference price and are drawn grey.">grey bars = reference, no trades</span>
+            <span v-if="tradedBars < candles.length" class="k stat-spacer ref-note" title="Bars with no paper trades show the reference price and are drawn grey.">▮ grey = no trades</span>
           </span>
           <div class="right">
             <div class="seg">
@@ -557,6 +606,8 @@ onBeforeUnmount(() => {
                 :key="'a-' + i"
                 class="ob-row ask"
                 :class="{ flash: l.changed }"
+                :title="'Buy at ' + fmtPx(l.price)"
+                @click="pickLevel(l.price, 'ask')"
               >
                 <div class="bar" :style="{ width: (l.qty / maxBookQty * 100) + '%' }" />
                 <span class="ob-px">{{ fmtPx(l.price) }}</span>
@@ -582,6 +633,8 @@ onBeforeUnmount(() => {
                 :key="'b-' + i"
                 class="ob-row bid"
                 :class="{ flash: l.changed }"
+                :title="'Sell at ' + fmtPx(l.price)"
+                @click="pickLevel(l.price, 'bid')"
               >
                 <div class="bar" :style="{ width: (l.qty / maxBookQty * 100) + '%' }" />
                 <span class="ob-px">{{ fmtPx(l.price) }}</span>
@@ -631,7 +684,7 @@ onBeforeUnmount(() => {
 
             <div v-if="orderType === 'limit'" class="field">
               <div class="field-row">
-                <span class="lbl">Limit price</span>
+                <span class="lbl">Limit price <span class="dim">· USD per credit</span></span>
                 <button type="button" class="last-px" @click="setLastPx">Last {{ fmtPx(midPrice) }}</button>
               </div>
               <div class="input-row">
@@ -645,14 +698,23 @@ onBeforeUnmount(() => {
 
             <div class="field">
               <div class="field-row">
-                <span class="lbl">Quantity ({{ PRODUCT_ID }})</span>
+                <span class="lbl">Amount</span>
+                <div class="seg seg-sm unit-seg">
+                  <button type="button" :class="{ active: sizeMode === 'usd' }" @click="setSizeMode('usd')">USD</button>
+                  <button type="button" :class="{ active: sizeMode === 'qty' }" @click="setSizeMode('qty')">Credits</button>
+                </div>
               </div>
               <div class="input-row">
-                <input v-model="qty" type="text" />
+                <input v-if="sizeMode === 'usd'" v-model="amountUsd" type="text" inputmode="decimal" aria-label="Amount in USD" />
+                <input v-else v-model="qty" type="text" inputmode="decimal" aria-label="Quantity in credits" />
                 <div class="ticks">
-                  <button type="button" @click="bumpQty(1)">▲</button>
-                  <button type="button" @click="bumpQty(-1)">▼</button>
+                  <button type="button" @click="sizeMode === 'usd' ? amountUsd = String(parseNum(amountUsd) + 10) : bumpQty(1)">▲</button>
+                  <button type="button" @click="sizeMode === 'usd' ? amountUsd = String(Math.max(0, parseNum(amountUsd) - 10)) : bumpQty(-1)">▼</button>
                 </div>
+              </div>
+              <div class="size-hint">
+                {{ sizeMode === 'usd' ? '≈ ' + fmtQty(qtyN) + ' ' + PRODUCT_ID + ' credits' : '≈ ' + fmtUsd(notional, notional < 10 ? 4 : 2) }}
+                <span class="dim">· 1 credit = {{ fmtUsd(pxN, dp) }}</span>
               </div>
               <div class="quick-fill">
                 <button type="button" @click="quickFill(0.25)">25%</button>
@@ -876,7 +938,7 @@ onBeforeUnmount(() => {
   --neg-bar: rgba(239, 68, 68, 0.16);
 
   display: grid;
-  grid-template-rows: 1fr 200px;
+  grid-template-rows: 1fr 180px;
   height: 100%;
   min-height: 800px;
   background: var(--canvas);
@@ -898,7 +960,7 @@ onBeforeUnmount(() => {
 .main-grid {
   display: grid;
   grid-template-columns: 1fr 340px;
-  grid-template-rows: 1.55fr 1fr;
+  grid-template-rows: 1.2fr 1fr;
   grid-template-areas:
     "chart book"
     "entry tape";
@@ -1245,19 +1307,30 @@ onBeforeUnmount(() => {
 }
 
 .entry-body {
-  padding: 16px 20px;
+  padding: 12px 18px;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 24px;
+  gap: 20px;
   flex: 1;
   min-height: 0;
+  overflow-y: auto; /* never clip the ticket on a short screen */
 }
 .entry-form {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   min-height: 0;
 }
+.size-hint { font-family: var(--font-mono); font-size: 11px; color: var(--text-2); }
+.size-hint .dim, .lbl .dim { color: var(--text-3); text-transform: none; letter-spacing: 0; }
+.unit-seg { height: 20px; }
+.unit-seg button { height: 18px; }
+.sym-select {
+  background: transparent; border: 1px solid transparent; border-radius: var(--radius-sm);
+  color: var(--text); font: inherit; cursor: pointer; padding: 2px 4px; max-width: 260px;
+}
+.sym-select:hover, .sym-select:focus { border-color: var(--border); outline: none; }
+.sym-select option { background: var(--elevated); color: var(--text); }
 .entry-form.summary-side { justify-content: space-between; }
 .seg-sm { height: 24px; }
 .seg-sm button { height: 22px; font-size: 10px; padding: 0 8px; }

@@ -181,7 +181,7 @@ here. Use the cluster's gateway (§7) for that.
 
 ## 9. Exchange: paper trading
 
-Switch the sidebar persona to **Trader** (the "Viewing as" pill). Then open `/markets`.
+Open **Markets** in the sidebar (`/markets`).
 
 - Expect: a **PAPER** banner ("Paper trading is open … real money is paused") and a **Trade →** link
   on each market.
