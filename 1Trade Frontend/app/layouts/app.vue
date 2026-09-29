@@ -28,9 +28,6 @@ const shellVars = computed(() => ({ '--app-sb-w': sidebar.collapsed.value ? '64p
     </main>
     <AppCommandPalette />
     <AppNotifications />
-    <TradeOrderDetail />
-    <TradePositionDetail />
-    <AppTransactionDetail />
   </div>
 </template>
 

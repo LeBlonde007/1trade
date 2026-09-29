@@ -555,10 +555,10 @@ async function send() {
     if (now - lastScroll > 80) { lastScroll = now; scrollToBottom() } // throttle reflow while streaming
   }
   try {
-    const { content, usage, aborted } = await useInference().runStream(liveModel, payload, params.maxTokens, {
+    const { content, usage, aborted, id } = await useInference().runStream(liveModel, payload, params.maxTokens, {
       onToken, signal: streamAbort.signal,
     })
-    finalizeAssistant(aTurn, content || aTurn.text, usage, liveModel, startedAt, aborted)
+    finalizeAssistant(aTurn, content || aTurn.text, usage, liveModel, startedAt, aborted, id)
   } catch (e: unknown) {
     const ex = e as { statusCode?: number; data?: { code?: string; message?: string }; message?: string }
     if (ex?.statusCode === 404 && !aTurn.text) {
@@ -566,7 +566,7 @@ async function send() {
       // the model still answers. No double-charge: the stream never reached a running model.
       try {
         const res = await useInference().run(liveModel, payload, params.maxTokens)
-        finalizeAssistant(aTurn, res.content, res.usage, liveModel, startedAt, false)
+        finalizeAssistant(aTurn, res.content, res.usage, liveModel, startedAt, false, res.id)
       } catch (e2: unknown) { renderAssistantError(aTurn, e2) }
     } else if (aTurn.text) {
       // Mid-stream failure after partial output — keep what arrived, mark it finished.
@@ -584,7 +584,7 @@ async function send() {
 // finalizeAssistant stamps a completed assistant turn with usage, latency, and the real credit cost
 // (estimating token counts when the gateway omits a usage chunk). The server-side ledger debit is the
 // source of truth; this is the visible mirror.
-function finalizeAssistant(t: Turn, content: string, usage: ChatUsage | undefined, model: string, startedAt: number, aborted: boolean) {
+function finalizeAssistant(t: Turn, content: string, usage: ChatUsage | undefined, model: string, startedAt: number, aborted: boolean, id?: string) {
   t.text = content
   t.html = renderMarkdownLite(content + (aborted ? '\n\n_(stopped)_' : ''))
   t.streaming = false
@@ -595,7 +595,7 @@ function finalizeAssistant(t: Turn, content: string, usage: ChatUsage | undefine
   const cc = liveCreditCost(model, total)
   t.creditCost = cc?.cost
   t.creditType = cc?.creditType
-  t.reqId = 'req_' + Math.random().toString(36).slice(2, 12)
+  t.reqId = id // the gateway's completion id; absent when the stream carried none
   t.backend = model
   void refreshBalance() // the debit settles async via the ledger; pull the new balance shortly after
 }
@@ -2012,7 +2012,7 @@ async function copyText(text: string, label: string) {
 
             <div class="meta-section">
               <div class="meta-eyebrow">— Headers · last request</div>
-              <pre class="meta-headers mono">x-1trade-request-id: {{ lastAssistant?.reqId ?? '—' }}
+              <pre class="meta-headers mono">completion id: {{ lastAssistant?.reqId ?? '—' }}
 x-1trade-backend:    {{ lastAssistant?.backend ?? '—' }}
 x-1trade-region:     us-east-1
 x-1trade-model-ver:  {{ selected.version }}

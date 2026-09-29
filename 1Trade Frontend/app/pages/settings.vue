@@ -4,8 +4,8 @@
  *
  * Renders inside the `app` layout (sidebar + topbar are shared).
  * Left nav lists every section; the right pane swaps content.
- * Profile is shown by default and fully populated; other sections
- * have header stubs so the shell is complete-but-minimal.
+ * Every section reads live data: the identity from /api/auth/me, two-factor, API keys from
+ * platform-core, KYC from /api/account/kyc. Settings the backend does not store yet are not shown.
  */
 
 definePageMeta({ layout: 'app', middleware: 'auth' })
@@ -15,8 +15,6 @@ type SectionKey =
   | 'profile'
   | 'security'
   | 'api'
-  | 'notifications'
-  | 'display'
   | 'kyc'
   | 'danger'
 
@@ -31,8 +29,6 @@ const SECTIONS: SectionDef[] = [
   { key: 'profile',       label: 'Profile',                group: 'Personal' },
   { key: 'security',      label: 'Account & Security',     group: 'Personal' },
   { key: 'api',           label: 'API Keys',               group: 'Personal' },
-  { key: 'notifications', label: 'Notifications',          group: 'Personal' },
-  { key: 'display',       label: 'Display preferences',    group: 'Personal' },
   { key: 'kyc',           label: 'KYC status',             group: 'Account' },
   { key: 'danger',        label: 'Danger zone',            group: 'Account',  danger: true },
 ]
@@ -50,59 +46,21 @@ const active = ref<SectionKey>('profile')
 const current = computed(() => SECTIONS.find(s => s.key === active.value)!)
 
 // =====================================================
-// Profile form state (pre-populated)
+// Identity + KYC (live)
 // =====================================================
-const profile = reactive({
-  firstName: 'Marcus',
-  lastName: 'Chen',
-  displayName: 'Marcus Chen',
-  email: 'marcus.chen@frontier.lab',
-  emailVerified: true,
-  phone: '+1 (212) 555-0142',
-  phoneVerified: false,
-  timezone: 'America/New_York',
-  currency: 'USD',
-  language: 'en-US',
-})
+const auth = useAuth()
+const user = computed(() => auth.user.value)
+const kycApi = useKyc()
+const ACCOUNT_TYPE_LABEL: Record<string, string> = {
+  trader: 'Trader', ai_company: 'AI company', enterprise: 'Enterprise', datacenter: 'Datacenter',
+}
+const initials = computed(() => (user.value?.email?.slice(0, 2) ?? '··').toUpperCase())
 
-const TIMEZONES = [
-  { value: 'America/New_York',    label: 'America / New York · UTC−5' },
-  { value: 'America/Los_Angeles', label: 'America / Los Angeles · UTC−8' },
-  { value: 'America/Chicago',     label: 'America / Chicago · UTC−6' },
-  { value: 'Europe/London',       label: 'Europe / London · UTC±0' },
-  { value: 'Europe/Frankfurt',    label: 'Europe / Frankfurt · UTC+1' },
-  { value: 'Europe/Helsinki',     label: 'Europe / Helsinki · UTC+2' },
-  { value: 'Asia/Tokyo',          label: 'Asia / Tokyo · UTC+9' },
-  { value: 'Asia/Singapore',      label: 'Asia / Singapore · UTC+8' },
-  { value: 'Asia/Hong_Kong',      label: 'Asia / Hong Kong · UTC+8' },
-  { value: 'UTC',                 label: 'UTC · Coordinated Universal Time' },
-]
-const CURRENCIES = [
-  { value: 'USD', label: 'USD · US Dollar' },
-  { value: 'EUR', label: 'EUR · Euro' },
-  { value: 'GBP', label: 'GBP · British Pound' },
-  { value: 'SGD', label: 'SGD · Singapore Dollar' },
-  { value: 'CHF', label: 'CHF · Swiss Franc' },
-]
-const LANGUAGES = [
-  { value: 'en-US', label: 'English (US)' },
-  { value: 'en-GB', label: 'English (UK)' },
-  { value: 'de-DE', label: 'Deutsch' },
-  { value: 'fr-FR', label: 'Français' },
-  { value: 'ja-JP', label: '日本語' },
-  { value: 'zh-CN', label: '中文 (简体)' },
-]
-
-const initials = computed(() => (profile.firstName[0] ?? 'M') + (profile.lastName[0] ?? 'C'))
-
-// =====================================================
-// Account & Security minimal data
-// =====================================================
-const SESSIONS = [
-  { id: 'this',  device: 'MacBook Pro · Chrome 124',  location: 'New York, US',  ip: '74.125.224.12', last: 'Active now',     current: true },
-  { id: 's2',    device: 'iPhone 15 Pro · iOS 17',     location: 'New York, US',  ip: '172.58.232.40', last: '2 hours ago',    current: false },
-  { id: 's3',    device: 'Windows 11 · Edge 124',      location: 'Tokyo, JP',     ip: '210.140.92.18', last: '3 days ago',     current: false },
-]
+/** signOut ends this session and returns to the login page. */
+async function signOut() {
+  await auth.logout().catch(() => {})
+  await navigateTo('/login')
+}
 
 // =====================================================
 // API Keys
@@ -152,22 +110,15 @@ const displayKeys = computed<ApiKey[]>(() => {
     scopes: (k.scopes ?? []) as Scope[],
     created: k.created_at ? k.created_at.slice(0, 10) : '—',
     lastUsed: '—',
-    createdBy: profile.email,
+    createdBy: user.value?.email ?? '—',
     status: k.revoked ? 'revoked' : 'active',
   }))
 })
 
-type Expiration = 'never' | '30d' | '90d' | '1y' | 'custom'
-const EXP_OPTIONS: Array<{ value: Expiration; label: string; sub: string }> = [
-  { value: '30d',    label: '30 days',  sub: 'Recommended for short-lived bots' },
-  { value: '90d',    label: '90 days',  sub: 'Standard rotation cadence' },
-  { value: '1y',     label: '1 year',   sub: 'Production · auto-rotates' },
-  { value: 'never',  label: 'Never',    sub: 'Discouraged · audit-flagged' },
-]
 
 const showApiModal = ref(false)
 const apiModalStep = ref<'form' | 'generated'>('form')
-const newKeyName = ref('Backfill replay · staging')
+const newKeyName = ref('')
 const newKeyScopes = reactive<Record<Scope, boolean>>({
   trade: false,
   read: true,
@@ -175,7 +126,6 @@ const newKeyScopes = reactive<Record<Scope, boolean>>({
   billing: false,
   admin: false,
 })
-const newKeyExp = ref<Expiration>('90d')
 const generatedKeyFull = ref('')
 const generatedKeyId = ref('')
 const copyToast = ref<'' | 'copied'>('')
@@ -183,13 +133,12 @@ const copyToast = ref<'' | 'copied'>('')
 function openCreateKeyModal() {
   showApiModal.value = true
   apiModalStep.value = 'form'
-  newKeyName.value = 'Backfill replay · staging'
+  newKeyName.value = ''
   newKeyScopes.trade = false
   newKeyScopes.read = true
   newKeyScopes['market-data'] = true
   newKeyScopes.billing = false
   newKeyScopes.admin = false
-  newKeyExp.value = '90d'
 }
 function closeApiModal() {
   showApiModal.value = false
@@ -229,7 +178,6 @@ async function copyGeneratedKey() {
   }
 }
 
-const expLabel = computed(() => EXP_OPTIONS.find(o => o.value === newKeyExp.value)?.label ?? 'Never')
 
 async function revokeKey(id: string) {
   try { await liveKeys.revoke(id) } catch { keyError.value = 'Could not revoke key.' }
@@ -251,6 +199,8 @@ onMounted(() => {
   const h = route.hash?.replace('#', '') as SectionKey
   if (h && SECTIONS.find(s => s.key === h)) active.value = h
   liveKeys.load().catch(() => { keyError.value = 'Could not load keys.' })
+  kycApi.load().catch(() => {})
+  if (!auth.user.value) auth.refresh().catch(() => {})
 })
 </script>
 
@@ -266,7 +216,7 @@ onMounted(() => {
         <span class="cur strong">{{ current.label }}</span>
       </div>
       <div class="subbar-right">
-        <span class="env-pill">PAPER</span>
+        <span class="env-pill">{{ user?.is_paper === false ? 'LIVE' : 'PAPER' }}</span>
       </div>
     </div>
 
@@ -331,10 +281,6 @@ onMounted(() => {
           </ul>
         </div>
 
-        <div class="nav-foot">
-          <span class="nf-k">Build</span>
-          <span class="nf-v">venue v2.4.1</span>
-        </div>
       </aside>
 
       <!-- ============ CONTENT ============ -->
@@ -351,129 +297,31 @@ onMounted(() => {
             </div>
           </header>
 
-          <!-- Avatar card -->
           <div class="card">
-            <div class="card-head"><span class="eyebrow"><span class="dot" /> Avatar</span></div>
+            <div class="card-head"><span class="eyebrow"><span class="dot" /> Account</span></div>
             <div class="avatar-row">
               <div class="avatar-big" aria-hidden="true">{{ initials }}</div>
               <div class="avatar-body">
-                <div class="avatar-name">{{ profile.displayName }}</div>
-                <div class="avatar-meta">PNG / JPG / SVG · square crop · ≤ 2MB · 256×256 recommended</div>
-                <div class="avatar-actions">
-                  <button type="button" class="btn secondary">
-                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square">
-                      <path d="M3 11l2-2 3 3 3-4 2 2v3H3z" />
-                      <path d="M2 13.5h12" />
-                    </svg>
-                    Upload new
-                  </button>
-                  <button type="button" class="btn ghost">Remove</button>
-                </div>
+                <div class="avatar-name">{{ user?.email ?? '—' }}</div>
+                <div class="avatar-meta">{{ ACCOUNT_TYPE_LABEL[user?.account_type ?? ''] ?? '—' }} account · {{ user?.is_paper === false ? 'real money' : 'paper / sandbox' }}</div>
               </div>
             </div>
           </div>
 
-          <!-- Identity card -->
           <div class="card">
-            <div class="card-head"><span class="eyebrow"><span class="dot" /> Identity</span></div>
+            <div class="card-head"><span class="eyebrow"><span class="dot" /> Details</span></div>
             <div class="card-body">
-              <div class="field-grid">
-                <div class="field col-6">
-                  <label class="field-label">— First name</label>
-                  <input v-model="profile.firstName" class="input" type="text" autocomplete="given-name" />
-                </div>
-                <div class="field col-6">
-                  <label class="field-label">— Last name</label>
-                  <input v-model="profile.lastName" class="input" type="text" autocomplete="family-name" />
-                </div>
-                <div class="field col-12">
-                  <label class="field-label">
-                    — Display name
-                    <span class="hint">Shown in chat, leaderboards and trade tape</span>
-                  </label>
-                  <input v-model="profile.displayName" class="input" type="text" />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Contact card -->
-          <div class="card">
-            <div class="card-head">
-              <span class="eyebrow"><span class="dot" /> Contact</span>
-              <span class="card-meta">2FA &amp; recovery contact</span>
-            </div>
-            <div class="card-body">
-              <div class="field-grid">
-                <div class="field col-12">
-                  <label class="field-label">— Email</label>
-                  <div class="input-affix">
-                    <input v-model="profile.email" class="input mono-input" type="email" autocomplete="email" />
-                    <span class="affix-right">
-                      <span class="status-tag verified">
-                        <span class="dot" />
-                        Verified
-                      </span>
-                      <button type="button" class="affix-link">Change</button>
-                    </span>
-                  </div>
-                  <span class="field-hint">Primary login. Used for receipts, 2FA backup and security alerts.</span>
-                </div>
-
-                <div class="field col-12">
-                  <label class="field-label">— Phone</label>
-                  <div class="input-affix">
-                    <input v-model="profile.phone" class="input mono-input" type="tel" autocomplete="tel" />
-                    <span class="affix-right">
-                      <span class="status-tag pending">
-                        <span class="dot" />
-                        Verify
-                      </span>
-                      <button type="button" class="affix-link primary">Send code →</button>
-                    </span>
-                  </div>
-                  <span class="field-hint">Optional · enables SMS recovery if you lose your authenticator.</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Preferences card -->
-          <div class="card">
-            <div class="card-head">
-              <span class="eyebrow"><span class="dot" /> Locale &amp; formatting</span>
-            </div>
-            <div class="card-body">
-              <div class="field-grid">
-                <div class="field col-12">
-                  <label class="field-label">— Timezone</label>
-                  <select v-model="profile.timezone" class="select">
-                    <option v-for="tz in TIMEZONES" :key="tz.value" :value="tz.value">{{ tz.label }}</option>
-                  </select>
-                  <span class="field-hint">Used for chart axes, daily prints and scheduled reports.</span>
-                </div>
-                <div class="field col-6">
-                  <label class="field-label">— Default currency</label>
-                  <select v-model="profile.currency" class="select">
-                    <option v-for="c in CURRENCIES" :key="c.value" :value="c.value">{{ c.label }}</option>
-                  </select>
-                </div>
-                <div class="field col-6">
-                  <label class="field-label">— Language</label>
-                  <select v-model="profile.language" class="select">
-                    <option v-for="l in LANGUAGES" :key="l.value" :value="l.value">{{ l.label }}</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Save bar -->
-          <div class="save-bar">
-            <span class="save-hint">Changes apply immediately on save · email change requires re-verification.</span>
-            <div class="save-actions">
-              <button type="button" class="btn secondary">Discard</button>
-              <button type="button" class="btn primary">Save changes</button>
+              <table class="table">
+                <tbody>
+                  <tr><td class="left">Email</td><td class="left mono">{{ user?.email ?? '—' }}</td></tr>
+                  <tr><td class="left">Account type</td><td class="left">{{ ACCOUNT_TYPE_LABEL[user?.account_type ?? ''] ?? '—' }}</td></tr>
+                  <tr><td class="left">Roles</td><td class="left mono">{{ user?.roles?.join(', ') || '—' }}</td></tr>
+                  <tr><td class="left">Identity verification</td><td class="left">{{ kycApi.kyc.value?.status ?? user?.kyc_status ?? '—' }}</td></tr>
+                  <tr><td class="left">Account ID</td><td class="left mono">{{ user?.tenant_id ?? '—' }}</td></tr>
+                  <tr><td class="left">User ID</td><td class="left mono">{{ user?.user_id ?? '—' }}</td></tr>
+                </tbody>
+              </table>
+              <p class="field-hint">To change your email address, contact <a href="mailto:support@1trade.com">support@1trade.com</a>.</p>
             </div>
           </div>
         </template>
@@ -484,59 +332,28 @@ onMounted(() => {
             <div>
               <div class="eyebrow"><span class="dot" /> Settings · Personal</div>
               <h2 class="section-title">Account &amp; Security</h2>
-              <p class="section-sub">Password, two-factor authentication and active sessions.</p>
+              <p class="section-sub">Two-factor authentication and your session.</p>
             </div>
           </header>
-
-          <div class="card">
-            <div class="card-head">
-              <span class="eyebrow"><span class="dot" /> Password</span>
-              <span class="card-meta">Last changed 2026-04-02</span>
-            </div>
-            <div class="card-body">
-              <div class="row-action">
-                <div class="row-text">
-                  <div class="row-title">Set a new password</div>
-                  <div class="row-sub">Minimum 12 characters · must include a number and a symbol</div>
-                </div>
-                <button type="button" class="btn secondary">Change password</button>
-              </div>
-            </div>
-          </div>
 
           <TwoFactorCard />
 
           <div class="card">
-            <div class="card-head">
-              <span class="eyebrow"><span class="dot" /> Active sessions</span>
-              <button type="button" class="head-link">Sign out everywhere</button>
-            </div>
+            <div class="card-head"><span class="eyebrow"><span class="dot" /> Session</span></div>
             <div class="card-body">
-              <table class="table">
-                <thead>
-                  <tr>
-                    <th class="left">Device</th>
-                    <th class="left">Location</th>
-                    <th class="left">IP</th>
-                    <th class="left">Last activity</th>
-                    <th class="right-th"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="s in SESSIONS" :key="s.id">
-                    <td class="left">
-                      {{ s.device }}
-                      <span v-if="s.current" class="status-tag verified inline">This device</span>
-                    </td>
-                    <td class="left">{{ s.location }}</td>
-                    <td class="left mono">{{ s.ip }}</td>
-                    <td class="left">{{ s.last }}</td>
-                    <td class="right-td">
-                      <button type="button" class="btn-mini" :disabled="s.current">Revoke</button>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+              <div class="row-action">
+                <div class="row-text">
+                  <div class="row-title">Signed in as {{ user?.email ?? '—' }}</div>
+                  <div class="row-sub">Sessions expire on their own. Sign out here to end this one now.</div>
+                </div>
+                <button type="button" class="btn secondary" @click="signOut">Sign out</button>
+              </div>
+              <div class="row-action">
+                <div class="row-text">
+                  <div class="row-title">Password</div>
+                  <div class="row-sub">To reset your password, contact <a href="mailto:support@1trade.com">support@1trade.com</a>.</div>
+                </div>
+              </div>
             </div>
           </div>
         </template>
@@ -667,44 +484,53 @@ onMounted(() => {
           </div>
         </template>
 
-        <!-- ===== STUB SECTIONS ===== -->
-        <template v-else>
+        <!-- ===== KYC ===== -->
+        <template v-else-if="active === 'kyc'">
           <header class="section-head">
             <div>
-              <div class="eyebrow"><span class="dot" /> Settings · {{ current.group }}</div>
-              <h2 class="section-title">{{ current.label }}</h2>
-              <p class="section-sub">
-                <template v-if="active === 'notifications'">
-                  Choose what triggers an email, push notification or webhook.
-                </template>
-                <template v-else-if="active === 'display'">
-                  Theme, density and table formatting defaults.
-                </template>
-                <template v-else-if="active === 'kyc'">
-                  Identity verification status. Required before your first real-money purchase.
-                </template>
-                <template v-else-if="active === 'danger'">
-                  Irreversible operations on the account.
-                </template>
-              </p>
+              <div class="eyebrow"><span class="dot" /> Settings · Account</div>
+              <h2 class="section-title">KYC status</h2>
+              <p class="section-sub">Identity verification. Required before your first real-money purchase; paper trading and sandbox credits never need it.</p>
             </div>
           </header>
-
-          <div class="card stub-card">
-            <div class="stub-mark">
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square">
-                <rect x="3" y="3" width="10" height="10" />
-                <path d="M3 7h10M7 3v10" />
-              </svg>
+          <div class="card">
+            <div class="card-body">
+              <table class="table">
+                <tbody>
+                  <tr><td class="left">Status</td><td class="left mono">{{ kycApi.kyc.value?.status ?? 'loading…' }}</td></tr>
+                  <tr v-if="kycApi.kyc.value?.legal_name"><td class="left">Legal name</td><td class="left">{{ kycApi.kyc.value.legal_name }}</td></tr>
+                  <tr v-if="kycApi.kyc.value?.country"><td class="left">Country</td><td class="left mono">{{ kycApi.kyc.value.country }}</td></tr>
+                  <tr v-if="kycApi.kyc.value?.submitted_at"><td class="left">Submitted</td><td class="left mono">{{ kycApi.kyc.value.submitted_at.slice(0, 10) }}</td></tr>
+                  <tr v-if="kycApi.kyc.value?.reviewed_at"><td class="left">Reviewed</td><td class="left mono">{{ kycApi.kyc.value.reviewed_at.slice(0, 10) }}</td></tr>
+                </tbody>
+              </table>
+              <div v-if="kycApi.kyc.value?.can_submit" class="stub-actions">
+                <NuxtLink to="/onboarding/kyc" class="btn primary">Verify your identity →</NuxtLink>
+              </div>
             </div>
-            <div class="stub-title">{{ current.label }} · shell only</div>
-            <p class="stub-text">
-              This section is wired into the navigation but its content is not part of the
-              current milestone. The shell preserves layout, breadcrumbs and section meta
-              so the surface can be filled in without re-touching the chrome.
-            </p>
-            <div class="stub-actions">
-              <button type="button" class="btn secondary" @click="goTo('profile')">← Back to Profile</button>
+          </div>
+        </template>
+
+        <!-- ===== DANGER ZONE ===== -->
+        <template v-else-if="active === 'danger'">
+          <header class="section-head">
+            <div>
+              <div class="eyebrow"><span class="dot" /> Settings · Account</div>
+              <h2 class="section-title">Danger zone</h2>
+              <p class="section-sub">Irreversible operations on the account.</p>
+            </div>
+          </header>
+          <div class="card">
+            <div class="card-body">
+              <div class="row-action">
+                <div class="row-text">
+                  <div class="row-title">Close this account</div>
+                  <div class="row-sub">
+                    Closing is handled by support so remaining credits and the audit trail are settled
+                    properly. Email <a href="mailto:support@1trade.com">support@1trade.com</a> from {{ user?.email ?? 'your account email' }}.
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </template>
@@ -771,27 +597,6 @@ onMounted(() => {
               </div>
             </div>
 
-            <div class="field">
-              <label class="field-label">— Expiration</label>
-              <div class="exp-list">
-                <label
-                  v-for="o in EXP_OPTIONS"
-                  :key="o.value"
-                  class="exp-opt"
-                  :class="{ checked: newKeyExp === o.value }"
-                >
-                  <input v-model="newKeyExp" type="radio" :value="o.value" />
-                  <span class="exp-radio" />
-                  <span class="exp-body">
-                    <span class="exp-label">{{ o.label }}</span>
-                    <span class="exp-sub">{{ o.sub }}</span>
-                  </span>
-                </label>
-              </div>
-              <span class="field-hint">
-                You'll get a reminder email 7 days before expiration. Keys can be rotated any time.
-              </span>
-            </div>
           </div>
 
           <footer class="modal-foot">
@@ -855,8 +660,8 @@ onMounted(() => {
                   :class="SCOPE_META[sc].cls"
                 >{{ SCOPE_META[sc].label }}</span>
               </dd>
-              <dt>Expires</dt><dd>{{ expLabel }}</dd>
-              <dt>Created by</dt><dd>{{ profile.email }}</dd>
+              <dt>Expires</dt><dd>Never — revoke it here when you no longer need it</dd>
+              <dt>Created by</dt><dd>{{ user?.email ?? '—' }}</dd>
             </dl>
           </div>
 

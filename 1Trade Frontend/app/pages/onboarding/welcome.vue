@@ -256,7 +256,7 @@ function fmtDelta(pct: number): string {
           ? 'Paper-trading mode · paper cash and credits only · real-money trading is paused pending licensing'
           : 'Sandbox mode · prepaid credits · real-money purchases require verification (KYC)' }}
       </span>
-      <a href="#" class="foot-link">{{ isTrader ? "What's paper trading? →" : 'How credits work →' }}</a>
+      <NuxtLink :to="isTrader ? '/legal#trading-rules' : '/legal#terms'" class="foot-link">{{ isTrader ? "What's paper trading? →" : 'How credits work →' }}</NuxtLink>
     </footer>
   </div>
 </template>

@@ -1,42 +1,51 @@
 <script setup lang="ts">
 /**
- * MarketingFooter — dark inverse site footer.
- * Ported from the 1Trade Homepage design. Used across all marketing pages.
- *
- * Live AI Index value in the status bar updates every 5s.
+ * MarketingFooter — dark inverse site footer, used across all marketing pages. Every link goes to a
+ * real page; the AI Index figure is the live EAI-IDX paper market (refreshed every 30 s).
  */
-const footerIdx = ref('1,002.4')
+const footerIdx = ref('—')
+const footerChange = ref(0)
 let tickInterval: ReturnType<typeof setInterval> | null = null
 
-const cols = [
-  {
-    title: 'Product',
-    links: ['Trading', 'Inference', 'Compute', 'Index', 'API'],
-  },
-  {
-    title: 'Markets',
-    links: ['AI Index', 'Text credits', 'Image credits', 'Video credits', 'GPU credits'],
-  },
-  {
-    title: 'Compute',
-    links: ['H100 instances', 'H200 instances', 'Inference catalog', 'Storage', 'Status'],
-  },
-  {
-    title: 'Company',
-    links: ['About', 'Methodology', 'Partners', 'Careers', 'Press'],
-  },
-  {
-    title: 'Legal',
-    links: ['Terms', 'Privacy', 'Trading rules', 'Disclosures', 'Compliance'],
-  },
+const cols: { title: string; links: { label: string; to: string }[] }[] = [
+  { title: 'Product', links: [
+    { label: 'Trading', to: '/markets' }, { label: 'Inference', to: '/inference' }, { label: 'Compute', to: '/compute' },
+    { label: 'Index', to: '/benchmark' }, { label: 'Status', to: '/status' },
+  ] },
+  { title: 'Markets', links: [
+    { label: 'AI Index', to: '/markets/eai-idx' }, { label: 'Text credits', to: '/markets/text-spot' },
+    { label: 'Image credits', to: '/markets/image-spot' }, { label: 'Video credits', to: '/markets/video-spot' },
+    { label: 'GPU credits', to: '/markets/h100-spot' },
+  ] },
+  { title: 'Compute', links: [
+    { label: 'GPU instances', to: '/compute/new' }, { label: 'Reserved capacity', to: '/compute/reserve' },
+    { label: 'Clusters', to: '/compute/clusters' }, { label: 'GPU catalog', to: '/compute/catalog' },
+    { label: 'Supply your GPUs', to: '/signup' },
+  ] },
+  { title: 'Company', links: [
+    { label: 'Index methodology', to: '/benchmark' }, { label: 'Open an account', to: '/signup' },
+    { label: 'Contact', to: 'mailto:contact@1trade.com' },
+  ] },
+  { title: 'Legal', links: [
+    { label: 'Terms', to: '/legal#terms' }, { label: 'Privacy', to: '/legal#privacy' },
+    { label: 'Trading rules', to: '/legal#trading-rules' }, { label: 'Risk disclosure', to: '/legal#risk' },
+    { label: 'Compliance', to: '/legal#compliance' },
+  ] },
 ]
 
+/** loadIndex reads the EAI-IDX paper market: credits per dollar and the 24h change. */
+async function loadIndex() {
+  try {
+    const r = await $fetch<{ summary: { last: string; change_pct_24h: string } }>('/api/trading/products/EAI-IDX')
+    const last = Number(r.summary.last)
+    if (last > 0) footerIdx.value = Math.round(1 / last).toLocaleString('en-US')
+    footerChange.value = Number(r.summary.change_pct_24h)
+  } catch { /* keep the last value */ }
+}
+
 onMounted(() => {
-  let v = 1.0024
-  tickInterval = setInterval(() => {
-    v = Math.max(0.985, Math.min(1.018, v + (1 - v) * 0.05 + (Math.random() - 0.5) * 0.0008))
-    footerIdx.value = (v * 1000).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
-  }, 5000)
+  void loadIndex()
+  tickInterval = setInterval(() => { void loadIndex() }, 30000)
 })
 
 onUnmounted(() => {
@@ -67,8 +76,9 @@ onUnmounted(() => {
         <div v-for="col in cols" :key="col.title" class="col">
           <h6>{{ col.title }}</h6>
           <ul>
-            <li v-for="link in col.links" :key="link">
-              <a href="#">{{ link }}</a>
+            <li v-for="link in col.links" :key="link.label">
+              <a v-if="link.to.startsWith('mailto:')" :href="link.to">{{ link.label }}</a>
+              <NuxtLink v-else :to="link.to">{{ link.label }}</NuxtLink>
             </li>
           </ul>
         </div>
@@ -79,10 +89,11 @@ onUnmounted(() => {
           © 2026 1Trade, Inc. · contact@1trade.com · San Francisco · Tokyo
         </div>
         <div class="bar-status">
-          <span><span class="status-dot" />All systems operational</span>
+          <NuxtLink to="/status" class="bar-status-link"><span class="status-dot" />System status</NuxtLink>
           <span class="bar-sep" />
           <span class="tnum">
-            AI Index · $1 = <span class="bar-num">{{ footerIdx }}</span> · <span class="pos">▲ 0.18%</span>
+            AI Index (paper market) · $1 = <span class="bar-num">{{ footerIdx }}</span> credits ·
+            <span :class="footerChange >= 0 ? 'pos' : 'neg'">{{ footerChange >= 0 ? '▲' : '▼' }} {{ Math.abs(footerChange).toFixed(2) }}%</span>
           </span>
         </div>
       </div>
@@ -91,6 +102,8 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+.bar-status-link { color: inherit; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+.bar-status-link:hover { color: var(--text); }
 .site {
   background: var(--canvas);
   color: var(--text);
@@ -190,6 +203,7 @@ li a:hover { color: var(--text); }
 
 .tnum { font-variant-numeric: tabular-nums; }
 .pos  { color: var(--pos); }
+.neg  { color: var(--neg); }
 
 /* Pulse dot */
 .status-dot {

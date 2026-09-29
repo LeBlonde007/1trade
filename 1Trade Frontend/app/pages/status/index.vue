@@ -1,153 +1,63 @@
 <script setup lang="ts">
-/**
- * /status — public system status page (J3).
- * Light marketing surface. Public — no auth.
- */
-import { CheckCircle2, AlertTriangle, XCircle, Rss, Mail, MessageSquare, ChevronDown } from 'lucide-vue-next'
+import { CheckCircle2, XCircle } from 'lucide-vue-next'
 
 definePageMeta({ layout: 'marketing' })
 useHead({ title: 'System status — 1Trade' })
 
-type Status = 'operational' | 'degraded' | 'outage' | 'maintenance'
+/**
+ * /status — live status of every platform service. Public — no auth.
+ *
+ * Each load (and every 30 s) the BFF checks each service's readiness (/api/status). There is no
+ * uptime history or incident log yet, so the page claims none — it shows what answers right now.
+ */
+type Status = 'operational' | 'outage'
+interface Component { group: string; name: string; status: Status; latency_ms: number | null }
 
-interface Component {
-  name: string
-  status: Status
-  uptime90d: number
-  group: string
-  note?: string
-}
+const components = ref<Component[]>([])
+const checkedAt = ref('')
+const loadError = ref('')
 
-interface IncidentUpdate {
-  ts: string
-  status: string
-  body: string
-}
-
-interface Incident {
-  id: string
-  title: string
-  severity: 'minor' | 'major' | 'critical'
-  status: 'investigating' | 'identified' | 'monitoring' | 'resolved'
-  components: string[]
-  startedAt: string
-  resolvedAt?: string
-  updates: IncidentUpdate[]
-}
-
-const components = ref<Component[]>([
-  { group: 'Trading',     name: 'Matching engine',         status: 'operational', uptime90d: 99.998 },
-  { group: 'Trading',     name: 'Order entry API',         status: 'operational', uptime90d: 99.991 },
-  { group: 'Trading',     name: 'Market data (websocket)', status: 'operational', uptime90d: 99.987 },
-  { group: 'Trading',     name: 'Settlement & clearing',   status: 'operational', uptime90d: 99.999 },
-  { group: 'Account',     name: 'Wallet & ledger',         status: 'operational', uptime90d: 99.996 },
-  { group: 'Account',     name: 'Identity & sign-in',      status: 'operational', uptime90d: 99.972 },
-  { group: 'Account',     name: 'Card & ACH funding',      status: 'degraded',    uptime90d: 99.842, note: 'Card 3-DS provider experiencing elevated latency (~6s)' },
-  { group: 'Developer',   name: 'REST API (api.trade1.com)', status: 'operational', uptime90d: 99.994 },
-  { group: 'Developer',   name: 'Webhooks',                status: 'operational', uptime90d: 99.981 },
-  { group: 'Developer',   name: 'Public docs',             status: 'operational', uptime90d: 99.999 },
-  { group: 'Compute',     name: 'us-east-1 (Ashburn)',     status: 'operational', uptime90d: 99.995 },
-  { group: 'Compute',     name: 'us-west-2 (Hillsboro)',   status: 'operational', uptime90d: 99.991 },
-  { group: 'Compute',     name: 'eu-central-1 (Frankfurt)', status: 'operational', uptime90d: 99.988 },
-  { group: 'Compute',     name: 'ap-south-1 (Mumbai)',     status: 'maintenance', uptime90d: 99.942, note: 'Planned hypervisor rollover 02:00–04:00 UTC' },
-])
-
-const incidents = ref<Incident[]>([
-  {
-    id: 'INC-2026-0517-01',
-    title: 'Elevated latency on card funding',
-    severity: 'minor',
-    status: 'monitoring',
-    components: ['Card & ACH funding'],
-    startedAt: '2026-05-24T13:42:00Z',
-    updates: [
-      { ts: '15:18 UTC', status: 'Monitoring',    body: 'Upstream provider confirms mitigation deployed. 3-DS handshake latency back under 2s. Continuing to monitor.' },
-      { ts: '14:31 UTC', status: 'Identified',    body: 'Issue isolated to our card-funding upstream provider\'s 3-DS step. Wire and ACH funding unaffected. Trading and compute fully operational.' },
-      { ts: '13:55 UTC', status: 'Investigating', body: 'We are seeing elevated 3-DS verification latency (~6s vs <1s baseline) for new card deposits. Engineers engaged.' },
-    ],
-  },
-])
-
-const past = ref([
-  { date: '2026-05-21', title: 'Order entry API degraded performance', duration: '14m', severity: 'minor' as const },
-  { date: '2026-05-09', title: 'Planned maintenance — eu-central-1 hypervisor upgrade', duration: '2h 00m', severity: 'minor' as const },
-  { date: '2026-04-28', title: 'Market data websocket disconnects (us-east-1)', duration: '8m',  severity: 'minor' as const },
-  { date: '2026-04-12', title: 'Webhooks delivery delayed up to 90s',              duration: '47m', severity: 'major' as const },
-  { date: '2026-03-30', title: 'Planned maintenance — settlement scheduled cutover', duration: '6m', severity: 'minor' as const },
-])
-
-const overallStatus = computed<Status>(() => {
-  if (components.value.some(c => c.status === 'outage'))     return 'outage'
-  if (components.value.some(c => c.status === 'degraded'))   return 'degraded'
-  if (components.value.some(c => c.status === 'maintenance')) return 'maintenance'
-  return 'operational'
-})
-
-const overallLabel = computed(() => ({
-  operational: 'All systems operational',
-  degraded:    'Partial service degradation',
-  outage:      'Major outage in progress',
-  maintenance: 'Scheduled maintenance in progress',
-}[overallStatus.value]))
-
-function statusTone(s: Status) {
-  return {
-    operational: 'pos',
-    degraded:    'warn',
-    outage:      'neg',
-    maintenance: 'info',
-  }[s]
-}
-
-function statusLabel(s: Status) {
-  return {
-    operational: 'Operational',
-    degraded:    'Degraded',
-    outage:      'Outage',
-    maintenance: 'Maintenance',
-  }[s]
-}
-
-const groups = computed(() => {
-  const order = ['Trading', 'Account', 'Developer', 'Compute']
-  return order.map(g => ({
-    name: g,
-    items: components.value.filter(c => c.group === g),
-  }))
-})
-
-// 90-day uptime strip — synthetic per-day status.
-// Deterministic per component+day, mostly green, occasional amber/red bar.
-function dayBars(comp: Component): Status[] {
-  const days: Status[] = []
-  const seedBase = comp.name.split('').reduce((a, c) => a + c.charCodeAt(0), 0)
-  for (let i = 0; i < 90; i++) {
-    const r = ((seedBase * 9301 + (i + 1) * 49297) % 233280) / 233280
-    // Bias towards operational; tail of degraded/outage scaled to component's uptime.
-    const downBudget = (100 - comp.uptime90d) / 100 * 4
-    if (r < downBudget * 0.15) days.push('outage')
-    else if (r < downBudget) days.push('degraded')
-    else days.push('operational')
+/** load runs the live check. */
+async function load() {
+  try {
+    const r = await $fetch<{ checked_at: string; components: Component[] }>('/api/status')
+    components.value = r.components
+    checkedAt.value = r.checked_at
+    loadError.value = ''
+  } catch {
+    loadError.value = 'The status check itself could not run — retrying.'
   }
-  // Today reflects current status.
-  days[89] = comp.status
-  return days
+}
+let timer: ReturnType<typeof setInterval> | null = null
+onMounted(() => { void load(); timer = setInterval(() => { void load() }, 30000) })
+onBeforeUnmount(() => { if (timer) clearInterval(timer) })
+
+const overallStatus = computed<Status>(() => components.value.some(c => c.status === 'outage') ? 'outage' : 'operational')
+const overallLabel = computed(() => {
+  if (!components.value.length) return loadError.value ? 'Status unavailable' : 'Checking…'
+  const down = components.value.filter(c => c.status === 'outage').length
+  return down === 0 ? 'All systems operational' : `${down} of ${components.value.length} services not responding`
+})
+
+/** statusTone maps a status to a colour token. */
+function statusTone(s: Status) {
+  return s === 'operational' ? 'pos' : 'neg'
 }
 
-const subscribeOpen = ref(false)
-const subscribeEmail = ref('')
-const subscribed = ref(false)
-
-function onSubscribe(e: Event) {
-  e.preventDefault()
-  if (!subscribeEmail.value) return
-  subscribed.value = true
+/** statusLabel is a status in words. */
+function statusLabel(s: Status) {
+  return s === 'operational' ? 'Operational' : 'Not responding'
 }
+
+const groups = computed(() => ['Trading', 'Account', 'Developer', 'Compute']
+  .map(g => ({ name: g, items: components.value.filter(c => c.group === g) }))
+  .filter(g => g.items.length))
 
 const nowLabel = computed(() => {
-  const d = new Date()
+  if (!checkedAt.value) return '—'
+  const d = new Date(checkedAt.value)
   const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())} UTC`
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} UTC`
 })
 </script>
 
@@ -158,94 +68,25 @@ const nowLabel = computed(() => {
       <div class="hero-inner">
         <div class="hero-status">
           <CheckCircle2 v-if="overallStatus === 'operational'" :size="28" :stroke-width="1.6" />
-          <AlertTriangle v-else-if="overallStatus === 'degraded' || overallStatus === 'maintenance'" :size="28" :stroke-width="1.6" />
           <XCircle v-else :size="28" :stroke-width="1.6" />
           <h1>{{ overallLabel }}</h1>
         </div>
         <div class="hero-meta">
-          <span class="meta-label">As of</span>
+          <span class="meta-label">Checked</span>
           <span class="meta-value mono">{{ nowLabel }}</span>
           <span class="meta-dot">·</span>
           <span class="meta-label">Refreshes every 30s</span>
         </div>
-
-        <div class="hero-actions">
-          <button class="btn-primary" @click="subscribeOpen = !subscribeOpen">
-            <Mail :size="14" :stroke-width="1.7" /> Subscribe to updates
-          </button>
-          <a class="btn-ghost" href="/status/rss.xml"><Rss :size="14" :stroke-width="1.7" /> RSS</a>
-          <a class="btn-ghost" href="https://status.trade1.com/sms"><MessageSquare :size="14" :stroke-width="1.7" /> SMS</a>
-        </div>
-
-        <Transition name="reveal">
-          <form v-if="subscribeOpen && !subscribed" class="subscribe-form" @submit="onSubscribe">
-            <input
-              v-model="subscribeEmail"
-              type="email"
-              required
-              placeholder="you@company.com"
-              autocomplete="email"
-            >
-            <select>
-              <option>All components</option>
-              <option>Trading only</option>
-              <option>Compute only</option>
-              <option>Developer / API only</option>
-            </select>
-            <button type="submit">Subscribe</button>
-          </form>
-          <div v-else-if="subscribed" class="subscribed-note">
-            Confirmation sent to <span class="mono">{{ subscribeEmail }}</span>. Click the link to activate.
-          </div>
-        </Transition>
+        <p v-if="loadError" class="comp-note">{{ loadError }}</p>
       </div>
     </section>
 
     <div class="container">
-      <!-- Active incidents -->
-      <section v-if="incidents.length" class="incidents">
-        <header class="section-head">
-          <h2>Active incidents</h2>
-          <span class="count">{{ incidents.length }}</span>
-        </header>
-
-        <article v-for="inc in incidents" :key="inc.id" class="incident" :class="`sev-${inc.severity}`">
-          <div class="inc-head">
-            <div class="inc-title">
-              <span class="sev-chip">{{ inc.severity }}</span>
-              <h3>{{ inc.title }}</h3>
-            </div>
-            <div class="inc-meta">
-              <span class="status-pill">{{ inc.status }}</span>
-              <span class="mono inc-id">{{ inc.id }}</span>
-            </div>
-          </div>
-
-          <div class="inc-affects">
-            <span class="caps">Affects</span>
-            <span v-for="c in inc.components" :key="c" class="comp-chip">{{ c }}</span>
-          </div>
-
-          <ol class="updates">
-            <li v-for="(u, i) in inc.updates" :key="i" :class="{ latest: i === 0 }">
-              <div class="upd-rail" />
-              <div class="upd-body">
-                <div class="upd-head">
-                  <span class="upd-status">{{ u.status }}</span>
-                  <span class="mono upd-ts">{{ u.ts }}</span>
-                </div>
-                <p>{{ u.body }}</p>
-              </div>
-            </li>
-          </ol>
-        </article>
-      </section>
-
       <!-- Components -->
       <section class="components">
         <header class="section-head">
           <h2>Components</h2>
-          <span class="caps subtitle">Last 90 days uptime</span>
+          <span class="caps subtitle">Live check · response time</span>
         </header>
 
         <div v-for="g in groups" :key="g.name" class="group">
@@ -254,24 +95,11 @@ const nowLabel = computed(() => {
             <li v-for="c in g.items" :key="c.name" class="comp-row">
               <div class="comp-left">
                 <span class="dot" :class="`tone-${statusTone(c.status)}`" />
-                <div>
-                  <div class="comp-name">{{ c.name }}</div>
-                  <div v-if="c.note" class="comp-note">{{ c.note }}</div>
-                </div>
+                <div><div class="comp-name">{{ c.name }}</div></div>
               </div>
-
-              <div class="comp-strip">
-                <span
-                  v-for="(d, i) in dayBars(c)"
-                  :key="i"
-                  class="bar"
-                  :class="`tone-${statusTone(d)}`"
-                  :title="`Day -${89 - i}: ${statusLabel(d)}`"
-                />
-              </div>
-
+              <div />
               <div class="comp-right">
-                <span class="mono uptime">{{ c.uptime90d.toFixed(3) }}%</span>
+                <span class="mono uptime">{{ c.latency_ms === null ? '—' : c.latency_ms + ' ms' }}</span>
                 <span class="status-tag" :class="`tone-${statusTone(c.status)}`">{{ statusLabel(c.status) }}</span>
               </div>
             </li>
@@ -279,31 +107,10 @@ const nowLabel = computed(() => {
         </div>
       </section>
 
-      <!-- Past incidents -->
-      <section class="history">
-        <header class="section-head">
-          <h2>Past incidents</h2>
-          <a href="/status/history" class="see-all">See all <ChevronDown :size="14" :stroke-width="1.7" style="transform:rotate(-90deg)" /></a>
-        </header>
-
-        <ul class="hist-list">
-          <li v-for="p in past" :key="p.date">
-            <span class="mono hist-date">{{ p.date }}</span>
-            <span class="hist-title">{{ p.title }}</span>
-            <span class="hist-meta">
-              <span class="hist-sev" :class="`sev-${p.severity}`">{{ p.severity }}</span>
-              <span class="mono">{{ p.duration }}</span>
-            </span>
-          </li>
-        </ul>
-      </section>
-
       <footer class="page-foot">
-        <span>All times UTC.</span>
+        <span>All times UTC. Uptime history and incident reports start with the production launch.</span>
         <span class="dot-sep">·</span>
-        <a href="/trust">Security & compliance</a>
-        <span class="dot-sep">·</span>
-        <a href="/docs/api/status">Programmatic status (JSON)</a>
+        <a href="/api/status">Programmatic status (JSON)</a>
       </footer>
     </div>
   </div>

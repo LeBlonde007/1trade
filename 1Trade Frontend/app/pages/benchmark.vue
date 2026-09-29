@@ -1,220 +1,128 @@
 <script setup lang="ts">
 /**
- * /benchmark — 1Trade AI Index Methodology · v1.2
- *
- * Whitepaper-style "credibility document". Three-pane shell:
- * left section nav · 720px reading column · right TOC scroll-spy.
- *
- * The formula in §3 is rendered with HTML typography (no KaTeX dep)
- * to keep the bundle lean; the source standalone used KaTeX via CDN.
- * The historical-prints chart in §10 uses Chart.js (already a dep).
+ * /benchmark — the AI Index methodology, rendered from the live index API: the current print, the
+ * constituent weight schedule, the window/trim/volume-floor parameters and the hash-chained print
+ * history all come from matching-engine /v1/index/*. The prose mirrors docs/index-methodology.md.
+ * Every print is simulated today (`source: mock`) and the page says so. Public — no auth.
  */
 import { Chart, type ChartDataset } from 'chart.js/auto'
 
 definePageMeta({ layout: 'marketing' })
 useHead({
-  title: 'AI Index Methodology · v1.2 — 1Trade',
-  meta: [{ name: 'description', content: 'Methodology document for the 1Trade AI Index — the daily reference price for AI compute.' }],
+  title: 'AI Index methodology — 1Trade',
+  meta: [{ name: 'description', content: 'How the 1Trade AI Credit Index is computed, published and verified.' }],
 })
 
-// =====================================================
-// Left-nav structure
-// =====================================================
-const LNAV_GROUPS = [
-  {
-    num: 'I',
-    title: 'Overview',
-    items: [
-      { id: 'sec-1',   pre: '§1', label: 'Executive summary' },
-      { id: 'live',    pre: '··', label: 'Current index value' },
-    ],
-  },
-  {
-    num: 'II',
-    title: 'Methodology',
-    items: [
-      { id: 'sec-2', pre: '§2', label: 'Constituent inputs' },
-      { id: 'sec-3', pre: '§3', label: 'Calculation formula' },
-      { id: 'sec-4', pre: '§4', label: 'Outlier filtering' },
-      { id: 'sec-5', pre: '§5', label: 'Volume floor' },
-      { id: 'sec-6', pre: '§6', label: 'Manipulation resistance' },
-    ],
-  },
-  {
-    num: 'III',
-    title: 'Operations',
-    items: [
-      { id: 'sec-7', pre: '§7', label: 'Publication schedule' },
-      { id: 'sec-8', pre: '§8', label: 'Methodology versioning' },
-      { id: 'sec-9', pre: '§9', label: 'Audit & oversight' },
-    ],
-  },
-  {
-    num: 'IV',
-    title: 'Data',
-    items: [
-      { id: 'sec-10', pre: '§10', label: 'Historical prints' },
-      { id: 'sec-11', pre: '§11', label: 'Constituent transparency' },
-    ],
-  },
-  {
-    num: 'V',
-    title: 'Governance',
-    items: [
-      { id: 'sec-12', pre: '§12', label: 'Methodology committee' },
-      { id: 'sec-13', pre: '§13', label: 'Complaint process' },
-      { id: 'sec-14', pre: '§14', label: 'Contact' },
-    ],
-  },
+interface IndexPrint {
+  print_id: string
+  value: string
+  published_at: string
+  methodology_version: string
+  observation_count: number
+  excluded_count?: number
+  chain_hash: string
+  prev_chain_hash?: string | null
+  provisional: boolean
+  source: 'mock' | 'computed'
+}
+interface Constituent { name: string; credit_type: string; weight: string; source: string; observed_at?: string | null }
+interface Methodology {
+  version: string
+  effective_date: string
+  window_minutes: number
+  trim_pct: string
+  volume_floor?: string
+  constituents: Constituent[]
+  is_mock: boolean
+}
+
+const SECTIONS = [
+  { id: 'live', label: 'Current value' },
+  { id: 'sec-1', label: 'What the index measures' },
+  { id: 'sec-2', label: 'Inputs' },
+  { id: 'sec-3', label: 'Constituents and weights' },
+  { id: 'sec-4', label: 'Computation' },
+  { id: 'sec-5', label: 'Audit chain' },
+  { id: 'sec-6', label: 'Publication' },
+  { id: 'sec-7', label: 'Changing the methodology' },
+  { id: 'sec-8', label: 'Historical prints' },
+  { id: 'sec-9', label: 'Known limitations' },
+  { id: 'sec-10', label: 'API and contact' },
 ]
 
-const RTOC = [
-  { id: 'sec-1',  label: 'Executive summary' },
-  { id: 'sec-2',  label: 'Constituent inputs' },
-  { id: 'sec-3',  label: 'Calculation formula' },
-  { id: 'sec-4',  label: 'Outlier filtering' },
-  { id: 'sec-5',  label: 'Volume floor' },
-  { id: 'sec-6',  label: 'Manipulation resistance' },
-  { id: 'sec-7',  label: 'Publication schedule' },
-  { id: 'sec-8',  label: 'Methodology versioning' },
-  { id: 'sec-9',  label: 'Audit & oversight' },
-  { id: 'sec-10', label: 'Historical prints' },
-  { id: 'sec-11', label: 'Constituent transparency' },
-  { id: 'sec-12', label: 'Methodology committee' },
-  { id: 'sec-13', label: 'Complaint process' },
-  { id: 'sec-14', label: 'Contact' },
-]
+const latest = ref<IndexPrint | null>(null)
+const nextAt = ref<string | null>(null)
+const meth = ref<Methodology | null>(null)
+const history = ref<IndexPrint[]>([])
+const loadError = ref('')
+const activeId = ref('live')
+const countdown = ref('—')
 
-// =====================================================
-// Constituent weights, version history, committee
-// =====================================================
-const CONSTITUENTS = [
-  { name: 'Text credit spot',     weight: 0.42, source: 'EX · TEXT-INDEX',         updated: '14:23:18' },
-  { name: 'Speech credit spot',   weight: 0.08, source: 'EX · SPEECH-INDEX',       updated: '14:18:04' },
-  { name: 'Image credit spot',    weight: 0.15, source: 'EX · IMAGE-INDEX',        updated: '14:21:51' },
-  { name: 'Video credit spot',    weight: 0.05, source: 'EX · VIDEO-INDEX',        updated: '13:55:09' },
-  { name: 'Niche credit spot',    weight: 0.10, source: 'EX · NICHE-INDEX',        updated: '14:10:32' },
-  { name: 'Inference cost avg.',  weight: 0.20, source: 'Derived · capacity util.',updated: '14:00:00' },
-]
+/** creditsPerUsd turns a USD-per-credit print value into "credits per $1". */
+function creditsPerUsd(v: string | undefined) {
+  const n = Number(v)
+  return n > 0 ? (1 / n).toLocaleString('en-US', { maximumFractionDigits: 1 }) : '—'
+}
+/** pctChange is the percent move from a to b, formatted with a sign. */
+function pctChange(a?: string, b?: string) {
+  const x = Number(a), y = Number(b)
+  if (!(x > 0) || !(y > 0)) return null
+  return ((y - x) / x) * 100
+}
+const change30 = computed(() => {
+  const h = history.value
+  return h.length > 1 ? pctChange(h[Math.max(0, h.length - 31)]!.value, h[h.length - 1]!.value) : null
+})
+const weightTotal = computed(() =>
+  (meth.value?.constituents ?? []).reduce((s, c) => s + Number(c.weight), 0).toFixed(4),
+)
 
-const VERSIONS = [
-  { v: '1.2', eff: '2026-04-01', cls: 'Minor', summary: 'Weight schedule rebalanced; video credit weight lowered to 0.05 (from 0.07).' },
-  { v: '1.1', eff: '2026-01-08', cls: 'Patch', summary: 'Clarified provisional-print reconciliation under §5.' },
-  { v: '1.0', eff: '2025-10-15', cls: 'Major', summary: 'Initial release. Six constituents; 120-minute window; 95% trimming.' },
-  { v: '0.9', eff: '2025-07-01', cls: 'Major', summary: 'Pre-launch pilot (consultation draft, no live prints).' },
-]
-
-const COMMITTEE = [
-  { name: 'Dr. Rina Halpern',    role: 'Chair · External',       bio: 'Formerly Head of Index Research, FTSE Russell. Independent appointment, three-year term commencing 2025-09-01.' },
-  { name: 'Marcus Kapoor',       role: 'Vice-chair · Internal',  bio: 'Chief Risk Officer, 1Trade Markets. Non-voting on weight-schedule revisions per cooling-off rule.' },
-  { name: 'Yui Tanaka',          role: 'Member · External',      bio: 'Director, Quantitative Research, Nomura Holdings. Two-year term.' },
-  { name: 'Léon Beaumont',       role: 'Member · External',      bio: 'Adjunct Professor of Market Microstructure, INSEAD; formerly Deutsche Börse Index.' },
-  { name: 'Priya Rao',           role: 'Member · Internal',      bio: 'Head of Market Data, 1Trade Markets. Non-voting on revisions affecting data products.' },
-  { name: 'Dr. Aiden O\'Connell', role: 'Observer · External',   bio: 'Representative of the audit firm; observer capacity, no vote.' },
-]
-
-// =====================================================
-// Live state — countdown + active section
-// =====================================================
-const countdown = ref('03:24:18')
-const activeId = ref('sec-1')
-
+/** tickCountdown counts down to the next publication the API announced. */
 function tickCountdown() {
-  const now = new Date()
-  const next = new Date(Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate(),
-    17, 0, 0,
-  ))
-  if (next.getTime() <= now.getTime()) next.setUTCDate(next.getUTCDate() + 1)
-  const diff = next.getTime() - now.getTime()
-  const h = Math.floor(diff / 3.6e6)
-  const m = Math.floor((diff % 3.6e6) / 6e4)
-  const s = Math.floor((diff % 6e4) / 1e3)
+  if (!nextAt.value) return
+  const diff = Math.max(0, new Date(nextAt.value).getTime() - Date.now())
+  const h = Math.floor(diff / 3.6e6), m = Math.floor((diff % 3.6e6) / 6e4), s = Math.floor((diff % 6e4) / 1e3)
   countdown.value = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
-// =====================================================
-// Historical chart — Chart.js, 217 business days, ends at 1.0024
-// =====================================================
+// Historical chart -----------------------------------------------------------
 const histCanvas = ref<HTMLCanvasElement | null>(null)
-let histChart: Chart<'line', number[]> | null = null
-let fullDates: Date[] = []
-let fullVals: number[] = []
-let currentDates: Date[] = []
-
-type RangeKey = '90' | '180' | '365' | 'all'
+let histChart: Chart<'line', number[], string> | null = null
+type RangeKey = '90' | '180' | '365' | '730'
+const RANGE_KEYS: RangeKey[] = ['90', '180', '365', '730']
+const RANGE_LABELS: Record<RangeKey, string> = { '90': '90D', '180': '180D', '365': '1Y', '730': '2Y' }
 const currentRange = ref<RangeKey>('365')
-const RANGE_KEYS: RangeKey[] = ['90', '180', '365', 'all']
-const RANGE_LABELS: Record<RangeKey, string> = { '90': '90D', '180': '180D', '365': '1Y', 'all': 'ALL' }
 
-function buildSeries(days: number) {
-  const out: number[] = []
-  const startVal = 1.0000
-  const endVal   = 1.0024
-  let val = startVal
-  for (let i = 0; i < days; i++) {
-    const drift = (endVal - startVal) / days
-    const small = (Math.sin(i * 0.42) + Math.cos(i * 0.27)) * 0.0015
-    const noise = (Math.random() - 0.5) * 0.0018
-    const ddPhase = Math.sin(i * 0.04) - 0.65
-    const dd = ddPhase > 0 ? -ddPhase * 0.012 : 0
-    val += drift + small + noise + dd
-    out.push(val)
+/** loadHistory fetches the print series for the chosen range and redraws the chart. */
+async function loadHistory(r: RangeKey) {
+  currentRange.value = r
+  try {
+    history.value = (await $fetch<{ prints: IndexPrint[] }>('/api/index-service/history', { query: { days: r } })).prints
+  } catch {
+    history.value = []
   }
-  const last = out[out.length - 1]!
-  const lift = endVal - last
-  for (let i = 0; i < out.length; i++) out[i]! += lift * (i / (out.length - 1))
-  out[0] = startVal
-  out[out.length - 1] = endVal
-  return out
+  drawChart()
 }
 
-function buildBusinessDays(days: number, end = new Date('2026-05-19T17:00:00Z')) {
-  const out: Date[] = []
-  const d = new Date(end)
-  let count = 0
-  while (count < days) {
-    const wd = d.getUTCDay()
-    if (wd !== 0 && wd !== 6) {
-      out.unshift(new Date(d))
-      count++
-    }
-    d.setUTCDate(d.getUTCDate() - 1)
-  }
-  return out
-}
-
-function initHistChart() {
+/** drawChart renders the history as credits per $1 — the unit the rest of the site quotes. */
+function drawChart() {
   if (!histCanvas.value) return
+  const labels = history.value.map(p => p.published_at.slice(0, 10))
+  const data = history.value.map(p => 1 / Number(p.value))
+  if (histChart) {
+    histChart.data.labels = labels
+    histChart.data.datasets[0]!.data = data
+    histChart.update()
+    return
+  }
   const ctx = histCanvas.value.getContext('2d')!
-  const N = 217
-  fullDates = buildBusinessDays(N)
-  fullVals  = buildSeries(N)
-  currentDates = fullDates
-  const labels = fullDates.map(d => d.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: '2-digit' }))
-  const grad = ctx.createLinearGradient(0, 0, 0, 240)
-  grad.addColorStop(0, 'rgba(14,14,14,0.10)')
-  grad.addColorStop(1, 'rgba(14,14,14,0.00)')
-
-  histChart = new Chart(ctx, {
+  histChart = new Chart<'line', number[], string>(ctx, {
     type: 'line',
     data: {
       labels,
       datasets: [{
-        label: 'AI-INDEX',
-        data: fullVals,
-        borderColor: '#0E0E0E',
-        borderWidth: 1.4,
-        backgroundColor: grad,
-        fill: true,
-        tension: 0.15,
-        pointRadius: 0,
-        pointHoverRadius: 3,
-        pointHoverBackgroundColor: '#fff',
-        pointHoverBorderColor: '#0E0E0E',
-        pointHoverBorderWidth: 1.5,
+        label: 'AI-INDEX', data, borderColor: '#0E0E0E', borderWidth: 1.4, fill: false,
+        tension: 0.15, pointRadius: 0, pointHoverRadius: 3,
       } as ChartDataset<'line', number[]>],
     },
     options: {
@@ -223,94 +131,42 @@ function initHistChart() {
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: false },
-        tooltip: {
-          backgroundColor: '#FFFFFF',
-          borderColor: 'rgba(14,14,14,0.20)',
-          borderWidth: 1,
-          padding: 10,
-          cornerRadius: 2,
-          titleColor: '#57534A',
-          bodyColor: '#0E0E0E',
-          titleFont: { family: "'JetBrains Mono', monospace", size: 10, weight: 'bold' },
-          bodyFont:  { family: "'JetBrains Mono', monospace", size: 12 },
-          displayColors: false,
-          callbacks: {
-            title: items => {
-              const d = currentDates[items[0]!.dataIndex]!
-              return d.toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })
-            },
-            label: item => 'AI-INDEX  ' + (item.parsed.y as number).toFixed(4),
-          },
-        },
+        tooltip: { callbacks: { label: item => `${(item.parsed.y as number).toFixed(1)} credits per $1` } },
       },
       scales: {
-        x: {
-          type: 'category',
-          grid: { display: false },
-          border: { color: 'rgba(14,14,14,0.20)' },
-          ticks: {
-            color: '#767269',
-            font: { family: "'JetBrains Mono', monospace", size: 10 },
-            maxRotation: 0,
-            autoSkip: true,
-            maxTicksLimit: 8,
-            callback: (_v, idx) => {
-              const d = currentDates[idx as number]
-              if (!d) return ''
-              return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
-            },
-          },
-        },
-        y: {
-          position: 'right',
-          grid: { color: 'rgba(14,14,14,0.06)' },
-          border: { display: false },
-          ticks: {
-            color: '#767269',
-            font: { family: "'JetBrains Mono', monospace", size: 10 },
-            callback: v => (v as number).toFixed(4),
-            padding: 8,
-          },
-        },
+        x: { grid: { display: false }, ticks: { maxTicksLimit: 8, maxRotation: 0, color: '#767269', font: { family: "'JetBrains Mono', monospace", size: 10 } } },
+        y: { position: 'right', grid: { color: 'rgba(14,14,14,0.06)' }, ticks: { color: '#767269', font: { family: "'JetBrains Mono', monospace", size: 10 } } },
       },
     },
   })
-
-  requestAnimationFrame(() => requestAnimationFrame(() => histChart?.resize()))
 }
 
-function setRange(r: RangeKey) {
-  currentRange.value = r
-  if (!histChart) return
-  const n = r === 'all' ? fullVals.length : Math.min(parseInt(r, 10), fullVals.length)
-  const slice = fullVals.slice(-n)
-  const dates = fullDates.slice(-n)
-  histChart.data.labels = dates.map(d => d.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: '2-digit' }))
-  histChart.data.datasets[0]!.data = slice
-  currentDates = dates
-  histChart.update()
-}
-
-// =====================================================
-// Scroll-spy with IntersectionObserver
-// =====================================================
 let io: IntersectionObserver | null = null
 let cdTimer: ReturnType<typeof setInterval> | null = null
 
-onMounted(() => {
+onMounted(async () => {
+  try {
+    const [l, m] = await Promise.all([
+      $fetch<{ print: IndexPrint; next_publication_at: string }>('/api/index-service/latest'),
+      $fetch<Methodology>('/api/index-service/methodology'),
+    ])
+    latest.value = l.print
+    nextAt.value = l.next_publication_at
+    meth.value = m
+  } catch {
+    loadError.value = 'The index service did not answer. Values will show once it is reachable.'
+  }
   tickCountdown()
   cdTimer = setInterval(tickCountdown, 1000)
-  initHistChart()
+  await nextTick()
+  loadHistory(currentRange.value)
 
   io = new IntersectionObserver((entries) => {
     let best: IntersectionObserverEntry | null = null
-    for (const e of entries) {
-      if (e.isIntersecting && (!best || e.intersectionRatio > best.intersectionRatio)) best = e
-    }
+    for (const e of entries) if (e.isIntersecting && (!best || e.intersectionRatio > best.intersectionRatio)) best = e
     if (best) activeId.value = best.target.id
   }, { rootMargin: '-30% 0px -60% 0px', threshold: [0, 0.25, 0.5, 1] })
-
-  document.querySelectorAll<HTMLElement>('section.sec').forEach(s => io!.observe(s))
+  document.querySelectorAll<HTMLElement>('section.sec, #live').forEach(s => io!.observe(s))
 })
 onBeforeUnmount(() => {
   if (cdTimer) clearInterval(cdTimer)
@@ -322,585 +178,255 @@ onBeforeUnmount(() => {
 <template>
   <div class="methodology">
     <div class="shell">
-      <!-- ============ LEFT NAV ============ -->
       <aside class="lnav" aria-label="Document sections">
-        <div v-for="g in LNAV_GROUPS" :key="g.num" class="lnav-group">
-          <div class="lnav-group-head"><span class="num">{{ g.num }}</span>{{ g.title }}</div>
+        <div class="lnav-group">
+          <div class="lnav-group-head">Methodology</div>
           <ul>
-            <li v-for="i in g.items" :key="i.id">
-              <a :href="'#' + i.id" :class="{ active: activeId === i.id }">
-                <span class="pre">{{ i.pre }}</span>{{ i.label }}
-              </a>
+            <li v-for="i in SECTIONS" :key="i.id">
+              <a :href="'#' + i.id" :class="{ active: activeId === i.id }">{{ i.label }}</a>
             </li>
           </ul>
         </div>
       </aside>
 
-      <!-- ============ CONTENT ============ -->
       <main class="content">
-        <!-- HEADER -->
         <header class="doc-head">
-          <div class="doc-eyebrow">Methodology · benchmark document</div>
-          <h1 class="doc-title">1Trade AI Index Methodology</h1>
+          <div class="doc-eyebrow">Methodology · published document</div>
+          <h1 class="doc-title">1Trade AI Credit Index methodology</h1>
           <div class="doc-version">
-            <span>Version <strong>1.2</strong></span>
-            <span>Effective <strong>2026-04-01</strong></span>
-            <span>Next review <strong>2026-Q3</strong></span>
-            <span class="pill"><span class="dot" /> IN EFFECT</span>
-          </div>
-          <div class="downloads">
-            <a class="dl-link" href="#" download>
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square"><path d="M8 2v8M4 7l4 4 4-4M3 13h10" /></svg>
-              <span>PDF · full whitepaper</span>
-              <span class="meta">(486 KB)</span>
-            </a>
-            <a class="dl-link" href="#" download>
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square"><path d="M8 2v8M4 7l4 4 4-4M3 13h10" /></svg>
-              <span>JSON · machine-readable</span>
-              <span class="meta">(12 KB)</span>
-            </a>
-            <a class="dl-link" href="#" download>
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square"><path d="M8 2v8M4 7l4 4 4-4M3 13h10" /></svg>
-              <span>Schema · Avro</span>
-              <span class="meta">(4 KB)</span>
-            </a>
+            <span>Version <strong>{{ meth?.version ?? '—' }}</strong></span>
+            <span>Effective <strong>{{ meth?.effective_date ?? '—' }}</strong></span>
+            <span class="pill"><span class="dot" /> SIMULATED PRINTS</span>
           </div>
         </header>
 
-        <!-- LIVE INDEX BOX -->
+        <div class="callout">
+          <p class="callout-p">
+            <strong>The index is not yet in production.</strong> Every print served today is simulated and
+            says so (<span class="mono-inline">source: mock</span>, <span class="mono-inline">provisional: true</span>).
+            Do not quote a value from this index as a market price. What is real today is the audit
+            chain in §5: prints are hash-chained exactly as described and can be verified independently.
+          </p>
+        </div>
+
+        <p v-if="loadError" class="callout-p neg">{{ loadError }}</p>
+
         <div id="live" class="live-box">
           <div class="live-box-head">
             <span>— Current value · AI-INDEX</span>
-            <span class="live"><span class="pulse" />Live · refreshed each print</span>
+            <span class="live"><span class="pulse" />Simulated · provisional</span>
           </div>
           <div class="live-box-grid">
             <div class="live-box-cell">
               <div class="lbl">Current value</div>
-              <div class="val">$1 = 1,002.4<span class="unit">AI credits</span></div>
-              <div class="sub">24h Δ <span class="pos">▲ +0.18%</span> · 30d Δ <span class="pos">▲ +2.31%</span></div>
+              <div class="val">$1 = {{ creditsPerUsd(latest?.value) }}<span class="unit">AI credits</span></div>
+              <div class="sub">
+                <span class="mono-inline">{{ latest?.value ?? '—' }}</span> USD per credit
+                <template v-if="change30 !== null"> · 30d Δ <span :class="change30 >= 0 ? 'pos' : 'neg'">{{ change30 >= 0 ? '+' : '' }}{{ change30.toFixed(2) }}%</span></template>
+              </div>
             </div>
             <div class="live-box-cell">
               <div class="lbl">Last print</div>
-              <div class="val val-sm">16:00 UTC</div>
-              <div class="sub">2026-05-19 · ref <span class="strong">0x7a3c91…f042</span></div>
+              <div class="val val-sm">{{ latest ? latest.published_at.slice(11, 16) + ' UTC' : '—' }}</div>
+              <div class="sub">
+                {{ latest?.published_at.slice(0, 10) ?? '—' }} · hash
+                <span class="strong">{{ latest ? latest.chain_hash.slice(0, 10) + '…' : '—' }}</span>
+              </div>
             </div>
             <div class="live-box-cell">
               <div class="lbl">Next print in</div>
               <div class="val val-md">{{ countdown }}</div>
-              <div class="sub">17:00 UTC daily · ICE business days</div>
+              <div class="sub">16:00 UTC daily</div>
             </div>
           </div>
         </div>
 
-        <!-- §1 EXECUTIVE SUMMARY -->
-        <section class="sec" id="sec-1">
-          <div class="sec-head">
-            <span class="sec-num">§ 1</span>
-            <h2>Executive summary</h2>
-          </div>
+        <section id="sec-1" class="sec">
+          <div class="sec-head"><span class="sec-num">§ 1</span><h2>What the index measures</h2></div>
           <div class="sec-body">
             <p class="lede">
-              The <strong>1Trade AI Index</strong> is a daily reference price for AI inference, expressed
-              as the number of <em>AI credits</em> redeemable per one United States dollar at print
-              time. The index is computed from observed transactions across the venue's constituent
-              sub-credit markets, weighted by inference category, with statistically robust filtering
-              for outliers and minimum-volume requirements.
+              The AI Credit Index is a reference price for one unit of general-purpose AI compute,
+              expressed as a fixed-point USD value per AI credit. The site also shows it inverted, as
+              AI credits per US dollar.
             </p>
             <p>
-              The index is intended as the canonical reference for cash- or physically-settled
-              derivatives on AI compute, including the 1Trade AI-INDEX spot and forward contracts.
-              Its design borrows from established commodity benchmarks (LBMA Gold Price, Brent Dated,
-              CME Henry Hub) and from equity-index methodology (S&amp;P, MSCI) where applicable to a
-              continuously-traded, multi-constituent underlying.
-            </p>
-            <p>
-              This document is normative. Any divergence between this document and an operational
-              implementation is to be treated as a defect in the implementation. The methodology
-              committee (§12) is the authority of last resort on interpretation.
+              It is a <strong>reference</strong> index, not a settlement price. Nothing on the platform
+              is settled, margined or liquidated against it.
             </p>
           </div>
         </section>
 
-        <!-- §2 CONSTITUENT INPUTS -->
-        <section class="sec" id="sec-2">
-          <div class="sec-head">
-            <span class="sec-num">§ 2</span>
-            <h2>Constituent inputs</h2>
-          </div>
+        <section id="sec-2" class="sec">
+          <div class="sec-head"><span class="sec-num">§ 2</span><h2>Inputs</h2></div>
           <div class="sec-body">
             <p>
-              The index draws on six observable input streams, each capturing a distinct inference
-              category. Five are spot prices on 1Trade sub-credit markets; the sixth is a derived
-              metric of weighted-average inference cost, computed from observed capacity utilisation
-              across the GPU-credit underlying.
+              Real-money trading is not open, so there are no real trade prints to observe; paper
+              trades are never used. Computing the index from trades is therefore impossible today, and
+              inventing trade prints would be dishonest. The current phase observes platform
+              transactions instead:
             </p>
-            <ul>
-              <li><strong>Text credit spot.</strong> Median execution price of TEXT-INDEX trades over the calculation window.</li>
-              <li><strong>Speech credit spot.</strong> Median execution price of SPEECH-INDEX trades over the calculation window.</li>
-              <li><strong>Image credit spot.</strong> Median execution price of IMAGE-INDEX trades over the calculation window.</li>
-              <li><strong>Video credit spot.</strong> Median execution price of VIDEO-INDEX trades; thinner book, see §5.</li>
-              <li><strong>Niche credit spot.</strong> Aggregate of long-tail inference categories (embedding, classification, fine-tune).</li>
-              <li><strong>Inference cost average.</strong> Capacity-weighted USD-per-token cost derived from H100 and H200 GPU-credit utilisation; see Appendix A of the full whitepaper.</li>
-            </ul>
-
-            <h3 class="sub">Constituent weights <span class="ix">— effective 2026-04-01</span></h3>
+            <table class="tbl" aria-label="Observation sources">
+              <thead><tr><th>Observation source</th><th>What it is</th></tr></thead>
+              <tbody>
+                <tr><td>Realized consumption rates</td><td>USD-equivalent actually charged per consumed sub-credit</td></tr>
+                <tr><td>Prepaid purchase prices</td><td>What customers paid per credit class, at purchase</td></tr>
+                <tr><td>Reserved-capacity transaction prices</td><td>Agreed prices on reserved GPU capacity</td></tr>
+              </tbody>
+            </table>
             <p>
-              Weights are set by the methodology committee at each quarterly review (§8). Weights
-              reflect transaction-volume share over the preceding 90 calendar days, adjusted for
-              inference-category representativeness. The current schedule is reproduced below.
+              When real-money trading opens, trade prints and surveillance exclusion flags join the
+              observation set. The methodology version will change and the change will be disclosed.
             </p>
+          </div>
+        </section>
 
+        <section id="sec-3" class="sec">
+          <div class="sec-head"><span class="sec-num">§ 3</span><h2>Constituents and weights</h2></div>
+          <div class="sec-body">
+            <p>
+              Every constituent is a canonical credit type. The schedule below is served live by
+              <span class="mono-inline">GET /v1/index/methodology</span>. This document and the API are the same schedule, so any
+              disagreement between them is a bug.
+            </p>
             <table class="tbl" aria-label="Current constituent weights">
               <thead>
-                <tr>
-                  <th>Constituent</th>
-                  <th class="num-h">Weight</th>
-                  <th>Source</th>
-                  <th class="num-h">Last update (UTC)</th>
-                </tr>
+                <tr><th>Constituent</th><th>Credit type</th><th class="num-h">Weight</th><th>Source</th><th class="num-h">Observed (UTC)</th></tr>
               </thead>
               <tbody>
-                <tr v-for="c in CONSTITUENTS" :key="c.name">
+                <tr v-if="!meth"><td colspan="5" class="mono-td">Loading…</td></tr>
+                <tr v-for="c in meth?.constituents ?? []" :key="c.credit_type">
                   <td>{{ c.name }}</td>
-                  <td class="num">{{ c.weight.toFixed(2) }}</td>
+                  <td class="mono-td">{{ c.credit_type }}</td>
+                  <td class="num">{{ c.weight }}</td>
                   <td class="mono-td">{{ c.source }}</td>
-                  <td class="num">{{ c.updated }}</td>
+                  <td class="num">{{ c.observed_at ? c.observed_at.slice(11, 19) : '—' }}</td>
                 </tr>
-                <tr class="total">
-                  <td>Total</td>
-                  <td class="num">1.00</td>
-                  <td colspan="2" />
-                </tr>
+                <tr v-if="meth" class="total"><td>Total</td><td /><td class="num">{{ weightTotal }}</td><td colspan="2" /></tr>
               </tbody>
             </table>
-            <div class="tbl-cap"><strong>Table 1.</strong> Constituent weights in effect at the time of publication. Subsequent quarterly revisions are linked from <a href="#sec-8">§8</a>.</div>
           </div>
         </section>
 
-        <!-- §3 CALCULATION FORMULA -->
-        <section class="sec" id="sec-3">
-          <div class="sec-head">
-            <span class="sec-num">§ 3</span>
-            <h2>Calculation formula</h2>
-          </div>
+        <section id="sec-4" class="sec">
+          <div class="sec-head"><span class="sec-num">§ 4</span><h2>Computation</h2></div>
           <div class="sec-body">
-            <p>
-              The index value <code>V(t)</code> at print time <code>t</code> is the trimmed,
-              volume-weighted sum of constituent observations across the calculation window
-              <code>[t − Δ, t]</code>:
-            </p>
-
-            <div class="formula-box" aria-label="Equation 1">
-              <div class="formula-eq">
-                <em>V</em>(<em>t</em>) =
-                trimmedMean<sub class="trim">0.025, 0.975</sub>
-                <span class="parens">(</span>
-                <span class="sigma">Σ</span><sub class="sigi">i=1</sub><sup class="sign">N</sup>
-                <em>P</em><sub>i</sub>(<em>t</em>)
-                <em>w</em><sub>i</sub>(<em>t</em>)
-                <span class="parens">)</span>
-                × <em>κ</em>
-              </div>
-              <div class="formula-where">
-                <dl>
-                  <dt>P<sub>i</sub>(t)</dt><dd>observed price of constituent <em>i</em> within the calculation window</dd>
-                  <dt>w<sub>i</sub>(t)</dt><dd>active weight of constituent <em>i</em> at time <em>t</em>; <span class="mono-inline">Σ w<sub>i</sub> = 1</span></dd>
-                  <dt>N</dt><dd>number of constituents in effect; currently <strong>6</strong></dd>
-                  <dt>Δ</dt><dd>calculation window; currently <strong>120 minutes</strong> rolling</dd>
-                  <dt>κ</dt><dd>normalization scalar; <strong>1,000</strong> (so the index quotes near unity)</dd>
-                </dl>
-              </div>
-            </div>
-
-            <p>
-              The trimmed mean operator excludes the lowest 2.5% and highest 2.5% of observations
-              within the window before the volume-weighted sum is taken. The operator is applied
-              jointly across all constituents (rather than per-constituent) so that genuine
-              cross-asset moves are preserved while idiosyncratic spikes are suppressed.
-            </p>
-            <p>
-              A reference implementation in Python, with deterministic test vectors covering 18
-              published prints, is distributed with the JSON download above. The reference
-              implementation is the authority for any computational ambiguity in the prose.
-            </p>
-          </div>
-        </section>
-
-        <!-- §4 OUTLIER FILTERING -->
-        <section class="sec" id="sec-4">
-          <div class="sec-head">
-            <span class="sec-num">§ 4</span>
-            <h2>Outlier filtering</h2>
-          </div>
-          <div class="sec-body">
-            <p>
-              The 95% trimmed mean was selected after comparative back-testing against
-              Huber M-estimation, MAD-based winsorisation, and the unmodified arithmetic mean
-              across <em>2,194 simulated prints</em> drawn from observed sub-credit volatility. The
-              trimmed mean is the simplest estimator that meets two requirements:
-              <strong>(i)</strong> a published, auditable cut-off; and
-              <strong>(ii)</strong> bounded influence under a single-counterparty wash-trading attack
-              up to 2.4% of window volume.
-            </p>
-
-            <div class="figure" aria-label="Trimmed mean visualization">
-              <div class="figure-head">
-                <span>— Figure 1 · Trimmed-mean operator</span>
-                <span class="legend">
-                  <span><span class="sw sw-dark" />Retained · 95%</span>
-                  <span><span class="sw sw-tail" />Excluded tails · 2 × 2.5%</span>
-                </span>
-              </div>
-              <div class="figure-body">
-                <svg class="hist-svg" viewBox="0 0 720 200" preserveAspectRatio="none" aria-hidden="true">
-                  <line x1="20" y1="180" x2="700" y2="180" stroke="rgba(14,14,14,0.20)" stroke-width="1" />
-                  <path d="M 20,180 L 20,165 L 40,155 L 60,148 L 80,140 L 80,180 Z" fill="#F1ECE1" stroke="#0E0E0E" stroke-width="1" />
-                  <path d="M 640,180 L 640,140 L 660,148 L 680,160 L 700,170 L 700,180 Z" fill="#F1ECE1" stroke="#0E0E0E" stroke-width="1" />
-                  <path d="M 80,140 L 100,128 L 130,110 L 160,90 L 190,72 L 220,56 L 260,40 L 300,30 L 340,26 L 360,25 L 380,26 L 420,30 L 460,40 L 500,56 L 540,72 L 580,90 L 610,110 L 640,140 L 640,180 L 80,180 Z" fill="#0E0E0E" fill-opacity="0.86" />
-                  <line x1="80" y1="20" x2="80" y2="180" stroke="#0E0E0E" stroke-width="1" stroke-dasharray="3 3" />
-                  <line x1="640" y1="20" x2="640" y2="180" stroke="#0E0E0E" stroke-width="1" stroke-dasharray="3 3" />
-                  <line x1="360" y1="20" x2="360" y2="180" stroke="#D4AF37" stroke-width="2" />
-                  <text x="80" y="14" text-anchor="middle" fill="#57534A" font-family="JetBrains Mono" font-size="10" font-weight="600" letter-spacing="0.06em">P₂.₅</text>
-                  <text x="640" y="14" text-anchor="middle" fill="#57534A" font-family="JetBrains Mono" font-size="10" font-weight="600" letter-spacing="0.06em">P₉₇.₅</text>
-                  <text x="360" y="14" text-anchor="middle" fill="#0E0E0E" font-family="JetBrains Mono" font-size="10" font-weight="600" letter-spacing="0.06em">x̄ = V(t)</text>
-                  <text x="50" y="196" text-anchor="middle" fill="#767269" font-family="JetBrains Mono" font-size="9">2.5%</text>
-                  <text x="360" y="196" text-anchor="middle" fill="#767269" font-family="JetBrains Mono" font-size="9">Distribution of constituent-weighted observations · 120-min window</text>
-                  <text x="670" y="196" text-anchor="middle" fill="#767269" font-family="JetBrains Mono" font-size="9">2.5%</text>
-                </svg>
-              </div>
-              <div class="figure-cap"><strong>Figure 1.</strong> Stylised distribution of constituent-weighted observations across the calculation window. The two shaded tails (2.5% each) are excluded before the volume-weighted mean is taken.</div>
-            </div>
-
-            <p>
-              The 2.5% trimming threshold may be revised by the methodology committee with not less
-              than 30 calendar days' notice. Any revision triggers a new methodology version
-              (§8).
-            </p>
-          </div>
-        </section>
-
-        <!-- §5 VOLUME FLOOR -->
-        <section class="sec" id="sec-5">
-          <div class="sec-head">
-            <span class="sec-num">§ 5</span>
-            <h2>Volume floor</h2>
-          </div>
-          <div class="sec-body">
-            <p>
-              A valid print requires at least <strong>N = 240</strong> observations across the
-              calculation window, of which not fewer than <strong>20</strong> must originate from
-              each constituent except <em>video credit spot</em>, which has a lower floor of
-              <strong>8</strong> observations in recognition of its thinner book.
-            </p>
-            <p>
-              If the volume floor is not met at any constituent, the print is marked
-              <em>provisional</em> and republished with the next-day reconciliation. If the floor
-              is not met at the aggregate level, no print is issued; the previous print remains
-              the prevailing reference and the methodology committee convenes within four
-              business hours under standing protocol <code>VP-01</code>.
-            </p>
-            <p>
-              In the 18 months of pre-launch observation, the aggregate floor was met on
-              <strong>100.0%</strong> of business days; constituent floors were met on
-              <strong>99.6%</strong> of business days, with three provisional prints, each
-              reconciled within one publication cycle.
-            </p>
-          </div>
-        </section>
-
-        <!-- §6 MANIPULATION RESISTANCE -->
-        <section class="sec" id="sec-6">
-          <div class="sec-head">
-            <span class="sec-num">§ 6</span>
-            <h2>Manipulation resistance</h2>
-          </div>
-          <div class="sec-body">
-            <p>
-              The index incorporates the following defences against attempted manipulation. Each
-              is documented in greater detail in the corresponding annex of the full whitepaper.
-            </p>
             <ol>
-              <li><strong>Cross-validation against multiple input sources.</strong> Each constituent's spot price is corroborated against the time-weighted mid-quote on the same market; large divergences trigger source isolation.</li>
-              <li><strong>Outlier exclusion via trimmed mean.</strong> See §4. Bounded influence of any single counterparty's window activity.</li>
-              <li><strong>Volume threshold for valid prints.</strong> See §5. A thin book defers to the prior print rather than admitting a thin observation.</li>
-              <li><strong>Surveillance for marking-the-close patterns.</strong> Pattern matching against last-minute order-book pressure, with manual review for matches above the surveillance threshold.</li>
-              <li><strong>Cryptographic audit chain on all prints.</strong> Each daily print is hashed and chained to the prior print; the chain root is published to a third-party transparency log within 60 seconds of issuance.</li>
-              <li><strong>Member-trading restrictions.</strong> Methodology committee members are subject to a 5-day cooling-off window around methodology revisions and may not hold proprietary positions in any constituent during their tenure.</li>
+              <li>Collect observations per constituent within a <strong>{{ meth?.window_minutes ?? '—' }}-minute window</strong> ending at publication. A constituent with no observation in its window is excluded from that print.</li>
+              <li>Apply the <strong>volume floor</strong>: an observation below <span class="mono-inline">{{ meth?.volume_floor ?? '—' }}</span> in notional is discarded as too thin to be price-forming.</li>
+              <li>Take a <strong>{{ meth?.trim_pct ?? '—' }}% trimmed mean</strong> per constituent, removing the extreme tails so a single unusual transaction cannot move the print.</li>
+              <li>Combine constituents by the §3 weights.</li>
+              <li>Round to 6 decimal places. All index arithmetic is fixed-point, never floating point.</li>
             </ol>
+            <p>Every print reports <span class="mono-inline">observation_count</span> and <span class="mono-inline">excluded_count</span>, so the sample behind a value is visible.</p>
           </div>
         </section>
 
-        <!-- §7 PUBLICATION SCHEDULE -->
-        <section class="sec" id="sec-7">
-          <div class="sec-head">
-            <span class="sec-num">§ 7</span>
-            <h2>Publication schedule</h2>
-          </div>
+        <section id="sec-5" class="sec">
+          <div class="sec-head"><span class="sec-num">§ 5</span><h2>Audit chain</h2></div>
           <div class="sec-body">
+            <p>Prints are immutable and hash-chained:</p>
+            <div class="formula-box"><div class="formula-eq mono-inline">chain_hash = SHA256( prev_chain_hash ‖ canonical_json(print) )</div></div>
             <p>
-              The 1Trade AI Index is published once per ICE business day at <strong>17:00 UTC</strong>.
-              Publication latency is targeted at &lt; 60 seconds from the close of the calculation
-              window; the observed median latency in 2026-Q1 was 14 seconds.
+              <span class="mono-inline">canonical_json</span> uses a fixed key order (print_id, value, published_at,
+              methodology_version, observation_count, excluded_count, provisional, source), values to exactly
+              6 decimals and RFC 3339 UTC timestamps. The genesis print chains from the empty string.
             </p>
             <p>
-              A continuous intraday <em>indicative</em> value is also computed at five-second intervals
-              and disseminated over the market data feed under the symbol <code>AI-INDEX.IV</code>.
-              The intraday indicative is for reference only and does not constitute a published print.
-            </p>
-            <p>
-              Holiday and exceptional-event handling follows the schedule maintained at
-              <a href="#">1trade.com/calendar</a>. No print is issued on days where the venue is closed.
+              <strong>To verify:</strong> fetch a series from <span class="mono-inline">GET /v1/index/history</span>,
+              re-derive each hash from the previous print's hash and the canonical form, and compare.
+              Altering any print breaks every hash after it. The credit ledger uses the same construction.
             </p>
           </div>
         </section>
 
-        <!-- §8 METHODOLOGY VERSIONING -->
-        <section class="sec" id="sec-8">
-          <div class="sec-head">
-            <span class="sec-num">§ 8</span>
-            <h2>Methodology versioning</h2>
+        <section id="sec-6" class="sec">
+          <div class="sec-head"><span class="sec-num">§ 6</span><h2>Publication</h2></div>
+          <div class="sec-body">
+            <ul>
+              <li>Daily at <strong>16:00 UTC</strong>. Every response states the next publication time.</li>
+              <li>A print is <span class="mono-inline">provisional</span> until it is finalised. Today every print is provisional.</li>
+              <li>Prints are never edited. A correction is a new print citing the one it supersedes; the superseded print stays in the chain.</li>
+            </ul>
           </div>
+        </section>
+
+        <section id="sec-7" class="sec">
+          <div class="sec-head"><span class="sec-num">§ 7</span><h2>Changing the methodology</h2></div>
           <div class="sec-body">
             <p>
-              Methodology revisions follow semantic versioning with the following correspondence:
-              <strong>major</strong> changes (formula structure, constituent set) carry a 90-day
-              consultation period; <strong>minor</strong> changes (weight schedule, trimming
-              threshold) carry a 30-day notification period; <strong>patch</strong> changes
-              (typographical, clarification of intent) take effect at publication and do not
-              re-rebase historical prints.
+              A methodology change is proposed in writing with its rationale and expected effect,
+              reviewed, published here with a new version number and effective date, and only then
+              deployed. A version change is never silent: each print states the
+              <span class="mono-inline">methodology_version</span> that produced it.
             </p>
-
-            <table class="tbl" aria-label="Methodology version history">
-              <thead>
-                <tr>
-                  <th>Version</th>
-                  <th>Effective</th>
-                  <th>Class</th>
-                  <th>Summary</th>
-                </tr>
-              </thead>
+            <table class="tbl" aria-label="Version history">
+              <thead><tr><th>Version</th><th>Effective</th><th>Change</th></tr></thead>
               <tbody>
-                <tr v-for="v in VERSIONS" :key="v.v">
-                  <td class="mono-td">{{ v.v }}</td>
-                  <td class="mono-td">{{ v.eff }}</td>
-                  <td>{{ v.cls }}</td>
-                  <td>{{ v.summary }}</td>
-                </tr>
+                <tr><td class="mono-td">1.2</td><td class="mono-td">2026-04-01</td><td>Current. Six constituents, 120-minute window, 95% trim, 25,000 volume floor.</td></tr>
               </tbody>
             </table>
-            <div class="tbl-cap"><strong>Table 2.</strong> Methodology version history. Earlier consultation drafts available on request.</div>
           </div>
         </section>
 
-        <!-- §9 AUDIT & OVERSIGHT -->
-        <section class="sec" id="sec-9">
-          <div class="sec-head">
-            <span class="sec-num">§ 9</span>
-            <h2>Audit and oversight</h2>
-          </div>
+        <section id="sec-8" class="sec">
+          <div class="sec-head"><span class="sec-num">§ 8</span><h2>Historical prints</h2></div>
           <div class="sec-body">
-            <p>
-              The methodology is reviewed quarterly by the 1Trade Methodology Committee (§12)
-              and audited annually by an independent third-party benchmark administrator. The
-              audit covers (a) conformity of the operational implementation to this document,
-              (b) integrity of the cryptographic audit chain, and (c) governance practices of the
-              methodology committee.
-            </p>
-            <div class="callout">
-              <span class="lbl">Independent auditor</span>
-              <p class="callout-p">
-                <em>[Auditor name to be confirmed — appointment under review by the Audit and
-                Oversight Committee. Expected attestation: ISAE 3000 (Revised), with scope per
-                IOSCO Principles for Financial Benchmarks.]</em>
-                <br />
-                <a href="#" class="callout-link">Audit reports archive →</a>
-              </p>
-            </div>
-            <p>
-              The audit chain is rooted in a third-party transparency log operated by the
-              <em>Cloudflare Merkle Town</em> service (RFC 6962). Independent verifiers may
-              reconstruct the entire history of prints from the published audit roots and the
-              per-print JSON manifests distributed under
-              <a href="#">data.trade1.com/index/v1/</a>.
-            </p>
-          </div>
-        </section>
-
-        <!-- §10 HISTORICAL PRINTS -->
-        <section class="sec" id="sec-10">
-          <div class="sec-head">
-            <span class="sec-num">§ 10</span>
-            <h2>Historical prints</h2>
-          </div>
-          <div class="sec-body">
-            <p>
-              The chart below renders the full series of daily index prints from launch
-              (2025-10-15) to the most recent business day. The index was normalised to a value of
-              <strong>1.0000</strong> at launch; the most recent print is
-              <strong>1.0024</strong>, a year-to-date change of <strong>+4.18%</strong>.
-            </p>
-
             <div class="chart-card">
               <div class="chart-head">
-                <h3 class="chart-ttl">AI-INDEX · daily prints<span class="chart-meta">· since launch · 217 business days</span></h3>
+                <h3 class="chart-ttl">AI-INDEX · daily prints<span class="chart-meta">· {{ history.length }} prints · simulated</span></h3>
                 <div class="ranges">
-                  <button
-                    v-for="r in RANGE_KEYS"
-                    :key="r"
-                    type="button"
-                    class="r"
-                    :class="{ active: currentRange === r }"
-                    @click="setRange(r)"
-                  >{{ RANGE_LABELS[r] }}</button>
+                  <button v-for="k in RANGE_KEYS" :key="k" type="button" class="r" :class="{ active: currentRange === k }" @click="loadHistory(k)">{{ RANGE_LABELS[k] }}</button>
                 </div>
               </div>
               <div class="chart-body">
                 <div class="chart-canvas-wrap"><canvas ref="histCanvas" /></div>
               </div>
               <div class="chart-foot">
-                <span>Source · EX market data feed · published prints only · normalised to 1.0000 at launch</span>
-                <a href="#" download>Download full historical data (CSV) →</a>
+                <span>Credits per $1 · each print hash-chained</span>
+                <a :href="`/api/index-service/history?days=${currentRange}`" target="_blank" rel="noopener">Raw prints (JSON) →</a>
               </div>
             </div>
-
-            <p>
-              Prints prior to launch are not included; the consultation-period pilot
-              (versions 0.9 — 0.9.4) was a paper exercise and did not include settlement.
-              Researchers requesting the pilot series should contact
-              <a href="mailto:methodology@1trade.com">methodology@1trade.com</a>.
-            </p>
           </div>
         </section>
 
-        <!-- §11 CONSTITUENT TRANSPARENCY -->
-        <section class="sec" id="sec-11">
-          <div class="sec-head">
-            <span class="sec-num">§ 11</span>
-            <h2>Constituent transparency</h2>
-          </div>
+        <section id="sec-9" class="sec">
+          <div class="sec-head"><span class="sec-num">§ 9</span><h2>Known limitations</h2></div>
           <div class="sec-body">
-            <p>
-              Per-constituent observed prices, window-volume figures, and exclusion counts are
-              published with each print under the JSON manifest. The manifest is fully signed and
-              chained to the audit log described in §9, and is downloadable on a five-second
-              delay over the public data API.
-            </p>
-            <p>
-              Subscribers to the institutional data feed receive the full per-fill detail in
-              real time, including taker / maker flags, counterparty bucket (member /
-              non-member), and the maker–taker contribution to each constituent's window-volume.
-            </p>
+            <ul>
+              <li><strong>Values are simulated today.</strong> <span class="mono-inline">source: mock</span> marks every print.</li>
+              <li><strong>No trade prints.</strong> The current phase observes platform transactions only (§2).</li>
+              <li><strong>Thin history.</strong> The platform is young, so early observation counts are small.</li>
+              <li><strong>No independent audit yet.</strong> The chain is verifiable by construction, but no third party has attested to it.</li>
+              <li><strong>Single operator.</strong> 1Trade computes an index over its own platform's transactions. Publishing the methodology, weights, observation counts and audit chain mitigates that conflict; it does not remove it.</li>
+              <li><strong>Administered prices are not discovered prices.</strong> Today's observations are at prices 1Trade set, so an index over them would largely restate that price table. That is why the index stays labelled simulated until prices vary by transaction or real trade prints exist.</li>
+            </ul>
           </div>
         </section>
 
-        <!-- §12 METHODOLOGY COMMITTEE -->
-        <section class="sec" id="sec-12">
-          <div class="sec-head">
-            <span class="sec-num">§ 12</span>
-            <h2>Methodology committee</h2>
-          </div>
+        <section id="sec-10" class="sec">
+          <div class="sec-head"><span class="sec-num">§ 10</span><h2>API and contact</h2></div>
           <div class="sec-body">
-            <p>
-              The methodology committee is responsible for (a) the quarterly review of constituent
-              weights, (b) extraordinary reviews triggered under the volume-floor protocol (§5),
-              and (c) approval of any methodology revision. Membership is mixed internal and
-              external; the external chair holds a casting vote.
-            </p>
-
-            <div class="committee">
-              <div v-for="m in COMMITTEE" :key="m.name" class="member">
-                <div class="name">{{ m.name }}</div>
-                <div class="role">{{ m.role }}</div>
-                <div class="bio">{{ m.bio }}</div>
-              </div>
-            </div>
-
-            <p>
-              Committee minutes for non-confidential portions of each session are published at
-              <a href="#">1trade.com/methodology/committee/minutes</a> within ten business days
-              of the session.
-            </p>
+            <table class="tbl" aria-label="Index endpoints">
+              <tbody>
+                <tr><td class="mono-td">GET /v1/index/latest</td><td>Current print and next publication time</td></tr>
+                <tr><td class="mono-td">GET /v1/index/history?days=N</td><td>Print series, oldest first, hash-chained</td></tr>
+                <tr><td class="mono-td">GET /v1/index/methodology</td><td>Live constituent and weight schedule</td></tr>
+              </tbody>
+            </table>
+            <p>Questions or concerns about the methodology: <a href="mailto:methodology@1trade.com">methodology@1trade.com</a>.</p>
           </div>
         </section>
-
-        <!-- §13 COMPLAINT PROCESS -->
-        <section class="sec" id="sec-13">
-          <div class="sec-head">
-            <span class="sec-num">§ 13</span>
-            <h2>Complaint process</h2>
-          </div>
-          <div class="sec-body">
-            <p>
-              Any market participant, vendor, or member of the public may submit a complaint
-              regarding the integrity of a print, the conduct of the methodology committee, or
-              the operation of the audit chain. Complaints are received at
-              <a href="mailto:complaints@1trade.com">complaints@1trade.com</a> and
-              acknowledged within two business days.
-            </p>
-            <p>
-              Substantive complaints are investigated within ten business days. Where the
-              investigation cannot be completed within the standard window, the complainant is
-              notified of an extended timetable. Resolution outcomes are published in
-              anonymised form at <a href="#">1trade.com/methodology/complaints</a>.
-            </p>
-          </div>
-        </section>
-
-        <!-- §14 CONTACT -->
-        <section class="sec" id="sec-14">
-          <div class="sec-head">
-            <span class="sec-num">§ 14</span>
-            <h2>Contact</h2>
-          </div>
-          <div class="sec-body">
-            <p>
-              General methodology enquiries:
-              <a href="mailto:methodology@1trade.com">methodology@1trade.com</a>.
-              Audit-chain and reconciliation enquiries:
-              <a href="mailto:audit@1trade.com">audit@1trade.com</a>.
-              Media enquiries should be routed through
-              <a href="mailto:press@1trade.com">press@1trade.com</a>.
-            </p>
-            <p>
-              1Trade Markets · 200 Pine Street · San Francisco, CA 94104 · United States.
-              For corporate registration and counterparty diligence, see
-              <a href="#">1trade.com/legal/entity</a>.
-            </p>
-          </div>
-        </section>
-
-        <!-- FOOTNOTES -->
-        <div class="footnote">
-          <p><sup>1</sup> The 1Trade AI Index is a non-investible benchmark. Any reference to <em>"investing"</em> in the index refers to investment in derivatives whose settlement value is determined by reference to a print of the index.</p>
-          <p><sup>2</sup> The trimmed mean is the operator <em>x̄<sub>α,β</sub>(X) := mean({ x ∈ X : Q<sub>α</sub>(X) ≤ x ≤ Q<sub>β</sub>(X) })</em>, where Q is the empirical quantile function.</p>
-          <p><sup>3</sup> Cloudflare Merkle Town is referenced for illustrative purposes; the production audit log provider will be confirmed in the next minor revision.</p>
-        </div>
-
-        <!-- PAGE FOOTER -->
-        <div class="doc-foot">
-          <div class="contacts">
-            <span><a href="mailto:methodology@1trade.com">methodology@1trade.com</a></span>
-            <span><a href="mailto:audit@1trade.com">audit@1trade.com</a></span>
-          </div>
-          <div class="vers">
-            <div class="v">Methodology v1.2</div>
-            <div>Last updated 2026-04-01</div>
-            <div>This document supersedes all prior methodology documents.</div>
-          </div>
-        </div>
       </main>
 
-      <!-- ============ RIGHT TOC ============ -->
       <aside class="rtoc" aria-label="On this page">
         <div class="rtoc-head">— On this page</div>
         <ul>
-          <li v-for="i in RTOC" :key="i.id">
+          <li v-for="i in SECTIONS" :key="i.id">
             <a :href="'#' + i.id" :class="{ active: activeId === i.id }">{{ i.label }}</a>
           </li>
         </ul>
         <div class="rtoc-meta">
-          <strong>v1.2</strong> · Effective 2026-04-01<br />
-          Next quarterly review: <strong>2026-Q3</strong>
+          <strong>v{{ meth?.version ?? '—' }}</strong> · Effective {{ meth?.effective_date ?? '—' }}
         </div>
       </aside>
     </div>
@@ -920,6 +446,7 @@ onBeforeUnmount(() => {
   font-feature-settings: 'ss01';
 }
 .pos { color: var(--pos); }
+.neg { color: var(--neg); }
 .mono-inline { font-family: var(--font-mono); }
 
 html { scroll-behavior: smooth; }

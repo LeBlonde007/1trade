@@ -15,7 +15,6 @@ import {
   Activity,
   LogOut,
   Building2,
-  ExternalLink,
   Wallet,
   Menu,
 } from 'lucide-vue-next'
@@ -240,16 +239,12 @@ function orgTypeLabel(t: 'personal' | 'lab' | 'enterprise'): string {
 
             <!-- Help / status -->
             <div class="um-section">
-              <a href="#" class="um-row um-item" role="menuitem">
-                <HelpCircle :size="14" /><span class="row-name">Help &amp; docs</span>
-                <ExternalLink :size="11" class="ext" />
-              </a>
-              <a href="#" class="um-row um-item" role="menuitem">
-                <Activity :size="14" /><span class="row-name">Status</span>
-                <span class="status-pill mono">
-                  <span class="status-dot" /> OPERATIONAL
-                </span>
-              </a>
+              <NuxtLink to="/onboarding/tour" class="um-row um-item" role="menuitem" @click="closeMenu">
+                <HelpCircle :size="14" /><span class="row-name">Product tour</span>
+              </NuxtLink>
+              <NuxtLink to="/status" class="um-row um-item" role="menuitem" @click="closeMenu">
+                <Activity :size="14" /><span class="row-name">System status</span>
+              </NuxtLink>
             </div>
 
             <!-- Sign out -->
@@ -521,21 +516,6 @@ function orgTypeLabel(t: 'personal' | 'lab' | 'enterprise'): string {
 
 /* External-link indicator + status pill */
 .ext { color: var(--text-3); }
-.status-pill {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 2px 6px;
-  border-radius: var(--radius-sm);
-  background: var(--pos-soft);
-  color: var(--pos);
-  font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-}
-.status-pill .status-dot {
-  width: 5px; height: 5px;
-  border-radius: 50%;
-  background: currentColor;
-}
 
 /* Sign out — destructive */
 .um-signout {

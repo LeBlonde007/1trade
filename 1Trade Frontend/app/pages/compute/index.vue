@@ -42,117 +42,11 @@ interface Instance {
 }
 
 // =====================================================
-// Mock instances — 5 rows per spec
+// Instances — filled from compute-control on mount (no placeholder rows)
 // =====================================================
-const NOW = Math.floor(Date.now() / 1000)
-
-const instances = reactive<Instance[]>([
-  {
-    id: 'i-7a3c91',
-    name: 'training-run-2026-05-19',
-    status: 'running',
-    gpu: 'H100',
-    gpuFull: 'H100 80GB SXM5',
-    count: 8,
-    region: 'us-east-1',
-    startedAt: NOW - (4 * 3600 + 23 * 60 + 12),   // 4h 23m 12s
-    uptimeSec: 4 * 3600 + 23 * 60 + 12,
-    hourlyRate: 8 * 2.99,                          // $23.92/hr
-    costSoFar: 0,                                  // recomputed on mount
-    ram: '1.92 TB DDR5',
-    storage: '16 TB NVMe (8 × 2 TB · RAID 0)',
-    network: '400 Gbps InfiniBand NDR',
-    os: 'Ubuntu 22.04 LTS',
-    image: '1trade-pytorch-2.4-cuda-12.4',
-    sshHost: 'training-run-2026-05-19.tyo1.trade1.com',
-    sshKey: 'SHA256:ZxVZ7p9k…7Qd2',
-    util: [88, 92, 85, 91, 89, 94, 87, 90],
-  },
-  {
-    id: 'i-4b8821',
-    name: 'inference-test-llama3',
-    status: 'running',
-    gpu: 'H100',
-    gpuFull: 'H100 80GB SXM5',
-    count: 1,
-    region: 'us-east-1',
-    startedAt: NOW - (18 * 3600 + 4 * 60),
-    uptimeSec: 18 * 3600 + 4 * 60,
-    hourlyRate: 2.99,
-    costSoFar: 0,
-    ram: '256 GB',
-    storage: '2 TB NVMe',
-    network: '100 Gbps Ethernet',
-    os: 'Ubuntu 22.04 LTS',
-    image: '1trade-vllm-0.5',
-    sshHost: 'inference-test-llama3.tyo1.trade1.com',
-    sshKey: 'SHA256:Lp4hF2x…aB91',
-    util: [62],
-  },
-  {
-    id: 'i-12fa55',
-    name: 'fine-tune-mistral-7b',
-    status: 'running',
-    gpu: 'H200',
-    gpuFull: 'H200 141GB SXM5',
-    count: 1,
-    region: 'eu-west-1',
-    startedAt: NOW - (2 * 86400 + 6 * 3600 + 41 * 60),
-    uptimeSec: 2 * 86400 + 6 * 3600 + 41 * 60,
-    hourlyRate: 3.49,
-    costSoFar: 0,
-    ram: '256 GB',
-    storage: '4 TB NVMe',
-    network: '200 Gbps InfiniBand HDR',
-    os: 'Ubuntu 22.04 LTS',
-    image: '1trade-axolotl-0.4',
-    sshHost: 'fine-tune-mistral-7b.dub1.trade1.com',
-    sshKey: 'SHA256:9eR8mW1…CC04',
-    util: [77],
-  },
-  {
-    id: 'i-9e0d11',
-    name: 'mlperf-bench-h100',
-    status: 'provisioning',
-    gpu: 'H100',
-    gpuFull: 'H100 80GB SXM5',
-    count: 1,
-    region: 'us-east-1',
-    startedAt: 0,
-    uptimeSec: 0,
-    hourlyRate: 2.99,
-    costSoFar: 0,
-    ram: '256 GB',
-    storage: '2 TB NVMe',
-    network: '100 Gbps Ethernet',
-    os: 'Ubuntu 22.04 LTS',
-    image: '1trade-mlperf-4.1',
-    sshHost: '— pending provision',
-    sshKey: '—',
-    util: [0],
-  },
-  {
-    id: 'i-stp-001',
-    name: 'nightly-eval-2026-05-18',
-    status: 'stopped',
-    gpu: 'H100',
-    gpuFull: 'H100 80GB SXM5',
-    count: 2,
-    region: 'us-east-1',
-    startedAt: 0,
-    uptimeSec: 1 * 3600 + 12 * 60,                 // ran for this much yesterday
-    hourlyRate: 5.98,
-    costSoFar: 7.18,
-    ram: '512 GB',
-    storage: '4 TB NVMe',
-    network: '200 Gbps InfiniBand HDR',
-    os: 'Ubuntu 22.04 LTS',
-    image: '1trade-pytorch-2.4-cuda-12.4',
-    sshHost: '— instance stopped',
-    sshKey: '—',
-    util: [0, 0],
-  },
-])
+const instances = reactive<Instance[]>([])
+/** loaded flips once the first fetch returns, so the table can tell "loading" from "none". */
+const loaded = ref(false)
 
 // =====================================================
 // Recompute live cost from uptime
@@ -162,14 +56,10 @@ function recomputeCostNow(it: Instance) {
     it.costSoFar = (it.uptimeSec / 3600) * it.hourlyRate
   }
 }
-for (const it of instances) recomputeCostNow(it)
 
 // =====================================================
 // Resource summary (right sidebar)
 // =====================================================
-const monthBudget = 15_000
-const monthCostBase = 1_847.32                     // base; live spend tracks above
-
 const runningGpuCount = computed(() =>
   instances.filter(i => i.status === 'running').reduce((s, i) => s + i.count, 0),
 )
@@ -178,16 +68,14 @@ const provisioningGpuCount = computed(() =>
 )
 const activeGpuCount = computed(() => runningGpuCount.value + provisioningGpuCount.value)
 
-const liveSpendDelta = ref(0)
-const monthCost = computed(() => monthCostBase + liveSpendDelta.value)
-const budgetAvailable = computed(() => monthBudget - monthCost.value)
-const budgetPct = computed(() => Math.min(100, (monthCost.value / monthBudget) * 100))
-const budgetTone = computed<'pos' | 'warn' | 'neg'>(() => {
-  const p = budgetPct.value
-  if (p >= 95) return 'neg'
-  if (p >= 80) return 'warn'
-  return 'pos'
-})
+/** burnRate is what the running instances cost per hour right now. */
+const burnRate = computed(() =>
+  instances.filter(i => i.status === 'running').reduce((s, i) => s + i.hourlyRate, 0),
+)
+/** accrued is what the running instances have cost since they started. */
+const accrued = computed(() =>
+  instances.filter(i => i.status === 'running').reduce((s, i) => s + i.costSoFar, 0),
+)
 
 // =====================================================
 // Formatters
@@ -217,7 +105,7 @@ function statusLabel(s: InstanceStatus) {
 // =====================================================
 // Expand / collapse rows
 // =====================================================
-const expandedIds = ref<Set<string>>(new Set(['i-7a3c91']))  // first row pre-expanded
+const expandedIds = ref<Set<string>>(new Set())
 function toggleRow(id: string) {
   const next = new Set(expandedIds.value)
   if (next.has(id)) next.delete(id)
@@ -259,69 +147,21 @@ async function copyCli() {
 }
 
 // =====================================================
-// Logs (terminal preview for the expanded instance)
-// =====================================================
-const LOG_LINES: Record<string, string[]> = {
-  'i-7a3c91': [
-    '[14:08:42] 1trade-runner v2.4.1 · 8 × H100 80GB · CUDA 12.4',
-    '[14:08:43] cgroups attached · NVIDIA driver 550.54 · NCCL 2.21.5',
-    '[14:08:46] pulling image 1trade-pytorch-2.4-cuda-12.4 (3.7 GB) …',
-    '[14:09:18] image ready · launching torchrun --nproc_per_node=8',
-    '[14:09:22] [rank 0] init_process_group · world_size=8 · backend=nccl',
-    '[14:09:24] [rank 0] dataset · /mnt/ds/c4-en.parquet · 364.2M rows',
-    '[14:09:31] [rank 0] model loaded · 7.24B params · bf16',
-    '[14:09:35] [rank 0] step      0 · loss 5.482 · lr 1.0e-5 · 2.1 tok/s/gpu',
-    '[14:11:08] [rank 0] step    100 · loss 3.946 · lr 2.0e-5 · 18,420 tok/s/gpu',
-    '[14:14:42] [rank 0] step    500 · loss 2.873 · lr 5.0e-5 · 19,840 tok/s/gpu',
-    '[14:22:11] [rank 0] step  1,000 · loss 2.401 · lr 1.0e-4 · 20,156 tok/s/gpu',
-    '[14:48:30] [rank 0] step  5,000 · loss 1.847 · lr 1.0e-4 · 20,318 tok/s/gpu',
-    '[15:32:55] [rank 0] step 10,000 · loss 1.541 · lr 8.7e-5 · 20,402 tok/s/gpu',
-    '[16:18:21] [rank 0] step 15,000 · loss 1.382 · lr 7.4e-5 · 20,388 tok/s/gpu',
-    '[17:04:08] [rank 0] step 20,000 · loss 1.276 · lr 6.1e-5 · 20,414 tok/s/gpu',
-    '[17:48:39] [rank 0] step 25,000 · loss 1.198 · lr 4.8e-5 · 20,422 tok/s/gpu',
-    '[18:02:12] [rank 0] checkpoint · /mnt/ckpt/step-25000 · 13.4 GB',
-    '[18:02:48] [rank 0] resume · step 25,000 · 21,940 tok/s/gpu (peak)',
-    '[18:18:55] [rank 0] step 27,500 · loss 1.142 · lr 3.5e-5 · 20,418 tok/s/gpu',
-    '[18:31:22] [rank 0] step 28,915 · loss 1.118 · lr 3.1e-5 · running ──',
-  ],
-  'i-4b8821': [
-    '[20:11:02] vllm-server starting · model meta-llama/Meta-Llama-3-8B-Instruct',
-    '[20:11:04] cuda kernels compiled · 1 × H100 80GB',
-    '[20:11:09] model loaded · 8.03B params · bf16 · 17.4 GB resident',
-    '[20:11:10] HTTP server listening on :8000 · OpenAI-compatible',
-    '[20:11:42] POST /v1/chat/completions · 412 tokens · 245ms',
-    '[20:12:14] POST /v1/chat/completions · 188 tokens · 110ms',
-    '[20:13:22] POST /v1/chat/completions · 1,084 tokens · 678ms',
-    '[ … 1,847 more requests · 99.6% under 500ms · throughput 142 RPM ]',
-  ],
-}
-
-// =====================================================
-// Live ticks — every 3s drift util + add uptime + cost
+// Live ticks — every 3s advance uptime + cost of running instances
 // =====================================================
 let liveTimer: ReturnType<typeof setInterval> | null = null
-let provisionTimer: ReturnType<typeof setTimeout> | null = null
 
 function tickLive() {
   for (const it of instances) {
     if (it.status === 'running') {
       it.uptimeSec += 3
       recomputeCostNow(it)
-      // drift utilization slightly
-      for (let i = 0; i < it.util.length; i++) {
-        const target = it.gpu === 'H200' ? 78 : 90
-        const drift = (target - it.util[i]!) * 0.06
-        const noise = (Math.random() - 0.5) * 4
-        it.util[i] = Math.max(35, Math.min(99, it.util[i]! + drift + noise))
-      }
-      // bump live monthly spend
-      liveSpendDelta.value += (it.hourlyRate / 3600) * 3
     }
   }
 }
 
 // =====================================================
-// Live data (F13) — replace the SSR placeholder rows with real instances from compute-control.
+// Live data (F13) — load the tenant's real instances from compute-control.
 // =====================================================
 const compute = useCompute()
 const HOURLY: Record<string, number> = { gpu_h100: 2.99, gpu_h200: 3.49 }
@@ -356,6 +196,8 @@ async function loadLive() {
     instances.splice(0, instances.length, ...rows)
   } catch {
     // leave the current rows on a transient error; the empty state covers a truly empty list
+  } finally {
+    loaded.value = true
   }
 }
 
@@ -365,7 +207,6 @@ onMounted(() => {
 })
 onBeforeUnmount(() => {
   if (liveTimer) clearInterval(liveTimer)
-  if (provisionTimer) clearTimeout(provisionTimer)
 })
 
 // =====================================================
@@ -545,6 +386,9 @@ onMounted(loadReservations)
                 </tr>
               </thead>
               <tbody>
+                <tr v-if="!sortedInstances.length" class="empty-row">
+                  <td colspan="10">{{ loaded ? 'No instances yet. Launch one below.' : 'Loading instances…' }}</td>
+                </tr>
                 <template v-for="it in sortedInstances" :key="it.id">
                   <tr class="row" :class="{ open: isExpanded(it.id), stopped: it.status === 'stopped' }" @click="toggleRow(it.id)">
                     <td class="caret-td">
@@ -652,25 +496,14 @@ onMounted(loadReservations)
                         <!-- Per-GPU utilization -->
                         <div class="ex-card util-card">
                           <div class="ex-head">— Per-GPU utilization</div>
-                          <div class="util-grid" :style="{ '--cols': it.util.length > 4 ? 8 : it.util.length }">
-                            <div
-                              v-for="(u, i) in it.util"
-                              :key="i"
-                              class="util-cell"
-                              :class="{ idle: u < 30 }"
-                            >
-                              <div class="util-bar-wrap">
-                                <div class="util-bar" :style="{ height: u + '%' }" />
-                              </div>
-                              <span class="util-pct mono">{{ Math.round(u) }}%</span>
-                              <span class="util-name mono">gpu{{ i }}</span>
-                            </div>
-                          </div>
+                          <p class="ex-note">
+                            GPU telemetry is not collected yet. Run <code>nvidia-smi</code> on the instance over SSH for live utilization.
+                          </p>
                         </div>
 
                         <!-- Cost breakdown -->
                         <div class="ex-card">
-                          <div class="ex-head">— Cost breakdown</div>
+                          <div class="ex-head">— Cost breakdown <NuxtLink :to="`/compute/${it.id}`" class="head-link" @click.stop>Details →</NuxtLink></div>
                           <dl class="spec-dl">
                             <dt>Rate</dt><dd>{{ fmtUsd(it.hourlyRate) }} / hr · {{ fmtUsd(it.hourlyRate / it.count) }} per GPU</dd>
                             <dt>Uptime</dt><dd>{{ it.status === 'provisioning' ? '— pending' : fmtUptime(it.uptimeSec) }}</dd>
@@ -680,21 +513,6 @@ onMounted(loadReservations)
                           </dl>
                         </div>
 
-                        <!-- Logs (full width below) -->
-                        <div class="ex-card logs-card">
-                          <div class="ex-head">
-                            — Logs · tail -20
-                            <span class="head-meta">
-                              <span class="pulse" />
-                              streaming · stdout merged
-                            </span>
-                          </div>
-                          <pre class="logs"><span v-for="(line, idx) in (LOG_LINES[it.id] || ['[ — no logs · instance ' + it.status + ' ]'])" :key="idx" class="log-line">{{ line }}</span></pre>
-                          <div class="logs-foot">
-                            <a href="#">Open full log stream →</a>
-                            <span class="dim">log-id <span class="mono">{{ it.id }}.stdout.log</span></span>
-                          </div>
-                        </div>
                       </div>
                     </td>
                   </tr>
@@ -757,30 +575,21 @@ onMounted(loadReservations)
 
           <div class="side-card">
             <div class="side-head">
-              <span class="eyebrow"><span class="dot" /> This month · cost</span>
-              <span class="side-meta">May 2026</span>
+              <span class="eyebrow"><span class="dot" /> Running cost</span>
             </div>
-            <div class="cost-num mono">{{ fmtUsd(monthCost) }}</div>
-            <div class="cost-sub">
-              <span :class="budgetTone === 'pos' ? 'pos-text' : budgetTone === 'warn' ? 'warn-text' : 'neg-text'">
-                {{ budgetPct.toFixed(1) }}%
-              </span>
-              of {{ fmtUsd(monthBudget) }} budget
-            </div>
-            <div class="budget-bar">
-              <div class="budget-fill" :class="budgetTone" :style="{ width: budgetPct + '%' }" />
+            <div class="cost-num mono">{{ fmtUsd(burnRate) }}<span class="cost-unit"> / hr</span></div>
+            <div class="cost-sub">across {{ runningGpuCount }} running GPUs</div>
+            <div class="cost-foot">
+              <span class="cf-k">Accrued on running instances</span>
+              <span class="cf-v mono">{{ fmtUsd(accrued) }}</span>
             </div>
             <div class="cost-foot">
-              <span class="cf-k">Available</span>
-              <span class="cf-v mono">{{ fmtUsd(budgetAvailable) }}</span>
+              <span class="cf-k">Projected · 24h at this rate</span>
+              <span class="cf-v mono">{{ fmtUsd(burnRate * 24) }}</span>
             </div>
             <div class="cost-foot">
-              <span class="cf-k">Daily burn · 7d avg</span>
-              <span class="cf-v mono">{{ fmtUsd(Math.round(monthCost / 21 * 100) / 100) }}</span>
-            </div>
-            <div class="cost-foot">
-              <span class="cf-k">Alerts</span>
-              <a href="#" class="cf-link">Email + Slack at 80%</a>
+              <span class="cf-k">Billed usage</span>
+              <NuxtLink to="/wallet" class="cf-link">Wallet transactions →</NuxtLink>
             </div>
           </div>
 
@@ -817,8 +626,8 @@ onMounted(loadReservations)
             <p class="help-body">
               All actions on this page have CLI + REST equivalents. Reach for the CLI when scripting; this UI is for ad-hoc monitoring.
             </p>
-            <a href="#" class="help-link">CLI reference →</a>
-            <a href="#" class="help-link">REST API · /v1/gpu →</a>
+            <code class="help-code">1trade help</code>
+            <NuxtLink to="/settings" class="help-link">API keys →</NuxtLink>
           </div>
         </aside>
       </div>
@@ -1292,6 +1101,12 @@ onMounted(loadReservations)
 }
 .expand-grid .ex-card.logs-card,
 .expand-grid .ex-card.util-card { grid-column: span 2; }
+.ex-note { margin: 0; color: var(--text-3); font-size: var(--fs-sm); line-height: 1.5; }
+.ex-note code, .help-code { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-2); }
+.help-code { display: block; margin-bottom: 8px; }
+.empty-row td { padding: 28px 16px; text-align: center; color: var(--text-3); font-size: var(--fs-sm); }
+.head-link { float: right; color: var(--brand); text-decoration: none; text-transform: none; letter-spacing: 0; }
+.cost-unit { font-size: var(--fs-sm); color: var(--text-3); }
 .expand-grid .ex-card.logs-card { grid-column: span 4; }
 
 .ex-head {
@@ -1808,6 +1623,12 @@ onMounted(loadReservations)
   .side-card { flex: 1 1 280px; }
   .expand-grid { grid-template-columns: repeat(2, 1fr); }
   .expand-grid .ex-card.util-card { grid-column: span 2; }
+.ex-note { margin: 0; color: var(--text-3); font-size: var(--fs-sm); line-height: 1.5; }
+.ex-note code, .help-code { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-2); }
+.help-code { display: block; margin-bottom: 8px; }
+.empty-row td { padding: 28px 16px; text-align: center; color: var(--text-3); font-size: var(--fs-sm); }
+.head-link { float: right; color: var(--brand); text-decoration: none; text-transform: none; letter-spacing: 0; }
+.cost-unit { font-size: var(--fs-sm); color: var(--text-3); }
 }
 @media (max-width: 720px) {
   .page-head { flex-direction: column; align-items: stretch; }

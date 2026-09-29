@@ -65,44 +65,31 @@ const cooldownLabel = computed(() => {
   return m + ':' + String(s).padStart(2, '0')
 })
 
-// Live AI Index ticker (Brownian motion, mean reversion to 1.0024)
-const indexValue = ref<number>(1.0024)
-const indexPct   = ref<number>(0.18)
-const utcTime    = ref<string>('14:32:08 UTC')
-let tickInterval: ReturnType<typeof setInterval> | null = null
+// AI Index ticker — live from the index API (simulated prints are labelled so).
+const idx = useIndexTicker(2)
+const utcTime = ref('')
 let clockInterval: ReturnType<typeof setInterval> | null = null
 
-function tickIndex() {
-  let v = indexValue.value
-  v = v + (1.0024 - v) * 0.04 + (Math.random() - 0.5) * 0.0006
-  v = Math.max(0.992, Math.min(1.015, v))
-  indexValue.value = v
-  indexPct.value = (v - 1.0) * 100
-}
+/** tickClock shows the current UTC time. */
 function tickClock() {
-  const d = new Date()
-  const h = String(d.getUTCHours()).padStart(2, '0')
-  const m = String(d.getUTCMinutes()).padStart(2, '0')
-  const s = String(d.getUTCSeconds()).padStart(2, '0')
-  utcTime.value = h + ':' + m + ':' + s + ' UTC'
+  utcTime.value = new Date().toISOString().slice(11, 19) + ' UTC'
 }
 
-const indexDisplay = computed(() => (indexValue.value * 1000).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }))
+const indexDisplay = computed(() => idx.creditsPerUsd.value === null ? '—'
+  : idx.creditsPerUsd.value.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }))
 const indexDeltaStr = computed(() => {
-  const arrow = indexPct.value >= 0 ? '▲' : '▼'
-  return arrow + ' ' + Math.abs(indexPct.value).toFixed(2) + '% (24h)'
+  const c = idx.changePct.value
+  return c === null ? '' : (c >= 0 ? '▲ ' : '▼ ') + Math.abs(c).toFixed(2) + '% (1d)'
 })
-const indexDeltaPos = computed(() => indexPct.value >= 0)
+const indexDeltaPos = computed(() => (idx.changePct.value ?? 0) >= 0)
 
 onMounted(() => {
   startCooldown(remaining.value)
-  tickInterval = setInterval(tickIndex, 2400)
   clockInterval = setInterval(tickClock, 1000)
   tickClock()
 })
 onBeforeUnmount(() => {
   if (timer) clearInterval(timer)
-  if (tickInterval) clearInterval(tickInterval)
   if (clockInterval) clearInterval(clockInterval)
 })
 
@@ -191,7 +178,7 @@ function commitChange() {
         <span class="t-delta mono" :class="{ pos: indexDeltaPos, neg: !indexDeltaPos }">{{ indexDeltaStr }}</span>
       </div>
       <div class="t-right">
-        <span>MARKETS OPEN</span>
+        <span>{{ idx.simulated.value ? 'SIMULATED INDEX' : 'PUBLISHED DAILY' }}</span>
         <span class="sep">·</span>
         <span class="mono">{{ utcTime }}</span>
       </div>

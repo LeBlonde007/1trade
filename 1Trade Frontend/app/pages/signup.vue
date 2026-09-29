@@ -6,12 +6,11 @@
  * Split-shell layout: 60% form (light) / 40% reassurance panel (dark inverse).
  *
  * Behaviors:
- *   - 3 account-type cards (Trader / AI Co / Enterprise) — single-select
+ *   - 4 account-type cards (Trader / AI Co / Enterprise / Datacenter) — single-select
  *   - Password show/hide + live strength meter (s1–s4)
  *   - Right panel: rotating value prop (3 messages, 6s)
- *   - Live AI Index ticker (Brownian motion + mean reversion, 5s)
- *   - 30-day mini chart with draw-on animation
- *   - "Next print" countdown
+ *   - AI Index ticker, 30-day mini chart and next-print countdown, live from the index API
+ *     (useIndexTicker) and labelled simulated while the index is not in production
  *
  * Layout set to false — this is a full-bleed page with its own chrome.
  */
@@ -67,8 +66,8 @@ const agreed = ref(true)
 // ─── Right panel: rotating value prop ──────────────────────
 const valueProps = [
   { plain: 'Start trading in ',         em: 'paper mode', tail: ' immediately — no funding needed.' },
-  { plain: 'Real-time ',                em: 'AI Index',         tail: ', published daily.' },
-  { plain: '',                          em: 'Free egress',      tail: ' on all compute. Always.' },
+  { plain: 'A public ',                 em: 'AI Index',         tail: ' methodology with a verifiable audit chain.' },
+  { plain: 'Prepaid ',                  em: 'credits',          tail: ' for inference and GPU compute, one wallet.' },
 ]
 const vpIdx = ref(0)
 const vpIn = ref(true)
@@ -83,86 +82,23 @@ const rotateProp = () => {
   }, 320)
 }
 
-// ─── Live AI Index ticker ──────────────────────────────────
-const tkPrice = ref(0.001005)
+// ─── Live AI Index (index API via the BFF) ────────────────
+const idx = useIndexTicker(30)
 const tkPriceText = computed(() =>
-  `$${tkPrice.value.toLocaleString('en-US', { minimumFractionDigits: 6, maximumFractionDigits: 6 })}`,
+  idx.value.value === null ? '—' : `$${idx.value.value.toLocaleString('en-US', { minimumFractionDigits: 6, maximumFractionDigits: 6 })}`,
 )
-const tkDirection = ref<'' | 'flash-up' | 'flash-down'>('')
-const tkDeltaPct = ref(0.0018)
-const tkDeltaNeg = computed(() => tkDeltaPct.value < 0)
-const tkDeltaText = computed(() => {
-  const pct = tkDeltaPct.value * 100
-  const sign = pct >= 0 ? '▲' : '▼'
-  return `${sign} ${Math.abs(pct).toFixed(2)}% (24h)`
+const tkChangeText = computed(() => {
+  const c = idx.changePct.value
+  return c === null ? '—' : `${c >= 0 ? '▲ +' : '▼ '}${c.toFixed(2)}% (30d)`
 })
-
-let tickInterval: ReturnType<typeof setInterval> | null = null
-const baseline24h = 0.001003
-
-const doTick = () => {
-  const drift = (0.001005 - tkPrice.value) * 0.05
-  const noise = (Math.random() - 0.5) * 0.0000028
-  const next = Math.max(0.000990, Math.min(0.001020, tkPrice.value + drift + noise))
-  const up = next > tkPrice.value
-  tkPrice.value = next
-  tkDeltaPct.value = (tkPrice.value - baseline24h) / baseline24h
-  tkDirection.value = up ? 'flash-up' : 'flash-down'
-  setTimeout(() => { tkDirection.value = '' }, 700)
-}
-
-// ─── Countdown to next print ──────────────────────────────
-const tkNext = ref('3h 24m')
-let nextSec = 3 * 3600 + 24 * 60
-let nextInterval: ReturnType<typeof setInterval> | null = null
-
-// ─── 30-day mini chart path ───────────────────────────────
-const miniLineD = ref('')
-const miniFillD = ref('')
-
-const buildMini = () => {
-  const W = 320, H = 90
-  const days = 30
-  let v = 0.000982
-  const pts: number[] = []
-  for (let i = 0; i < days; i++) {
-    const drift = 0.0000003
-    const dd = Math.random() < 0.05 ? -(0.000008 + Math.random() * 0.000010) : 0
-    v += drift + (Math.random() - 0.48) * 0.0000060 + dd
-    v = Math.max(0.000960, Math.min(0.001020, v))
-    pts.push(v)
-  }
-  pts[pts.length - 1] = 0.001005
-  const min = Math.min(...pts), max = Math.max(...pts)
-  const range = max - min || 1
-  const pad = 6
-  const usableH = H - pad * 2
-  const stepX = W / (pts.length - 1)
-  const d = pts.map((p, i) => {
-    const x = i * stepX
-    const y = pad + usableH - ((p - min) / range) * usableH
-    return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)} ${y.toFixed(1)}`
-  }).join(' ')
-  miniLineD.value = d
-  miniFillD.value = `${d} L ${W} ${H} L 0 ${H} Z`
-}
+const mini = computed(() => sparkPath(idx.series.value, 320, 90))
 
 onMounted(() => {
-  buildMini()
   vpInterval = setInterval(rotateProp, 6000)
-  tickInterval = setInterval(doTick, 5000)
-  nextInterval = setInterval(() => {
-    nextSec = Math.max(0, nextSec - 60)
-    const h = Math.floor(nextSec / 3600)
-    const m = Math.floor((nextSec % 3600) / 60)
-    tkNext.value = `${h}h ${String(m).padStart(2, '0')}m`
-  }, 60_000)
 })
 
 onUnmounted(() => {
   if (vpInterval) clearInterval(vpInterval)
-  if (tickInterval) clearInterval(tickInterval)
-  if (nextInterval) clearInterval(nextInterval)
 })
 
 const togglePw = () => { passwordShown.value = !passwordShown.value }
@@ -299,8 +235,8 @@ const onSubmit = async () => {
           <input v-model="agreed" type="checkbox" />
           <span>
             I agree to 1Trade's
-            <a href="#">Terms of Service</a> and
-            <a href="#">Privacy Policy</a>. Real-money trading requires further verification at v1.5.
+            <NuxtLink to="/legal#terms">Terms of Service</NuxtLink> and
+            <NuxtLink to="/legal#privacy">Privacy Policy</NuxtLink>. Real-money trading requires further verification at v1.5.
           </span>
         </label>
 
@@ -345,24 +281,24 @@ const onSubmit = async () => {
       <div class="ticker">
         <div class="head">
           <span class="live-dot" />
-          <span class="t-label">1Trade AI Index · Live</span>
-          <span class="badge">PUBLISHED DAILY</span>
+          <span class="t-label">1Trade AI Index</span>
+          <span class="badge">{{ idx.simulated.value ? 'SIMULATED' : 'PUBLISHED DAILY' }}</span>
         </div>
         <div class="row-2">
-          <span class="price" :class="tkDirection">{{ tkPriceText }}</span>
-          <span class="delta" :class="{ neg: tkDeltaNeg }">{{ tkDeltaText }}</span>
+          <span class="price">{{ tkPriceText }}</span>
+          <span class="delta" :class="{ neg: (idx.changePct.value ?? 0) < 0 }">{{ tkChangeText }}</span>
         </div>
-        <div class="meta">Last print 16:00 UTC · Next in <span>{{ tkNext }}</span></div>
+        <div class="meta">USD per AI credit · next print in <span>{{ idx.countdown.value }}</span></div>
       </div>
 
       <div class="mini-chart">
         <div class="mc-head">
           <span class="mc-title">— 30D index history</span>
-          <span class="mc-stat">▲ +2.31% (30d)</span>
+          <NuxtLink to="/benchmark" class="mc-stat">Methodology →</NuxtLink>
         </div>
         <svg viewBox="0 0 320 90" preserveAspectRatio="none">
-          <path class="fill" :d="miniFillD" />
-          <path class="line" :d="miniLineD" />
+          <path class="fill" :d="mini.fill" />
+          <path class="line" :d="mini.line" />
         </svg>
         <div class="ax">
           <span>30D AGO</span>
@@ -373,18 +309,18 @@ const onSubmit = async () => {
       <div class="trust">
         <div class="item">
           <span class="ico"><ShieldCheck :size="18" :stroke-width="1.6" /></span>
-          <span class="nm">SOC 2 Type I path</span>
-          <span class="sub">AUDIT Q3 2026</span>
+          <span class="nm">Paper trading first</span>
+          <span class="sub">NO REAL MONEY AT RISK</span>
         </div>
         <div class="item">
           <span class="ico"><BadgeCheck :size="18" :stroke-width="1.6" /></span>
-          <span class="nm">Audited externally</span>
-          <span class="sub">INDEX METHODOLOGY</span>
+          <span class="nm">Public methodology</span>
+          <span class="sub">HASH-CHAINED PRINTS</span>
         </div>
         <div class="item">
           <span class="ico"><Banknote :size="18" :stroke-width="1.6" /></span>
-          <span class="nm">UBS Japan anchor</span>
-          <span class="sub">FINANCIAL SERVICES</span>
+          <span class="nm">Append-only ledger</span>
+          <span class="sub">EVERY CREDIT AUDITED</span>
         </div>
       </div>
     </section>

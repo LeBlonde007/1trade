@@ -6,6 +6,7 @@ export interface ChatUsage { prompt_tokens: number; completion_tokens: number; t
 export interface ChatResult { content: string; usage: ChatUsage; model: string }
 
 interface ChatResponse {
+  id?: string
   model: string
   choices: Array<{ message: { content: string } }>
   usage: ChatUsage
@@ -28,7 +29,7 @@ export function useInference() {
     prompt: string,
     maxTokens: number | undefined,
     handlers: { onToken: (delta: string) => void; signal?: AbortSignal },
-  ): Promise<{ content: string; usage?: ChatUsage; aborted: boolean }> {
+  ): Promise<{ content: string; usage?: ChatUsage; aborted: boolean; id?: string }> {
     running.value = true
     error.value = ''
     insufficientCredit.value = false
@@ -54,6 +55,7 @@ export function useInference() {
       let buffer = ''
       let content = ''
       let usage: ChatUsage | undefined
+      let id: string | undefined
       let aborted = false
       try {
         for (;;) {
@@ -70,12 +72,14 @@ export function useInference() {
             if (!payload || payload === '[DONE]') continue
             try {
               const j = JSON.parse(payload) as {
+                id?: string
                 choices?: Array<{ delta?: { content?: string } }>
                 usage?: ChatUsage
               }
               const delta = j.choices?.[0]?.delta?.content
               if (delta) { content += delta; handlers.onToken(delta) }
               if (j.usage) usage = j.usage
+              if (j.id) id = j.id
             } catch { /* keep-alive comment or split frame — ignore */ }
           }
         }
@@ -85,7 +89,7 @@ export function useInference() {
         else throw streamErr
       }
       result.value = { content, usage: usage ?? { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }, model }
-      return { content, usage, aborted }
+      return { content, usage, aborted, id }
     } finally {
       running.value = false
     }
@@ -102,7 +106,7 @@ export function useInference() {
         body: { model, messages: [{ role: 'user', content: prompt }], max_tokens: maxTokens },
       })
       result.value = { content: r.choices?.[0]?.message?.content || '', usage: r.usage, model: r.model }
-      return result.value
+      return { ...result.value, id: r.id }
     } catch (err: unknown) {
       const ex = err as { statusCode?: number; data?: { code?: string; message?: string } }
       if (ex?.statusCode === 402 || ex?.data?.code === 'INSUFFICIENT_CREDIT') insufficientCredit.value = true

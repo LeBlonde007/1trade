@@ -57,13 +57,12 @@ export const personas: Persona[] = [
     id: 'lab',
     name: 'AI Lab / Researcher (bonus)',
     pitch: 'Compute + inference deep dive.',
-    blurb: 'Provision an H100 box, tail logs, browse the model catalog, watch cost in real time.',
+    blurb: 'Provision an H100 box, browse the model catalog, watch cost in real time.',
     glyph: '⌗',
-    estimate: '~2 min · 7 stops',
+    estimate: '~1 min · 4 stops',
   },
 ]
 
-export const DEMO_INSTANCE_ID = 'inst_8c4f2a1e'
 
 // ────────────────────────────────────────────────────────────────────────────
 // Persona 1 — Jordan Park
@@ -257,12 +256,12 @@ const traderTour: TourStep[] = [
     element: 'h1, .toc, main',
     title: 'AI-Index methodology — published artifact',
     body: `
-      <p>Every constituent, weight, and audit pointer is public. Open in a fresh tab on demos.</p>
+      <p>Every constituent, weight and window parameter is public and served live by the index API.</p>
       <ul>
-        <li><strong>Sticky TOC</strong> left rail: definitions → weighting → rebalance → audit.</li>
-        <li><strong>Formula block</strong> with monospace formatted equations.</li>
-        <li><strong>Historical chart</strong> with rebase-to-100 toggle.</li>
-        <li><strong>Audit pointer</strong>: signed daily hashes published to a public Merkle log.</li>
+        <li><strong>Current print</strong> with its hash and the countdown to the next 16:00 UTC publication.</li>
+        <li><strong>Constituent table</strong> straight from <code>/v1/index/methodology</code>.</li>
+        <li><strong>Audit chain</strong>: how to re-derive every print's hash yourself.</li>
+        <li><strong>Historical prints</strong> chart, with the raw JSON one click away. Prints are simulated until the index goes live, and labelled so.</li>
       </ul>
     `,
     side: 'bottom',
@@ -423,7 +422,7 @@ const enterpriseTour: TourStep[] = [
         <li><strong>Filters</strong>: actor · action type · date range · resource.</li>
         <li><strong>Full-text search</strong> across action bodies.</li>
         <li><strong>Export</strong>: CSV for spreadsheets, JSON for SIEM ingestion.</li>
-        <li><strong>Immutable</strong>: each row has a Merkle hash; tampering is detectable.</li>
+        <li><strong>Append-only</strong>: audit rows are never edited or deleted.</li>
       </ul>
     `,
     side: 'bottom',
@@ -538,13 +537,12 @@ const datacenterTour: TourStep[] = [
     route: '/datacenter',
     section: 'Settlement statement detail',
     element: '.statements, table, main',
-    title: 'Statements — every fill is an artifact',
+    title: 'Payout statements',
     body: `
-      <p>Click any row in the Statements table → <em>"Download May 2026 →"</em>. Each statement is:</p>
+      <p>The <em>Payouts</em> table lists one statement per monthly cycle, computed from the GPU time your sources served.</p>
       <ul>
-        <li>A signed CSV of every fill in the period.</li>
-        <li>A summary PDF (counterparty redacted) for your books.</li>
-        <li>A hash anchored to the venue's public Merkle log — your auditor can verify without trusting us.</li>
+        <li>Each statement shows the period, GPU-hours, amount and state.</li>
+        <li>If a number looks wrong, <em>Dispute</em> sends it to 1Trade operations with your reason.</li>
       </ul>
     `,
     side: 'top',
@@ -575,8 +573,8 @@ const labTour: TourStep[] = [
     element: 'h1, .page-head, table',
     title: 'Your fleet at a glance',
     body: `
-      <p>Same view as enterprise: <strong>8 instances</strong>, region column, status column, per-row 8-GPU utilization bars, hourly burn column.</p>
-      <p>Click <em>+ New instance</em> top-right or any row to drill in.</p>
+      <p>Every instance you run: status, GPU type and count, region, uptime, cost so far and hourly rate.</p>
+      <p>Click <em>+ New instance</em> top-right to launch one, or a row to see its SSH command and cost breakdown.</p>
     `,
     side: 'bottom',
     askFeedback: true,
@@ -592,61 +590,6 @@ const labTour: TourStep[] = [
       <p>Live price tile shows $23.92 / hr — the line-item breakdown (GPU · disk · system · egress) is below it.</p>
     `,
     side: 'right',
-    askFeedback: true,
-  },
-  {
-    id: 'lab.compute.overview',
-    route: `/compute/${DEMO_INSTANCE_ID}`,
-    section: 'Instance overview',
-    element: 'h1, .head, .grid-3',
-    title: 'Per-GPU utilization, live',
-    body: `
-      <p>Eight H100s, each with:</p>
-      <ul>
-        <li>Utilization bar (% busy).</li>
-        <li>Memory %.</li>
-        <li>Temperature (turns amber at 78 °C).</li>
-        <li>Watts.</li>
-      </ul>
-      <p>RAM gauge ring on the right, four throughput sparklines (disk-read · disk-write · net-in · net-out). Refreshes every 1.5 s. Config card below shows image, IPv4, SSH command, tags.</p>
-    `,
-    side: 'bottom',
-    askFeedback: true,
-  },
-  {
-    id: 'lab.compute.logs',
-    route: `/compute/${DEMO_INSTANCE_ID}`,
-    section: 'Instance logs',
-    element: '.tabs, [role="tablist"], nav',
-    title: 'Logs tab — live tail',
-    body: `
-      <p>Click the <strong>Logs</strong> tab on the instance detail.</p>
-      <ul>
-        <li><strong>Follow toggle</strong> — pause / resume auto-scroll.</li>
-        <li><strong>Stream filter</strong> — all / stdout / stderr.</li>
-        <li><strong>Full-text search</strong>.</li>
-        <li><strong>Download archive</strong> — full history (last 200 lines in the live tail, rest in object storage).</li>
-      </ul>
-      <p>Lines stream every ~900 ms in the demo to simulate a real training loop (epoch / step / loss / tok-per-sec).</p>
-    `,
-    side: 'bottom',
-    askFeedback: true,
-  },
-  {
-    id: 'lab.compute.cost',
-    route: `/compute/${DEMO_INSTANCE_ID}`,
-    section: 'Instance cost',
-    element: '.tabs, [role="tablist"], nav',
-    title: 'Cost tab — hourly bars + breakdown',
-    body: `
-      <ul>
-        <li>Four KPI cards: <strong>hourly rate · spend MTD · projected month · budget remaining</strong>.</li>
-        <li>48-hour bar chart of per-hour spend.</li>
-        <li>Breakdown card: GPU compute · provisioned IOPS storage · system · egress.</li>
-      </ul>
-      <p>Set a budget cap on the instance and it auto-stops on breach — no surprise bills.</p>
-    `,
-    side: 'bottom',
     askFeedback: true,
   },
   {

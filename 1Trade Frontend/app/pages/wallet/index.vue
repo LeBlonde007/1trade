@@ -317,7 +317,7 @@ const todayPct = computed(() => startTotal.value === 0 ? 0 : todayPnl.value / st
     <!-- Sub-topbar: crumbs only (live data already in app topbar) -->
     <div class="subbar">
       <nav class="breadcrumbs">
-        <a href="#">Account</a>
+        <NuxtLink to="/settings">Account</NuxtLink>
         <span class="sep">›</span>
         <span class="cur">Wallet</span>
       </nav>
@@ -486,10 +486,10 @@ const todayPct = computed(() => startTotal.value === 0 ? 0 : todayPnl.value / st
             <tr><td colspan="6" class="dim" style="text-align:center; padding:24px 0;">No movements yet — buy or convert credits to get started.</td></tr>
           </tbody>
         </table>
-        <a href="#" class="full-link">
+        <NuxtLink to="/history" class="full-link">
           View full history
           <svg viewBox="0 0 16 16"><path d="M3 8h10M9 4l4 4-4 4" /></svg>
-        </a>
+        </NuxtLink>
       </div>
 
       <!-- ================= CONVERSION DRAWER ================= -->

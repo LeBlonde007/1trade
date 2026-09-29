@@ -149,64 +149,50 @@ function onPasteCode(e: ClipboardEvent) {
 }
 
 // =====================================================
-// Right-pane live ticker
+// Right-pane ticker — live paper-venue markets from the matching engine (via the BFF)
 // =====================================================
 interface MarketRow {
-  sym: string
-  px: number
-  dec: number
-  chg: number
-  dir: 'up' | 'down'
-  flash: '' | 'tick-flash-up' | 'tick-flash-dn'
+  product_id: string
+  last: number
+  changePct24h: number
+  spreadBps: number
+  volume24h: number
+  quote_precision: number
 }
-const tickerRows = ref<MarketRow[]>([
-  { sym: 'AI-INDEX',    px: 0.001005, dec: 6, chg:  0.41, dir: 'up',   flash: '' },
-  { sym: 'H100-USD',    px: 2.9912,   dec: 4, chg:  0.18, dir: 'up',   flash: '' },
-  { sym: 'H200-USD',    px: 3.8450,   dec: 4, chg: -0.27, dir: 'down', flash: '' },
-  { sym: 'TEXT-INDEX',  px: 0.001210, dec: 6, chg:  1.84, dir: 'up',   flash: '' },
-  { sym: 'IMAGE-INDEX', px: 0.007980, dec: 6, chg: -0.62, dir: 'down', flash: '' },
-  { sym: 'VIDEO-INDEX', px: 0.249820, dec: 6, chg:  0.14, dir: 'up',   flash: '' },
-])
+const tickerRows = ref<MarketRow[]>([])
+const venueState = ref('')
+const clock = ref('')
 
+/** loadMarkets refreshes the ticker; on failure it keeps the last rows. */
+async function loadMarkets() {
+  try {
+    const r = await $fetch<{ exchange_status: { state: string }; markets: MarketRow[] }>('/api/trading/markets')
+    tickerRows.value = (r.markets ?? []).slice(0, 6)
+    venueState.value = r.exchange_status?.state ?? ''
+  } catch { /* keep the last rows */ }
+}
+/** fmtPx formats a price to the product's quote precision. */
 function fmtPx(n: number, dec = 6) {
   return n.toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec })
 }
-function sparkPoints(dir: 'up' | 'down') {
-  return dir === 'up'
-    ? '0,18 8,16 16,17 24,14 32,15 40,12 48,11 56,9 64,10 72,7 80,6 88,4'
-    : '0,4 8,6 16,5 24,8 32,9 40,7 48,11 56,12 64,10 72,14 80,15 88,17'
-}
-
-const clock = ref('14:32:41 ET')
+/** tickClock shows the current UTC time. */
 function tickClock() {
-  const start = new Date('2026-05-19T14:32:41')
-  const now = new Date(start.getTime() + (Date.now() % 60_000))
-  clock.value = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')} ET`
+  clock.value = new Date().toISOString().slice(11, 19) + ' UTC'
 }
+const medianSpread = computed(() => {
+  const s = tickerRows.value.map(m => m.spreadBps).filter(n => n > 0).sort((a, b) => a - b)
+  return s.length ? s[Math.floor(s.length / 2)]! : null
+})
+const volume24h = computed(() => tickerRows.value.reduce((t, m) => t + m.volume24h, 0))
 
 let tickerInterval: ReturnType<typeof setInterval> | null = null
 let clockInterval:  ReturnType<typeof setInterval> | null = null
 
 onMounted(() => {
   tickClock()
+  loadMarkets()
   clockInterval = setInterval(tickClock, 1000)
-  tickerInterval = setInterval(() => {
-    const which = Math.floor(Math.random() * tickerRows.value.length)
-    tickerRows.value = tickerRows.value.map((m, i) => {
-      if (i !== which) return { ...m, flash: '' }
-      const delta = (Math.random() - 0.48) * m.px * 0.0008
-      const newPx = Math.max(0, m.px + delta)
-      const newChg = m.chg + delta / m.px * 100
-      const dir: 'up' | 'down' = delta >= 0 ? 'up' : 'down'
-      return {
-        ...m,
-        px: newPx,
-        chg: newChg,
-        dir,
-        flash: delta >= 0 ? 'tick-flash-up' : 'tick-flash-dn',
-      }
-    })
-  }, 1200)
+  tickerInterval = setInterval(loadMarkets, 5000)
 })
 onBeforeUnmount(() => {
   if (tickerInterval) clearInterval(tickerInterval)
@@ -395,7 +381,7 @@ onBeforeUnmount(() => {
 
       <footer class="lf-foot">
         <div class="legal">
-          By signing in you agree to 1Trade's <a href="#">Customer Agreement</a> and <a href="#">Risk Disclosure</a>.
+          By signing in you agree to 1Trade's <NuxtLink to="/legal#terms">Customer Agreement</NuxtLink> and <NuxtLink to="/legal#risk">Risk Disclosure</NuxtLink>.
           Paper accounts carry no monetary value.
         </div>
         <div class="lang">English (US)</div>
@@ -407,23 +393,22 @@ onBeforeUnmount(() => {
       <div class="rp-top">
         <span class="rp-eyebrow">
           <span>— 1TRADE</span>
-          <span class="rp-live"><span class="pulse" />Live · NYSE {{ clock.slice(0, 5) }} ET</span>
+          <span class="rp-live"><span class="pulse" />{{ venueState === 'paper' ? 'Paper venue' : 'Venue' }} · {{ clock }}</span>
         </span>
-        <span class="rp-version">venue v2.4.1 · TLS 1.3 · region us-east-1</span>
       </div>
 
       <h2 class="rp-headline">
         The <em>global exchange</em><br />for AI compute.
       </h2>
       <p class="rp-lede">
-        AI credits and GPU credits trade on a single venue. Daily reference index,
-        deep order book, owned underlying — settlement in cash or physical compute.
+        AI credits and GPU credits on a single venue, with a public reference index.
+        Trading is paper-only today: paper cash and paper credits, no real money.
       </p>
 
       <!-- Live ticker -->
       <div class="terminal">
         <div class="terminal-head">
-          <span>— Live · top markets</span>
+          <span>— Paper markets · live</span>
           <span class="terminal-meta">
             <span class="clock">{{ clock }}</span>
             <span class="dots"><span /><span /><span /></span>
@@ -435,59 +420,46 @@ onBeforeUnmount(() => {
               <th>Market</th>
               <th class="num-h">Last (USD)</th>
               <th class="num-h">24h Δ</th>
-              <th class="num-h">Sparkline · 1H</th>
+              <th class="num-h">Spread</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="m in tickerRows" :key="m.sym" :class="m.flash">
-              <td class="sym">{{ m.sym }}</td>
-              <td class="num">{{ fmtPx(m.px, m.dec) }}</td>
-              <td class="num" :class="m.chg >= 0 ? 'pos' : 'neg'">
+            <tr v-if="!tickerRows.length"><td colspan="4" class="sym">Loading markets…</td></tr>
+            <tr v-for="m in tickerRows" :key="m.product_id">
+              <td class="sym">{{ m.product_id }}</td>
+              <td class="num">{{ fmtPx(m.last, m.quote_precision) }}</td>
+              <td class="num" :class="m.changePct24h >= 0 ? 'pos' : 'neg'">
                 <span class="chg">
-                  <span class="arr">{{ m.chg >= 0 ? '▲' : '▼' }}</span>{{ Math.abs(m.chg).toFixed(2) }}%
+                  <span class="arr">{{ m.changePct24h >= 0 ? '▲' : '▼' }}</span>{{ Math.abs(m.changePct24h).toFixed(2) }}%
                 </span>
               </td>
-              <td class="num">
-                <svg class="sparkline" :class="m.dir" viewBox="0 0 92 22" preserveAspectRatio="none">
-                  <polyline :points="sparkPoints(m.dir)" fill="none" stroke-width="1.2" stroke-linecap="square" stroke-linejoin="miter" />
-                </svg>
-              </td>
+              <td class="num">{{ m.spreadBps.toFixed(0) }} bps</td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      <!-- Mini index card -->
+      <!-- Venue summary (live) -->
       <div class="idx-card">
         <div class="idx-cell">
-          <div class="lbl">24h volume</div>
-          <div class="val">$12.4M</div>
-          <div class="sub">across 6 markets</div>
+          <div class="lbl">24h paper volume</div>
+          <div class="val">{{ volume24h.toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</div>
+          <div class="sub">units across {{ tickerRows.length }} markets</div>
         </div>
         <div class="idx-cell">
-          <div class="lbl">AI-INDEX</div>
-          <div class="val">1.0024</div>
-          <div class="sub pos">▲ +0.18% · 24h</div>
+          <div class="lbl">Median spread</div>
+          <div class="val">{{ medianSpread === null ? '—' : medianSpread.toFixed(0) + ' bps' }}</div>
+          <div class="sub">top of book</div>
         </div>
         <div class="idx-cell">
-          <div class="lbl">Typical spread</div>
-          <div class="val">0.10%</div>
-          <div class="sub">10 bps · L1</div>
-        </div>
-        <div class="idx-cell">
-          <div class="lbl">Settlement</div>
-          <div class="val">T+0</div>
-          <div class="sub">cash · physical</div>
+          <div class="lbl">Mode</div>
+          <div class="val">Paper</div>
+          <div class="sub">no real money</div>
         </div>
       </div>
 
       <!-- Footer citation -->
       <div class="rp-foot">
-        <div class="rp-quote">
-          “The first venue where a CFO and a GPU buyer hedge on the same screen.
-          We use it for the same reason we use CME — because the underlying is real.”
-          <span class="rp-quote-name"><strong>R. Sato</strong> · Treasury · Frontier Lab</span>
-        </div>
         <div class="rp-links">
           <NuxtLink to="/markets">Market data</NuxtLink>
           <NuxtLink to="/inference">Documentation</NuxtLink>

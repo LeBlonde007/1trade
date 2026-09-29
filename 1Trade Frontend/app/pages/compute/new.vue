@@ -297,7 +297,6 @@ const overBudget = computed(() => cost30d.value > budgetRemaining)
                   <div class="gpu-sub">
                     <template v-if="g.disabled">
                       <span class="gpu-tag">{{ g.tag }}</span>
-                      <a href="#" class="gpu-link" @click.prevent>Sign up for waitlist →</a>
                     </template>
                     <template v-else>{{ g.recommended }}</template>
                   </div>
@@ -342,7 +341,7 @@ const overBudget = computed(() => cost30d.value > budgetRemaining)
               class="slider"
             />
             <div class="section-hint">
-              Above 32 GPUs · <a href="#" @click.prevent>Contact sales for cluster size 32+ →</a>
+              Above 32 GPUs · <NuxtLink to="/compute/clusters">Launch a multi-node cluster →</NuxtLink>
             </div>
           </div>
 
@@ -394,7 +393,7 @@ const overBudget = computed(() => cost30d.value > budgetRemaining)
             <div class="section-head">
               <span class="section-k">SSH access</span>
               <span class="section-meta">
-                <a href="#" @click.prevent>Manage keys via CLI →</a>
+                Public keys, one per line
               </span>
             </div>
             <textarea

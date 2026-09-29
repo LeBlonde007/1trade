@@ -1,6 +1,8 @@
 <script setup lang="ts">
 /**
- * /onboarding/kyc — Trader Light KYC flow (4 steps).
+ * /onboarding/kyc — identity verification (4 steps). Submitting posts the verification to
+ * platform-core (useKyc → /api/account/kyc) and shows the state it returns. KYC is what real-money
+ * purchases require (F22); paper trading needs none.
  *
  * Standalone chrome (no marketing nav / no app sidebar) to keep the focus
  * on the form. The user's design tweaks landed on: lime primary button,
@@ -116,38 +118,34 @@ const TRADED_LABELS: Record<string, string> = {
 const YEARS_LABELS = Object.fromEntries(YEARS_OPTIONS.map(o => [o.value, o.label]))
 const VOLUME_LABELS = Object.fromEntries(VOLUME_OPTIONS.map(o => [o.value, o.label]))
 
-// Realistic prefilled defaults (matches the design's INITIAL_DATA).
+// Empty until the user fills it in — nothing here is anyone's real data.
 const data = reactive({
-  first: 'Marcus',
-  last:  'Chen',
-  dob:   '1989-03-14',
+  first: '',
+  last:  '',
+  dob:   '',
   country: 'US',
-  state: 'New York',
-  tradedBefore: 'yes',
-  years: '3-10',
-  assets: 'Equities & options',
-  isPro: 'yes',
-  firmName: 'Citadel Securities',
-  firmRole: 'Quant researcher',
-  intentions: ['explore', 'test'] as string[],
+  state: '',
+  tradedBefore: '',
+  years: '',
+  assets: '',
+  isPro: '',
+  firmName: '',
+  firmRole: '',
+  intentions: [] as string[],
   otherReason: '',
-  volume: '50-250k',
-  focus: 'AI-INDEX',
+  volume: '',
+  focus: 'EAI-IDX',
   confirmed: false,
 })
 
-// Default to step 2 (index 1) — matches the brief's example state.
-const stepIdx = ref(1)
+const stepIdx = ref(0)
 const submitting = ref(false)
 const submitted = ref(false)
+const submitError = ref('')
+const kycStatus = ref('')
+const { user } = useAuth()
+const home = computed(() => personaCx.home.value)
 
-function fmtClock(d = new Date()): string {
-  const hh = ((d.getHours() + 11) % 12) + 1
-  const mm = String(d.getMinutes()).padStart(2, '0')
-  const ap = d.getHours() >= 12 ? 'PM' : 'AM'
-  return `${hh}:${mm} ${ap}`
-}
-const savedAt = ref(fmtClock())
 
 const showStateField = computed(() => ['US', 'CA', 'AU'].includes(data.country))
 const stateLabel = computed(() => {
@@ -180,16 +178,6 @@ const errors = computed(() => validate(stepIdx.value))
 const canContinue = computed(() => Object.keys(errors.value).length === 0)
 const currentStep = computed(() => STEPS[stepIdx.value]!)
 
-// Re-mark autosave whenever the form actually changes (not the submit gate).
-watch(
-  () => ({
-    a: data.first, b: data.last, c: data.dob, d: data.country, e: data.state,
-    f: data.tradedBefore, g: data.years, h: data.assets, i: data.isPro,
-    j: data.firmName, k: data.firmRole, l: [...data.intentions].join(','),
-    m: data.otherReason, n: data.volume, o: data.focus,
-  }),
-  () => { savedAt.value = fmtClock() },
-)
 
 function goTo(i: number, push = true) {
   if (i < 0 || i >= STEPS.length) return
@@ -202,28 +190,30 @@ function goTo(i: number, push = true) {
   }
 }
 
-function next() {
+/** next advances a step; on the last step it submits the verification to platform-core. */
+async function next() {
   if (!canContinue.value) return
   if (stepIdx.value === STEPS.length - 1) {
     submitting.value = true
-    setTimeout(() => {
-      submitting.value = false
+    submitError.value = ''
+    try {
+      const r = await useKyc().submit({
+        legal_name: `${data.first.trim()} ${data.last.trim()}`, country: data.country, entity_type: 'individual',
+      })
+      kycStatus.value = r?.status ?? 'pending'
       submitted.value = true
-    }, 1400)
+    } catch (e: unknown) {
+      const d = (e as { data?: { message?: string } })?.data
+      submitError.value = d?.message || 'The verification could not be submitted. Please try again.'
+    } finally {
+      submitting.value = false
+    }
     return
   }
   goTo(stepIdx.value + 1)
 }
 const back = () => goTo(Math.max(0, stepIdx.value - 1))
 
-function reset() {
-  submitted.value = false
-  stepIdx.value = 0
-  if (typeof window !== 'undefined') {
-    history.replaceState({ step: 0 }, '', '')
-    window.scrollTo({ top: 0 })
-  }
-}
 
 onMounted(() => {
   history.replaceState({ step: stepIdx.value }, '', '')
@@ -297,12 +287,8 @@ const intentionTitles = computed(() =>
         1TRADE
       </div>
       <div class="topbar-right">
-        <span class="save-state">
-          <span class="save-dot" />
-          <span>Autosaved · {{ savedAt }}</span>
-        </span>
-        <span class="email">marcus.chen@frontier.lab</span>
-        <a href="#" class="exit">Save &amp; exit</a>
+        <span class="email">{{ user?.email }}</span>
+        <NuxtLink :to="home" class="exit">Exit</NuxtLink>
       </div>
     </header>
 
@@ -313,29 +299,19 @@ const intentionTitles = computed(() =>
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square"
                style="width:24px;height:24px"><path d="M3 8.5l3.2 3.2L13 5" /></svg>
         </div>
-        <h1 class="success-title">Paper account opened.</h1>
-        <p class="success-sub">Identity verified. Your demo trading account is funded and ready.</p>
-        <div class="balance-card">
-          <div class="balance-row">
-            <span class="lbl">Starting balance</span>
-            <span class="val">$10,000.00</span>
-          </div>
-          <div class="balance-row">
-            <span class="lbl">Default market</span>
-            <span class="val sm">AI-INDEX</span>
-          </div>
-          <div class="balance-row">
-            <span class="lbl">Account ID</span>
-            <span class="val xs">EX-PT-7A3C91</span>
-          </div>
-        </div>
+        <h1 class="success-title">{{ kycStatus === 'verified' ? 'Identity verified.' : 'Verification submitted.' }}</h1>
+        <p class="success-sub">
+          {{ kycStatus === 'verified'
+            ? 'Real-money purchases are unlocked for this account.'
+            : 'We are reviewing your details; real-money purchases unlock once it is approved.' }}
+          Paper trading works either way.
+        </p>
         <div class="success-actions">
-          <NuxtLink to="/onboarding/welcome" class="btn primary accent lg">
-            Enter the venue
+          <NuxtLink :to="home" class="btn primary accent lg">
+            Continue
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square"
                  style="width:14px;height:14px"><path d="M3 8h10M9 4l4 4-4 4" /></svg>
           </NuxtLink>
-          <button class="btn ghost" type="button" @click="reset">← Restart flow</button>
         </div>
       </div>
     </div>
@@ -345,10 +321,10 @@ const intentionTitles = computed(() =>
       <div class="page-header">
         <div class="eyebrow"><span class="dot" /> {{ personaName }} onboarding</div>
         <template v-if="personaCx.persona.value === 'enterprise'">
-          <h1 class="page-title">You're verified — welcome to 1Trade.</h1>
+          <h1 class="page-title">No verification needed to get started.</h1>
           <p class="page-subtitle">
-            Identity verification (KYC) is only required for real-money <em>trading</em>. As an AI
-            company you run inference &amp; compute on prepaid credits — no KYC needed. You're ready to go.
+            Your trial credits work right away for inference and compute. Identity verification (KYC)
+            is asked for when you make your first real-money purchase, on the buy page.
           </p>
         </template>
         <template v-else>
@@ -378,10 +354,10 @@ const intentionTitles = computed(() =>
     <div v-else class="page">
       <div class="page-header">
         <div class="eyebrow"><span class="dot" /> Trader onboarding · Light KYC</div>
-        <h1 class="page-title">Verify your identity to start paper trading.</h1>
+        <h1 class="page-title">Verify your identity.</h1>
         <p class="page-subtitle">
-          Light KYC takes about three minutes and unlocks a $10,000 paper-trading account
-          against live order-book data. Real-money trading requires a separate Full KYC upgrade.
+          Verification is what real-money purchases require; it takes about three minutes. Paper
+          trading is already open without it.
         </p>
       </div>
 
@@ -768,8 +744,8 @@ const intentionTitles = computed(() =>
                   I confirm the information above is accurate and complete.
                   <small>
                     Paper-trading accounts are funded with simulated capital and carry no monetary value.
-                    By proceeding you agree to the <a href="#">Customer Agreement</a> and
-                    <a href="#">Risk Disclosure</a>.
+                    By proceeding you agree to the <NuxtLink to="/legal#terms">Customer Agreement</NuxtLink> and
+                    <NuxtLink to="/legal#risk">Risk Disclosure</NuxtLink>.
                   </small>
                 </span>
               </label>
@@ -900,6 +876,7 @@ const intentionTitles = computed(() =>
             </template>
           </span>
           <div class="footer-actions">
+            <p v-if="submitError" class="submit-error" role="alert">{{ submitError }}</p>
             <button v-if="stepIdx > 0" type="button" class="btn secondary" @click="back">
               <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"
                    stroke-linecap="square" style="width:14px;height:14px">
@@ -943,6 +920,7 @@ const intentionTitles = computed(() =>
 </template>
 
 <style scoped>
+.submit-error { color: var(--neg); font-size: 13px; margin: 0 auto 0 0; align-self: center; }
 /* ============================================================
    The token names below resolve from /app/assets/css/tokens.css
    (canvas / elevated / sunken / text / text-2 / text-3 / border /
