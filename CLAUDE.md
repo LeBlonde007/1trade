@@ -20,6 +20,10 @@
 > - the framing guide holds on **all** customer-facing copy. Banned words: "futures",
 >   "speculation", "investment return", "guaranteed yield". F22 audits this.
 >
+> **Owner decision (2026-09-29), demo MVP:** *paper* order entry is open (the paper venue, trading.yaml
+> v1.1) and users may sign up as a **paper Trader**. That is paper cash and paper credits only. Real-money
+> order entry and real-money trading accounts remain forbidden until counsel signs off.
+>
 > So: engineering unblocked, go-live still gated. If those two get conflated the licence track is
 > the thing that breaks, and it is the long-lead item.
 >

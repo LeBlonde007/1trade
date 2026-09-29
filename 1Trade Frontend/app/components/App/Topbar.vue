@@ -30,10 +30,24 @@ const unreadCount = useState<number>('notif-unread', () => 2)
 const personaCx = usePersona()
 const isTrader = computed(() => personaCx.persona.value === 'trader')
 
-// ─── Live index ticker ───────────────────────────────────────
-const indexPrice = ref(0.001005)
-const indexChange = ref(0.0018)
+// ─── Trader chrome: live AI Index market + paper cash ────────
+const indexPrice = ref(0)
+const indexChange = ref(0) // fraction (0.0018 = 0.18%)
+const paperCash = ref<number | null>(null)
 let tickerInterval: ReturnType<typeof setInterval> | null = null
+
+/** loadTraderChrome reads the EAI-IDX paper market's last/24h change and the caller's paper cash. */
+async function loadTraderChrome() {
+  try {
+    const r = await $fetch<{ summary: { last: string; change_pct_24h: string } }>('/api/trading/products/EAI-IDX')
+    indexPrice.value = Number(r.summary.last)
+    indexChange.value = Number(r.summary.change_pct_24h) / 100
+  } catch { /* keep the last values */ }
+  try {
+    const c = await $fetch<{ balances: { balance: string; locked_amount: string }[] }>('/api/wallet/cash-balances')
+    paperCash.value = (c.balances ?? []).reduce((s, b) => s + Number(b.balance), 0)
+  } catch { /* keep the last value */ }
+}
 
 // ─── User / org session (real identity from useAuth) ─
 interface Org {
@@ -103,13 +117,10 @@ function onKeyDown(e: KeyboardEvent) {
 onMounted(() => {
   document.addEventListener('mousedown', onDocMouseDown)
   document.addEventListener('keydown', onKeyDown)
-  // The index ticker only drives the trader market pill — don't run it otherwise.
+  // The market pill and paper cash are trader chrome — don't poll for anyone else.
   if (isTrader.value) {
-    tickerInterval = setInterval(() => {
-      const drift = (Math.random() - 0.5) * 0.000002
-      indexPrice.value = Math.max(0.0009, Math.min(0.0011, indexPrice.value + drift))
-      indexChange.value = (indexPrice.value - 0.001) / 0.001
-    }, 3000)
+    void loadTraderChrome()
+    tickerInterval = setInterval(() => { void loadTraderChrome() }, 10000)
   }
 })
 
@@ -138,7 +149,7 @@ function orgTypeLabel(t: 'personal' | 'lab' | 'enterprise'): string {
         <span class="brand-text">1TRADE</span>
       </NuxtLink>
 
-      <!-- AI-Index market pill — trading only (paused exchange). Hidden for AI company / datacenter. -->
+      <!-- AI-Index market pill — trader only (paper exchange). Hidden for AI company / datacenter. -->
       <NuxtLink v-if="isTrader" to="/markets/eai-idx" class="market-pill">
         <span class="sym">EAI-IDX</span>
         <span class="name">AI Index</span>
@@ -150,11 +161,11 @@ function orgTypeLabel(t: 'personal' | 'lab' | 'enterprise'): string {
 
     <!-- Right: balance + search + bell + avatar -->
     <div class="right">
-      <!-- Trader: USD trading balance (paused showcase). AI company / datacenter: a plain Wallet link
-           — no fake number; the real per-credit balances live on /wallet + the console strip. -->
-      <NuxtLink v-if="isTrader" to="/wallet" class="balance">
-        <span class="amount mono">$10,247.83</span>
-        <span class="cur">USD</span>
+      <!-- Trader: the real paper cash balance. AI company / datacenter: a plain Wallet link; the
+           per-credit balances live on /wallet + the console strip. -->
+      <NuxtLink v-if="isTrader" to="/portfolio" class="balance" title="Paper cash — no real money">
+        <span class="amount mono">{{ paperCash === null ? '—' : '$' + paperCash.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span>
+        <span class="cur">PAPER</span>
       </NuxtLink>
       <NuxtLink v-else to="/wallet" class="balance" title="Wallet — credit balances">
         <Wallet :size="14" />

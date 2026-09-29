@@ -24,12 +24,12 @@ definePageMeta({ layout: false })
 useHead({ title: 'Open an account — 1Trade', htmlAttrs: { 'data-theme': 'light' } })
 
 // ─── Account type ───────────────────────────────────────────
-// Trader is disabled until the exchange/trading layer ships (license-gated, paused per the GTM
-// pivot) — default is AI Company, the live platform-first product.
+// Trader opens a PAPER trading account (owner decision 2026-09-29, demo MVP): paper cash and credits
+// only — real-money trading stays licence-gated. Default is AI Company, the platform-first product.
 type AccountKey = 'trader' | 'ai' | 'ent'
 const acctType = ref<AccountKey>('ai')
 const acctTypes: { key: AccountKey; icon: any; nm: string; l1: string; l2: string; soon?: boolean }[] = [
-  { key: 'trader', icon: CandlestickChart, nm: 'Trader',     l1: 'Trade credits',  l2: 'Paper or real money', soon: true },
+  { key: 'trader', icon: CandlestickChart, nm: 'Trader',     l1: 'Trade credits',  l2: 'Paper trading' },
   { key: 'ai',     icon: Terminal,         nm: 'AI Company', l1: 'Use credits',     l2: 'Inference & compute' },
   { key: 'ent',    icon: Building2,        nm: 'Enterprise', l1: 'Multi-user SSO', l2: 'Procurement-friendly' },
 ]
@@ -167,8 +167,7 @@ const togglePw = () => { passwordShown.value = !passwordShown.value }
  * Submit handler — create the account (the BFF sets the httpOnly session), set the runtime persona
  * from the chosen account type, then start onboarding. Every flow is: verify → welcome → (tour) →
  * home, where home is persona-aware (usePersona.postOnboard): AI Company / Enterprise → /console;
- * Trader → /onboarding/kyc (Light-KYC) → /trade. The Trader card is disabled (soon) under the GTM
- * pivot, so in practice signups are AI Company / Enterprise → enterprise persona → land in /console.
+ * Trader → /trade (paper trading needs no KYC; real money stays paused).
  */
 const onSubmit = async () => {
   if (!agreed.value || !email.value || !password.value) return
@@ -178,7 +177,7 @@ const onSubmit = async () => {
     // Create the real account (tenant + admin user) via the BFF, then continue onboarding.
     await useAuth().signup(email.value, password.value)
     // The account-type choice drives the runtime persona — the sidebar surface and the
-    // persona-aware onboarding path (trader → Light KYC; AI company → console).
+    // persona-aware onboarding path (trader → paper exchange; AI company → console).
     usePersona().set(acctType.value === 'trader' ? 'trader' : 'enterprise')
     await navigateTo('/onboarding/verify?email=' + encodeURIComponent(email.value))
   } catch (err: unknown) {

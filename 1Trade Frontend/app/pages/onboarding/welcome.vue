@@ -8,7 +8,7 @@
  *     minted here, and the first request is shown ready to run.
  *     The goal is that this screen is the last one before a real metered call, not a menu of
  *     places to go next.
- *   - trader → the paper-account + live-index showcase, then the KYC gate (exchange is paused).
+ *   - trader → the paper account + live paper markets, then straight to /trade (real money is paused).
  *
  * The guided tour stays an optional link; it is not in the path to first action.
  * Brief warmth, no consumer-cheer. Trust-building via real numbers.
@@ -19,13 +19,13 @@ useHead({ title: 'Welcome to 1Trade — 1Trade', htmlAttrs: { 'data-theme': 'lig
 const route = useRoute()
 const firstName = ref<string>(typeof route.query.name === 'string' ? route.query.name : 'Jane')
 
-// Persona-aware primary CTA — AI company → console, datacenter → dashboard, trader → KYC gate (the
-// paused exchange). Never hardcode /trade: a verified AI company must not land on the exchange.
+// Persona-aware primary CTA — AI company → console, datacenter → dashboard, trader → the paper
+// exchange. Never hardcode /trade: a verified AI company must not land on the exchange.
 const personaCx = usePersona()
 const isTrader = computed(() => personaCx.persona.value === 'trader')
 const ctaTo = computed(() => personaCx.postOnboard.value)
 const ctaLabel = computed(() => ({
-  trader: 'Continue', enterprise: 'Go to your console', partner: 'Go to your dashboard',
+  trader: 'Start paper trading', enterprise: 'Go to your console', partner: 'Go to your dashboard',
 }[personaCx.persona.value]))
 
 // ─── AI-company activation ───────────────────────────────────────────────────────────────
@@ -87,39 +87,41 @@ const curlSnippet = computed(() => `curl "$TRADE1_BASE/v1/chat/completions" \\
 
 onMounted(() => { if (!isTrader.value) loadTrialBalance() })
 
-// Live AI Index (mean reversion to 1.0024)
-const indexValue = ref<number>(1.0024)
-const indexPct   = ref<number>(0.18)
+// ─── Trader showcase: the caller's paper cash and the live paper markets ─────────────────────────
+const indexValue = ref<number>(0) // EAI-IDX last price (USD per credit)
+const indexPct = ref<number>(0)
+const paperCash = ref<number | null>(null)
 let tickInterval: ReturnType<typeof setInterval> | null = null
 
 interface MarketRow { sym: string; px: number; deltaPct: number; precision: number }
-const markets = ref<MarketRow[]>([
-  { sym: 'EAI-IDX',   px: 0.001005, deltaPct: 0.18, precision: 6 },
-  { sym: 'TEXT-SPOT', px: 0.001210, deltaPct: 1.84, precision: 6 },
-  { sym: 'H100-SPOT', px: 2.99,     deltaPct: 0.18, precision: 2 },
-])
+const markets = ref<MarketRow[]>([])
 
-function tickIndex() {
-  let v = indexValue.value
-  v = v + (1.0024 - v) * 0.04 + (Math.random() - 0.5) * 0.0006
-  v = Math.max(0.992, Math.min(1.015, v))
-  indexValue.value = v
-  indexPct.value = (v - 1.0) * 100
-
-  // Markets drift around the same regime
-  const ratio = v / 1.0024
-  markets.value = markets.value.map((m, i) => {
-    const base = i === 0 ? 0.001005 : i === 1 ? 0.001210 : 2.99
-    const jitter = i === 2 ? (Math.random() - 0.5) * 0.004 : (Math.random() - 0.5) * 0.0000008
-    return { ...m, px: base * ratio + jitter }
-  })
+/** loadTraderShowcase reads the paper cash balance and three live paper markets. */
+async function loadTraderShowcase() {
+  try {
+    const r = await $fetch<{ markets: { product_id: string; last: number; changePct24h: number; quote_precision: number }[] }>('/api/trading/markets')
+    const pick = ['EAI-IDX', 'TEXT-SPOT', 'H100-SPOT']
+    markets.value = pick.map(id => r.markets.find(m => m.product_id === id)).filter(Boolean)
+      .map(m => ({ sym: m!.product_id, px: m!.last, deltaPct: m!.changePct24h, precision: m!.quote_precision }))
+    const idx = r.markets.find(m => m.product_id === 'EAI-IDX')
+    if (idx) { indexValue.value = idx.last; indexPct.value = idx.changePct24h }
+  } catch { /* keep the last values */ }
+  try {
+    const c = await $fetch<{ balances: { balance: string }[] }>('/api/wallet/cash-balances')
+    paperCash.value = (c.balances ?? []).reduce((s, b) => s + Number(b.balance), 0)
+  } catch { /* keep the last value */ }
 }
 
-// The live index ticker is trading-only — don't run it on the AI-company welcome.
-onMounted(() => { if (isTrader.value) tickInterval = setInterval(tickIndex, 2400) })
+// The paper markets are trader-only — don't poll on the AI-company welcome.
+onMounted(() => {
+  if (!isTrader.value) return
+  void loadTraderShowcase()
+  tickInterval = setInterval(() => { void loadTraderShowcase() }, 5000)
+})
 onBeforeUnmount(() => { if (tickInterval) clearInterval(tickInterval) })
 
-const indexDisplay = computed(() => (indexValue.value * 1000).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }))
+// Credits one dollar buys at the EAI-IDX paper market's last price.
+const indexDisplay = computed(() => indexValue.value > 0 ? (1 / indexValue.value).toLocaleString('en-US', { maximumFractionDigits: 0 }) : '—')
 const indexDeltaStr = computed(() => {
   const arrow = indexPct.value >= 0 ? '▲' : '▼'
   return arrow + ' ' + Math.abs(indexPct.value).toFixed(2) + '%'
@@ -207,30 +209,30 @@ function fmtDelta(pct: number): string {
           </ol>
         </div>
 
-        <!-- Trader (paused exchange): the live index + markets showcase -->
+        <!-- Trader: paper cash + the live paper markets -->
         <div v-else class="cards">
           <div class="card c-1">
             <div class="cap">Paper balance</div>
-            <div class="big mono">$10,000.00</div>
-            <div class="sub-line">USD ready · risk-free practice</div>
+            <div class="big mono">{{ paperCash === null ? '—' : '$' + paperCash.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</div>
+            <div class="sub-line">paper USD · no real money</div>
           </div>
 
           <div class="card c-2">
-            <div class="cap">AI Index live</div>
+            <div class="cap">AI Index · paper market</div>
             <div class="big mono">$1 = {{ indexDisplay }}</div>
             <div class="sub-line">
-              credits per dollar ·
+              AI credits per dollar ·
               <span class="mono" :class="{ pos: indexDeltaPos, neg: !indexDeltaPos }">{{ indexDeltaStr }}</span>
             </div>
           </div>
 
           <div class="card c-3">
-            <div class="cap">Markets open</div>
+            <div class="cap">Paper markets open</div>
             <ul class="markets-list">
               <li v-for="m in markets" :key="m.sym" class="market-row">
                 <span class="sym mono">{{ m.sym }}</span>
                 <span class="px mono">{{ fmtPx(m.px, m.precision) }}</span>
-                <span class="delta mono pos">{{ fmtDelta(m.deltaPct) }}</span>
+                <span class="delta mono" :class="m.deltaPct >= 0 ? 'pos' : 'neg'">{{ fmtDelta(m.deltaPct) }}</span>
               </li>
             </ul>
           </div>
@@ -251,7 +253,7 @@ function fmtDelta(pct: number): string {
     <footer class="page-foot">
       <span class="mono muted">
         {{ isTrader
-          ? 'Account EX-PT-7A3C91 · paper-trading mode · capital trading requires further verification'
+          ? 'Paper-trading mode · paper cash and credits only · real-money trading is paused pending licensing'
           : 'Sandbox mode · prepaid credits · real-money purchases require verification (KYC)' }}
       </span>
       <a href="#" class="foot-link">{{ isTrader ? "What's paper trading? →" : 'How credits work →' }}</a>
