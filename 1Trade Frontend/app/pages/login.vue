@@ -318,7 +318,7 @@ onBeforeUnmount(() => {
 
           <div class="lf-meta">
             <NuxtLink to="/signup" class="lf-link primary">New to 1Trade? Open an account →</NuxtLink>
-            <a href="#" class="lf-link" @click.prevent="ssoMode = !ssoMode">{{ ssoMode ? 'Sign in with a password instead' : 'Sign in with SSO (firm accounts)' }}</a>
+            <button type="button" class="lf-link link-btn" @click="ssoMode = !ssoMode">{{ ssoMode ? 'Sign in with a password instead' : 'Sign in with SSO (firm accounts)' }}</button>
           </div>
         </template>
 
@@ -338,14 +338,14 @@ onBeforeUnmount(() => {
           <div v-if="useRecovery" class="field">
             <div class="field-label">
               <span>— Recovery code</span>
-              <a href="#" @click.prevent="useRecovery = false">Use the authenticator code →</a>
+              <button type="button" class="link-btn" @click="useRecovery = false">Use the authenticator code →</button>
             </div>
             <input v-model="recoveryCode" class="input mono-input" placeholder="xxxxx-xxxxx" autocomplete="off" aria-label="Recovery code" />
           </div>
           <div v-else class="field">
             <div class="field-label">
               <span>— Authenticator code</span>
-              <a href="#" @click.prevent="useRecovery = true">Use a recovery code instead →</a>
+              <button type="button" class="link-btn" @click="useRecovery = true">Use a recovery code instead →</button>
             </div>
             <div class="code-input" @paste="onPasteCode">
               <input
@@ -373,7 +373,7 @@ onBeforeUnmount(() => {
           </button>
 
           <div class="lf-meta">
-            <a href="#" class="lf-link" @click.prevent="step = 'creds'">← Back to sign in</a>
+            <button type="button" class="lf-link link-btn" @click="step = 'creds'">← Back to sign in</button>
             <a href="mailto:support@1trade.ai?subject=Authenticator%20help" class="lf-link">Lost your authenticator? Contact support →</a>
           </div>
         </template>
@@ -785,6 +785,9 @@ onBeforeUnmount(() => {
   text-decoration: none;
 }
 .lf-link:hover { color: var(--text); text-decoration: underline; }
+.link-btn { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.lf-link.link-btn { text-decoration: none; font-family: var(--font-sans); font-size: 13px; color: var(--text-2); }
+.lf-link.link-btn:hover { color: var(--text); text-decoration: underline; }
 .lf-link.primary { color: var(--text); font-weight: 500; }
 
 .lf-foot {
