@@ -4,8 +4,8 @@
  *
  * Sources (each loads independently; one failing never blanks the others):
  *   - paper cash from credit-ledger (/api/wallet/cash-balances) — real, with what open orders hold;
- *   - open paper positions from the matching engine (/api/trading/positions) — simulated while the
- *     venue is paused (F22), and labelled that way;
+ *   - open paper positions from the matching engine (/api/trading/positions) — built from the
+ *     caller's real paper fills, which settle in the ledger (real money stays paused, F22);
  *   - paper fills (/api/trading/fills) and cash movements (/api/wallet/cash-transactions) for the
  *     per-position fills and the activity feed.
  *
@@ -68,7 +68,7 @@ const cash = computed(() => wallet.cashBalances.value.find((b) => b.currency ===
 const cashAvailable = computed(() =>
   cash.value ? fromMicros(toMicros(cash.value.balance) - toMicros(cash.value.locked_amount)) : '0.000000')
 
-// ─── Positions (engine, simulated while paused) ─────────────
+// ─── Positions (the engine's paper venue) ─────────────
 const totals = computed(() => ({
   value: sumDecimal(positions.value.map((p) => p.notional)),
   unrealized: sumDecimal(positions.value.map((p) => p.unrealized_pnl)),
@@ -133,8 +133,8 @@ function when(ts: string): string {
 
     <p class="notice">
       <span class="tag mono">PAPER</span>
-      Order entry is paused pending exchange licensing. Positions and fills are simulated; paper cash is
-      your real ledger balance. No real money is involved.
+      Paper trading: your orders fill on the paper books and settle in the ledger with paper cash and
+      paper credits. Real-money trading is paused pending exchange licensing. No real money is involved.
     </p>
     <p v-for="e in errors" :key="e" class="err">{{ e }} <button type="button" class="link" @click="load">Retry</button></p>
 
@@ -150,14 +150,14 @@ function when(ts: string): string {
         <div v-else-if="!loading" class="sub">No paper cash yet — it is granted when your account is activated.</div>
       </div>
       <div class="kpi">
-        <div class="lbl">Position value <span class="dim">· simulated</span></div>
+        <div class="lbl">Position value <span class="dim">· paper</span></div>
         <div class="val mono">{{ usd(totals.value) }}</div>
         <div class="sub mono">{{ positions.length }} open {{ positions.length === 1 ? 'position' : 'positions' }}</div>
       </div>
       <div class="kpi">
         <div class="lbl">Unrealized P&amp;L</div>
         <div class="val mono" :class="tone(totals.unrealized)">{{ signed(totals.unrealized) }}</div>
-        <div class="sub">Marked to the current simulated price</div>
+        <div class="sub">Marked to the paper book's mid</div>
       </div>
       <div class="kpi">
         <div class="lbl">Realized P&amp;L</div>

@@ -3,7 +3,7 @@
  * /history — Trade history (C4). Live, no mock data.
  *
  * One dense, time-ordered table over two real sources (merged in utils/history.ts):
- *   - paper fills from the matching engine — the venue is paused (F22), so these are simulated paper
+ *   - paper fills from the matching engine's paper venue (real money paused, F22); these settle in the ledger as paper
  *     fills and are labelled that way on screen;
  *   - ledger transactions from credit-ledger — real, append-only, each with its own chain hash;
  *   - paper cash movements from credit-ledger (activation grant, trade legs, fees) — always paper.
@@ -225,9 +225,9 @@ function kindTone(k: HistoryKind): string {
     <!-- Staged-venue notice: the exchange is paused pending licensing (F22). -->
     <p class="notice">
       <span class="notice-tag mono">PAPER</span>
-      Order entry is paused pending exchange licensing. Trades below are simulated paper fills; ledger
-      entries (purchases, conversions, usage) are real and hash-chained, and cash rows are your paper
-      cash balance.
+      Paper trading: trades below are your paper fills, settled in the ledger with paper cash and paper
+      credits. Ledger entries (purchases, conversions, usage, trade settlements) are hash-chained.
+      Real-money trading is paused pending exchange licensing.
     </p>
 
     <p v-for="e in errors" :key="e" class="err">{{ e }} <button type="button" class="link" @click="load">Retry</button></p>
@@ -369,8 +369,8 @@ function kindTone(k: HistoryKind): string {
                         <dt>Fee</dt><dd class="mono">{{ item.row!.fee }}</dd>
                       </dl>
                       <p class="d-note">
-                        Simulated paper fill — the venue is not open, so this did not settle against the
-                        credit ledger and has no ledger chain hash.
+                        Paper fill — settled in the credit ledger with paper value; the ledger's settlement
+                        entries carry the hash chain.
                       </p>
                     </div>
                     <div v-else class="d-left">

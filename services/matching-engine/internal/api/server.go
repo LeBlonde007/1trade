@@ -3,9 +3,10 @@
 //
 // Two rules shape every handler here:
 //
-//   - **Writes are refused, always.** POST /v1/trading/orders and DELETE /v1/trading/orders/{id} return
-//     503 EXCHANGE_PAUSED unconditionally. They do not validate, queue, log an intent, or partially
-//     apply anything — an order that cannot be filled must not look accepted.
+//   - **Real-money writes are refused, always.** Without a venue (New) every write returns 503
+//     EXCHANGE_PAUSED. With the paper venue (NewPaper, see paper.go) paper principals trade on paper
+//     books, and a real-money principal still gets 503 EXCHANGE_PAUSED: no code path accepts a real
+//     order until the licence lands (F22).
 //   - **Everything served is paper.** `is_paper` is hardcoded true on every object, not copied from a
 //     request or a claim. There is no code path that emits `is_paper: false`.
 //
@@ -29,16 +30,21 @@ import (
 	"github.com/trade1/matching-engine/internal/metrics"
 	"github.com/trade1/matching-engine/internal/portfolio"
 	"github.com/trade1/matching-engine/internal/refindex"
+	"github.com/trade1/matching-engine/internal/venue"
 )
 
-// Server wires config + the credential resolver behind one routed handler. The engine holds no state:
-// every response is derived from the product catalog and the current time.
+// Server wires config + the credential resolver behind one routed handler. Without a venue it holds no
+// state: every response is derived from the product catalog and the current time.
 type Server struct {
 	cfg  config.Config
 	auth *auth.Resolver
 	mux  *http.ServeMux
 	// now is the clock, injectable so tests can pin time and assert that history is stable.
 	now func() time.Time
+	// venue is the live paper exchange; nil keeps the service paused (the Phase 1 mock adapter).
+	venue *venue.Venue
+	// liquidityTenant is the paper liquidity account, which may not trade through the API.
+	liquidityTenant string
 }
 
 // New builds the routed handler.
@@ -46,6 +52,24 @@ func New(cfg config.Config, resolver *auth.Resolver) *Server {
 	s := &Server{cfg: cfg, auth: resolver, mux: http.NewServeMux(), now: func() time.Time { return time.Now().UTC() }}
 	s.routes()
 	return s
+}
+
+// NewPaper builds the handler over the live paper venue: paper order entry is open, real money is not.
+func NewPaper(cfg config.Config, resolver *auth.Resolver, v *venue.Venue, liquidityTenant string, now func() time.Time) *Server {
+	if now == nil {
+		now = func() time.Time { return time.Now().UTC() }
+	}
+	s := &Server{cfg: cfg, auth: resolver, mux: http.NewServeMux(), now: now, venue: v, liquidityTenant: liquidityTenant}
+	s.routes()
+	return s
+}
+
+// status is the exchange status this server reports.
+func (s *Server) status() domain.ExchangeStatus {
+	if s.venue != nil {
+		return domain.PaperStatus(s.cfg.MethodologyURL)
+	}
+	return domain.Status(s.cfg.MethodologyURL)
 }
 
 // NewWithClock builds the routed handler with a fixed clock, for deterministic tests.
@@ -91,7 +115,7 @@ func (s *Server) listProducts(w http.ResponseWriter, _ *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"products":        products,
-		"exchange_status": statusJSON(domain.Status(s.cfg.MethodologyURL)),
+		"exchange_status": statusJSON(s.status()),
 	})
 }
 
@@ -102,6 +126,10 @@ func (s *Server) getProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	metrics.RecordMarketData("product")
+	if s.venue != nil {
+		writeJSON(w, http.StatusOK, map[string]any{"product": productJSON(p), "summary": s.paperSummary(p)})
+		return
+	}
 	sum := marketdata.SummaryAt(p, s.now())
 	writeJSON(w, http.StatusOK, map[string]any{
 		"product": productJSON(p),
@@ -116,6 +144,10 @@ func (s *Server) getQuote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	metrics.RecordMarketData("quote")
+	if s.venue != nil {
+		s.paperQuote(w, p)
+		return
+	}
 	q := marketdata.QuoteAt(p, s.now())
 	writeJSON(w, http.StatusOK, map[string]any{
 		"product_id": p.ID,
@@ -139,6 +171,10 @@ func (s *Server) getOrderBook(w http.ResponseWriter, r *http.Request) {
 	}
 	depth := intParam(r, "depth", 10, 1, 50)
 	metrics.RecordMarketData("orderbook")
+	if s.venue != nil {
+		s.paperBook(w, p, depth)
+		return
+	}
 	book := marketdata.BookAt(p, s.now(), depth)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"product_id": p.ID,
@@ -157,6 +193,10 @@ func (s *Server) listTrades(w http.ResponseWriter, r *http.Request) {
 	}
 	limit := intParam(r, "limit", 40, 1, 200)
 	metrics.RecordMarketData("trades")
+	if s.venue != nil {
+		s.paperTrades(w, p, limit)
+		return
+	}
 	prints := marketdata.PrintsBefore(p, s.now(), limit)
 	out := make([]map[string]any, 0, len(prints))
 	for _, pr := range prints {
@@ -192,6 +232,10 @@ func (s *Server) listCandles(w http.ResponseWriter, r *http.Request) {
 	}
 	limit := intParam(r, "limit", 200, 1, 500)
 	metrics.RecordMarketData("candles")
+	if s.venue != nil {
+		s.paperCandles(w, p, interval, secs, limit)
+		return
+	}
 	candles := marketdata.CandlesBefore(p, s.now(), secs, limit)
 	out := make([]map[string]any, 0, len(candles))
 	for _, c := range candles {
@@ -211,7 +255,12 @@ func (s *Server) listCandles(w http.ResponseWriter, r *http.Request) {
 // accepted. It returns 200 with an empty list rather than 503: the question "what are my orders?" has a
 // truthful answer, and it is "none".
 func (s *Server) listOrders(w http.ResponseWriter, r *http.Request) {
-	if _, ok := s.requireTenant(w, r); !ok {
+	p, ok := s.requireTenant(w, r)
+	if !ok {
+		return
+	}
+	if s.venue != nil {
+		s.listPaperOrders(w, r, p)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"orders": []any{}})
@@ -229,6 +278,10 @@ type orderRequest struct {
 // authenticates first so an anonymous caller gets 401 rather than learning about the pause, then records
 // the attempt (real demand evidence for the F22 licensing decision) and refuses.
 func (s *Server) placeOrder(w http.ResponseWriter, r *http.Request) {
+	if s.venue != nil {
+		s.placePaperOrder(w, r)
+		return
+	}
 	if _, ok := s.requireTenant(w, r); !ok {
 		return
 	}
@@ -243,6 +296,10 @@ func (s *Server) placeOrder(w http.ResponseWriter, r *http.Request) {
 
 // cancelOrder refuses cancellation with 503 EXCHANGE_PAUSED — there is nothing to cancel.
 func (s *Server) cancelOrder(w http.ResponseWriter, r *http.Request) {
+	if s.venue != nil {
+		s.cancelPaperOrder(w, r)
+		return
+	}
 	if _, ok := s.requireTenant(w, r); !ok {
 		return
 	}
@@ -254,6 +311,10 @@ func (s *Server) cancelOrder(w http.ResponseWriter, r *http.Request) {
 func (s *Server) listPositions(w http.ResponseWriter, r *http.Request) {
 	p, ok := s.requireTenant(w, r)
 	if !ok {
+		return
+	}
+	if s.venue != nil {
+		s.listPaperPositions(w, p)
 		return
 	}
 	positions := portfolio.Positions(p.TenantID, s.now())
@@ -287,6 +348,10 @@ func (s *Server) listFills(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, http.StatusUnprocessableEntity, "invalid_request", "unknown product_id")
 			return
 		}
+	}
+	if s.venue != nil {
+		s.listPaperFills(w, r, p, productID)
+		return
 	}
 	limit := intParam(r, "limit", 50, 1, 200)
 	fills := portfolio.Fills(p.TenantID, s.now(), productID, limit)
@@ -383,9 +448,9 @@ func (s *Server) requireTenant(w http.ResponseWriter, r *http.Request) (auth.Pri
 // writePaused writes the contract's ExchangePausedError with a 503.
 func (s *Server) writePaused(w http.ResponseWriter) {
 	writeJSON(w, http.StatusServiceUnavailable, map[string]any{
-		"code":             domain.PausedCode,
-		"message":          domain.PausedMessage,
-		"methodology_url":  s.cfg.MethodologyURL,
+		"code":            domain.PausedCode,
+		"message":         domain.PausedMessage,
+		"methodology_url": s.cfg.MethodologyURL,
 	})
 }
 
@@ -440,9 +505,9 @@ func summaryJSON(p domain.Product, s marketdata.Summary) map[string]any {
 // statusJSON renders an ExchangeStatus in the contract shape.
 func statusJSON(st domain.ExchangeStatus) map[string]any {
 	return map[string]any{
-		"state":            st.State,
-		"reason":           st.Reason,
-		"methodology_url":  st.MethodologyURL,
+		"state":           st.State,
+		"reason":          st.Reason,
+		"methodology_url": st.MethodologyURL,
 	}
 }
 

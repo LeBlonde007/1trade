@@ -176,3 +176,15 @@ Now:
 Reproduced on the real binary: surveillance started first → 503 → NATS starts → it retries → 200 →
 the wash trade is caught and the metrics appear.
 
+## Status — paper quoter exemption (2026-09-29)
+
+The paper venue's liquidity account re-quotes a ladder on both sides of every paper book, which is
+exactly what layering and a high order-to-trade ratio look like. `detect.Config.PaperQuoters`
+(`PAPER_LIQUIDITY_TENANT_ID`, same default as the engine) exempts that account from spoofing,
+layering and excessive cancellation — **on paper books only**. On a real book the account gets no
+exemption. Wash trades, marking the close, cross-product manipulation and position limits still
+apply to it everywhere.
+
+Tested: the quoter's ladder raises nothing on paper; the same pattern from a customer still alerts;
+the quoter still alerts on a real book; position limits still fire. Mutation-checked: dropping the
+"paper only" condition fails the test.

@@ -166,6 +166,11 @@ func (e *Engine) validate(c *SubmitCmd) (*book, *Order, error) {
 	if c.IsPaper && c.IsInternal {
 		return nil, nil, ErrInternalPaper
 	}
+	// The paper liquidity account exists to keep paper books two-sided. It holds no real value, so it
+	// must never reach a real book, and it is never an internal account.
+	if c.IsLiquidity && (!c.IsPaper || c.IsInternal) {
+		return nil, nil, ErrLiquidityReal
+	}
 
 	b := e.books[bookKey{product: p.ID, paper: c.IsPaper}]
 	if b == nil {
@@ -176,7 +181,8 @@ func (e *Engine) validate(c *SubmitCmd) (*book, *Order, error) {
 	o := &Order{
 		OrderID: c.OrderID, TenantID: c.TenantID, SubAccountID: c.SubAccountID, ProductID: p.ID,
 		Side: c.Side, Type: c.Type, TIF: c.TIF, Price: c.Price, Quantity: c.Quantity,
-		IsPaper: c.IsPaper, IsInternal: c.IsInternal, State: Accepted, AcceptedAt: c.TS, UpdatedAt: c.TS,
+		IsPaper: c.IsPaper, IsInternal: c.IsInternal, IsLiquidity: c.IsLiquidity, State: Accepted,
+		AcceptedAt: c.TS, UpdatedAt: c.TS,
 	}
 	return b, o, nil
 }

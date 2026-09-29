@@ -92,6 +92,7 @@ var (
 	ErrNotional         = errors.New("engine: price × quantity is too large")
 	ErrMissingID        = errors.New("engine: order_id and tenant_id are required")
 	ErrInternalPaper    = errors.New("engine: internal accounts may not trade on paper books")
+	ErrLiquidityReal    = errors.New("engine: the paper liquidity account trades on paper books only")
 	ErrOrderNotFound    = errors.New("engine: order not found")
 	ErrOrderNotOpen     = errors.New("engine: order is not open")
 	ErrMissingTimestamp = errors.New("engine: command timestamp is required")
@@ -113,6 +114,7 @@ type Order struct {
 	Filled       Fixed
 	IsPaper      bool
 	IsInternal   bool
+	IsLiquidity  bool // the paper liquidity account (paper books only; see SubmitCmd.IsLiquidity)
 	State        State
 	Reason       string
 	AcceptedAt   time.Time
@@ -206,7 +208,12 @@ type SubmitCmd struct {
 	Quantity     Fixed
 	IsPaper      bool
 	IsInternal   bool
-	TS           time.Time
+	// IsLiquidity marks the paper liquidity account: it quotes both sides of paper books so they are
+	// never empty, holds no real value, and may never trade on a real book. It is not internal, so the
+	// insider-risk rule (internal accounts never meet customer paper accounts) still holds. omitempty
+	// keeps every earlier journal entry's encoding byte-identical.
+	IsLiquidity bool `json:",omitempty"`
+	TS          time.Time
 
 	// RiskReason and RiskChecked are filled by the engine from Config.Risk the first time the command
 	// runs and replayed verbatim afterwards, so replay never re-asks an external system for a decision.

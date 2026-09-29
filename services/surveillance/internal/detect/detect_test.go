@@ -214,6 +214,45 @@ func TestExcessiveCancellation(t *testing.T) {
 	expect(t, "ratio 5", func(c *Config) { c.LayerMinOrders = 1000 }, churn(5))
 }
 
+// TestPaperQuoterExemption checks the paper liquidity account's quoting (a ladder cancelled and
+// re-placed while it trades the other side) raises no layering or order-to-trade alert on paper — yet
+// the same pattern from a customer still does, the same account still alerts on a real book, and a
+// trade-based rule (position limit) still applies to it.
+func TestPaperQuoterExemption(t *testing.T) {
+	ladder := func(tenant string, paper bool) []event {
+		var evs []event
+		for round := range 6 {
+			base := time.Duration(round) * 5 * time.Second
+			for i, px := range []string{"0.001200", "0.001199", "0.001198", "0.001197"} {
+				ev := accept(fmt.Sprintf("%s-%d-%d", tenant, round, i), tenant, "TEXT-SPOT", "buy", "50", px, at(base+time.Duration(i)*time.Millisecond))
+				ev.order.IsPaper = paper
+				evs = append(evs, ev)
+			}
+			tr := trade(fmt.Sprintf("t-%s-%d", tenant, round), "TEXT-SPOT", "M", tenant, "sell", "1", "0.00121", at(base+time.Second))
+			tr.trade.IsPaper = paper
+			evs = append(evs, tr)
+			for i := range 4 {
+				ev := cancel(fmt.Sprintf("%s-%d-%d", tenant, round, i), tenant, "user_cancel", "0", at(base+2*time.Second+time.Duration(i)*time.Millisecond))
+				ev.order.IsPaper = paper
+				evs = append(evs, ev)
+			}
+		}
+		return evs
+	}
+	quoters := func(c *Config) { c.PaperQuoters = map[string]bool{"LIQ": true}; c.OTRMinOrders = 20 }
+	if got := expect(t, "quoter on paper", quoters, ladder("LIQ", true)); len(got) != 0 {
+		return
+	}
+	if got := run(New(func() Config { c := DefaultConfig(); quoters(&c); return c }()), ladder("CUST", true)); len(got) == 0 {
+		t.Error("a customer's identical layering pattern raised no alert")
+	}
+	if got := run(New(func() Config { c := DefaultConfig(); quoters(&c); return c }()), ladder("LIQ", false)); len(got) == 0 {
+		t.Error("the quoter was exempt on a real book")
+	}
+	limits := func(c *Config) { quoters(c); c.DefaultMaxPosition = 3 * unit }
+	expect(t, "position limit still applies", limits, ladder("LIQ", true), "position_limit/M", "position_limit/LIQ")
+}
+
 // TestPositionLimit: net and gross limits.
 func TestPositionLimit(t *testing.T) {
 	limits := func(c *Config) { c.DefaultMaxPosition = 100 * unit; c.MaxGrossNotional = 1000 * unit }

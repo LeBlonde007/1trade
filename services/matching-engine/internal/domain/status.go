@@ -3,6 +3,7 @@ package domain
 // Exchange states from openapi/trading.yaml ExchangeStatus.
 const (
 	StatePaused = "paused"
+	StatePaper  = "paper"
 	StateLive   = "live"
 )
 
@@ -33,4 +34,15 @@ func Status(methodologyURL string) ExchangeStatus {
 		Reason:         PausedReason,
 		MethodologyURL: methodologyURL,
 	}
+}
+
+// PaperReason tells clients paper trading is open while real money is not.
+const PaperReason = "Paper trading is open: orders match on paper books with paper cash. " +
+	"Real-money trading is paused pending exchange licensing."
+
+// PaperStatus is the status with the paper venue running (trading.yaml v1.1): paper orders are
+// accepted, real-money orders are still refused. It is chosen by starting the paper venue in code
+// (cmd/matching-engine), never by a flag that could open real money.
+func PaperStatus(methodologyURL string) ExchangeStatus {
+	return ExchangeStatus{State: StatePaper, Reason: PaperReason, MethodologyURL: methodologyURL}
 }

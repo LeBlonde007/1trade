@@ -59,6 +59,9 @@ func Open(ctx context.Context, dsn string) (*Store, error) {
 // Close releases the pool.
 func (s *Store) Close() { s.pool.Close() }
 
+// Pool is the store's connection pool, shared with the relay cursors (outbox.NewPGCursor).
+func (s *Store) Pool() *pgxpool.Pool { return s.pool }
+
 // kindOf names a command for the kind column.
 func kindOf(c engine.Command) string {
 	switch {

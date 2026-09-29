@@ -191,7 +191,7 @@ const traderTour: TourStep[] = [
         <li><strong>KPI strip</strong>: paper cash (and what open orders hold), position value, unrealized and realized P&amp;L.</li>
         <li><strong>Open positions</strong>: click a row to see its recent fills.</li>
         <li><strong>Exposure by market</strong> and <strong>recent activity</strong> (fills + cash movements) on the right rail.</li>
-        <li>Positions are simulated while the venue is paused — the page says so.</li>
+        <li>Positions come from your paper fills — paper cash and credits only; real money is paused.</li>
       </ul>
     `,
     side: 'bottom',

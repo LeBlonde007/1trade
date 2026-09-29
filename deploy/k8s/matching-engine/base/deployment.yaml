@@ -14,6 +14,24 @@ spec:
     metadata:
       labels: { app: matching-engine }
     spec:
+      # The journal schema (migrations/NNNN_*.sql from the matching-engine-migrations ConfigMap, applied
+      # in name order; every file is safe to re-run).
+      initContainers:
+        - name: migrate
+          image: postgres:16-alpine
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              set -- /migrations/[0-9]*.sql
+              [ -e "$1" ] || { echo "no migrations mounted"; exit 1; }
+              for f in "$@"; do
+                echo "applying $f"; psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"
+              done
+          env:
+            - { name: DATABASE_URL, valueFrom: { configMapKeyRef: { name: matching-engine-env, key: DATABASE_URL } } }
+          volumeMounts:
+            - { name: migrations, mountPath: /migrations }
       containers:
         - name: matching-engine
           image: 1trade/matching-engine:dev
@@ -21,7 +39,14 @@ spec:
           envFrom:
             - configMapRef: { name: otel-env, optional: true }   # OTLP endpoint for traces; created by install-data-plane.sh OBS=1
             - configMapRef: { name: matching-engine-env }
-            - secretRef: { name: platform-auth }   # PLATFORM_JWT_SECRET (verify tenant JWTs)
+            - secretRef: { name: platform-auth }   # PLATFORM_JWT_SECRET (verify tenant JWTs); SERVICE_TOKEN (fund the paper liquidity account)
+            - secretRef: { name: ledger-settle }   # SETTLE_SERVICE_TOKEN — the engine's own reserve/settle token (ADR-0004)
+          # The engine replays its journal before it listens; give recovery up to 5 minutes before the
+          # liveness probe may restart it.
+          startupProbe:
+            httpGet: { path: /healthz, port: 8087 }
+            periodSeconds: 5
+            failureThreshold: 60
           livenessProbe:
             httpGet: { path: /healthz, port: 8087 }
             periodSeconds: 10
@@ -38,3 +63,6 @@ spec:
             readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
             capabilities: { drop: [ALL] }
+      volumes:
+        - name: migrations
+          configMap: { name: matching-engine-migrations }

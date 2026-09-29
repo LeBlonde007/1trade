@@ -102,7 +102,7 @@ These are authored alongside Phase 1 so the switch-on is a config flip, not a re
 
 | Contract | Status |
 |---|---|
-| `openapi/trading.yaml` | specced; backed by mock data adapter in `matching-engine` |
+| `openapi/trading.yaml` | v1.1.0 — paper venue live in `matching-engine` (paper order entry; real money 503 EXCHANGE_PAUSED); mock adapter without the journal |
 | `events/trades.executed.v1.yaml` | specced |
 | `events/orders.state.v1.yaml` | specced |
 | `events/surveillance.alert.v1.yaml` | authored 2026-09-27 (it was listed as specced but missing); detectors emit it, publishing not yet wired |

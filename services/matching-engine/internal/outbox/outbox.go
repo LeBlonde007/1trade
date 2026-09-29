@@ -40,11 +40,15 @@ type Sink interface {
 	Publish(ctx context.Context, subject, msgID string, data []byte) error
 }
 
+// Handler consumes one event in journal order (the settlement worker). A failure stops the relay at
+// that event; the next Step retries it, so the handler must be idempotent.
+type Handler func(ctx context.Context, ev engine.Event) error
+
 // Relay follows the journal and publishes its events.
 type Relay struct {
 	src    Source
 	cursor Cursor
-	sink   Sink
+	emit   Handler
 	shadow *engine.Engine
 	seq    uint64 // last journal seq applied to the shadow engine
 	head   string // chain hash of that entry
@@ -56,8 +60,21 @@ type Relay struct {
 // shadow engine derives byte-identical events; Risk and Persist are cleared (journaled commands carry
 // their risk decision, and the shadow never writes).
 func New(cfg engine.Config, src Source, cursor Cursor, sink Sink) *Relay {
+	return NewHandler(cfg, src, cursor, func(ctx context.Context, ev engine.Event) error {
+		subject, data, err := events.Encode(ev)
+		if err != nil {
+			return fmt.Errorf("encode: %w", err)
+		}
+		return sink.Publish(ctx, subject, msgID(ev), data)
+	})
+}
+
+// NewHandler builds a relay that hands each event to handle instead of a message sink — the same
+// ordered, cursor-tracked, restart-safe delivery, for in-process consumers such as settlement. Each
+// consumer needs its own cursor.
+func NewHandler(cfg engine.Config, src Source, cursor Cursor, handle Handler) *Relay {
 	cfg.Risk, cfg.Persist = nil, nil
-	return &Relay{src: src, cursor: cursor, sink: sink, shadow: engine.New(cfg)}
+	return &Relay{src: src, cursor: cursor, emit: handle, shadow: engine.New(cfg)}
 }
 
 // Step applies every new journal entry to the shadow engine and publishes the events at or after the
@@ -95,14 +112,10 @@ func (r *Relay) Step(ctx context.Context) (int, error) {
 			start = r.pos.Idx
 		}
 		for i := start; i < len(evs); i++ {
-			subject, data, err := events.Encode(evs[i])
-			if err != nil {
-				return published, fmt.Errorf("outbox: encode seq %d event %d: %w", e.Seq, i, err)
-			}
-			if err := r.sink.Publish(ctx, subject, msgID(evs[i]), data); err != nil {
+			if err := r.emit(ctx, evs[i]); err != nil {
 				r.pos = Position{Seq: e.Seq, Idx: i}
 				_ = r.cursor.Save(ctx, r.pos)
-				return published, fmt.Errorf("outbox: publish seq %d event %d: %w", e.Seq, i, err)
+				return published, fmt.Errorf("outbox: deliver seq %d event %d: %w", e.Seq, i, err)
 			}
 			published++
 		}

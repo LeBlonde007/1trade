@@ -138,10 +138,19 @@ k8s_resource('surveillance', port_forwards='8088:8088',
              resource_deps=['surveillance-migrations', 'platform-auth'])
 
 # --- matching-engine (KW03) — the exchange's order book + reference index. Phase 2 moved from
-# keep-warm to ACTIVE (2026-09): the service is built for real, but stays paper-only and the venue
-# does not open until the F22 licence clears. Writes are expected to refuse with EXCHANGE_PAUSED. ---
+# keep-warm to ACTIVE (2026-09): the paper venue runs (paper orders fill against the paper liquidity
+# account and settle in the ledger); real-money orders still refuse with EXCHANGE_PAUSED until the F22
+# licence clears. ---
 docker_build('1trade/matching-engine:dev', 'services/matching-engine',
              dockerfile='services/matching-engine/Dockerfile')
+local_resource(
+    'matching-engine-migrations',
+    cmd='kubectl create configmap matching-engine-migrations ' +
+        '--from-file=services/matching-engine/migrations/ ' +
+        '--dry-run=client -o yaml | kubectl apply -f -',
+    deps=['services/matching-engine/migrations'],
+)
 k8s_yaml(kustomize('deploy/k8s/matching-engine/base'))
+# The paper venue: reserves + settles against credit-ledger with its own token, journals to Postgres.
 k8s_resource('matching-engine', port_forwards='8087:8087',
-             resource_deps=['platform-auth'])   # verifies tenant JWTs with the shared secret
+             resource_deps=['platform-auth', 'ledger-settle', 'matching-engine-migrations', 'credit-ledger'])

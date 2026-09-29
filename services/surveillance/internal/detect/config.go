@@ -60,6 +60,14 @@ type Config struct {
 	DefaultMaxPosition Fixed
 	MaxGrossNotional   Fixed
 	LimitBucket        time.Duration // one position-limit alert per tenant/product per bucket
+
+	// PaperQuoters are accounts that quote paper books by design — the matching engine's paper
+	// liquidity account, which re-quotes a ladder on both sides of every book. On PAPER books only,
+	// their order patterns (spoofing, layering, excessive cancellation) are not alerted: that is how
+	// quoting looks, and flagging it would bury real alerts. Every trade-based rule (wash trades,
+	// marking the close, cross-product, position limits) still applies to them, and on real books
+	// they get no exemption at all.
+	PaperQuoters map[string]bool
 }
 
 // DefaultConfig is the v1 starting point.

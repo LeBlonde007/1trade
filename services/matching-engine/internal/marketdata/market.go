@@ -13,12 +13,12 @@ import (
 
 // Quote is a two-sided quote at an instant.
 type Quote struct {
-	Bid, Ask, Mid  float64
-	BidSize        float64
-	AskSize        float64
-	Spread         float64
-	SpreadBps      float64
-	AsOf           time.Time
+	Bid, Ask, Mid float64
+	BidSize       float64
+	AskSize       float64
+	Spread        float64
+	SpreadBps     float64
+	AsOf          time.Time
 }
 
 // Level is one aggregated order-book level.
@@ -47,9 +47,9 @@ type Print struct {
 
 // Candle is one OHLCV bar. Time is the bar-open in Unix seconds.
 type Candle struct {
-	Time                    int64
-	Open, High, Low, Close  float64
-	Volume                  float64
+	Time                   int64
+	Open, High, Low, Close float64
+	Volume                 float64
 }
 
 // Summary is a product's 24h rollup.

@@ -121,6 +121,7 @@ func (d *Detector) OnOrder(o Order) []Alert {
 		return nil
 	}
 	var out []Alert
+	quoter := o.IsPaper && d.cfg.PaperQuoters[o.TenantID]
 	switch o.State {
 	case "accepted":
 		price := Fixed(0)
@@ -129,6 +130,9 @@ func (d *Detector) OnOrder(o Order) []Alert {
 		}
 		p.orders[o.OrderID] = &orderRec{id: o.OrderID, tenant: o.TenantID, product: o.ProductID, side: o.Side,
 			qty: fx(o.Quantity), price: price, accepted: o.TS}
+		if quoter {
+			break // quoting is not an order-to-trade signal (Config.PaperQuoters)
+		}
 		p.accepts = append(p.accepts, acceptRec{ts: o.TS, tenant: o.TenantID, product: o.ProductID, orderID: o.OrderID, qty: fx(o.Quantity)})
 		out = append(out, d.excessiveCancellation(p, o)...)
 	case "cancelled":
@@ -136,7 +140,7 @@ func (d *Detector) OnOrder(o Order) []Alert {
 		delete(p.orders, o.OrderID)
 		// Only a customer's own cancel is a signal. The engine's automatic cancels (IOC / market
 		// remainders, FOK misses, self-trade prevention) are not the customer withdrawing liquidity.
-		if rec == nil || o.Reason == nil || *o.Reason != "user_cancel" {
+		if rec == nil || o.Reason == nil || *o.Reason != "user_cancel" || quoter {
 			break
 		}
 		filled := fx(o.FilledQuantity)

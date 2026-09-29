@@ -179,13 +179,36 @@ Then call `localhost:18085/v1/chat/completions` with your API key (§7):
 Usage events are not published from this host gateway (it has no NATS), so metering is not tested
 here. Use the cluster's gateway (§7) for that.
 
-## 9. Exchange (paper, behind the licence gate)
+## 9. Exchange: paper trading
 
-Open `/markets`, `/trade`, `/portfolio` and `/history`.
+Switch the sidebar persona to **Trader** (the "Viewing as" pill). Then open `/markets`.
 
-- Expect: the index and markets render. The order book is simulated and labelled illustrative.
-- Placing an order is refused (`EXCHANGE_PAUSED`). No venue is live until the licence clears (F22).
-- `/benchmark` shows the public index methodology.
+- Expect: a **PAPER** banner ("Paper trading is open … real money is paused") and a **Trade →** link
+  on each market.
+
+1. **Trade.** Open `/trade?product=H100-SPOT`.
+   - Expect: a real book. The paper liquidity account quotes three levels a side around about 2.99.
+   - "Available" shows your $10,000 of paper cash.
+2. **Market buy.** Buy 5 at market.
+   - Expect: "Filled 5 at 3.0x".
+   - The fill appears on the tape and in Fills. Positions shows long 5.
+   - Paper cash drops by the cost plus the 1% taker fee (check `/wallet`).
+3. **Limit order.** Place a limit buy 2 at 1.00.
+   - Expect: "Resting on the book at 1.00". Orders shows it as open.
+   - The cash for it is held: $2.02 is locked.
+   - Cancel it. Expect: cancelled, and the hold is released.
+4. **Close.** In Positions, click **Close**.
+   - Expect: a market sell flattens it. Realized P&L shows the round trip, fees included.
+5. **Chart.** Bars with trades are coloured; bars with no trade show the reference price in grey.
+   The engine labels every bar.
+6. **Detail and history.** `/markets/h100-spot` shows the same book, tape and 24h stats.
+   `/portfolio` and `/history` show your paper fills.
+7. **Restart.** Restart the engine (e.g. `kubectl rollout restart deploy/matching-engine`).
+   - Expect: your orders, fills and positions are all still there. They are rebuilt from the journal.
+
+Real money stays paused. An account whose token is not paper gets **503 EXCHANGE_PAUSED** on every
+order. Paper trading uses paper cash and credits only. `/benchmark` shows the public index
+methodology; the index values are still provisional.
 
 ---
 

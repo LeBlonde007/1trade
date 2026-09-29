@@ -30,10 +30,9 @@ interface Market {
 }
 interface ExchangeStatus { state: string; reason: string; methodology_url: string }
 
-// Live from the matching engine. Prices are simulated while the venue is paused, but simulated
-// SERVER-side — this page used to run its own Brownian motion, which meant /markets and /trade
-// could disagree about the same product. The engine is the single source of truth; the page only
-// re-fetches.
+// Live from the matching engine's paper venue: last, 24h change, spread and volume come from the
+// paper books and paper trades (a product with no trades yet is flat at its book's mid). The engine is
+// the single source of truth; the page only re-fetches.
 const markets = ref<Market[]>([])
 const exchangeStatus = ref<ExchangeStatus | null>(null)
 const loading = ref(true)
@@ -174,10 +173,16 @@ function togglePin(sym: string) { pinned[sym] = !pinned[sym] }
           </p>
         </div>
         <div class="mk-actions">
-          <NuxtLink to="/markets/heat" class="mk-act-link">Heat map →</NuxtLink>
-          <NuxtLink to="/watchlist"    class="mk-act-link">Watchlist →</NuxtLink>
+          <NuxtLink to="/trade" class="mk-act-link">Trading view →</NuxtLink>
+          <NuxtLink to="/benchmark" class="mk-act-link">Index methodology →</NuxtLink>
         </div>
       </div>
+
+      <p v-if="exchangeStatus" class="mk-status" role="status">
+        <span class="mk-status-pill mono">{{ exchangeStatus.state === 'paper' ? 'PAPER' : exchangeStatus.state.toUpperCase() }}</span>
+        <span class="mk-status-txt">{{ exchangeStatus.reason }}</span>
+        <NuxtLink :to="exchangeStatus.methodology_url || '/benchmark'" class="mk-status-link">Index methodology →</NuxtLink>
+      </p>
 
       <div class="mk-filters">
         <div class="chips">
@@ -239,7 +244,8 @@ function togglePin(sym: string) { pinned[sym] = !pinned[sym] }
                 </svg>
               </td>
               <td class="r">
-                <NuxtLink :to="'/markets/' + m.product_id.toLowerCase()" class="open-link">Open →</NuxtLink>
+                <NuxtLink v-if="exchangeStatus?.state === 'paper' && m.tradeable" :to="'/trade?product=' + m.product_id" class="open-link">Trade →</NuxtLink>
+                <NuxtLink v-else :to="'/markets/' + m.product_id.toLowerCase()" class="open-link">Open →</NuxtLink>
               </td>
             </tr>
           </template>
@@ -250,8 +256,8 @@ function togglePin(sym: string) { pinned[sym] = !pinned[sym] }
 </template>
 
 <style scoped>
-/* Exchange status — deliberately prominent. It reports a paused venue and simulated market data;
-   burying it would misrepresent the product while the licence is pending. */
+/* Exchange status — deliberately prominent: paper trading only, real money paused. Burying it would
+   misrepresent the product while the licence is pending. */
 .mk-status {
   display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap;
   padding: var(--sp-3) var(--sp-4); margin-bottom: var(--sp-4);

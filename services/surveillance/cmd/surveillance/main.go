@@ -52,7 +52,9 @@ func main() {
 		go func() {
 			for delay := time.Second; ; delay = min(delay*2, 30*time.Second) {
 				r, err := pipeline.Start(cfg.NATSURL, func(pub pipeline.Publisher) *pipeline.Pipeline {
-					return pipeline.New(detect.DefaultConfig(), st, pub)
+					dc := detect.DefaultConfig()
+					dc.PaperQuoters = map[string]bool{cfg.PaperLiquidityTenant: true}
+					return pipeline.New(dc, st, pub)
 				})
 				if err == nil {
 					watching.Store(status{})

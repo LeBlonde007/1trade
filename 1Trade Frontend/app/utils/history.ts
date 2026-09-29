@@ -1,8 +1,8 @@
 /**
  * history — merges the two live sources behind /history into one time-ordered event list.
  *
- *   - Paper fills from the matching engine (`/api/trading/fills`). The venue is paused (F22), so these
- *     are simulated paper fills; every row carries is_paper and is labelled as such on screen.
+ *   - Paper fills from the matching engine (`/api/trading/fills`) — real paper trades that settle in the
+ *     ledger (real money is paused, F22); every row carries is_paper and is labelled as such on screen.
  *   - Ledger transactions from credit-ledger (`/api/wallet/transactions`). These are real, append-only
  *     and hash-chained; each carries its own chain_hash.
  *

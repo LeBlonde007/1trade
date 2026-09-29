@@ -75,3 +75,22 @@ beyond the spec.
 ## Milestone
 
 - M6 (Gate 6): spec finalized.
+
+## Status — paper liquidity account built (2026-09-29)
+
+The internal market maker still may not quote customer paper books (insider-risk rule). Paper
+liquidity instead comes from a **separate, non-internal paper liquidity account**
+(`matching-engine/internal/liquidity`, owner decision 2026-09-29):
+
+- **Quoting:** a symmetric ladder (3 levels, first at ±0.5% = the 1% base spread, then 0.25% apart,
+  at least a tick apart) around the reference price, $250 of paper notional per level. It re-quotes
+  on a 0.5% move or when a level is taken.
+- **Paper only:**
+  - the engine refuses its orders on real books;
+  - its value is paper grants (a one-time seed plus hourly-bounded top-ups on refusal);
+  - it can't use the HTTP API.
+- **Surveillance:** on paper books it is exempt from the quote-pattern rules (layering, spoofing,
+  excessive cancellation) only; every trade-based rule still applies (KW05).
+
+The real market maker — skew, inventory limits, stop-loss, volatility withdrawal, quoting on real
+books — remains Phase 2 and licence-gated.

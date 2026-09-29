@@ -1,18 +1,21 @@
 openapi: 3.0.3
 info:
   title: 1Trade Trading API (products, market data, orders, positions)
-  version: 1.0.0
+  version: 1.1.0
   description: >
-    **The 1Trade exchange API.** Owned by `matching-engine`. This contract is published in full so
-    the trading surface (KW02) and the eventual real engine (KW03 Phase 2) build against one stable
-    interface — but in **Phase 1 only the read endpoints are implemented**, and they are served by the
-    service's **mock adapter**: believable simulated market data, deterministic per product, generated
-    in-process. There is no order book, no customer order flow, and no settlement.
+    **The 1Trade exchange API.** Owned by `matching-engine`.
 
-    **The exchange is paused (license-gated — see F22).** Every write endpoint
-    (`POST /v1/trading/orders`, `DELETE /v1/trading/orders/{id}`) returns **503** with error code
-    `EXCHANGE_PAUSED`. Clients must render that state honestly rather than faking a fill; the trading
-    UI carries a "Demo — exchange paused" ribbon on every route (KW02).
+    **v1.1.0 (2026-09-29) — paper venue.** When the service runs with its journal, the real engine
+    serves this API: **paper order entry is open** (orders reserve paper cash or credits in
+    credit-ledger, match with price-time priority, and settle there), and orders, fills, positions,
+    book, quote and tape are real paper activity. Paper books are kept two-sided by the paper
+    liquidity account — a non-internal account that trades on paper books only (the insider-risk rule
+    is unchanged). `exchange_status.state` is `paper`.
+
+    **Real money stays paused (licence-gated — see F22).** A principal whose token is not paper gets
+    **503** `EXCHANGE_PAUSED` on every write, in code, with no configuration that changes it. Without
+    its journal the service runs the Phase 1 mock adapter: simulated market data, every write 503
+    `EXCHANGE_PAUSED`, `exchange_status.state` `paused`. Clients must render either state honestly.
 
     **Everything this API returns is paper.** `is_paper` is `true` on every object in Phase 1, with no
     way to request otherwise: real-money trading requires both the license and a `tech-lead` contract
@@ -31,8 +34,8 @@ servers:
 tags:
   - { name: products, description: "The tradeable product catalog (read-only)." }
   - { name: marketdata, description: "Quotes, order book, prints, candles (public reads; mock in Phase 1)." }
-  - { name: orders, description: "Order entry + cancel. PAUSED in Phase 1 — always 503 EXCHANGE_PAUSED." }
-  - { name: portfolio, description: "Tenant-scoped positions + fills (mock in Phase 1)." }
+  - { name: orders, description: "Order entry + cancel. Paper: open. Real money: 503 EXCHANGE_PAUSED." }
+  - { name: portfolio, description: "Tenant-scoped positions + fills (real paper activity; mock without the venue)." }
 
 paths:
   /healthz:
@@ -176,8 +179,8 @@ paths:
       tags: [orders]
       summary: The tenant's orders, newest first (tenant JWT).
       description: >
-        Implemented as a read in Phase 1 and always empty — no customer order flow exists while the
-        exchange is paused. Present so the client can build the real list view now.
+        The tenant's paper orders. `state=open` includes partially filled orders. Empty without the
+        paper venue.
       operationId: listOrders
       security: [{ bearerAuth: [] }]
       parameters:
@@ -196,11 +199,14 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
     post:
       tags: [orders]
-      summary: Place an order — PAUSED, always 503.
+      summary: Place a paper order (real money — 503 EXCHANGE_PAUSED).
       description: >
-        The order-entry contract for Phase 2. In Phase 1 this endpoint validates nothing and accepts
-        nothing: it returns 503 `EXCHANGE_PAUSED` with a link to the published methodology. `is_paper`
-        is never read from the body — at switch-on it is derived from the authenticated principal.
+        `is_paper` is never read from the body: it comes from the verified token, and unknown body
+        fields are refused (422). The order id is derived from the tenant and the Idempotency-Key, so
+        a retry returns the same order (200); the same key with a different order is 409. A risk
+        refusal (the ledger could not reserve the hold) is a created order in state `rejected` with
+        its `reason` (insufficient_cash, insufficient_credit, risk_unavailable). An unfilled market,
+        IOC or FOK remainder is `cancelled`.
       operationId: placeOrder
       security: [{ bearerAuth: [] }]
       parameters:
@@ -215,24 +221,51 @@ paths:
           application/json:
             schema: { $ref: '#/components/schemas/OrderRequest' }
       responses:
-        '503':
-          description: The exchange is paused (license-gated). The only response in Phase 1.
+        '201':
+          description: The order (any state — accepted, filled, cancelled remainder, or rejected by risk).
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ExchangePausedError' }
+              schema: { $ref: '#/components/schemas/Order' }
+        '200':
+          description: A retry of an Idempotency-Key already used for this order.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Order' }
+        '400': { description: "Missing or oversized Idempotency-Key.", content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+        '403': { description: "The account may not trade through the API.", content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+        '409': { description: "IDEMPOTENCY_CONFLICT — the key was used for a different order.", content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+        '422': { $ref: '#/components/responses/InvalidRequest' }
+        '503':
+          description: >
+            Real money is paused (licence-gated), or the venue is not running: `EXCHANGE_PAUSED`.
+            Or an ApiError with code `unavailable` when the journal briefly cannot take the order —
+            retry with the same key.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - { $ref: '#/components/schemas/ExchangePausedError' }
+                  - { $ref: '#/components/schemas/ApiError' }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
   /v1/trading/orders/{orderId}:
     delete:
       tags: [orders]
-      summary: Cancel an order — PAUSED, always 503.
+      summary: Cancel one of the tenant's open paper orders (real money — 503 EXCHANGE_PAUSED).
       operationId: cancelOrder
       security: [{ bearerAuth: [] }]
       parameters:
         - { name: orderId, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
+        '200':
+          description: The cancelled order.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Order' }
+        '404': { description: "No such order for this tenant (another tenant's order is not found).", content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
+        '409': { description: "order_not_open — already filled, cancelled or rejected.", content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } } }
         '503':
-          description: The exchange is paused (license-gated). The only response in Phase 1.
+          description: Real money is paused (licence-gated), or the venue is not running.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ExchangePausedError' }
@@ -241,7 +274,7 @@ paths:
   /v1/trading/positions:
     get:
       tags: [portfolio]
-      summary: The tenant's open positions, marked to the current mock mid (tenant JWT).
+      summary: The tenant's positions from its paper fills, marked to the book's mid (tenant JWT).
       operationId: listPositions
       security: [{ bearerAuth: [] }]
       responses:
@@ -315,10 +348,14 @@ components:
       description: Why order entry is unavailable, and where the methodology lives.
       required: [state, reason, methodology_url]
       properties:
-        state: { type: string, enum: [paused, live], example: paused }
+        state:
+          type: string
+          enum: [paused, paper, live]
+          description: "paused = no order entry (mock adapter); paper = paper order entry open, real money paused; live = licensed (not in use)."
+          example: paper
         reason:
           type: string
-          example: "Order entry is paused pending exchange licensing. Market data shown is simulated."
+          example: "Paper trading is open: orders match on paper books with paper cash. Real-money trading is paused pending exchange licensing."
         methodology_url: { type: string, example: "/methodology" }
 
     Product:
@@ -348,7 +385,7 @@ components:
 
     MarketSummary:
       type: object
-      description: 24h rollup for one product, from the mock generator in Phase 1.
+      description: 24h rollup for one product from paper trades (flat at the book's mid when nothing traded); from the mock generator without the venue.
       required: [product_id, last, open_24h, high_24h, low_24h, change_pct_24h, volume_24h, spread_bps, is_paper]
       properties:
         product_id: { type: string }
@@ -374,6 +411,10 @@ components:
         spread: { $ref: '#/components/schemas/Decimal' }
         spread_bps: { type: string, example: "4.0" }
         as_of: { type: string, format: date-time }
+        source:
+          type: string
+          enum: [book, reference]
+          description: "book = the paper book's best bid/offer; reference = a side of the book is empty, so the reference walk is shown (sizes 0)."
         is_paper: { type: boolean, enum: [true] }
 
     BookLevel:
@@ -424,6 +465,10 @@ components:
         low: { $ref: '#/components/schemas/Decimal' }
         close: { $ref: '#/components/schemas/Decimal' }
         volume: { $ref: '#/components/schemas/Decimal' }
+        source:
+          type: string
+          enum: [trades, reference]
+          description: "trades = built from paper trades in the bar; reference = no trade in the bar, so it shows the reference walk with volume 0. Never unlabelled."
 
     OrderRequest:
       type: object
@@ -453,6 +498,13 @@ components:
         state: { type: string, enum: [open, partially_filled, filled, cancelled, rejected] }
         filled_quantity: { $ref: '#/components/schemas/Decimal' }
         avg_fill_price: { allOf: [{ $ref: '#/components/schemas/Decimal' }], nullable: true }
+        reason:
+          type: string
+          nullable: true
+          description: >
+            Why the order was cancelled or rejected: user_cancel, self_trade, unfilled_remainder,
+            fok_unfilled, day_expired; insufficient_cash, insufficient_credit, risk_unavailable,
+            order_id_reused.
         is_paper: { type: boolean, enum: [true] }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }

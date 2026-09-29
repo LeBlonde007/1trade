@@ -244,8 +244,10 @@ and executing at the taker's price. Both mutations were caught.
      in §8 (credit.yaml v1.3) and not yet approved.
 4. **Risk hook implementation.** Balance and position-limit checks against the ledger, plus
    surveillance holds (KW05).
-5. **API wiring.** Behind the licence gate: order entry, cancel, and orders/fills reads served from
-   the engine instead of the Phase 1 simulator. Paper-only first.
+5. **API wiring — paper built (2026-09-29).** Order entry, cancel, and the orders, fills, positions,
+   book, quote, tape and candles are served from the engine (`internal/venue`, `internal/api/paper.go`)
+   for paper principals. Real-money principals still get 503 EXCHANGE_PAUSED; that cutover is
+   licence-gated.
 6. **Performance.** Measure against the budget: acceptance P99 < 10 ms, match P99 < 5 ms. A single
    mutex serialises all books today. Per-book locking is the known optimisation, and must not change
    the order of events within a book.
@@ -255,10 +257,9 @@ and executing at the taker's price. Both mutations were caught.
 - **Sequence scope.** `orders.state.v1` says the sequence is "per-product". Because paper and real
   are separate books, the engine sequences per `(product_id, is_paper)`. Consumers should key gap
   detection on both. Proposed: clarify the contract wording.
-- **Market maker on paper books.** The insider-risk rule stops internal accounts quoting into
-  customer paper books. So paper liquidity cannot come from the internal market maker as specced.
-  Options: a non-internal paper liquidity account that is clearly labelled, or accept thin paper
-  books. KW04 needs this decided before it builds paper quoting.
+- ~~**Market maker on paper books.**~~ **Decided and built (2026-09-29):** a non-internal *paper
+  liquidity account* (`internal/liquidity`). The engine refuses its orders on real books
+  (`ErrLiquidityReal`), so the insider-risk rule is unchanged. See KW04.
 - ~~**What if settlement is refused (402)?**~~ **Decided and built:** reserve at acceptance
   (credit.yaml v1.2). See §7.3.
 - **Cancel and reject reasons.** The engine emits:

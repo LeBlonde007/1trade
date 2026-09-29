@@ -178,3 +178,54 @@ licence-gated cutover.
 Acceptance (Phase 2): ✅ deterministic, replayable, race-free under concurrent load · ✅ paper/real
 isolation enforced · ✅ property-based tests pass · ⬜ matches the trading contract end to end (API
 not wired) · ⬜ performance targets measured.
+
+## Status — paper venue live; real money still paused (2026-09-29)
+
+The owner approved opening **paper** order entry (real money stays licence-gated, F22). The cutover
+wiring from SPEC §7.3 is built, for paper only:
+
+- `cmd/matching-engine` runs the **paper venue** when `DATABASE_URL` is set:
+  - `venue.Recover` (journal.Recover plus the read models) with `settle.ReserveRisk`;
+  - the reservation reconciler, resumed from tombstones and sweeping the ledger;
+  - a **settlement relay**: the outbox relay in handler mode feeding `settle.Worker`, on its own
+    durable cursor (`settle`);
+  - the NATS relay (cursor `nats`);
+  - day-order expiry at 00:00 UTC.
+
+  Without a journal the service stays on the paused mock adapter.
+- `internal/venue` holds the engine plus read models — orders, fills and positions per tenant; prints,
+  one-minute bars and last price per product. They are rebuilt from the journal on start, so they
+  can't drift from it.
+- The API (`internal/api/paper.go`, trading.yaml **v1.1.0**):
+  - **Order entry.** Place and cancel orders; the order id comes from tenant + Idempotency-Key
+    (a retry is 200, the same key with a different order is 409).
+  - **Market data.** The real paper book, quote, tape and summary. Candles with no trade are the
+    reference walk, labelled `source: reference`.
+  - **Tenant data.** Orders, fills and positions (average cost, realized and unrealized P&L).
+  - **What is refused:**
+    - `is_paper` comes only from the token, and unknown body fields are refused;
+    - a real-money token gets **503 EXCHANGE_PAUSED**, in code;
+    - the liquidity account cannot use the API.
+- **Paper liquidity** (`internal/liquidity`, SPEC §8 decided: a clearly labelled non-internal paper
+  account):
+  - it quotes 3 levels a side around the reference, starting 0.5% from mid, with $250 per level;
+  - it re-quotes when the reference moves 0.5% or a level is taken — about 6k journal commands a day;
+  - it is funded once with paper value (idempotent keys), topped up only when the ledger refuses one
+    of its orders, and backs off while the ledger is unreachable;
+  - the engine refuses its orders on any real book (`ErrLiquidityReal`), and the insider-risk rule is
+    unchanged.
+- **Evidence:**
+  - unit and API tests;
+  - mutation checks — the real-money refusal, the liquidity rules, idempotency conflicts, body
+    smuggling and outage backoff are each caught when broken;
+  - live e2e against real credit-ledger, platform-core and NATS:
+    - a customer bought 10 H100 at 3.01, and ledger cash moved by exactly 30.10 + 0.301 fee;
+    - an oversized market order swept the book and cancelled the rest;
+    - a resting bid locked $5.05, and cancelling released it;
+    - after a restart, fills and positions were intact and the bot re-adopted its ladder;
+  - the browser flow on /trade.
+- **Deploy:** matching-engine now has a migration initContainer, `DATABASE_URL`, the `ledger-settle`
+  secret and a startup probe; the Tiltfile ships `matching-engine-migrations`.
+
+**Remaining** (SPEC §7): snapshots (the journal replays from genesis on start), per-book locking and
+performance measurement, and the real-money cutover — which needs the licence.

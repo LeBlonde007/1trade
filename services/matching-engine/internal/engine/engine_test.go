@@ -1,7 +1,9 @@
 package engine
 
 import (
+	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 )
@@ -180,6 +182,49 @@ func TestInternalPaperForbidden(t *testing.T) {
 	c.IsPaper = false
 	if _, err := e.Submit(c); err != nil {
 		t.Fatalf("internal real-book order rejected: %v", err)
+	}
+}
+
+// TestPaperLiquidityRule checks the paper liquidity account: it trades with customers on paper books
+// (that is its purpose), but never on a real book and never as an internal account — so the
+// insider-risk rule and paper/real isolation both still hold.
+func TestPaperLiquidityRule(t *testing.T) {
+	e := New(Config{})
+	ask := limit("lp1", "liq", Sell, "0.001005", "10", 1)
+	ask.IsLiquidity = true
+	mustSubmit(t, e, ask)
+	r := mustSubmit(t, e, limit("c1", "cust", Buy, "0.001005", "4", 2))
+	if tr := trades(r.Events); len(tr) != 1 || tr[0].Seller.TenantID != "liq" || tr[0].Seller.IsInternal {
+		t.Fatalf("customer did not trade with the paper liquidity account: %+v", tr)
+	}
+	if o, _ := e.Order("lp1", "liq"); !o.IsLiquidity {
+		t.Fatal("liquidity flag lost on the order")
+	}
+
+	real := limit("lp2", "liq", Sell, "0.001005", "10", 3)
+	real.IsLiquidity, real.IsPaper = true, false
+	if _, err := e.Submit(real); !errors.Is(err, ErrLiquidityReal) {
+		t.Fatalf("liquidity order on a real book: err = %v, want ErrLiquidityReal", err)
+	}
+	internal := limit("lp3", "liq", Sell, "0.001005", "10", 4)
+	internal.IsLiquidity, internal.IsInternal = true, true
+	if _, err := e.Submit(internal); err == nil {
+		t.Fatal("an internal account was accepted as paper liquidity")
+	}
+	if len(e.Journal()) != 2 {
+		t.Fatalf("refused liquidity orders reached the journal: %d commands", len(e.Journal()))
+	}
+}
+
+// TestLiquidityFlagKeepsOldJournalEncoding checks omitempty: a customer submit encodes exactly as it
+// did before the flag existed, so earlier journals and their hash chains are untouched.
+func TestLiquidityFlagKeepsOldJournalEncoding(t *testing.T) {
+	b, err := json.Marshal(Command{Submit: &SubmitCmd{OrderID: "o", TenantID: "t", IsPaper: true}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(b), "IsLiquidity") {
+		t.Fatalf("customer submit encodes the liquidity flag: %s", b)
 	}
 }
 

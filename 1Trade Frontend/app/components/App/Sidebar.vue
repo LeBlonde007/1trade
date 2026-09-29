@@ -69,7 +69,7 @@ const groups: NavGroup[] = [
     title: 'Trade',
     items: [
       { icon: CandlestickChart, label: 'Trade',      to: '/trade',     personas: ['trader'] },
-      { icon: List,             label: 'Markets',    to: '/markets/eai-idx', match: '/markets', personas: ['trader'] },
+      { icon: List,             label: 'Markets',    to: '/markets', match: '/markets', personas: ['trader'] },
       { icon: Clock,            label: 'History',    to: '/history',   personas: ['trader'] },
     ],
   },

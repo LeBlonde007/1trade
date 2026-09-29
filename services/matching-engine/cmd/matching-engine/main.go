@@ -1,13 +1,12 @@
 // Command matching-engine is the HTTP entrypoint for the exchange (KW03).
 //
-// Phase 1 runs the **mock adapter only**: it serves simulated market data for the trading surface
-// (KW02) and the Phase 1 index reads, and it refuses every write with 503 EXCHANGE_PAUSED because the
-// exchange is paused pending licensing (F22). It holds no order book, opens no database, emits no
-// events, and moves no credit — there is deliberately nothing here that could accept a customer order.
+// With a journal (DATABASE_URL) it runs the **paper venue**: the real engine, reservations and
+// settlement against credit-ledger, event publishing, and the paper liquidity account (startPaper).
+// Paper orders are accepted; real-money orders are refused with 503 EXCHANGE_PAUSED in code, because
+// real trading waits on the licence (F22).
 //
-// The real engine (Redis order book, price-time priority matching, event sourcing, atomic settlement
-// against credit-ledger) is specified in SPEC.md and lands at Phase 2 switch-on behind the same
-// contract.
+// Without a journal it runs the Phase 1 **mock adapter**: simulated market data, and every write
+// refused with 503 EXCHANGE_PAUSED.
 package main
 
 import (
@@ -39,17 +38,26 @@ func main() {
 	}
 	resolver := auth.NewResolver(cfg.JWTSecret)
 
+	handler, mode := http.Handler(api.New(cfg, resolver)), "mock adapter; order entry paused"
+	if cfg.DatabaseURL != "" {
+		v, err := startPaper(context.Background(), cfg)
+		if err != nil {
+			slog.Error("paper venue failed to start; staying paused", "err", err)
+		} else {
+			handler, mode = api.NewPaper(cfg, resolver, v, cfg.LiquidityTenant, nil), "paper venue; real money paused"
+		}
+	}
+
 	// Expose Prometheus /metrics next to the app (same port, cluster-internal) + instrument app routes.
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", obs.Handler())
-	mux.Handle("/", obs.Instrument(api.New(cfg, resolver)))
+	mux.Handle("/", obs.Instrument(handler))
 	srv := &http.Server{
 		Addr:              cfg.Addr,
 		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
-	slog.Info("matching-engine listening (mock adapter; order entry paused)",
-		"addr", cfg.Addr, "env", cfg.Env, "version", Version)
+	slog.Info("matching-engine listening", "mode", mode, "addr", cfg.Addr, "env", cfg.Env, "version", Version)
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		slog.Error("server", "err", err)
 		os.Exit(1)
