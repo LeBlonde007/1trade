@@ -1,9 +1,10 @@
 /**
- * usePersona — global "active persona" state.
+ * usePersona — the product surface the app shows (sidebar, landing page, trader chrome).
  *
- * The user picks a persona on /onboarding/tour. Their choice is then used
- * to filter the trading-app sidebar, hint marketing nav, and pre-select
- * the tour engine. Persists to localStorage so it survives reloads.
+ * When signed in it is the account's type from /v1/auth/me (platform-core v1.11) — chosen at signup
+ * and stored server-side, so it is the same on every device: trader → trader, AI company and
+ * enterprise → enterprise, datacenter → partner. Signed out (marketing pages, the tour) it falls back
+ * to a local choice kept in localStorage.
  *
  * Default = 'enterprise' (AI company) — the platform-first audience post-GTM-pivot.
  *
@@ -15,6 +16,11 @@
 export type ActivePersona = 'trader' | 'enterprise' | 'partner'
 
 const STORAGE_KEY = 'exa:active-persona'
+
+/** The persona each account type sees. */
+const ACCOUNT_PERSONA: Record<string, ActivePersona> = {
+  trader: 'trader', ai_company: 'enterprise', enterprise: 'enterprise', datacenter: 'partner',
+}
 const VALID: ActivePersona[] = ['trader', 'enterprise', 'partner']
 
 export interface PersonaMeta {
@@ -31,9 +37,15 @@ export const PERSONA_META: Record<ActivePersona, PersonaMeta> = {
 }
 
 export function usePersona() {
-  // Default = 'enterprise' (AI company) — the platform-first audience post-GTM-pivot. Traders +
-  // datacenter partners switch via the sidebar persona pill; the choice persists to localStorage.
-  const persona = useState<ActivePersona>('active-persona', () => 'enterprise')
+  // The local choice (signed-out fallback). Default = 'enterprise' (AI company), the platform-first
+  // audience.
+  const local = useState<ActivePersona>('active-persona', () => 'enterprise')
+  const auth = useAuth()
+  // The signed-in account's type wins; it cannot be switched from the UI.
+  const persona = computed<ActivePersona>({
+    get: () => ACCOUNT_PERSONA[auth.user.value?.account_type ?? ''] ?? local.value,
+    set: (p) => { local.value = p },
+  })
 
   // Hydrate from localStorage once on the client.
   if (import.meta.client) {
@@ -41,8 +53,8 @@ export function usePersona() {
       try { return localStorage.getItem(STORAGE_KEY) as ActivePersona | null }
       catch { return null }
     })()
-    if (saved && VALID.includes(saved) && saved !== persona.value) {
-      persona.value = saved
+    if (saved && VALID.includes(saved) && saved !== local.value) {
+      local.value = saved
     }
   }
 

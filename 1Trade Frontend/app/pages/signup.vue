@@ -17,8 +17,9 @@
  */
 import {
   CandlestickChart, Terminal, Building2,
-  Eye, EyeOff, ArrowRight, ShieldCheck, BadgeCheck, Banknote,
+  Eye, EyeOff, ArrowRight, ShieldCheck, BadgeCheck, Banknote, Server,
 } from 'lucide-vue-next'
+import type { AccountType } from '~/composables/useAuth'
 
 definePageMeta({ layout: false })
 useHead({ title: 'Open an account — 1Trade', htmlAttrs: { 'data-theme': 'light' } })
@@ -26,13 +27,16 @@ useHead({ title: 'Open an account — 1Trade', htmlAttrs: { 'data-theme': 'light
 // ─── Account type ───────────────────────────────────────────
 // Trader opens a PAPER trading account (owner decision 2026-09-29, demo MVP): paper cash and credits
 // only — real-money trading stays licence-gated. Default is AI Company, the platform-first product.
-type AccountKey = 'trader' | 'ai' | 'ent'
+type AccountKey = 'trader' | 'ai' | 'ent' | 'dc'
 const acctType = ref<AccountKey>('ai')
 const acctTypes: { key: AccountKey; icon: any; nm: string; l1: string; l2: string; soon?: boolean }[] = [
   { key: 'trader', icon: CandlestickChart, nm: 'Trader',     l1: 'Trade credits',  l2: 'Paper trading' },
   { key: 'ai',     icon: Terminal,         nm: 'AI Company', l1: 'Use credits',     l2: 'Inference & compute' },
   { key: 'ent',    icon: Building2,        nm: 'Enterprise', l1: 'Multi-user SSO', l2: 'Procurement-friendly' },
+  { key: 'dc',     icon: Server,           nm: 'Datacenter', l1: 'Supply GPUs',    l2: 'Register capacity' },
 ]
+/** The account type each card signs up as (platform-core v1.11); it picks the product surface. */
+const ACCOUNT_TYPE: Record<AccountKey, AccountType> = { trader: 'trader', ai: 'ai_company', ent: 'enterprise', dc: 'datacenter' }
 /** selectAcct picks an account type, ignoring disabled (coming-soon) ones. */
 const selectAcct = (a: { key: AccountKey; soon?: boolean }) => { if (!a.soon) acctType.value = a.key }
 
@@ -175,10 +179,10 @@ const onSubmit = async () => {
   submitting.value = true
   try {
     // Create the real account (tenant + admin user) via the BFF, then continue onboarding.
-    await useAuth().signup(email.value, password.value)
-    // The account-type choice drives the runtime persona — the sidebar surface and the
-    // persona-aware onboarding path (trader → paper exchange; AI company → console).
-    usePersona().set(acctType.value === 'trader' ? 'trader' : 'enterprise')
+    // The account type is stored on the account and drives the product surface everywhere (sidebar,
+    // landing page): trader → paper exchange, AI company / enterprise → console, datacenter → capacity.
+    await useAuth().signup(email.value, password.value, undefined, ACCOUNT_TYPE[acctType.value])
+    usePersona().set(({ trader: 'trader', ai: 'enterprise', ent: 'enterprise', dc: 'partner' } as const)[acctType.value])
     await navigateTo('/onboarding/verify?email=' + encodeURIComponent(email.value))
   } catch (err: unknown) {
     const ex = err as { statusCode?: number; data?: { message?: string } }
@@ -486,7 +490,7 @@ const onSubmit = async () => {
 /* ─── Account-type cards ─── */
 .acct-types {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 10px;
   margin-bottom: 32px;
 }

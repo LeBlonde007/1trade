@@ -35,7 +35,9 @@ func (s *Server) ssoRoutes() {
 const domainTXTPrefix = "_1trade-verify."
 
 // SetTXTLookup replaces the DNS TXT resolver (tests).
-func (s *Server) SetTXTLookup(f func(ctx context.Context, name string) ([]string, error)) { s.lookupTXT = f }
+func (s *Server) SetTXTLookup(f func(ctx context.Context, name string) ([]string, error)) {
+	s.lookupTXT = f
+}
 
 // ssoURLAllowed reports whether an IdP SSO URL may be sent to a browser: https only (plain http is
 // accepted in dev, for a local test IdP). Anything else — javascript:, data:, relative — is refused,

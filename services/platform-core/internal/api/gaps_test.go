@@ -9,10 +9,10 @@ import (
 	"os"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/trade1/platform-core/internal/api"
 	"github.com/trade1/platform-core/internal/config"
 	"github.com/trade1/platform-core/internal/store"
-	"github.com/google/uuid"
 )
 
 // TestVerifyAndBudget covers the email-verification flow (resend → token → verify, single-use) and

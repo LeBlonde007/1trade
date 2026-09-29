@@ -181,7 +181,7 @@ here. Use the cluster's gateway (§7) for that.
 
 ## 9. Exchange: paper trading
 
-Open **Markets** in the sidebar (`/markets`).
+Sign up as a **Trader** (the sidebar then shows Portfolio, Trade, Markets, History, Index, Wallet) and open **Markets** (`/markets`).
 
 - Expect: a **PAPER** banner ("Paper trading is open … real money is paused") and a **Trade →** link
   on each market.

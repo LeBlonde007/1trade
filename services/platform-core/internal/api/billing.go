@@ -9,10 +9,10 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/trade1/platform-core/internal/billing"
 	"github.com/trade1/platform-core/internal/domain"
 	"github.com/trade1/platform-core/internal/store"
-	"github.com/google/uuid"
 )
 
 // checkoutBody is the POST /v1/billing/checkout request.

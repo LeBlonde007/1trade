@@ -1,13 +1,18 @@
 openapi: 3.0.3
 info:
   title: 1Trade Platform-Core API (auth, accounts, RBAC, keys, billing)
-  version: 1.10.0
+  version: 1.11.0
   description: >
     Identity for the whole platform. Owned by `platform-core`. Every other service authenticates
     inbound requests by verifying the JWT this service issues (see JwtClaims) — that's how each
     service resolves tenant_id / sub_account_id / roles / is_paper. SAML/SCIM/2FA are M4 additions
     (this v1 covers email+password, OAuth, API keys, and the account/org surface). See
     docs/plans/features/F02-auth-and-sso.md and F03-accounts-orgs-rbac.md.
+
+    **v1.11.0 (2026-09-29, account type).** Signup takes an optional `account_type` (trader |
+    ai_company (default) | enterprise | datacenter; anything else 422 bad_account_type) and `/v1/auth/me`
+    returns it. It chooses the product surface the web app shows and grants nothing: roles and is_paper
+    still decide what an account may do. A trader account is paper-only.
 
     **v1.6.0 (2026-09-28, team management).** Members (list; admins remove — never themselves, never
     the last admin), invitations (admins invite an email with roles and optionally a sub-account; the
@@ -85,6 +90,7 @@ paths:
                 email: { type: string, format: email }
                 password: { type: string, format: password }
                 tenant_name: { type: string }
+                account_type: { $ref: '#/components/schemas/AccountType' }
       responses:
         '201':
           description: Created + authenticated.
@@ -1025,6 +1031,12 @@ components:
         roles:     { type: array, items: { $ref: '#/components/schemas/Role' } }
         is_paper:  { type: boolean }
         kyc_status: { $ref: '#/components/schemas/KycStatus', description: "tenant KYC state; gates real-money purchases (the web app reads this for the buy gate)" }
+        account_type: { $ref: '#/components/schemas/AccountType' }
+    AccountType:
+      type: string
+      enum: [trader, ai_company, enterprise, datacenter]
+      default: ai_company
+      description: "v1.11: what the account signed up as — picks the web app's product surface; grants no permission."
     KycStatus:
       type: string
       enum: [unverified, pending, verified, rejected]

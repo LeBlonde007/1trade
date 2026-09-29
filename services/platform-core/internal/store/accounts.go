@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/trade1/platform-core/internal/domain"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/trade1/platform-core/internal/domain"
 )
 
 // Org is an organization under a tenant (multi-user accounts).

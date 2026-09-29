@@ -8,11 +8,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/trade1/platform-core/internal/domain"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/trade1/platform-core/internal/domain"
 )
 
 // ErrEmailTaken is returned when a signup email already exists.
@@ -48,9 +48,14 @@ type User struct {
 	IsPaper  bool
 }
 
-// Signup atomically creates an individual tenant + its first (admin) user. Returns ErrEmailTaken if
-// the email is already registered.
+// Signup atomically creates an individual ai_company tenant + its first (admin) user. Returns
+// ErrEmailTaken if the email is already registered.
 func (s *Store) Signup(ctx context.Context, email, passwordHash, tenantName string) (User, error) {
+	return s.SignupAs(ctx, email, passwordHash, tenantName, domain.AccountAICompany)
+}
+
+// SignupAs is Signup with the account type the user chose (it picks the product surface they see).
+func (s *Store) SignupAs(ctx context.Context, email, passwordHash, tenantName string, accountType domain.AccountType) (User, error) {
 	email = domain.NormalizeEmail(email) // one account per address regardless of case
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -60,8 +65,8 @@ func (s *Store) Signup(ctx context.Context, email, passwordHash, tenantName stri
 
 	tenantID := uuid.NewString()
 	if _, err := tx.Exec(ctx,
-		`INSERT INTO tenants (id, name, kind, is_paper) VALUES ($1,$2,'individual',TRUE)`,
-		tenantID, tenantName); err != nil {
+		`INSERT INTO tenants (id, name, kind, is_paper, account_type) VALUES ($1,$2,'individual',TRUE,$3)`,
+		tenantID, tenantName, string(accountType)); err != nil {
 		return User{}, fmt.Errorf("insert tenant: %w", err)
 	}
 
@@ -125,9 +130,10 @@ func (s *Store) GetUserByEmail(ctx context.Context, email string) (AuthUser, boo
 type Identity struct {
 	UserID, Email, TenantID, OrgID, SubAccountID string
 	MFAEnabled                                   bool
-	Roles                          []domain.Role
-	IsPaper                        bool
-	KYCStatus                      domain.KYCStatus
+	Roles                                        []domain.Role
+	IsPaper                                      bool
+	KYCStatus                                    domain.KYCStatus
+	AccountType                                  domain.AccountType
 }
 
 // GetUserByID loads a user's identity by id (for /me). ok=false if not found.
@@ -135,11 +141,11 @@ func (s *Store) GetUserByID(ctx context.Context, id string) (Identity, bool, err
 	var idn Identity
 	var org *string
 	var roles []string
-	var kyc string
+	var kyc, accountType string
 	err := s.pool.QueryRow(ctx,
-		`SELECT u.id, u.email, u.tenant_id, u.org_id, u.roles, t.is_paper, t.kyc_status, coalesce(u.sub_account_id::text, ''), u.mfa_enabled
+		`SELECT u.id, u.email, u.tenant_id, u.org_id, u.roles, t.is_paper, t.kyc_status, coalesce(u.sub_account_id::text, ''), u.mfa_enabled, t.account_type
 		 FROM users u JOIN tenants t ON t.id = u.tenant_id WHERE u.id = $1`, id).
-		Scan(&idn.UserID, &idn.Email, &idn.TenantID, &org, &roles, &idn.IsPaper, &kyc, &idn.SubAccountID, &idn.MFAEnabled)
+		Scan(&idn.UserID, &idn.Email, &idn.TenantID, &org, &roles, &idn.IsPaper, &kyc, &idn.SubAccountID, &idn.MFAEnabled, &accountType)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Identity{}, false, nil
 	}
@@ -151,6 +157,7 @@ func (s *Store) GetUserByID(ctx context.Context, id string) (Identity, bool, err
 	}
 	idn.Roles = toRoles(roles)
 	idn.KYCStatus = domain.KYCStatus(kyc)
+	idn.AccountType = domain.AccountType(accountType)
 	return idn, true, nil
 }
 

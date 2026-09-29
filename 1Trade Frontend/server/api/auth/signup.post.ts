@@ -5,13 +5,13 @@
 import { defineEventHandler, readBody } from 'h3'
 import { setSession, proxyJson } from '../../utils/api'
 
-interface Creds { email?: string; password?: string; tenant_name?: string }
+interface Creds { email?: string; password?: string; tenant_name?: string; account_type?: string }
 
 export default defineEventHandler(async (event) => {
   const body = await readBody<Creds>(event)
   const out = await proxyJson<{ token?: string; expires_at?: string; status?: string; email?: string }>(event, 'platform', '/v1/auth/signup', {
     method: 'POST',
-    body: { email: body?.email, password: body?.password, tenant_name: body?.tenant_name },
+    body: { email: body?.email, password: body?.password, tenant_name: body?.tenant_name, account_type: body?.account_type },
   })
   // When the deployment gates login on email verification, signup returns no session — the user must
   // click the emailed link, then log in. Surface that to the caller instead of setting a cookie.

@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/trade1/platform-core/internal/domain"
 	"github.com/google/uuid"
+	"github.com/trade1/platform-core/internal/domain"
 )
 
 // TestStoreIntegration exercises the real Postgres store: signup (tenant+user), login lookup,

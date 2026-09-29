@@ -9,11 +9,11 @@ import (
 	"os"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/trade1/platform-core/internal/api"
 	"github.com/trade1/platform-core/internal/config"
 	"github.com/trade1/platform-core/internal/domain"
 	"github.com/trade1/platform-core/internal/store"
-	"github.com/google/uuid"
 )
 
 const jwtSecret = "platform-core-test-secret-32+chars-xxxxx"
@@ -84,6 +84,21 @@ func TestAPIIntegration(t *testing.T) {
 	var me map[string]any
 	if code := do("GET", "/v1/auth/me", token, nil, &me); code != 200 || me["email"] != email {
 		t.Fatalf("me status %d email=%v", code, me["email"])
+	}
+	if me["account_type"] != "ai_company" {
+		t.Fatalf("default account_type = %v, want ai_company", me["account_type"])
+	}
+	// The account type chosen at signup is stored and returned; an unknown one is refused.
+	var trader map[string]any
+	if code := do("POST", "/v1/auth/signup", "", map[string]string{"email": "t+" + uuid.NewString() + "@acme.ai", "password": "pw-12345", "account_type": "trader"}, &trader); code != 201 {
+		t.Fatalf("trader signup = %d (%v)", code, trader)
+	}
+	var tme map[string]any
+	if do("GET", "/v1/auth/me", trader["token"].(string), nil, &tme); tme["account_type"] != "trader" {
+		t.Fatalf("trader /me account_type = %v", tme["account_type"])
+	}
+	if code := do("POST", "/v1/auth/signup", "", map[string]string{"email": "x+" + uuid.NewString() + "@acme.ai", "password": "pw-12345", "account_type": "admin"}, nil); code != 422 {
+		t.Fatalf("unknown account_type = %d, want 422", code)
 	}
 	// /me without a token → 401
 	if code := do("GET", "/v1/auth/me", "", nil, nil); code != 401 {

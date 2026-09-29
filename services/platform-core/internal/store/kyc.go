@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/trade1/platform-core/internal/domain"
 	"github.com/jackc/pgx/v5"
+	"github.com/trade1/platform-core/internal/domain"
 )
 
 // KYCRecord is a tenant's identity-verification state (F22). PII is intentionally minimal.

@@ -6,8 +6,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/trade1/platform-core/internal/domain"
 	"github.com/google/uuid"
+	"github.com/trade1/platform-core/internal/domain"
 )
 
 // TestConversationsIntegration exercises conversation CRUD plus tenant isolation against real Postgres

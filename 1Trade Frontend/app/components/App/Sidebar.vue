@@ -9,9 +9,9 @@
  * flat list. Groups are now real, labels are the default, and the rail collapses to icons for
  * anyone who wants the horizontal space back.
  *
- * One navigation for everyone: every surface is listed, so an AI company can open the paper exchange
- * and a trader can reach inference without switching views. (The account type chosen at signup still
- * decides where onboarding lands.)
+ * Items are tagged with the personas they belong to, and the account's type (chosen at signup, stored
+ * server-side — usePersona) filters the list: a trader sees the exchange, an AI company its console,
+ * inference and compute, a datacenter its capacity. There is no switcher; the account decides.
  */
 import {
   LayoutDashboard,
@@ -28,8 +28,10 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
 } from 'lucide-vue-next'
+import type { ActivePersona } from '~/composables/usePersona'
 
 const route = useRoute()
+const personaCx = usePersona()
 const sidebar = useSidebar()
 
 interface NavItem {
@@ -37,6 +39,7 @@ interface NavItem {
   label: string
   to: string
   match?: string
+  personas: ActivePersona[] | 'all'
 }
 interface NavGroup {
   /** Rendered as a section label when expanded; a hairline when collapsed. */
@@ -49,39 +52,46 @@ const groups: NavGroup[] = [
   {
     title: 'Overview',
     items: [
-      { icon: LayoutDashboard,  label: 'Console',    to: '/console' },
-      { icon: Briefcase,        label: 'Portfolio',  to: '/portfolio' },
-      { icon: Database,         label: 'Capacity',   to: '/datacenter', match: '/datacenter' },
+      { icon: LayoutDashboard,  label: 'Console',    to: '/console', personas: ['enterprise'] },
+      { icon: Briefcase,        label: 'Portfolio',  to: '/portfolio', personas: ['trader'] },
+      { icon: Database,         label: 'Capacity',   to: '/datacenter', match: '/datacenter', personas: ['partner'] },
     ],
   },
   {
     title: 'Build',
     items: [
-      { icon: MessageSquare,    label: 'Inference',  to: '/inference' },
-      { icon: Server,           label: 'Compute',    to: '/compute',   match: '/compute' },
+      { icon: MessageSquare,    label: 'Inference',  to: '/inference', personas: ['enterprise'] },
+      { icon: Server,           label: 'Compute',    to: '/compute',   match: '/compute', personas: ['enterprise'] },
     ],
   },
   {
     title: 'Trade',
     items: [
-      { icon: CandlestickChart, label: 'Trade',      to: '/trade' },
-      { icon: List,             label: 'Markets',    to: '/markets', match: '/markets' },
-      { icon: Clock,            label: 'History',    to: '/history' },
+      { icon: CandlestickChart, label: 'Trade',      to: '/trade', personas: ['trader'] },
+      { icon: List,             label: 'Markets',    to: '/markets', match: '/markets', personas: ['trader'] },
+      { icon: Clock,            label: 'History',    to: '/history', personas: ['trader'] },
     ],
   },
   {
     title: 'Research',
     items: [
-      { icon: TrendingUp,       label: 'Index',      to: '/benchmark' },
+      { icon: TrendingUp,       label: 'Index',      to: '/benchmark', personas: ['trader'] },
     ],
   },
   {
     title: 'Account',
     items: [
-      { icon: Wallet,           label: 'Wallet',     to: '/wallet',    match: '/wallet' },
+      { icon: Wallet,           label: 'Wallet',     to: '/wallet',    match: '/wallet', personas: 'all' },
     ],
   },
 ]
+
+/** Groups with at least one item for the account's persona. */
+const visibleGroups = computed(() =>
+  groups
+    .map((g) => ({ ...g, items: g.items.filter((i) => personaCx.belongsTo(i.personas)) }))
+    .filter((g) => g.items.length > 0),
+)
 
 const isActive = (item: { to: string; match?: string }) => {
   const target = item.match ?? item.to
@@ -97,7 +107,7 @@ const isActive = (item: { to: string; match?: string }) => {
     aria-label="App navigation"
   >
     <nav class="sb-scroll">
-      <div v-for="g in groups" :key="g.title" class="sb-group">
+      <div v-for="g in visibleGroups" :key="g.title" class="sb-group">
         <p class="sb-gtitle">{{ g.title }}</p>
         <ul class="sb-list">
           <li v-for="item in g.items" :key="item.to">

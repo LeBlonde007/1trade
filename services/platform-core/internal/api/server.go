@@ -140,9 +140,10 @@ func (s *Server) readyz(w http.ResponseWriter, r *http.Request) {
 }
 
 type credsBody struct {
-	Email      string `json:"email"`
-	Password   string `json:"password"`
-	TenantName string `json:"tenant_name"`
+	Email       string `json:"email"`
+	Password    string `json:"password"`
+	TenantName  string `json:"tenant_name"`
+	AccountType string `json:"account_type"` // signup only: trader | ai_company (default) | enterprise | datacenter
 }
 
 // signup creates an individual tenant + admin user and returns a token (auto-login).
@@ -150,6 +151,11 @@ func (s *Server) signup(w http.ResponseWriter, r *http.Request) {
 	var b credsBody
 	if err := json.NewDecoder(r.Body).Decode(&b); err != nil || b.Email == "" || b.Password == "" {
 		writeErr(w, http.StatusBadRequest, "bad_request", "email and password are required")
+		return
+	}
+	accountType, ok := domain.ParseAccountType(b.AccountType)
+	if !ok {
+		writeErr(w, http.StatusUnprocessableEntity, "bad_account_type", "account_type must be trader, ai_company, enterprise or datacenter")
 		return
 	}
 	hash, err := domain.HashPassword(b.Password)
@@ -161,7 +167,7 @@ func (s *Server) signup(w http.ResponseWriter, r *http.Request) {
 	if name == "" {
 		name = b.Email
 	}
-	u, err := s.st.Signup(r.Context(), b.Email, hash, name)
+	u, err := s.st.SignupAs(r.Context(), b.Email, hash, name, accountType)
 	if errors.Is(err, store.ErrEmailTaken) {
 		writeErr(w, http.StatusConflict, "email_taken", "that email is already registered")
 		return
@@ -173,7 +179,7 @@ func (s *Server) signup(w http.ResponseWriter, r *http.Request) {
 	slog.Info("audit: signup", "user_id", u.ID, "tenant_id", u.TenantID)
 	_, _ = s.st.WriteAudit(r.Context(), store.AuditEntry{
 		TenantID: u.TenantID, ActorID: u.ID, Action: "tenant.signup",
-		TargetType: "tenant", TargetID: u.TenantID, After: map[string]any{"email": b.Email}, IsPaper: u.IsPaper,
+		TargetType: "tenant", TargetID: u.TenantID, After: map[string]any{"email": b.Email, "account_type": accountType}, IsPaper: u.IsPaper,
 	})
 	if raw := s.issueVerifyToken(r, u.ID); raw != "" {
 		link := email.VerifyURL(s.cfg.AppBaseURL, raw)
@@ -285,7 +291,7 @@ func (s *Server) me(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"user_id": idn.UserID, "email": idn.Email, "tenant_id": idn.TenantID,
 		"org_id": idn.OrgID, "roles": idn.Roles, "is_paper": idn.IsPaper, "kyc_status": idn.KYCStatus,
-		"sub_account_id": nilIfEmpty(idn.SubAccountID), "mfa_enabled": idn.MFAEnabled,
+		"sub_account_id": nilIfEmpty(idn.SubAccountID), "mfa_enabled": idn.MFAEnabled, "account_type": idn.AccountType,
 	})
 }
 

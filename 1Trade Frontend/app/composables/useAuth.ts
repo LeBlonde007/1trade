@@ -12,7 +12,12 @@ export interface Identity {
   is_paper: boolean
   /** Tenant KYC state (F22) — gates real-money purchases. From /v1/auth/me. */
   kyc_status?: 'unverified' | 'pending' | 'verified' | 'rejected'
+  /** What the account signed up as (platform-core v1.11) — picks the product surface (usePersona). */
+  account_type?: AccountType
 }
+
+/** Account types (platform-core.yaml AccountType). */
+export type AccountType = 'trader' | 'ai_company' | 'enterprise' | 'datacenter'
 
 export function useAuth() {
   const user = useState<Identity | null>('auth:user', () => null)
@@ -39,9 +44,9 @@ export function useAuth() {
    * backend returns no session — signup yields `{ status: 'verification_required', email }` and the
    * caller shows a "check your inbox" screen. Otherwise it loads the identity (immediate login).
    */
-  async function signup(email: string, password: string, tenant_name?: string) {
+  async function signup(email: string, password: string, tenant_name?: string, account_type?: AccountType) {
     const res = await $fetch<Identity | { status: string; email: string }>('/api/auth/signup', {
-      method: 'POST', body: { email, password, tenant_name },
+      method: 'POST', body: { email, password, tenant_name, account_type },
     })
     if (res && 'status' in res && res.status === 'verification_required') {
       user.value = null

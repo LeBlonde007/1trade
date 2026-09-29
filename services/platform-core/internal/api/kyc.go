@@ -110,8 +110,8 @@ func (s *Server) submitKYC(w http.ResponseWriter, r *http.Request) {
 	slog.Info("audit: kyc submitted", "tenant_id", p.TenantID, "status", newStatus)
 	_, _ = s.st.WriteAudit(r.Context(), store.AuditEntry{
 		TenantID: p.TenantID, ActorID: p.UserID, Action: action, TargetType: "tenant", TargetID: p.TenantID,
-		Before: map[string]any{"status": string(cur.Status)},
-		After:  map[string]any{"status": string(newStatus), "country": country, "entity_type": b.EntityType},
+		Before:  map[string]any{"status": string(cur.Status)},
+		After:   map[string]any{"status": string(newStatus), "country": country, "entity_type": b.EntityType},
 		IsPaper: p.IsPaper,
 	})
 	latest, _, _ := s.st.GetKYC(r.Context(), p.TenantID)
